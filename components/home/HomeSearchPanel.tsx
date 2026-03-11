@@ -2,18 +2,21 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, MapPin, Loader2, ChevronDown, X, Users, Building2 } from 'lucide-react';
-import { locationsApi, usersApi } from '@/lib/api';
+import {
+  Search, MapPin, Loader2, X, Users, Building2,
+  ArrowLeft, ChevronRight, SlidersHorizontal,
+} from 'lucide-react';
+import { locationsApi } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CATEGORY_TABS = [
-  { value: 'buy',        label: 'Buy' },
-  { value: 'rent',       label: 'Rent' },
-  { value: 'pg',         label: 'PG' },
-  { value: 'commercial', label: 'Commercial' },
-  { value: 'agents',     label: 'Agents', icon: Users },
-  { value: '',           label: 'New Projects', href: '/new-projects' },
+  { value: 'buy',        label: 'Buy',         emoji: '🏠' },
+  { value: 'rent',       label: 'Rent',        emoji: '🔑' },
+  { value: 'pg',         label: 'PG',          emoji: '🛏️' },
+  { value: 'commercial', label: 'Commercial',  emoji: '🏢' },
+  { value: 'agents',     label: 'Agents',      emoji: '👤' },
 ];
 
 const BHK_OPTIONS = [
@@ -23,35 +26,409 @@ const BHK_OPTIONS = [
 ];
 
 const BUDGET_OPTIONS_BUY = [
-  { label: 'Under 25 Lac', min: 0, max: 2500000 },
-  { label: '25 - 50 Lac', min: 2500000, max: 5000000 },
-  { label: '50 Lac - 1 Cr', min: 5000000, max: 10000000 },
-  { label: '1 - 2 Cr', min: 10000000, max: 20000000 },
-  { label: '2 - 5 Cr', min: 20000000, max: 50000000 },
-  { label: 'Above 5 Cr', min: 50000000, max: 0 },
+  { label: 'Under 25L',    min: 0,        max: 2500000  },
+  { label: '25L – 50L',   min: 2500000,  max: 5000000  },
+  { label: '50L – 1Cr',   min: 5000000,  max: 10000000 },
+  { label: '1Cr – 2Cr',   min: 10000000, max: 20000000 },
+  { label: '2Cr – 5Cr',   min: 20000000, max: 50000000 },
+  { label: 'Above 5Cr',   min: 50000000, max: 0        },
 ];
 
 const BUDGET_OPTIONS_RENT = [
-  { label: 'Under ₹10K', min: 0, max: 10000 },
-  { label: '₹10K - 20K', min: 10000, max: 20000 },
-  { label: '₹20K - 40K', min: 20000, max: 40000 },
-  { label: '₹40K - 75K', min: 40000, max: 75000 },
-  { label: 'Above ₹75K', min: 75000, max: 0 },
+  { label: 'Under ₹10K',  min: 0,     max: 10000 },
+  { label: '₹10K – 20K', min: 10000, max: 20000  },
+  { label: '₹20K – 40K', min: 20000, max: 40000  },
+  { label: '₹40K – 75K', min: 40000, max: 75000  },
+  { label: 'Above ₹75K', min: 75000, max: 0      },
 ];
 
 const PROPERTY_TYPES_BUY = [
-  { value: 'apartment', label: 'Apartment' }, { value: 'villa', label: 'Villa' },
-  { value: 'plot', label: 'Plot' },           { value: 'house', label: 'House' },
-  { value: 'penthouse', label: 'Penthouse' }, { value: 'studio', label: 'Studio' },
+  { value: 'apartment', label: 'Apartment' }, { value: 'villa',     label: 'Villa'   },
+  { value: 'plot',      label: 'Plot'      }, { value: 'house',     label: 'House'   },
+  { value: 'penthouse', label: 'Penthouse' }, { value: 'studio',    label: 'Studio'  },
 ];
 
 const PROPERTY_TYPES_COMMERCIAL = [
-  { value: 'commercial_office', label: 'Office Space' },
-  { value: 'commercial_shop', label: 'Shop' },
-  { value: 'commercial_warehouse', label: 'Warehouse' },
+  { value: 'commercial_office',    label: 'Office Space' },
+  { value: 'commercial_shop',      label: 'Shop'         },
+  { value: 'commercial_warehouse', label: 'Warehouse'    },
 ];
 
-// ─── Agent Search Panel ───────────────────────────────────────────────────────
+const POPULAR_SEARCHES = [
+  '2 BHK in Mumbai', 'Villa in Goa', 'Office Space Delhi',
+  'PG in Bangalore', 'Plots in Hyderabad', 'Flat in Pune',
+];
+
+// ─── Mobile Full-Screen Search ────────────────────────────────────────────────
+
+interface MobileFullSearchProps {
+  initialCategory: string;
+  onClose: () => void;
+}
+
+function MobileFullSearch({ initialCategory, onClose }: MobileFullSearchProps) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<NodeJS.Timeout>();
+
+  const [category, setCategory] = useState(initialCategory);
+  const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedBHK, setSelectedBHK] = useState<string[]>([]);
+  const [selectedBudget, setSelectedBudget] = useState<{ min: number; max: number; label: string } | null>(null);
+  const [selectedType, setSelectedType] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  const isAgentMode = category === 'agents';
+  const budgetOptions = category === 'rent' || category === 'pg' ? BUDGET_OPTIONS_RENT : BUDGET_OPTIONS_BUY;
+  const typeOptions = category === 'commercial' ? PROPERTY_TYPES_COMMERCIAL : PROPERTY_TYPES_BUY;
+  const showBHK = !isAgentMode && category !== 'commercial';
+
+  // Slide-up animation on mount
+  useEffect(() => {
+    // Lock body scroll
+    document.body.style.overflow = 'hidden';
+    // Small delay to trigger CSS transition
+    const t = setTimeout(() => setMounted(true), 10);
+    // Focus input
+    const f = setTimeout(() => inputRef.current?.focus(), 150);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(f);
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  // Hardware back button / swipe-back support
+  useEffect(() => {
+    const handlePop = () => onClose();
+    window.history.pushState({ searchOverlay: true }, '');
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, [onClose]);
+
+  const fetchSuggestions = async (val: string) => {
+    if (!val.trim() || val.length < 2) { setSuggestions([]); return; }
+    setLoading(true);
+    try {
+      const { data } = await locationsApi.search(val);
+      setSuggestions(data.slice(0, 7));
+    } catch { setSuggestions([]); }
+    finally { setLoading(false); }
+  };
+
+  const handleCategoryChange = (cat: string) => {
+    setCategory(cat);
+    setSelectedBHK([]);
+    setSelectedBudget(null);
+    setSelectedType('');
+  };
+
+  const handleClose = () => {
+    // Pop the history state we pushed
+    if (window.history.state?.searchOverlay) window.history.back();
+    else onClose();
+  };
+
+  const handleSearch = (city?: string, locality?: string, state?: string) => {
+    const c = city || query;
+    if (isAgentMode) {
+      const params = new URLSearchParams();
+      if (c) params.set('city', c);
+      if (state) params.set('state', state);
+      router.push(`/agents?${params.toString()}`);
+    } else {
+      const params = new URLSearchParams();
+      params.set('category', category);
+      if (c) params.set('city', c);
+      if (locality) params.set('locality', locality);
+      if (selectedBHK.length > 0) params.set('bedrooms', selectedBHK.join(','));
+      if (selectedBudget) {
+        if (selectedBudget.min) params.set('minPrice', String(selectedBudget.min));
+        if (selectedBudget.max) params.set('maxPrice', String(selectedBudget.max));
+      }
+      if (selectedType) params.set('type', selectedType);
+      router.push(`/properties?${params.toString()}`);
+    }
+    onClose();
+  };
+
+  const activeFiltersCount = [
+    selectedType,
+    selectedBHK.length > 0,
+    selectedBudget,
+  ].filter(Boolean).length;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={cn(
+          'fixed inset-0 bg-black/40 z-[299] transition-opacity duration-300',
+          mounted ? 'opacity-100' : 'opacity-0'
+        )}
+        onClick={handleClose}
+      />
+
+      {/* Full-screen panel — slides up */}
+      <div
+        className={cn(
+          'fixed inset-x-0 bottom-0 z-[300] bg-white flex flex-col transition-transform duration-300 ease-out',
+          'rounded-t-3xl shadow-2xl',
+          mounted ? 'translate-y-0' : 'translate-y-full'
+        )}
+        style={{ height: '92dvh', maxHeight: '92vh' }}
+      >
+        {/* ── Top bar (always visible, keyboard-safe) ── */}
+        <div className="flex-shrink-0 px-4 pt-4 pb-3">
+          {/* Drag handle */}
+          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+
+          {/* Header row */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleClose}
+              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 active:bg-gray-200 transition-colors"
+              aria-label="Close"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-700" />
+            </button>
+
+            {/* Search input — always at top */}
+            <div className="flex-1 flex items-center gap-2 bg-gray-100 rounded-2xl px-4 py-3 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-400 transition-all">
+              <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                placeholder={isAgentMode ? 'City or state...' : 'City, locality, society...'}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  clearTimeout(debounceRef.current);
+                  debounceRef.current = setTimeout(() => fetchSuggestions(e.target.value), 280);
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                className="flex-1 outline-none text-sm bg-transparent text-gray-900 placeholder-gray-400"
+              />
+              {loading && <Loader2 className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />}
+              {query && !loading && (
+                <button
+                  onClick={() => { setQuery(''); setSuggestions([]); inputRef.current?.focus(); }}
+                  className="flex-shrink-0"
+                >
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Category chips */}
+          <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
+            {CATEGORY_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => handleCategoryChange(tab.value)}
+                className={cn(
+                  'flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all active:scale-95',
+                  category === tab.value
+                    ? 'bg-primary-600 text-white shadow-md shadow-primary-600/30'
+                    : 'bg-gray-100 text-gray-600'
+                )}
+              >
+                <span className="text-base leading-none">{tab.emoji}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Scrollable body ── */}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          {/* Location suggestions (when typing) */}
+          {query && suggestions.length > 0 && (
+            <div className="px-4 pb-2">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Suggestions</p>
+              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 active:bg-gray-100 text-left transition-colors border-b border-gray-50 last:border-0"
+                    onClick={() => {
+                      const display = s.locality ? `${s.locality}, ${s.city}` : s.city;
+                      setQuery(display);
+                      setSuggestions([]);
+                      handleSearch(s.city, s.locality, s.state);
+                    }}
+                  >
+                    <div className="w-9 h-9 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-4 h-4 text-primary-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 truncate">{s.locality || s.city}</div>
+                      {s.locality && <div className="text-xs text-gray-400">{s.city}, {s.state}</div>}
+                      {!s.locality && s.state && <div className="text-xs text-gray-400">{s.state}</div>}
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Popular searches (when input is empty) */}
+          {!query && (
+            <div className="px-4 pb-3">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Popular Searches</p>
+              <div className="flex flex-wrap gap-2">
+                {POPULAR_SEARCHES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => { setQuery(s); handleSearch(s); }}
+                    className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-200 text-gray-700 text-sm font-medium px-3 py-2 rounded-xl transition-colors"
+                  >
+                    <Search className="w-3 h-3 text-gray-400" />
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Filters section */}
+          {!isAgentMode && (
+            <div className="px-4 pb-6 space-y-5">
+              {/* Divider */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-gray-100" />
+                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  <SlidersHorizontal className="w-3 h-3" />
+                  Filters
+                </div>
+                <div className="flex-1 h-px bg-gray-100" />
+              </div>
+
+              {/* Property Type */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2.5">Property Type</label>
+                <div className="flex flex-wrap gap-2">
+                  {typeOptions.map((t) => (
+                    <button
+                      key={t.value}
+                      onClick={() => setSelectedType(selectedType === t.value ? '' : t.value)}
+                      className={cn(
+                        'px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all active:scale-95',
+                        selectedType === t.value
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 text-gray-600 bg-white'
+                      )}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* BHK */}
+              {showBHK && (
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2.5">BHK</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {BHK_OPTIONS.map((bhk) => (
+                      <button
+                        key={bhk.value}
+                        onClick={() => setSelectedBHK(prev =>
+                          prev.includes(bhk.value) ? prev.filter(b => b !== bhk.value) : [...prev, bhk.value]
+                        )}
+                        className={cn(
+                          'px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all active:scale-95',
+                          selectedBHK.includes(bhk.value)
+                            ? 'border-primary-500 bg-primary-50 text-primary-700'
+                            : 'border-gray-200 text-gray-600 bg-white'
+                        )}
+                      >
+                        {bhk.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Budget */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2.5">Budget</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {budgetOptions.map((b) => (
+                    <button
+                      key={b.label}
+                      onClick={() => setSelectedBudget(selectedBudget?.label === b.label ? null : { ...b })}
+                      className={cn(
+                        'px-3 py-3 rounded-xl text-sm font-semibold border-2 transition-all text-left active:scale-95',
+                        selectedBudget?.label === b.label
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 text-gray-700 bg-white'
+                      )}
+                    >
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Agent mode — extra padding at bottom */}
+          {isAgentMode && <div className="h-6" />}
+        </div>
+
+        {/* ── Bottom search button (always visible) ── */}
+        <div className="flex-shrink-0 px-4 pb-6 pt-3 bg-white border-t border-gray-100">
+          {/* Active filter summary */}
+          {activeFiltersCount > 0 && (
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              {selectedType && (
+                <span className="flex items-center gap-1 bg-primary-50 text-primary-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  {typeOptions.find(t => t.value === selectedType)?.label}
+                  <button onClick={() => setSelectedType('')}><X className="w-3 h-3" /></button>
+                </span>
+              )}
+              {selectedBHK.map(b => (
+                <span key={b} className="flex items-center gap-1 bg-primary-50 text-primary-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  {b} BHK
+                  <button onClick={() => setSelectedBHK(p => p.filter(x => x !== b))}><X className="w-3 h-3" /></button>
+                </span>
+              ))}
+              {selectedBudget && (
+                <span className="flex items-center gap-1 bg-primary-50 text-primary-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  {selectedBudget.label}
+                  <button onClick={() => setSelectedBudget(null)}><X className="w-3 h-3" /></button>
+                </span>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={() => handleSearch()}
+            className="w-full py-4 bg-primary-600 active:bg-primary-700 text-white rounded-2xl font-bold text-base transition-all active:scale-[0.98] flex items-center justify-center gap-2.5 shadow-lg shadow-primary-600/30"
+          >
+            {isAgentMode ? <Users className="w-5 h-5" /> : <Search className="w-5 h-5" />}
+            {isAgentMode
+              ? (query ? `Find Agents in ${query}` : 'Find All Agents')
+              : (query ? `Search in ${query}` : 'Search Properties')
+            }
+            {activeFiltersCount > 0 && (
+              <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                +{activeFiltersCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Desktop: Agent Search Panel ─────────────────────────────────────────────
 
 function AgentSearchPanel() {
   const router = useRouter();
@@ -81,7 +458,6 @@ function AgentSearchPanel() {
 
   return (
     <div className="flex flex-wrap gap-2 items-center">
-      {/* Location Input */}
       <div className="relative flex-1 min-w-[250px]">
         <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100 bg-white">
           <MapPin className="w-4 h-4 text-primary-500 flex-shrink-0 mr-2" />
@@ -106,16 +482,13 @@ function AgentSearchPanel() {
             </button>
           )}
         </div>
-
         {showSug && suggestions.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
             {suggestions.map((s, i) => (
-              <button
-                key={i}
+              <button key={i}
                 className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-left transition-colors"
                 onClick={() => {
-                  const display = s.locality ? `${s.locality}, ${s.city}` : s.city;
-                  setQuery(display);
+                  setQuery(s.locality ? `${s.locality}, ${s.city}` : s.city);
                   handleSearch(s.city, s.state);
                 }}
               >
@@ -129,8 +502,6 @@ function AgentSearchPanel() {
           </div>
         )}
       </div>
-
-      {/* Search Button */}
       <button
         onClick={() => handleSearch(query)}
         className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-colors shadow-lg shadow-primary-600/30 flex-shrink-0"
@@ -142,7 +513,7 @@ function AgentSearchPanel() {
   );
 }
 
-// ─── Property Search Panel ────────────────────────────────────────────────────
+// ─── Desktop: Property Search Panel ──────────────────────────────────────────
 
 interface PropertySearchPanelProps {
   category: string;
@@ -165,20 +536,17 @@ function PropertySearchPanel({ category, onSearch }: PropertySearchPanelProps) {
   const budgetRef = useRef<HTMLDivElement>(null);
   const typeRef = useRef<HTMLDivElement>(null);
 
-  // Reset filters when category changes
   useEffect(() => {
-    setSelectedBHK([]);
-    setSelectedBudget(null);
-    setSelectedType('');
+    setSelectedBHK([]); setSelectedBudget(null); setSelectedType('');
   }, [category]);
 
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
+    const h = (e: MouseEvent) => {
       if (budgetRef.current && !budgetRef.current.contains(e.target as Node)) setShowBudgetDropdown(false);
       if (typeRef.current && !typeRef.current.contains(e.target as Node)) setShowTypeDropdown(false);
     };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
   }, []);
 
   const fetchSuggestions = async (val: string) => {
@@ -202,7 +570,7 @@ function PropertySearchPanel({ category, onSearch }: PropertySearchPanelProps) {
 
   return (
     <div className="flex flex-wrap gap-2">
-      {/* 1. Property Type */}
+      {/* Property Type */}
       <div ref={typeRef} className="relative">
         <button
           onClick={() => { setShowTypeDropdown(p => !p); setShowBudgetDropdown(false); }}
@@ -212,7 +580,7 @@ function PropertySearchPanel({ category, onSearch }: PropertySearchPanelProps) {
           <span className={selectedType ? 'text-primary-700 font-medium' : 'text-gray-500'}>
             {typeOptions.find(t => t.value === selectedType)?.label || 'Property Type'}
           </span>
-          <ChevronDown className="w-4 h-4 text-gray-400 ml-auto" />
+          <X className={cn('w-3 h-3 text-gray-400 ml-auto transition-transform', showTypeDropdown ? 'rotate-0' : 'rotate-45')} />
         </button>
         {showTypeDropdown && (
           <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 min-w-[180px] overflow-hidden">
@@ -230,21 +598,20 @@ function PropertySearchPanel({ category, onSearch }: PropertySearchPanelProps) {
         )}
       </div>
 
-      {/* 2. BHK */}
+      {/* BHK */}
       {showBHK && (
         <div className="flex items-center gap-1 border border-gray-200 rounded-xl px-3 py-2.5 bg-white">
           {BHK_OPTIONS.slice(0, 4).map((bhk) => (
             <button key={bhk.value}
               onClick={() => setSelectedBHK(prev => prev.includes(bhk.value) ? prev.filter(b => b !== bhk.value) : [...prev, bhk.value])}
-              className={`text-xs px-2 py-1 rounded-lg font-medium transition-all ${
-                selectedBHK.includes(bhk.value) ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-              }`}>{bhk.label}
+              className={`text-xs px-2 py-1 rounded-lg font-medium transition-all ${selectedBHK.includes(bhk.value) ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+              {bhk.label}
             </button>
           ))}
         </div>
       )}
 
-      {/* 3. Budget */}
+      {/* Budget */}
       <div ref={budgetRef} className="relative">
         <button
           onClick={() => { setShowBudgetDropdown(p => !p); setShowTypeDropdown(false); }}
@@ -253,7 +620,7 @@ function PropertySearchPanel({ category, onSearch }: PropertySearchPanelProps) {
           <span className={selectedBudget ? 'text-primary-700 font-medium' : 'text-gray-500'}>
             {selectedBudget?.label || 'Budget'}
           </span>
-          <ChevronDown className="w-4 h-4 text-gray-400 ml-auto" />
+          <X className={cn('w-3 h-3 text-gray-400 ml-auto', showBudgetDropdown ? 'rotate-0' : 'rotate-45')} />
         </button>
         {showBudgetDropdown && (
           <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 min-w-[200px] overflow-hidden">
@@ -271,7 +638,7 @@ function PropertySearchPanel({ category, onSearch }: PropertySearchPanelProps) {
         )}
       </div>
 
-      {/* 4. Location (last — user decides location after property criteria) */}
+      {/* Location */}
       <div className="relative flex-1 min-w-[200px]">
         <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100 bg-white">
           <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mr-2" />
@@ -294,7 +661,6 @@ function PropertySearchPanel({ category, onSearch }: PropertySearchPanelProps) {
             </button>
           )}
         </div>
-
         {showSuggestions && suggestions.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
             {suggestions.map((s, i) => (
@@ -315,7 +681,7 @@ function PropertySearchPanel({ category, onSearch }: PropertySearchPanelProps) {
         )}
       </div>
 
-      {/* 5. Search Button */}
+      {/* Search */}
       <button
         onClick={() => buildAndSearch()}
         className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-colors shadow-lg shadow-primary-600/30 flex-shrink-0"
@@ -323,207 +689,6 @@ function PropertySearchPanel({ category, onSearch }: PropertySearchPanelProps) {
         <Search className="w-4 h-4" />
         Search
       </button>
-    </div>
-  );
-}
-
-// ─── Mobile Search Drawer ─────────────────────────────────────────────────────
-
-interface MobileSearchDrawerProps {
-  category: string;
-  setCategory: (c: string) => void;
-  onClose: () => void;
-}
-
-function MobileSearchDrawer({ category, setCategory, onClose }: MobileSearchDrawerProps) {
-  const router = useRouter();
-  const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [showSug, setShowSug] = useState(false);
-  const [selectedBHK, setSelectedBHK] = useState<string[]>([]);
-  const [selectedBudget, setSelectedBudget] = useState<{ min: number; max: number; label: string } | null>(null);
-  const [selectedType, setSelectedType] = useState<string>('');
-  const debounceRef = useRef<NodeJS.Timeout>();
-
-  const isAgentMode = category === 'agents';
-  const budgetOptions = category === 'rent' || category === 'pg' ? BUDGET_OPTIONS_RENT : BUDGET_OPTIONS_BUY;
-  const typeOptions = category === 'commercial' ? PROPERTY_TYPES_COMMERCIAL : PROPERTY_TYPES_BUY;
-  const showBHK = !isAgentMode && category !== 'commercial';
-
-  const fetchSuggestions = async (val: string) => {
-    if (!val.trim() || val.length < 2) { setSuggestions([]); return; }
-    setLoading(true);
-    try {
-      const { data } = await locationsApi.search(val);
-      setSuggestions(data.slice(0, 6));
-    } catch { setSuggestions([]); }
-    finally { setLoading(false); }
-  };
-
-  const handleSearch = (city?: string, locality?: string, state?: string) => {
-    if (isAgentMode) {
-      const params = new URLSearchParams();
-      if (city) params.set('city', city);
-      if (state) params.set('state', state);
-      router.push(`/agents?${params.toString()}`);
-    } else {
-      const params = new URLSearchParams();
-      params.set('category', category);
-      const c = city || query;
-      if (c) params.set('city', c);
-      if (locality) params.set('locality', locality);
-      if (selectedBHK.length > 0) params.set('bedrooms', selectedBHK.join(','));
-      if (selectedBudget) {
-        if (selectedBudget.min) params.set('minPrice', String(selectedBudget.min));
-        if (selectedBudget.max) params.set('maxPrice', String(selectedBudget.max));
-      }
-      if (selectedType) params.set('type', selectedType);
-      router.push(`/properties?${params.toString()}`);
-    }
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-white z-[200] flex flex-col overflow-hidden">
-      {/* Top bar */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-gray-100 flex-shrink-0">
-        <button onClick={onClose}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 flex-shrink-0">
-          <X className="w-5 h-5 text-gray-600" />
-        </button>
-        <h2 className="font-bold text-gray-900 text-lg">
-          {isAgentMode ? 'Find Agents' : 'Find Your Property'}
-        </h2>
-      </div>
-
-      {/* Category pills */}
-      <div className="flex gap-2 px-4 py-3 overflow-x-auto border-b border-gray-100 flex-shrink-0" style={{ scrollbarWidth: 'none' }}>
-        {CATEGORY_TABS.filter(t => !t.href).map((tab) => (
-          <button key={tab.value}
-            onClick={() => { setCategory(tab.value); setSelectedBHK([]); setSelectedBudget(null); setSelectedType(''); }}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-5 py-2 rounded-full text-sm font-semibold transition-all ${
-              category === tab.value ? 'bg-primary-600 text-white shadow-md' : 'bg-gray-100 text-gray-600'
-            }`}
-          >
-            {tab.icon && <tab.icon className="w-3.5 h-3.5" />}
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Scrollable form */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
-        {/* Property Type (if not agents) */}
-        {!isAgentMode && (
-          <div>
-            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Property Type</label>
-            <div className="flex gap-2 flex-wrap">
-              {typeOptions.map((t) => (
-                <button key={t.value}
-                  onClick={() => setSelectedType(selectedType === t.value ? '' : t.value)}
-                  className={`px-3 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
-                    selectedType === t.value ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600'
-                  }`}>{t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* BHK */}
-        {showBHK && (
-          <div>
-            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">BHK</label>
-            <div className="flex gap-2 flex-wrap">
-              {BHK_OPTIONS.map((bhk) => (
-                <button key={bhk.value}
-                  onClick={() => setSelectedBHK(prev => prev.includes(bhk.value) ? prev.filter(b => b !== bhk.value) : [...prev, bhk.value])}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
-                    selectedBHK.includes(bhk.value) ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                  }`}>{bhk.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Budget (if not agents) */}
-        {!isAgentMode && (
-          <div>
-            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">Budget</label>
-            <div className="grid grid-cols-2 gap-2">
-              {budgetOptions.map((b) => (
-                <button key={b.label}
-                  onClick={() => setSelectedBudget(selectedBudget?.label === b.label ? null : { ...b })}
-                  className={`px-3 py-2.5 rounded-xl text-sm font-medium border-2 transition-all text-left ${
-                    selectedBudget?.label === b.label ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-700'
-                  }`}>{b.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Location (always last) */}
-        <div>
-          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">
-            {isAgentMode ? 'Location (City / State)' : 'Location'}
-          </label>
-          <div className="relative">
-            <div className="flex items-center border-2 border-gray-200 rounded-2xl px-4 py-3 focus-within:border-primary-400">
-              <MapPin className="w-4 h-4 text-gray-400 mr-3 flex-shrink-0" />
-              <input type="text"
-                placeholder={isAgentMode ? 'City or state name...' : 'City, locality, society...'}
-                value={query} autoFocus
-                onChange={(e) => {
-                  setQuery(e.target.value); setShowSug(true);
-                  clearTimeout(debounceRef.current);
-                  debounceRef.current = setTimeout(() => fetchSuggestions(e.target.value), 300);
-                }}
-                className="flex-1 outline-none text-sm bg-transparent"
-              />
-              {loading && <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />}
-              {query && !loading && (
-                <button onClick={() => { setQuery(''); setSuggestions([]); }}>
-                  <X className="w-4 h-4 text-gray-400" />
-                </button>
-              )}
-            </div>
-
-            {showSug && suggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-                {suggestions.map((s, i) => (
-                  <button key={i}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-left transition-colors"
-                    onClick={() => {
-                      const display = s.locality ? `${s.locality}, ${s.city}` : s.city;
-                      setQuery(display); setShowSug(false);
-                      handleSearch(s.city, s.locality, s.state);
-                    }}>
-                    <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                    <div>
-                      <div className="text-sm font-medium">{s.locality || s.city}</div>
-                      {s.locality && <div className="text-xs text-gray-400">{s.city}, {s.state}</div>}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom search button */}
-      <div className="p-4 border-t border-gray-100 bg-white flex-shrink-0">
-        <button
-          onClick={() => handleSearch()}
-          className="w-full py-4 bg-primary-600 text-white rounded-2xl font-bold text-base hover:bg-primary-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-primary-600/30"
-        >
-          {isAgentMode ? <Users className="w-5 h-5" /> : <Search className="w-5 h-5" />}
-          {isAgentMode ? 'Find Agents' : 'Search Properties'}
-        </button>
-      </div>
     </div>
   );
 }
@@ -545,83 +710,93 @@ export default function HomeSearchPanel() {
     router.push(`/properties?${params.toString()}`);
   }, [category, router]);
 
-  const CategoryPills = () => (
-    <div className="flex gap-1">
-      {CATEGORY_TABS.map((tab) => (
-        <button
-          key={tab.label}
-          onClick={() => {
-            if (tab.href) { router.push(tab.href); return; }
-            setCategory(tab.value);
-          }}
-          className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all ${
-            category === tab.value && !tab.href
-              ? 'bg-white text-primary-700 shadow-sm'
-              : 'bg-white/20 text-white hover:bg-white/30'
-          }`}
-        >
-          {tab.icon && <tab.icon className="w-3.5 h-3.5" />}
-          {tab.label}
-        </button>
-      ))}
-    </div>
-  );
+  const activeCat = CATEGORY_TABS.find(t => t.value === category);
 
   return (
     <div className="w-full max-w-5xl mx-auto">
-      {/* ── Mobile ──────────────────────────────────────── */}
+
+      {/* ── Mobile: single compact trigger ── */}
       <div className="sm:hidden">
-        {/* Category pills */}
-        <div className="flex gap-1 overflow-x-auto pb-0" style={{ scrollbarWidth: 'none' }}>
+        {/* One-tap search trigger */}
+        <button
+          onClick={() => setShowMobileSearch(true)}
+          className="w-full flex items-center gap-3 bg-white rounded-2xl shadow-2xl shadow-black/20 px-4 py-4 text-left active:scale-[0.98] transition-transform"
+        >
+          {/* Search icon */}
+          <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Search className="w-5 h-5 text-primary-600" />
+          </div>
+
+          {/* Placeholder text */}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-gray-800">
+              {isAgentMode ? 'Find Agents' : 'Search Properties'}
+            </div>
+            <div className="text-xs text-gray-400 truncate">
+              {isAgentMode ? 'City, locality or state...' : 'City, locality, society...'}
+            </div>
+          </div>
+
+          {/* Active category chip */}
+          <span className={cn(
+            'flex-shrink-0 flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full',
+            'bg-primary-600 text-white'
+          )}>
+            <span>{activeCat?.emoji}</span>
+            {activeCat?.label}
+          </span>
+        </button>
+
+        {/* Category quick-select row */}
+        <div className="flex gap-1.5 mt-3 overflow-x-auto no-scrollbar pb-1">
           {CATEGORY_TABS.map((tab) => (
             <button
-              key={tab.label}
-              onClick={() => {
-                if (tab.href) { router.push(tab.href); return; }
-                setCategory(tab.value);
-              }}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all ${
-                category === tab.value && !tab.href
+              key={tab.value}
+              onClick={() => setCategory(tab.value)}
+              className={cn(
+                'flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95',
+                category === tab.value
                   ? 'bg-white text-primary-700 shadow-sm'
-                  : 'bg-white/20 text-white hover:bg-white/30'
-              }`}
+                  : 'bg-white/20 text-white'
+              )}
             >
-              {tab.icon && <tab.icon className="w-3.5 h-3.5" />}
-              {tab.label}
+              {tab.emoji} {tab.label}
             </button>
           ))}
         </div>
 
-        <div className="bg-white rounded-b-2xl rounded-tr-2xl shadow-2xl p-3">
-          <button
-            onClick={() => setShowMobileSearch(true)}
-            className="w-full flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-3 text-left"
-          >
-            {isAgentMode
-              ? <Users className="w-4 h-4 text-primary-500 flex-shrink-0" />
-              : <Search className="w-4 h-4 text-primary-500 flex-shrink-0" />
-            }
-            <span className="text-gray-400 text-sm flex-1">
-              {isAgentMode ? 'Search agents by city or state...' : 'Search city, locality, society...'}
-            </span>
-            <span className="text-xs text-primary-600 font-semibold bg-primary-50 px-2 py-1 rounded-lg flex-shrink-0">
-              {isAgentMode ? 'Find' : 'Search'}
-            </span>
-          </button>
-        </div>
-
+        {/* Full-screen search overlay */}
         {showMobileSearch && (
-          <MobileSearchDrawer
-            category={category}
-            setCategory={setCategory}
+          <MobileFullSearch
+            initialCategory={category}
             onClose={() => setShowMobileSearch(false)}
           />
         )}
       </div>
 
-      {/* ── Desktop ─────────────────────────────────────── */}
+      {/* ── Desktop ── */}
       <div className="hidden sm:block">
-        <CategoryPills />
+        {/* Category tabs */}
+        <div className="flex gap-1 overflow-x-auto no-scrollbar">
+          {[...CATEGORY_TABS, { value: '', label: 'New Projects', emoji: '🏗️' }].map((tab) => (
+            <button
+              key={tab.label}
+              onClick={() => {
+                if (!tab.value) { router.push('/new-projects'); return; }
+                setCategory(tab.value);
+              }}
+              className={cn(
+                'flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all',
+                category === tab.value && tab.value
+                  ? 'bg-white text-primary-700 shadow-sm'
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              )}
+            >
+              {tab.emoji} {tab.label}
+            </button>
+          ))}
+        </div>
+
         <div className="bg-white rounded-b-2xl rounded-tr-2xl shadow-2xl p-3">
           {isAgentMode ? (
             <AgentSearchPanel />
