@@ -101,28 +101,9 @@ function StateSelector({ compact = false }: { compact?: boolean }) {
 
   useEffect(() => {
     const saved = loadLocationFromLS();
-    if (saved.state) {
-      if (!selectedState) {
-        dispatch(setSelectedLocation({ state: saved.state, stateId: saved.stateId }));
-      }
-      return;
+    if (saved.state && !selectedState) {
+      dispatch(setSelectedLocation({ state: saved.state, stateId: saved.stateId }));
     }
-    setDetecting(true);
-    detectLocation()
-      .then((loc) => {
-        if (!loc.state) return;
-        locationsApi.getStates().then(r => {
-          const data = r.data;
-          const arr: { id: string; name: string }[] = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-          const match = arr.find(s => s.name.toLowerCase() === loc.state.toLowerCase());
-          if (match) {
-            dispatch(setSelectedLocation({ state: match.name, stateId: match.id }));
-            saveLocationToLS(match.name, match.id);
-          }
-        }).catch(() => {});
-      })
-      .catch(() => {})
-      .finally(() => setDetecting(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -18,6 +18,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'think4buysale.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
     ],
   },
   async rewrites() {

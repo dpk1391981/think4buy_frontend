@@ -15,6 +15,9 @@ import {
 } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { useWishlist } from '@/hooks/useWishlist';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAppDispatch } from '@/lib/store';
+import { openAuthModal } from '@/lib/store/slices/uiSlice';
 
 interface PropertyCardProps {
   property: Property;
@@ -37,6 +40,8 @@ const PLAN_BADGE: Record<string, { label: string; cls: string }> = {
 
 export default function PropertyCard({ property, className, listView }: PropertyCardProps) {
   const { isSaved, toggle } = useWishlist();
+  const { user } = useAuth();
+  const dispatch = useAppDispatch();
   const primaryImage = getPrimaryImage(property.images);
   const saved = isSaved(property.id);
   const plan = property.listingPlan && PLAN_BADGE[property.listingPlan];
@@ -52,6 +57,10 @@ export default function PropertyCard({ property, className, listView }: Property
   const handleWishlist = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!user) {
+      dispatch(openAuthModal('login'));
+      return;
+    }
     toggle(property.id);
   };
 
