@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   Search, MapPin, Loader2, X, Users, Building2,
@@ -113,18 +114,16 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
     onClose();
   };
 
-  return (
-    /* ── Full-screen panel ─────────────────────────────────────────────────
-       LAYOUT RULES for mobile keyboard safety:
-       • flex-col on the outer panel
-       • flex-shrink-0 on top-bar  → keyboard can NEVER push it off screen
-       • flex-1 min-h-0 on body   → scrollable area shrinks when keyboard opens
-       • flex-shrink-0 on bottom  → search button stays visible above keyboard
-       NO body.style.overflow manipulation — that breaks iOS fixed positioning
-    ─────────────────────────────────────────────────────────────────────── */
+  // Portal ensures the overlay renders at document.body level,
+  // bypassing any parent stacking context (transforms, opacity, etc.)
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
+
+  const panel = (
     <div
-      className="fixed inset-0 z-[300] bg-white flex flex-col"
-      style={{ height: '100dvh' }}   /* dvh = dynamic viewport (shrinks with keyboard) */
+      className="fixed inset-0 bg-white flex flex-col"
+      style={{ zIndex: 9999, height: '100dvh' }}
     >
 
       {/* ── TOP BAR — flex-shrink-0 ensures it's ALWAYS on screen ───────── */}
@@ -374,6 +373,8 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
         </div>
     </div>
   );
+
+  return createPortal(panel, document.body);
 }
 
 // ─── Small reusable pieces ────────────────────────────────────────────────────
