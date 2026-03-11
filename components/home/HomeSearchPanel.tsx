@@ -54,45 +54,35 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
   const inputRef = useRef<HTMLInputElement>(null);
   const debRef   = useRef<NodeJS.Timeout>();
 
-  const [cat, setCat]           = useState(initialCat);
-  const [query, setQuery]       = useState('');
-  const [suggs, setSuggs]       = useState<any[]>([]);
-  const [busy, setBusy]         = useState(false);
-  const [bhk, setBhk]           = useState<string[]>([]);
-  const [budget, setBudget]     = useState<(typeof BUDGET_BUY)[0] | null>(null);
-  const [type, setType]         = useState('');
+  const [cat, setCat]       = useState(initialCat);
+  const [query, setQuery]   = useState('');
+  const [suggs, setSuggs]   = useState<any[]>([]);
+  const [busy, setBusy]     = useState(false);
+  const [bhk, setBhk]       = useState<string[]>([]);
+  const [budget, setBudget] = useState<(typeof BUDGET_BUY)[0] | null>(null);
+  const [type, setType]     = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [ready, setReady]       = useState(false);   // controls animation
 
-  const isAgent  = cat === 'agents';
-  const budgets  = (cat === 'rent' || cat === 'pg') ? BUDGET_RENT : BUDGET_BUY;
-  const types    = cat === 'commercial' ? TYPES_COM : TYPES_BUY;
-  const showBHK  = !isAgent && cat !== 'commercial';
+  const isAgent    = cat === 'agents';
+  const budgets    = (cat === 'rent' || cat === 'pg') ? BUDGET_RENT : BUDGET_BUY;
+  const types      = cat === 'commercial' ? TYPES_COM : TYPES_BUY;
+  const showBHK    = !isAgent && cat !== 'commercial';
   const filterCount = [type, bhk.length > 0, budget].filter(Boolean).length;
 
-  // Animate in
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    const t = setTimeout(() => setReady(true), 16);
-    const f = setTimeout(() => inputRef.current?.focus(), 200);
-    return () => { clearTimeout(t); clearTimeout(f); document.body.style.overflow = ''; };
-  }, []);
-
-  // Android back-button
+  // Android hardware-back support — no body-overflow manipulation (breaks iOS)
   useEffect(() => {
     window.history.pushState({ msearch: true }, '');
-    const pop = () => { document.body.style.overflow = ''; onClose(); };
+    const pop = () => onClose();
     window.addEventListener('popstate', pop);
     return () => window.removeEventListener('popstate', pop);
   }, [onClose]);
 
   const close = () => {
-    setReady(false);
-    setTimeout(() => { document.body.style.overflow = ''; onClose(); }, 260);
     if (window.history.state?.msearch) window.history.back();
+    else onClose();
   };
 
-  const fetch = async (v: string) => {
+  const fetchLocs = async (v: string) => {
     if (!v.trim() || v.length < 2) { setSuggs([]); return; }
     setBusy(true);
     try { const { data } = await locationsApi.search(v); setSuggs(data.slice(0, 8)); }
@@ -112,101 +102,108 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
       router.push(`/agents?${p}`);
     } else {
       const p = new URLSearchParams({ category: cat });
-      if (c)       p.set('city', c);
+      if (c)        p.set('city', c);
       if (locality) p.set('locality', locality);
       if (bhk.length) p.set('bedrooms', bhk.map(b => b[0]).join(','));
-      if (budget) {
-        if (budget.min) p.set('minPrice', String(budget.min));
-        if (budget.max) p.set('maxPrice', String(budget.max));
-      }
+      if (budget?.min) p.set('minPrice', String(budget.min));
+      if (budget?.max) p.set('maxPrice', String(budget.max));
       if (type) p.set('type', TYPE_MAP[type] || '');
       router.push(`/properties?${p}`);
     }
-    close();
+    onClose();
   };
 
-  const catInfo = CATEGORY_TABS.find(c => c.value === cat)!;
-
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className={cn('fixed inset-0 z-[298] bg-black/50 transition-opacity duration-300',
-          ready ? 'opacity-100' : 'opacity-0')}
-        onClick={close}
-      />
+    /* ── Full-screen panel ─────────────────────────────────────────────────
+       LAYOUT RULES for mobile keyboard safety:
+       • flex-col on the outer panel
+       • flex-shrink-0 on top-bar  → keyboard can NEVER push it off screen
+       • flex-1 min-h-0 on body   → scrollable area shrinks when keyboard opens
+       • flex-shrink-0 on bottom  → search button stays visible above keyboard
+       NO body.style.overflow manipulation — that breaks iOS fixed positioning
+    ─────────────────────────────────────────────────────────────────────── */
+    <div
+      className="fixed inset-0 z-[300] bg-white flex flex-col"
+      style={{ height: '100dvh' }}   /* dvh = dynamic viewport (shrinks with keyboard) */
+    >
 
-      {/* Panel — full screen slide up */}
-      <div className={cn(
-        'fixed inset-0 z-[299] bg-white flex flex-col transition-transform duration-300 ease-out',
-        ready ? 'translate-y-0' : 'translate-y-full',
-      )}>
+      {/* ── TOP BAR — flex-shrink-0 ensures it's ALWAYS on screen ───────── */}
+      <div className="flex-shrink-0 bg-white px-4 pt-5 pb-3 border-b border-gray-100">
 
-        {/* ── TOP BAR — always above keyboard ───────────────────────────── */}
-        <div className="flex-shrink-0 bg-white px-3 pt-4 pb-2">
-          <div className="flex items-center gap-2">
-            {/* Back */}
-            <button
-              onPointerDown={close}
-              className="w-11 h-11 rounded-2xl bg-gray-100 flex items-center justify-center flex-shrink-0 active:bg-gray-200"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-700" />
-            </button>
+        {/* Row: back arrow + search input */}
+        <div className="flex items-center gap-3">
 
-            {/* Input wrapper */}
-            <div className="flex-1 flex items-center h-11 bg-gray-100 rounded-2xl px-3 gap-2">
-              {busy
-                ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />
-                : <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
-              }
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                placeholder={isAgent ? 'City or state...' : 'City, locality, project...'}
-                onChange={e => {
-                  setQuery(e.target.value);
-                  clearTimeout(debRef.current);
-                  debRef.current = setTimeout(() => fetch(e.target.value), 250);
-                }}
-                onKeyDown={e => e.key === 'Enter' && go()}
-                className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 min-w-0"
-              />
-              {query && (
-                <button
-                  onPointerDown={e => { e.preventDefault(); setQuery(''); setSuggs([]); inputRef.current?.focus(); }}
-                  className="w-5 h-5 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0"
-                >
-                  <X className="w-3 h-3 text-gray-600" />
-                </button>
-              )}
-            </div>
-          </div>
+          {/* Back button */}
+          <button
+            onClick={close}
+            className="w-11 h-11 rounded-2xl bg-gray-100 active:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors"
+            aria-label="Close search"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-700" />
+          </button>
 
-          {/* Category tabs */}
-          <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
-            {CATEGORY_TABS.map(tab => (
+          {/* Search input — white bg + border so it's always visible on any device */}
+          <div className="flex-1 flex items-center gap-3 bg-white border-2 border-gray-200 rounded-2xl px-4"
+            style={{ height: 52 }}>
+            {busy
+              ? <Loader2 className="w-5 h-5 text-gray-400 animate-spin flex-shrink-0" />
+              : <Search className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            }
+            <input
+              ref={inputRef}
+              autoFocus
+              type="text"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={query}
+              placeholder={isAgent ? 'City or state...' : 'City, locality, project...'}
+              onChange={e => {
+                setQuery(e.target.value);
+                clearTimeout(debRef.current);
+                debRef.current = setTimeout(() => fetchLocs(e.target.value), 250);
+              }}
+              onKeyDown={e => e.key === 'Enter' && go()}
+              /* text-base = 16px — CRITICAL: iOS auto-zooms any input < 16px */
+              className="flex-1 text-base text-gray-900 outline-none placeholder-gray-400"
+              style={{ background: 'transparent', border: 'none', WebkitAppearance: 'none' }}
+            />
+            {query && (
               <button
-                key={tab.value}
-                onClick={() => changeCat(tab.value)}
-                className={cn(
-                  'flex-shrink-0 h-9 px-4 rounded-full text-sm font-bold transition-all active:scale-95',
-                  cat === tab.value
-                    ? `bg-gradient-to-r ${tab.color} text-white shadow-md`
-                    : 'bg-gray-100 text-gray-500',
-                )}
+                onClick={() => { setQuery(''); setSuggs([]); inputRef.current?.focus(); }}
+                className="w-7 h-7 rounded-full bg-gray-200 active:bg-gray-300 flex items-center justify-center flex-shrink-0 transition-colors"
+                aria-label="Clear"
               >
-                {tab.label}
+                <X className="w-3.5 h-3.5 text-gray-500" />
               </button>
-            ))}
+            )}
           </div>
         </div>
 
-        {/* Thin line */}
-        <div className="flex-shrink-0 h-px bg-gray-100" />
+        {/* Category chips */}
+        <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
+          {CATEGORY_TABS.map(tab => (
+            <button
+              key={tab.value}
+              onClick={() => changeCat(tab.value)}
+              className={cn(
+                'flex-shrink-0 h-9 px-4 rounded-full text-sm font-bold transition-all active:scale-95',
+                cat === tab.value
+                  ? `bg-gradient-to-r ${tab.color} text-white shadow-md`
+                  : 'bg-gray-100 text-gray-500',
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        {/* ── SCROLLABLE BODY ───────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto overscroll-contain">
+      {/* ── SCROLLABLE BODY — min-h-0 prevents Safari flexbox overflow bug ── */}
+      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ minHeight: 0 }}>
 
           {/* ── STATE A: Suggestions while typing ── */}
           {query.length >= 2 && (
@@ -375,8 +372,7 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
             )}
           </button>
         </div>
-      </div>
-    </>
+    </div>
   );
 }
 
