@@ -4,421 +4,373 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search, MapPin, Loader2, X, Users, Building2,
-  ArrowLeft, ChevronRight, SlidersHorizontal,
+  ArrowLeft, ChevronRight, SlidersHorizontal, TrendingUp,
 } from 'lucide-react';
 import { locationsApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { TOP_CITIES } from '@/lib/utils';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Data ─────────────────────────────────────────────────────────────────────
 
 const CATEGORY_TABS = [
-  { value: 'buy',        label: 'Buy',         emoji: '🏠' },
-  { value: 'rent',       label: 'Rent',        emoji: '🔑' },
-  { value: 'pg',         label: 'PG',          emoji: '🛏️' },
-  { value: 'commercial', label: 'Commercial',  emoji: '🏢' },
-  { value: 'agents',     label: 'Agents',      emoji: '👤' },
+  { value: 'buy',        label: 'Buy',        color: 'from-blue-500 to-blue-600'    },
+  { value: 'rent',       label: 'Rent',       color: 'from-emerald-500 to-emerald-600' },
+  { value: 'pg',         label: 'PG',         color: 'from-purple-500 to-purple-600' },
+  { value: 'commercial', label: 'Commercial', color: 'from-orange-500 to-orange-600' },
+  { value: 'agents',     label: 'Agents',     color: 'from-pink-500 to-rose-600'    },
 ];
 
-const BHK_OPTIONS = [
-  { value: '1', label: '1 BHK' }, { value: '2', label: '2 BHK' },
-  { value: '3', label: '3 BHK' }, { value: '4', label: '4 BHK' },
-  { value: '5', label: '5+ BHK' },
+const BHK_OPTIONS = ['1 BHK', '2 BHK', '3 BHK', '4 BHK', '5+ BHK'];
+
+const BUDGET_BUY = [
+  { label: 'Under 25L',  min: 0,        max: 2500000  },
+  { label: '25L–50L',    min: 2500000,  max: 5000000  },
+  { label: '50L–1Cr',    min: 5000000,  max: 10000000 },
+  { label: '1Cr–2Cr',    min: 10000000, max: 20000000 },
+  { label: '2Cr–5Cr',    min: 20000000, max: 50000000 },
+  { label: 'Above 5Cr',  min: 50000000, max: 0        },
 ];
 
-const BUDGET_OPTIONS_BUY = [
-  { label: 'Under 25L',    min: 0,        max: 2500000  },
-  { label: '25L – 50L',   min: 2500000,  max: 5000000  },
-  { label: '50L – 1Cr',   min: 5000000,  max: 10000000 },
-  { label: '1Cr – 2Cr',   min: 10000000, max: 20000000 },
-  { label: '2Cr – 5Cr',   min: 20000000, max: 50000000 },
-  { label: 'Above 5Cr',   min: 50000000, max: 0        },
+const BUDGET_RENT = [
+  { label: 'Under ₹10K', min: 0,     max: 10000 },
+  { label: '₹10–20K',    min: 10000, max: 20000 },
+  { label: '₹20–40K',    min: 20000, max: 40000 },
+  { label: '₹40–75K',    min: 40000, max: 75000 },
+  { label: 'Above ₹75K', min: 75000, max: 0     },
 ];
 
-const BUDGET_OPTIONS_RENT = [
-  { label: 'Under ₹10K',  min: 0,     max: 10000 },
-  { label: '₹10K – 20K', min: 10000, max: 20000  },
-  { label: '₹20K – 40K', min: 20000, max: 40000  },
-  { label: '₹40K – 75K', min: 40000, max: 75000  },
-  { label: 'Above ₹75K', min: 75000, max: 0      },
-];
-
-const PROPERTY_TYPES_BUY = [
-  { value: 'apartment', label: 'Apartment' }, { value: 'villa',     label: 'Villa'   },
-  { value: 'plot',      label: 'Plot'      }, { value: 'house',     label: 'House'   },
-  { value: 'penthouse', label: 'Penthouse' }, { value: 'studio',    label: 'Studio'  },
-];
-
-const PROPERTY_TYPES_COMMERCIAL = [
-  { value: 'commercial_office',    label: 'Office Space' },
-  { value: 'commercial_shop',      label: 'Shop'         },
-  { value: 'commercial_warehouse', label: 'Warehouse'    },
-];
-
-const POPULAR_SEARCHES = [
-  '2 BHK in Mumbai', 'Villa in Goa', 'Office Space Delhi',
-  'PG in Bangalore', 'Plots in Hyderabad', 'Flat in Pune',
-];
+const TYPES_BUY = ['Apartment', 'Villa', 'Plot', 'House', 'Penthouse', 'Studio'];
+const TYPES_COM = ['Office Space', 'Shop', 'Warehouse'];
+const TYPE_MAP: Record<string, string> = {
+  'Apartment': 'apartment', 'Villa': 'villa', 'Plot': 'plot',
+  'House': 'house', 'Penthouse': 'penthouse', 'Studio': 'studio',
+  'Office Space': 'commercial_office', 'Shop': 'commercial_shop', 'Warehouse': 'commercial_warehouse',
+};
 
 // ─── Mobile Full-Screen Search ────────────────────────────────────────────────
 
-interface MobileFullSearchProps {
-  initialCategory: string;
-  onClose: () => void;
-}
-
-function MobileFullSearch({ initialCategory, onClose }: MobileFullSearchProps) {
-  const router = useRouter();
+function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: () => void }) {
+  const router   = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const debRef   = useRef<NodeJS.Timeout>();
 
-  const [category, setCategory] = useState(initialCategory);
-  const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedBHK, setSelectedBHK] = useState<string[]>([]);
-  const [selectedBudget, setSelectedBudget] = useState<{ min: number; max: number; label: string } | null>(null);
-  const [selectedType, setSelectedType] = useState('');
-  const [mounted, setMounted] = useState(false);
+  const [cat, setCat]           = useState(initialCat);
+  const [query, setQuery]       = useState('');
+  const [suggs, setSuggs]       = useState<any[]>([]);
+  const [busy, setBusy]         = useState(false);
+  const [bhk, setBhk]           = useState<string[]>([]);
+  const [budget, setBudget]     = useState<(typeof BUDGET_BUY)[0] | null>(null);
+  const [type, setType]         = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [ready, setReady]       = useState(false);   // controls animation
 
-  const isAgentMode = category === 'agents';
-  const budgetOptions = category === 'rent' || category === 'pg' ? BUDGET_OPTIONS_RENT : BUDGET_OPTIONS_BUY;
-  const typeOptions = category === 'commercial' ? PROPERTY_TYPES_COMMERCIAL : PROPERTY_TYPES_BUY;
-  const showBHK = !isAgentMode && category !== 'commercial';
+  const isAgent  = cat === 'agents';
+  const budgets  = (cat === 'rent' || cat === 'pg') ? BUDGET_RENT : BUDGET_BUY;
+  const types    = cat === 'commercial' ? TYPES_COM : TYPES_BUY;
+  const showBHK  = !isAgent && cat !== 'commercial';
+  const filterCount = [type, bhk.length > 0, budget].filter(Boolean).length;
 
-  // Slide-up animation on mount
+  // Animate in
   useEffect(() => {
-    // Lock body scroll
     document.body.style.overflow = 'hidden';
-    // Small delay to trigger CSS transition
-    const t = setTimeout(() => setMounted(true), 10);
-    // Focus input
-    const f = setTimeout(() => inputRef.current?.focus(), 150);
-    return () => {
-      clearTimeout(t);
-      clearTimeout(f);
-      document.body.style.overflow = '';
-    };
+    const t = setTimeout(() => setReady(true), 16);
+    const f = setTimeout(() => inputRef.current?.focus(), 200);
+    return () => { clearTimeout(t); clearTimeout(f); document.body.style.overflow = ''; };
   }, []);
 
-  // Hardware back button / swipe-back support
+  // Android back-button
   useEffect(() => {
-    const handlePop = () => onClose();
-    window.history.pushState({ searchOverlay: true }, '');
-    window.addEventListener('popstate', handlePop);
-    return () => window.removeEventListener('popstate', handlePop);
+    window.history.pushState({ msearch: true }, '');
+    const pop = () => { document.body.style.overflow = ''; onClose(); };
+    window.addEventListener('popstate', pop);
+    return () => window.removeEventListener('popstate', pop);
   }, [onClose]);
 
-  const fetchSuggestions = async (val: string) => {
-    if (!val.trim() || val.length < 2) { setSuggestions([]); return; }
-    setLoading(true);
-    try {
-      const { data } = await locationsApi.search(val);
-      setSuggestions(data.slice(0, 7));
-    } catch { setSuggestions([]); }
-    finally { setLoading(false); }
+  const close = () => {
+    setReady(false);
+    setTimeout(() => { document.body.style.overflow = ''; onClose(); }, 260);
+    if (window.history.state?.msearch) window.history.back();
   };
 
-  const handleCategoryChange = (cat: string) => {
-    setCategory(cat);
-    setSelectedBHK([]);
-    setSelectedBudget(null);
-    setSelectedType('');
+  const fetch = async (v: string) => {
+    if (!v.trim() || v.length < 2) { setSuggs([]); return; }
+    setBusy(true);
+    try { const { data } = await locationsApi.search(v); setSuggs(data.slice(0, 8)); }
+    catch { setSuggs([]); } finally { setBusy(false); }
   };
 
-  const handleClose = () => {
-    // Pop the history state we pushed
-    if (window.history.state?.searchOverlay) window.history.back();
-    else onClose();
+  const changeCat = (v: string) => {
+    setCat(v); setBhk([]); setBudget(null); setType('');
   };
 
-  const handleSearch = (city?: string, locality?: string, state?: string) => {
-    const c = city || query;
-    if (isAgentMode) {
-      const params = new URLSearchParams();
-      if (c) params.set('city', c);
-      if (state) params.set('state', state);
-      router.push(`/agents?${params.toString()}`);
+  const go = (city?: string, locality?: string, state?: string) => {
+    const c = city || query.trim();
+    if (isAgent) {
+      const p = new URLSearchParams();
+      if (c) p.set('city', c);
+      if (state) p.set('state', state);
+      router.push(`/agents?${p}`);
     } else {
-      const params = new URLSearchParams();
-      params.set('category', category);
-      if (c) params.set('city', c);
-      if (locality) params.set('locality', locality);
-      if (selectedBHK.length > 0) params.set('bedrooms', selectedBHK.join(','));
-      if (selectedBudget) {
-        if (selectedBudget.min) params.set('minPrice', String(selectedBudget.min));
-        if (selectedBudget.max) params.set('maxPrice', String(selectedBudget.max));
+      const p = new URLSearchParams({ category: cat });
+      if (c)       p.set('city', c);
+      if (locality) p.set('locality', locality);
+      if (bhk.length) p.set('bedrooms', bhk.map(b => b[0]).join(','));
+      if (budget) {
+        if (budget.min) p.set('minPrice', String(budget.min));
+        if (budget.max) p.set('maxPrice', String(budget.max));
       }
-      if (selectedType) params.set('type', selectedType);
-      router.push(`/properties?${params.toString()}`);
+      if (type) p.set('type', TYPE_MAP[type] || '');
+      router.push(`/properties?${p}`);
     }
-    onClose();
+    close();
   };
 
-  const activeFiltersCount = [
-    selectedType,
-    selectedBHK.length > 0,
-    selectedBudget,
-  ].filter(Boolean).length;
+  const catInfo = CATEGORY_TABS.find(c => c.value === cat)!;
 
   return (
     <>
       {/* Backdrop */}
       <div
-        className={cn(
-          'fixed inset-0 bg-black/40 z-[299] transition-opacity duration-300',
-          mounted ? 'opacity-100' : 'opacity-0'
-        )}
-        onClick={handleClose}
+        className={cn('fixed inset-0 z-[298] bg-black/50 transition-opacity duration-300',
+          ready ? 'opacity-100' : 'opacity-0')}
+        onClick={close}
       />
 
-      {/* Full-screen panel — slides up */}
-      <div
-        className={cn(
-          'fixed inset-x-0 bottom-0 z-[300] bg-white flex flex-col transition-transform duration-300 ease-out',
-          'rounded-t-3xl shadow-2xl',
-          mounted ? 'translate-y-0' : 'translate-y-full'
-        )}
-        style={{ height: '92dvh', maxHeight: '92vh' }}
-      >
-        {/* ── Top bar (always visible, keyboard-safe) ── */}
-        <div className="flex-shrink-0 px-4 pt-4 pb-3">
-          {/* Drag handle */}
-          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+      {/* Panel — full screen slide up */}
+      <div className={cn(
+        'fixed inset-0 z-[299] bg-white flex flex-col transition-transform duration-300 ease-out',
+        ready ? 'translate-y-0' : 'translate-y-full',
+      )}>
 
-          {/* Header row */}
-          <div className="flex items-center gap-3">
+        {/* ── TOP BAR — always above keyboard ───────────────────────────── */}
+        <div className="flex-shrink-0 bg-white px-3 pt-4 pb-2">
+          <div className="flex items-center gap-2">
+            {/* Back */}
             <button
-              onClick={handleClose}
-              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 active:bg-gray-200 transition-colors"
-              aria-label="Close"
+              onPointerDown={close}
+              className="w-11 h-11 rounded-2xl bg-gray-100 flex items-center justify-center flex-shrink-0 active:bg-gray-200"
             >
               <ArrowLeft className="w-5 h-5 text-gray-700" />
             </button>
 
-            {/* Search input — always at top */}
-            <div className="flex-1 flex items-center gap-2 bg-gray-100 rounded-2xl px-4 py-3 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-400 transition-all">
-              <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            {/* Input wrapper */}
+            <div className="flex-1 flex items-center h-11 bg-gray-100 rounded-2xl px-3 gap-2">
+              {busy
+                ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />
+                : <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              }
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
-                placeholder={isAgentMode ? 'City or state...' : 'City, locality, society...'}
-                onChange={(e) => {
+                placeholder={isAgent ? 'City or state...' : 'City, locality, project...'}
+                onChange={e => {
                   setQuery(e.target.value);
-                  clearTimeout(debounceRef.current);
-                  debounceRef.current = setTimeout(() => fetchSuggestions(e.target.value), 280);
+                  clearTimeout(debRef.current);
+                  debRef.current = setTimeout(() => fetch(e.target.value), 250);
                 }}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="flex-1 outline-none text-sm bg-transparent text-gray-900 placeholder-gray-400"
+                onKeyDown={e => e.key === 'Enter' && go()}
+                className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400 min-w-0"
               />
-              {loading && <Loader2 className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />}
-              {query && !loading && (
+              {query && (
                 <button
-                  onClick={() => { setQuery(''); setSuggestions([]); inputRef.current?.focus(); }}
-                  className="flex-shrink-0"
+                  onPointerDown={e => { e.preventDefault(); setQuery(''); setSuggs([]); inputRef.current?.focus(); }}
+                  className="w-5 h-5 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0"
                 >
-                  <X className="w-4 h-4 text-gray-400" />
+                  <X className="w-3 h-3 text-gray-600" />
                 </button>
               )}
             </div>
           </div>
 
-          {/* Category chips */}
-          <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar pb-1">
-            {CATEGORY_TABS.map((tab) => (
+          {/* Category tabs */}
+          <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
+            {CATEGORY_TABS.map(tab => (
               <button
                 key={tab.value}
-                onClick={() => handleCategoryChange(tab.value)}
+                onClick={() => changeCat(tab.value)}
                 className={cn(
-                  'flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all active:scale-95',
-                  category === tab.value
-                    ? 'bg-primary-600 text-white shadow-md shadow-primary-600/30'
-                    : 'bg-gray-100 text-gray-600'
+                  'flex-shrink-0 h-9 px-4 rounded-full text-sm font-bold transition-all active:scale-95',
+                  cat === tab.value
+                    ? `bg-gradient-to-r ${tab.color} text-white shadow-md`
+                    : 'bg-gray-100 text-gray-500',
                 )}
               >
-                <span className="text-base leading-none">{tab.emoji}</span>
                 {tab.label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* ── Scrollable body ── */}
+        {/* Thin line */}
+        <div className="flex-shrink-0 h-px bg-gray-100" />
+
+        {/* ── SCROLLABLE BODY ───────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto overscroll-contain">
-          {/* Location suggestions (when typing) */}
-          {query && suggestions.length > 0 && (
-            <div className="px-4 pb-2">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Suggestions</p>
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-                {suggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 active:bg-gray-100 text-left transition-colors border-b border-gray-50 last:border-0"
-                    onClick={() => {
-                      const display = s.locality ? `${s.locality}, ${s.city}` : s.city;
-                      setQuery(display);
-                      setSuggestions([]);
-                      handleSearch(s.city, s.locality, s.state);
-                    }}
-                  >
-                    <div className="w-9 h-9 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <MapPin className="w-4 h-4 text-primary-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-gray-900 truncate">{s.locality || s.city}</div>
-                      {s.locality && <div className="text-xs text-gray-400">{s.city}, {s.state}</div>}
-                      {!s.locality && s.state && <div className="text-xs text-gray-400">{s.state}</div>}
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* Popular searches (when input is empty) */}
-          {!query && (
-            <div className="px-4 pb-3">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Popular Searches</p>
-              <div className="flex flex-wrap gap-2">
-                {POPULAR_SEARCHES.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => { setQuery(s); handleSearch(s); }}
-                    className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-200 text-gray-700 text-sm font-medium px-3 py-2 rounded-xl transition-colors"
-                  >
-                    <Search className="w-3 h-3 text-gray-400" />
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Filters section */}
-          {!isAgentMode && (
-            <div className="px-4 pb-6 space-y-5">
-              {/* Divider */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-gray-100" />
-                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  <SlidersHorizontal className="w-3 h-3" />
-                  Filters
-                </div>
-                <div className="flex-1 h-px bg-gray-100" />
-              </div>
-
-              {/* Property Type */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2.5">Property Type</label>
-                <div className="flex flex-wrap gap-2">
-                  {typeOptions.map((t) => (
-                    <button
-                      key={t.value}
-                      onClick={() => setSelectedType(selectedType === t.value ? '' : t.value)}
-                      className={cn(
-                        'px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all active:scale-95',
-                        selectedType === t.value
-                          ? 'border-primary-500 bg-primary-50 text-primary-700'
-                          : 'border-gray-200 text-gray-600 bg-white'
-                      )}
-                    >
-                      {t.label}
-                    </button>
+          {/* ── STATE A: Suggestions while typing ── */}
+          {query.length >= 2 && (
+            <div>
+              {suggs.length > 0 ? (
+                <>
+                  <SectionHeader icon={<MapPin className="w-3.5 h-3.5" />} label="Locations" />
+                  {suggs.map((s, i) => (
+                    <LocationRow
+                      key={i}
+                      primary={s.locality || s.city}
+                      secondary={s.locality ? `${s.city}, ${s.state}` : s.state}
+                      onTap={() => go(s.city, s.locality, s.state)}
+                    />
                   ))}
-                </div>
-              </div>
-
-              {/* BHK */}
-              {showBHK && (
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2.5">BHK</label>
-                  <div className="flex gap-2 flex-wrap">
-                    {BHK_OPTIONS.map((bhk) => (
-                      <button
-                        key={bhk.value}
-                        onClick={() => setSelectedBHK(prev =>
-                          prev.includes(bhk.value) ? prev.filter(b => b !== bhk.value) : [...prev, bhk.value]
-                        )}
-                        className={cn(
-                          'px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all active:scale-95',
-                          selectedBHK.includes(bhk.value)
-                            ? 'border-primary-500 bg-primary-50 text-primary-700'
-                            : 'border-gray-200 text-gray-600 bg-white'
-                        )}
-                      >
-                        {bhk.label}
-                      </button>
-                    ))}
-                  </div>
+                </>
+              ) : !busy && (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <MapPin className="w-10 h-10 mb-3 text-gray-200" />
+                  <p className="text-sm font-medium">No locations found</p>
+                  <p className="text-xs mt-1">Try a city or area name</p>
                 </div>
               )}
-
-              {/* Budget */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2.5">Budget</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {budgetOptions.map((b) => (
-                    <button
-                      key={b.label}
-                      onClick={() => setSelectedBudget(selectedBudget?.label === b.label ? null : { ...b })}
-                      className={cn(
-                        'px-3 py-3 rounded-xl text-sm font-semibold border-2 transition-all text-left active:scale-95',
-                        selectedBudget?.label === b.label
-                          ? 'border-primary-500 bg-primary-50 text-primary-700'
-                          : 'border-gray-200 text-gray-700 bg-white'
-                      )}
-                    >
-                      {b.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
 
-          {/* Agent mode — extra padding at bottom */}
-          {isAgentMode && <div className="h-6" />}
+          {/* ── STATE B: Default — popular cities + filters ── */}
+          {query.length < 2 && (
+            <>
+              {/* Popular cities */}
+              <SectionHeader icon={<TrendingUp className="w-3.5 h-3.5" />} label="Popular Cities" />
+              {TOP_CITIES.map(city => (
+                <LocationRow
+                  key={city.name}
+                  primary={city.name}
+                  secondary={`${city.count} properties`}
+                  onTap={() => go(city.name)}
+                  dot={city.gradient}
+                />
+              ))}
+
+              {/* Filters — only for property search */}
+              {!isAgent && (
+                <>
+                  {/* Filter toggle header */}
+                  <button
+                    onClick={() => setShowFilters(v => !v)}
+                    className="w-full flex items-center justify-between px-5 py-3.5 mt-1"
+                  >
+                    <div className="flex items-center gap-2">
+                      <SlidersHorizontal className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm font-bold text-gray-700">Filters</span>
+                      {filterCount > 0 && (
+                        <span className="bg-primary-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                          {filterCount}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-primary-600 font-semibold">
+                      {showFilters ? 'Hide' : 'Show'}
+                    </span>
+                  </button>
+
+                  {showFilters && (
+                    <div className="px-4 pb-4 space-y-4">
+                      {/* Property Type */}
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Property Type</p>
+                        <div className="flex flex-wrap gap-2">
+                          {types.map(t => (
+                            <FilterChip
+                              key={t} label={t}
+                              active={type === t}
+                              onTap={() => setType(type === t ? '' : t)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* BHK */}
+                      {showBHK && (
+                        <div>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">BHK</p>
+                          <div className="flex flex-wrap gap-2">
+                            {BHK_OPTIONS.map(b => (
+                              <FilterChip
+                                key={b} label={b}
+                                active={bhk.includes(b)}
+                                onTap={() => setBhk(p => p.includes(b) ? p.filter(x => x !== b) : [...p, b])}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Budget */}
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Budget</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {budgets.map(b => (
+                            <button
+                              key={b.label}
+                              onClick={() => setBudget(budget?.label === b.label ? null : b)}
+                              className={cn(
+                                'px-3 py-3 rounded-xl text-sm font-semibold border-2 text-left transition-all active:scale-95',
+                                budget?.label === b.label
+                                  ? 'border-primary-500 bg-primary-50 text-primary-700'
+                                  : 'border-gray-100 bg-gray-50 text-gray-700',
+                              )}
+                            >
+                              {b.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* Extra scroll breathing room */}
+          <div className="h-4" />
         </div>
 
-        {/* ── Bottom search button (always visible) ── */}
-        <div className="flex-shrink-0 px-4 pb-6 pt-3 bg-white border-t border-gray-100">
-          {/* Active filter summary */}
-          {activeFiltersCount > 0 && (
-            <div className="flex items-center gap-2 mb-3 flex-wrap">
-              {selectedType && (
-                <span className="flex items-center gap-1 bg-primary-50 text-primary-700 text-xs font-semibold px-2.5 py-1 rounded-full">
-                  {typeOptions.find(t => t.value === selectedType)?.label}
-                  <button onClick={() => setSelectedType('')}><X className="w-3 h-3" /></button>
-                </span>
+        {/* ── BOTTOM BUTTON — always visible ────────────────────────────── */}
+        <div className="flex-shrink-0 bg-white border-t border-gray-100 px-4 py-4">
+          {/* Active filter pills */}
+          {filterCount > 0 && (
+            <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
+              {type && (
+                <ActivePill label={type} onRemove={() => setType('')} />
               )}
-              {selectedBHK.map(b => (
-                <span key={b} className="flex items-center gap-1 bg-primary-50 text-primary-700 text-xs font-semibold px-2.5 py-1 rounded-full">
-                  {b} BHK
-                  <button onClick={() => setSelectedBHK(p => p.filter(x => x !== b))}><X className="w-3 h-3" /></button>
-                </span>
+              {bhk.map(b => (
+                <ActivePill key={b} label={b} onRemove={() => setBhk(p => p.filter(x => x !== b))} />
               ))}
-              {selectedBudget && (
-                <span className="flex items-center gap-1 bg-primary-50 text-primary-700 text-xs font-semibold px-2.5 py-1 rounded-full">
-                  {selectedBudget.label}
-                  <button onClick={() => setSelectedBudget(null)}><X className="w-3 h-3" /></button>
-                </span>
+              {budget && (
+                <ActivePill label={budget.label} onRemove={() => setBudget(null)} />
               )}
             </div>
           )}
 
           <button
-            onClick={() => handleSearch()}
-            className="w-full py-4 bg-primary-600 active:bg-primary-700 text-white rounded-2xl font-bold text-base transition-all active:scale-[0.98] flex items-center justify-center gap-2.5 shadow-lg shadow-primary-600/30"
+            onClick={() => go()}
+            className={cn(
+              'w-full h-14 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-3',
+              'bg-gradient-to-r', `from-primary-600 to-primary-700`,
+              'shadow-lg shadow-primary-600/40 active:scale-[0.98] transition-transform',
+            )}
           >
-            {isAgentMode ? <Users className="w-5 h-5" /> : <Search className="w-5 h-5" />}
-            {isAgentMode
-              ? (query ? `Find Agents in ${query}` : 'Find All Agents')
-              : (query ? `Search in ${query}` : 'Search Properties')
+            {isAgent
+              ? <Users className="w-5 h-5 flex-shrink-0" />
+              : <Search className="w-5 h-5 flex-shrink-0" />
             }
-            {activeFiltersCount > 0 && (
-              <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                +{activeFiltersCount}
+            <span className="truncate">
+              {query
+                ? (isAgent ? `Find Agents — ${query}` : `Search in ${query}`)
+                : (isAgent ? 'Find Agents' : 'Search Properties')
+              }
+            </span>
+            {filterCount > 0 && (
+              <span className="bg-white/25 text-white text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+                +{filterCount}
               </span>
             )}
           </button>
@@ -428,170 +380,179 @@ function MobileFullSearch({ initialCategory, onClose }: MobileFullSearchProps) {
   );
 }
 
-// ─── Desktop: Agent Search Panel ─────────────────────────────────────────────
+// ─── Small reusable pieces ────────────────────────────────────────────────────
 
-function AgentSearchPanel() {
+function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <div className="flex items-center gap-2 px-5 pt-4 pb-2">
+      <span className="text-gray-400">{icon}</span>
+      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+    </div>
+  );
+}
+
+function LocationRow({
+  primary, secondary, onTap, dot,
+}: {
+  primary: string; secondary?: string; onTap: () => void; dot?: string;
+}) {
+  return (
+    <button
+      onClick={onTap}
+      className="w-full flex items-center gap-4 px-5 py-3.5 active:bg-gray-50 transition-colors text-left"
+    >
+      <div className={cn(
+        'w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0',
+        dot ? `bg-gradient-to-br ${dot}` : 'bg-primary-50',
+      )}>
+        <MapPin className={cn('w-4 h-4', dot ? 'text-white' : 'text-primary-500')} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold text-gray-900 truncate">{primary}</div>
+        {secondary && <div className="text-xs text-gray-400 mt-0.5 truncate">{secondary}</div>}
+      </div>
+      <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+    </button>
+  );
+}
+
+function FilterChip({ label, active, onTap }: { label: string; active: boolean; onTap: () => void }) {
+  return (
+    <button
+      onClick={onTap}
+      className={cn(
+        'h-9 px-4 rounded-xl text-sm font-semibold border-2 transition-all active:scale-95',
+        active
+          ? 'border-primary-500 bg-primary-50 text-primary-700'
+          : 'border-gray-100 bg-gray-50 text-gray-600',
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ActivePill({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="flex-shrink-0 flex items-center gap-1.5 bg-primary-50 text-primary-700 text-xs font-bold px-3 py-1.5 rounded-full">
+      {label}
+      <button onPointerDown={e => { e.stopPropagation(); onRemove(); }}>
+        <X className="w-3 h-3" />
+      </button>
+    </span>
+  );
+}
+
+// ─── Desktop panels (unchanged) ───────────────────────────────────────────────
+
+function DesktopAgentSearch() {
   const router = useRouter();
-  const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [showSug, setShowSug] = useState(false);
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const [q, setQ] = useState('');
+  const [suggs, setSuggs] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [show, setShow] = useState(false);
+  const deb = useRef<NodeJS.Timeout>();
 
-  const fetchSuggestions = async (val: string) => {
-    if (!val.trim() || val.length < 2) { setSuggestions([]); return; }
-    setLoading(true);
-    try {
-      const { data } = await locationsApi.search(val);
-      setSuggestions(data.slice(0, 6));
-    } catch { setSuggestions([]); }
-    finally { setLoading(false); }
+  const fetch = async (v: string) => {
+    if (!v.trim() || v.length < 2) { setSuggs([]); return; }
+    setBusy(true);
+    try { const { data } = await locationsApi.search(v); setSuggs(data.slice(0, 6)); }
+    catch { setSuggs([]); } finally { setBusy(false); }
   };
 
-  const handleSearch = (city?: string, state?: string) => {
-    const params = new URLSearchParams();
-    if (city) params.set('city', city);
-    if (state) params.set('state', state);
-    router.push(`/agents?${params.toString()}`);
-    setShowSug(false);
+  const go = (city?: string, state?: string) => {
+    const p = new URLSearchParams();
+    if (city) p.set('city', city);
+    if (state) p.set('state', state);
+    router.push(`/agents?${p}`);
+    setShow(false);
   };
 
   return (
     <div className="flex flex-wrap gap-2 items-center">
       <div className="relative flex-1 min-w-[250px]">
         <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100 bg-white">
-          <MapPin className="w-4 h-4 text-primary-500 flex-shrink-0 mr-2" />
-          <input
-            type="text"
-            placeholder="Search by city, locality or state..."
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setShowSug(true);
-              clearTimeout(debounceRef.current);
-              debounceRef.current = setTimeout(() => fetchSuggestions(e.target.value), 300);
-            }}
-            onFocus={() => setShowSug(true)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch(query)}
-            className="flex-1 outline-none text-sm bg-transparent"
-          />
-          {loading && <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />}
-          {query && !loading && (
-            <button onClick={() => { setQuery(''); setSuggestions([]); }}>
-              <X className="w-4 h-4 text-gray-400" />
-            </button>
-          )}
+          <MapPin className="w-4 h-4 text-primary-500 mr-2 flex-shrink-0" />
+          <input type="text" placeholder="City, locality or state..." value={q}
+            onChange={e => { setQ(e.target.value); setShow(true); clearTimeout(deb.current); deb.current = setTimeout(() => fetch(e.target.value), 300); }}
+            onFocus={() => setShow(true)}
+            onKeyDown={e => e.key === 'Enter' && go(q)}
+            className="flex-1 outline-none text-sm bg-transparent" />
+          {busy ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin" /> : q && <button onClick={() => { setQ(''); setSuggs([]); }}><X className="w-4 h-4 text-gray-400" /></button>}
         </div>
-        {showSug && suggestions.length > 0 && (
+        {show && suggs.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-            {suggestions.map((s, i) => (
-              <button key={i}
-                className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-left transition-colors"
-                onClick={() => {
-                  setQuery(s.locality ? `${s.locality}, ${s.city}` : s.city);
-                  handleSearch(s.city, s.state);
-                }}
-              >
+            {suggs.map((s, i) => (
+              <button key={i} className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-left"
+                onClick={() => { setQ(s.locality ? `${s.locality}, ${s.city}` : s.city); go(s.city, s.state); }}>
                 <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                <div>
-                  <div className="text-sm font-medium">{s.locality || s.city}</div>
-                  {s.locality && <div className="text-xs text-gray-400">{s.city}, {s.state}</div>}
-                </div>
+                <div><div className="text-sm font-medium">{s.locality || s.city}</div>{s.locality && <div className="text-xs text-gray-400">{s.city}, {s.state}</div>}</div>
               </button>
             ))}
           </div>
         )}
       </div>
-      <button
-        onClick={() => handleSearch(query)}
-        className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-colors shadow-lg shadow-primary-600/30 flex-shrink-0"
-      >
-        <Users className="w-4 h-4" />
-        Find Agents
+      <button onClick={() => go(q)} className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-primary-600/30">
+        <Users className="w-4 h-4" /> Find Agents
       </button>
     </div>
   );
 }
 
-// ─── Desktop: Property Search Panel ──────────────────────────────────────────
-
-interface PropertySearchPanelProps {
-  category: string;
-  onSearch: (city: string, locality?: string) => void;
-}
-
-function PropertySearchPanel({ category, onSearch }: PropertySearchPanelProps) {
-  const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [selectedBHK, setSelectedBHK] = useState<string[]>([]);
-  const [selectedBudget, setSelectedBudget] = useState<{ min: number; max: number; label: string } | null>(null);
-  const [selectedType, setSelectedType] = useState<string>('');
-  const [showBudgetDropdown, setShowBudgetDropdown] = useState(false);
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
-
-  const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout>();
-  const budgetRef = useRef<HTMLDivElement>(null);
+function DesktopPropertySearch({ category, onSearch }: { category: string; onSearch: (city: string, locality?: string) => void }) {
+  const [q, setQ] = useState('');
+  const [suggs, setSuggs] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [showS, setShowS] = useState(false);
+  const [bhk, setBhk] = useState<string[]>([]);
+  const [budget, setBudget] = useState<any>(null);
+  const [type, setType] = useState('');
+  const [showBud, setShowBud] = useState(false);
+  const [showType, setShowType] = useState(false);
+  const deb = useRef<NodeJS.Timeout>();
+  const budRef = useRef<HTMLDivElement>(null);
   const typeRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setSelectedBHK([]); setSelectedBudget(null); setSelectedType('');
-  }, [category]);
-
+  useEffect(() => { setBhk([]); setBudget(null); setType(''); }, [category]);
   useEffect(() => {
     const h = (e: MouseEvent) => {
-      if (budgetRef.current && !budgetRef.current.contains(e.target as Node)) setShowBudgetDropdown(false);
-      if (typeRef.current && !typeRef.current.contains(e.target as Node)) setShowTypeDropdown(false);
+      if (budRef.current && !budRef.current.contains(e.target as Node)) setShowBud(false);
+      if (typeRef.current && !typeRef.current.contains(e.target as Node)) setShowType(false);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  const fetchSuggestions = async (val: string) => {
-    if (!val.trim() || val.length < 2) { setSuggestions([]); return; }
-    setLoading(true);
-    try {
-      const { data } = await locationsApi.search(val);
-      setSuggestions(data.slice(0, 6));
-    } catch { setSuggestions([]); }
-    finally { setLoading(false); }
+  const fetch = async (v: string) => {
+    if (!v.trim() || v.length < 2) { setSuggs([]); return; }
+    setBusy(true);
+    try { const { data } = await locationsApi.search(v); setSuggs(data.slice(0, 6)); }
+    catch { setSuggs([]); } finally { setBusy(false); }
   };
 
-  const buildAndSearch = useCallback((overrideCity?: string, overrideLocality?: string) => {
-    onSearch(overrideCity || query, overrideLocality);
-    setShowSuggestions(false);
-  }, [query, onSearch]);
+  const search = useCallback((city?: string, loc?: string) => { onSearch(city || q, loc); setShowS(false); }, [q, onSearch]);
 
-  const budgetOptions = category === 'rent' || category === 'pg' ? BUDGET_OPTIONS_RENT : BUDGET_OPTIONS_BUY;
-  const typeOptions = category === 'commercial' ? PROPERTY_TYPES_COMMERCIAL : PROPERTY_TYPES_BUY;
+  const budgets = (category === 'rent' || category === 'pg') ? BUDGET_RENT : BUDGET_BUY;
+  const types   = category === 'commercial' ? TYPES_COM : TYPES_BUY;
   const showBHK = category !== 'commercial';
 
   return (
     <div className="flex flex-wrap gap-2">
-      {/* Property Type */}
+      {/* Type dropdown */}
       <div ref={typeRef} className="relative">
-        <button
-          onClick={() => { setShowTypeDropdown(p => !p); setShowBudgetDropdown(false); }}
-          className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 text-sm hover:border-primary-400 transition-colors min-w-[140px] bg-white"
-        >
+        <button onClick={() => { setShowType(p => !p); setShowBud(false); }}
+          className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 text-sm hover:border-primary-400 min-w-[140px] bg-white">
           <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-          <span className={selectedType ? 'text-primary-700 font-medium' : 'text-gray-500'}>
-            {typeOptions.find(t => t.value === selectedType)?.label || 'Property Type'}
-          </span>
-          <X className={cn('w-3 h-3 text-gray-400 ml-auto transition-transform', showTypeDropdown ? 'rotate-0' : 'rotate-45')} />
+          <span className={type ? 'text-primary-700 font-medium' : 'text-gray-500'}>{type || 'Property Type'}</span>
+          <ChevronRight className={cn('w-3.5 h-3.5 text-gray-400 ml-auto transition-transform', showType && 'rotate-90')} />
         </button>
-        {showTypeDropdown && (
+        {showType && (
           <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 min-w-[180px] overflow-hidden">
             <div className="p-1">
-              <button onClick={() => { setSelectedType(''); setShowTypeDropdown(false); }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg">Any Type</button>
-              {typeOptions.map((t) => (
-                <button key={t.value} onClick={() => { setSelectedType(t.value); setShowTypeDropdown(false); }}
-                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${selectedType === t.value ? 'bg-primary-50 text-primary-700 font-medium' : 'hover:bg-gray-50'}`}>
-                  {t.label}
-                </button>
+              <button onClick={() => { setType(''); setShowType(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg">Any Type</button>
+              {types.map(t => (
+                <button key={t} onClick={() => { setType(t); setShowType(false); }}
+                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${type === t ? 'bg-primary-50 text-primary-700 font-medium' : 'hover:bg-gray-50'}`}>{t}</button>
               ))}
             </div>
           </div>
@@ -601,37 +562,29 @@ function PropertySearchPanel({ category, onSearch }: PropertySearchPanelProps) {
       {/* BHK */}
       {showBHK && (
         <div className="flex items-center gap-1 border border-gray-200 rounded-xl px-3 py-2.5 bg-white">
-          {BHK_OPTIONS.slice(0, 4).map((bhk) => (
-            <button key={bhk.value}
-              onClick={() => setSelectedBHK(prev => prev.includes(bhk.value) ? prev.filter(b => b !== bhk.value) : [...prev, bhk.value])}
-              className={`text-xs px-2 py-1 rounded-lg font-medium transition-all ${selectedBHK.includes(bhk.value) ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-              {bhk.label}
+          {BHK_OPTIONS.slice(0, 4).map(b => (
+            <button key={b} onClick={() => setBhk(p => p.includes(b) ? p.filter(x => x !== b) : [...p, b])}
+              className={`text-xs px-2 py-1 rounded-lg font-medium transition-all ${bhk.includes(b) ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+              {b}
             </button>
           ))}
         </div>
       )}
 
-      {/* Budget */}
-      <div ref={budgetRef} className="relative">
-        <button
-          onClick={() => { setShowBudgetDropdown(p => !p); setShowTypeDropdown(false); }}
-          className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 text-sm hover:border-primary-400 transition-colors min-w-[130px] bg-white"
-        >
-          <span className={selectedBudget ? 'text-primary-700 font-medium' : 'text-gray-500'}>
-            {selectedBudget?.label || 'Budget'}
-          </span>
-          <X className={cn('w-3 h-3 text-gray-400 ml-auto', showBudgetDropdown ? 'rotate-0' : 'rotate-45')} />
+      {/* Budget dropdown */}
+      <div ref={budRef} className="relative">
+        <button onClick={() => { setShowBud(p => !p); setShowType(false); }}
+          className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 text-sm hover:border-primary-400 min-w-[130px] bg-white">
+          <span className={budget ? 'text-primary-700 font-medium' : 'text-gray-500'}>{budget?.label || 'Budget'}</span>
+          <ChevronRight className={cn('w-3.5 h-3.5 text-gray-400 ml-auto transition-transform', showBud && 'rotate-90')} />
         </button>
-        {showBudgetDropdown && (
+        {showBud && (
           <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 min-w-[200px] overflow-hidden">
             <div className="p-1">
-              <button onClick={() => { setSelectedBudget(null); setShowBudgetDropdown(false); }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg">Any Budget</button>
-              {budgetOptions.map((b) => (
-                <button key={b.label} onClick={() => { setSelectedBudget(b); setShowBudgetDropdown(false); }}
-                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${selectedBudget?.label === b.label ? 'bg-primary-50 text-primary-700 font-medium' : 'hover:bg-gray-50'}`}>
-                  {b.label}
-                </button>
+              <button onClick={() => { setBudget(null); setShowBud(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg">Any Budget</button>
+              {budgets.map(b => (
+                <button key={b.label} onClick={() => { setBudget(b); setShowBud(false); }}
+                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${budget?.label === b.label ? 'bg-primary-50 text-primary-700 font-medium' : 'hover:bg-gray-50'}`}>{b.label}</button>
               ))}
             </div>
           </div>
@@ -641,168 +594,153 @@ function PropertySearchPanel({ category, onSearch }: PropertySearchPanelProps) {
       {/* Location */}
       <div className="relative flex-1 min-w-[200px]">
         <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100 bg-white">
-          <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mr-2" />
-          <input ref={inputRef} type="text"
-            placeholder="City, locality, society..."
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value); setShowSuggestions(true);
-              clearTimeout(debounceRef.current);
-              debounceRef.current = setTimeout(() => fetchSuggestions(e.target.value), 300);
-            }}
-            onFocus={() => setShowSuggestions(true)}
-            onKeyDown={(e) => e.key === 'Enter' && buildAndSearch()}
-            className="flex-1 outline-none text-sm bg-transparent"
-          />
-          {loading && <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />}
-          {query && !loading && (
-            <button onClick={() => { setQuery(''); setSuggestions([]); }}>
-              <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
-            </button>
-          )}
+          <MapPin className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+          <input type="text" placeholder="City, locality, society..." value={q}
+            onChange={e => { setQ(e.target.value); setShowS(true); clearTimeout(deb.current); deb.current = setTimeout(() => fetch(e.target.value), 300); }}
+            onFocus={() => setShowS(true)}
+            onKeyDown={e => e.key === 'Enter' && search()}
+            className="flex-1 outline-none text-sm bg-transparent" />
+          {busy ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin" /> : q && <button onClick={() => { setQ(''); setSuggs([]); }}><X className="w-4 h-4 text-gray-400" /></button>}
         </div>
-        {showSuggestions && suggestions.length > 0 && (
+        {showS && suggs.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-            {suggestions.map((s, i) => (
-              <button key={i} className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-left transition-colors"
-                onClick={() => {
-                  const display = s.locality ? `${s.locality}, ${s.city}` : s.city;
-                  setQuery(display); setShowSuggestions(false);
-                  buildAndSearch(s.city, s.locality);
-                }}>
+            {suggs.map((s, i) => (
+              <button key={i} className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-left"
+                onClick={() => { setQ(s.locality ? `${s.locality}, ${s.city}` : s.city); setShowS(false); search(s.city, s.locality); }}>
                 <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                <div>
-                  <div className="text-sm font-medium">{s.locality || s.city}</div>
-                  {s.locality && <div className="text-xs text-gray-400">{s.city}, {s.state}</div>}
-                </div>
+                <div><div className="text-sm font-medium">{s.locality || s.city}</div>{s.locality && <div className="text-xs text-gray-400">{s.city}, {s.state}</div>}</div>
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* Search */}
-      <button
-        onClick={() => buildAndSearch()}
-        className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-colors shadow-lg shadow-primary-600/30 flex-shrink-0"
-      >
-        <Search className="w-4 h-4" />
-        Search
+      {/* Search button */}
+      <button onClick={() => search()} className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-primary-600/30">
+        <Search className="w-4 h-4" /> Search
       </button>
     </div>
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function HomeSearchPanel() {
-  const router = useRouter();
-  const [category, setCategory] = useState('buy');
-  const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const router  = useRouter();
+  const [cat, setCat]   = useState('buy');
+  const [open, setOpen] = useState(false);
 
-  const isAgentMode = category === 'agents';
+  const isAgent  = cat === 'agents';
+  const catInfo  = CATEGORY_TABS.find(c => c.value === cat)!;
 
-  const handlePropertySearch = useCallback((city: string, locality?: string) => {
-    const params = new URLSearchParams();
-    params.set('category', category);
-    if (city) params.set('city', city);
-    if (locality) params.set('locality', locality);
-    router.push(`/properties?${params.toString()}`);
-  }, [category, router]);
-
-  const activeCat = CATEGORY_TABS.find(t => t.value === category);
+  const handleSearch = useCallback((city: string, locality?: string) => {
+    const p = new URLSearchParams({ category: cat });
+    if (city)     p.set('city', city);
+    if (locality) p.set('locality', locality);
+    router.push(`/properties?${p}`);
+  }, [cat, router]);
 
   return (
     <div className="w-full max-w-5xl mx-auto">
 
-      {/* ── Mobile: single compact trigger ── */}
-      <div className="sm:hidden">
-        {/* One-tap search trigger */}
+      {/* ════════════════════════════════════
+          MOBILE  — single search trigger
+          ════════════════════════════════════ */}
+      <div className="sm:hidden w-full">
+
+        {/* Trigger card */}
         <button
-          onClick={() => setShowMobileSearch(true)}
-          className="w-full flex items-center gap-3 bg-white rounded-2xl shadow-2xl shadow-black/20 px-4 py-4 text-left active:scale-[0.98] transition-transform"
+          onClick={() => setOpen(true)}
+          className="w-full bg-white rounded-2xl shadow-2xl shadow-black/25 p-4 flex items-center gap-3 active:scale-[0.97] transition-transform"
         >
-          {/* Search icon */}
-          <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Search className="w-5 h-5 text-primary-600" />
-          </div>
-
-          {/* Placeholder text */}
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-gray-800">
-              {isAgentMode ? 'Find Agents' : 'Search Properties'}
-            </div>
-            <div className="text-xs text-gray-400 truncate">
-              {isAgentMode ? 'City, locality or state...' : 'City, locality, society...'}
-            </div>
-          </div>
-
-          {/* Active category chip */}
-          <span className={cn(
-            'flex-shrink-0 flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full',
-            'bg-primary-600 text-white'
+          {/* Icon */}
+          <div className={cn(
+            'w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br',
+            catInfo.color,
           )}>
-            <span>{activeCat?.emoji}</span>
-            {activeCat?.label}
-          </span>
+            {isAgent
+              ? <Users className="w-5 h-5 text-white" />
+              : <Search className="w-5 h-5 text-white" />
+            }
+          </div>
+
+          {/* Text */}
+          <div className="flex-1 text-left min-w-0">
+            <div className="text-[13px] font-semibold text-gray-800">
+              {isAgent ? 'Find Agents' : `${catInfo.label} a Property`}
+            </div>
+            <div className="text-xs text-gray-400 mt-0.5 truncate">
+              {isAgent ? 'Search by city or state' : 'City, locality, project...'}
+            </div>
+          </div>
+
+          {/* Category badge */}
+          <div className={cn(
+            'flex-shrink-0 flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl text-white bg-gradient-to-r',
+            catInfo.color,
+          )}>
+            {catInfo.label}
+          </div>
         </button>
 
-        {/* Category quick-select row */}
-        <div className="flex gap-1.5 mt-3 overflow-x-auto no-scrollbar pb-1">
-          {CATEGORY_TABS.map((tab) => (
+        {/* Category strip below trigger */}
+        <div className="flex items-center gap-1.5 mt-3 overflow-x-auto no-scrollbar">
+          {CATEGORY_TABS.map(tab => (
             <button
               key={tab.value}
-              onClick={() => setCategory(tab.value)}
+              onClick={() => setCat(tab.value)}
               className={cn(
-                'flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95',
-                category === tab.value
-                  ? 'bg-white text-primary-700 shadow-sm'
-                  : 'bg-white/20 text-white'
+                'flex-shrink-0 h-8 px-4 rounded-full text-xs font-bold transition-all active:scale-95',
+                cat === tab.value
+                  ? 'bg-white text-gray-900 shadow-md'
+                  : 'bg-white/15 text-white/80',
               )}
             >
-              {tab.emoji} {tab.label}
+              {tab.label}
             </button>
           ))}
+          <button
+            onClick={() => router.push('/new-projects')}
+            className="flex-shrink-0 h-8 px-4 rounded-full text-xs font-bold bg-white/15 text-white/80"
+          >
+            New Projects
+          </button>
         </div>
 
         {/* Full-screen search overlay */}
-        {showMobileSearch && (
-          <MobileFullSearch
-            initialCategory={category}
-            onClose={() => setShowMobileSearch(false)}
-          />
+        {open && (
+          <MobileSearch initialCat={cat} onClose={() => setOpen(false)} />
         )}
       </div>
 
-      {/* ── Desktop ── */}
+      {/* ════════════════════════════════════
+          DESKTOP  — full inline search bar
+          ════════════════════════════════════ */}
       <div className="hidden sm:block">
         {/* Category tabs */}
         <div className="flex gap-1 overflow-x-auto no-scrollbar">
-          {[...CATEGORY_TABS, { value: '', label: 'New Projects', emoji: '🏗️' }].map((tab) => (
+          {[...CATEGORY_TABS, { value: '', label: 'New Projects', color: 'from-teal-500 to-teal-600' }].map(tab => (
             <button
               key={tab.label}
-              onClick={() => {
-                if (!tab.value) { router.push('/new-projects'); return; }
-                setCategory(tab.value);
-              }}
+              onClick={() => { if (!tab.value) { router.push('/new-projects'); return; } setCat(tab.value); }}
               className={cn(
                 'flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all',
-                category === tab.value && tab.value
+                cat === tab.value && tab.value
                   ? 'bg-white text-primary-700 shadow-sm'
-                  : 'bg-white/20 text-white hover:bg-white/30'
+                  : 'bg-white/20 text-white hover:bg-white/30',
               )}
             >
-              {tab.emoji} {tab.label}
+              {tab.label}
             </button>
           ))}
         </div>
 
+        {/* Search panel body */}
         <div className="bg-white rounded-b-2xl rounded-tr-2xl shadow-2xl p-3">
-          {isAgentMode ? (
-            <AgentSearchPanel />
-          ) : (
-            <PropertySearchPanel category={category} onSearch={handlePropertySearch} />
-          )}
+          {isAgent
+            ? <DesktopAgentSearch />
+            : <DesktopPropertySearch category={cat} onSearch={handleSearch} />
+          }
         </div>
       </div>
     </div>
