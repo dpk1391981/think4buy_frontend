@@ -1,0 +1,273 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import {
+  Building2,
+  TrendingUp,
+  Shield,
+  HeadphonesIcon,
+  ArrowRight,
+  Star,
+  CheckCircle2,
+  Home,
+  Users,
+  Award,
+  BarChart3,
+} from 'lucide-react';
+import HomeSearchPanel from '@/components/home/HomeSearchPanel';
+import FeaturedProperties from '@/components/home/FeaturedProperties';
+import CityExplorer from '@/components/home/CityExplorer';
+import ServicesBanner from '@/components/home/ServicesBanner';
+import StatsBar from '@/components/home/StatsBar';
+import TopAgents from '@/components/home/TopAgents';
+
+export const metadata: Metadata = {
+  title: 'Think4BuySale – Buy, Rent & Sell Properties in India',
+  description:
+    "Think4BuySale – India's trusted real estate portal. 50,000+ verified properties in Mumbai, Delhi, Bangalore, Pune & more. Buy, Rent, Sell — Free listings.",
+  openGraph: {
+    title: "Think4BuySale – India's Trusted Real Estate Portal",
+    description: 'Buy, Rent & Sell Properties across India. 50,000+ verified listings, best prices.',
+    images: [{ url: '/og-image.jpg', width: 1200, height: 630, alt: 'Think4BuySale Real Estate' }],
+  },
+  alternates: { canonical: '/' },
+};
+
+const QUICK_LINKS = [
+  { label: 'Apartments for Sale', href: '/properties?category=buy&type=apartment' },
+  { label: 'Villas in Mumbai', href: '/properties?category=buy&type=villa&city=Mumbai' },
+  { label: '2 BHK for Rent', href: '/properties?category=rent&bedrooms=2' },
+  { label: 'PG in Bangalore', href: '/properties?category=pg&city=Bangalore' },
+  { label: 'Office Space Delhi', href: '/properties?category=commercial&city=Delhi' },
+  { label: 'Plots in Hyderabad', href: '/properties?category=buy&type=plot&city=Hyderabad' },
+];
+
+const PROPERTY_CATEGORIES = [
+  { icon: '🏠', label: 'Buy', sublabel: 'Apartments, Villas, Plots', href: '/buy', gradient: 'from-blue-500 to-blue-700' },
+  { icon: '🔑', label: 'Rent', sublabel: 'Flats, Houses, PG', href: '/rent', gradient: 'from-emerald-500 to-emerald-700' },
+  { icon: '🏢', label: 'Commercial', sublabel: 'Office, Shop, Warehouse', href: '/commercial', gradient: 'from-orange-500 to-orange-700' },
+  { icon: '🛏️', label: 'PG / Co-Living', sublabel: 'Single, Double, Triple', href: '/pg', gradient: 'from-purple-500 to-purple-700' },
+  { icon: '🏗️', label: 'New Projects', sublabel: 'Builder Floors, Societies', href: '/new-projects', gradient: 'from-pink-500 to-rose-600' },
+  { icon: '📐', label: 'Plot / Land', sublabel: 'Residential, Commercial', href: '/buy?type=plot', gradient: 'from-teal-500 to-teal-700' },
+];
+
+const WHY_US = [
+  { icon: Shield, title: 'Verified Listings', desc: 'All properties verified by our expert team.', color: 'bg-blue-50 text-blue-600' },
+  { icon: Building2, title: '50,000+ Properties', desc: 'Largest database across 50+ Indian cities.', color: 'bg-green-50 text-green-600' },
+  { icon: TrendingUp, title: 'Best Prices', desc: 'Compare and get the best market deals.', color: 'bg-orange-50 text-orange-600' },
+  { icon: HeadphonesIcon, title: '24/7 Support', desc: 'Expert team available round-the-clock.', color: 'bg-purple-50 text-purple-600' },
+];
+
+const PLATFORM_STATS = [
+  { value: '50,000+', label: 'Active Listings', icon: Home },
+  { value: '2,000+', label: 'Verified Agents', icon: Users },
+  { value: '15,000+', label: 'Happy Buyers', icon: Award },
+  { value: '98%', label: 'Satisfaction Rate', icon: BarChart3 },
+];
+
+export default function HomePage() {
+  return (
+    <>
+      {/* ─── Hero Section ─────────────────────────────────────────────────── */}
+      <section className="relative min-h-[80vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 pt-16">
+        {/* Animated background blobs */}
+        <div className="absolute top-20 left-10 w-72 h-72 bg-primary-600/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-primary-700/10 rounded-full blur-3xl" />
+
+        <div className="container-max relative z-10 py-14 px-4">
+          <div className="max-w-4xl mx-auto text-center mb-8">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-white/90 text-sm font-medium px-4 py-2 rounded-full mb-6 border border-white/20">
+              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+              India&apos;s #1 Trusted Real Estate Platform
+            </div>
+
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white leading-tight mb-4">
+              Find Your Perfect
+              <span className="block bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                Dream Property
+              </span>
+            </h1>
+
+            <p className="text-lg text-blue-100/80 mb-8 max-w-2xl mx-auto">
+              50,000+ verified properties across India. Buy, rent, or invest in your ideal home with confidence.
+            </p>
+          </div>
+
+          {/* Advanced Search Panel */}
+          <HomeSearchPanel />
+
+          {/* Quick Search Links */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-6">
+            <span className="text-blue-300/70 text-xs font-medium uppercase tracking-wide">Quick Search:</span>
+            {QUICK_LINKS.map((link) => (
+              <Link
+                key={link.label}
+                href={link.href}
+                className="text-xs bg-white/10 hover:bg-white/20 text-white/80 hover:text-white px-3 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/30"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Wave */}
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1440 60" className="w-full fill-gray-50" preserveAspectRatio="none">
+            <path d="M0,30L60,28C120,26,240,22,360,22C480,22,600,26,720,30C840,34,960,38,1080,36C1200,34,1320,28,1380,25L1440,22L1440,60L0,60Z" />
+          </svg>
+        </div>
+      </section>
+
+      {/* ─── Platform Stats ───────────────────────────────────────────────── */}
+      <section className="py-8 bg-gray-50">
+        <div className="container-max">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {PLATFORM_STATS.map(({ value, label, icon: Icon }) => (
+              <div key={label} className="bg-white rounded-2xl p-5 text-center border border-gray-100 shadow-sm">
+                <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center mx-auto mb-3">
+                  <Icon className="w-5 h-5 text-primary-600" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900">{value}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Category Grid ────────────────────────────────────────────────── */}
+      <section className="py-12 bg-gray-50">
+        <div className="container-max">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">What Are You Looking For?</h2>
+            <p className="text-gray-500 mt-2">Browse properties by category</p>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+            {PROPERTY_CATEGORIES.map((cat) => (
+              <Link
+                key={cat.label}
+                href={cat.href}
+                className="group relative overflow-hidden rounded-2xl p-5 flex flex-col items-center text-center transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-white border border-gray-100"
+              >
+                <div
+                  className={`w-12 h-12 bg-gradient-to-br ${cat.gradient} rounded-xl flex items-center justify-center mb-3 text-2xl shadow-lg`}
+                >
+                  {cat.icon}
+                </div>
+                <span className="font-bold text-sm text-gray-900">{cat.label}</span>
+                <span className="text-xs text-gray-500 hidden sm:block mt-1 leading-tight">{cat.sublabel}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Featured Properties ──────────────────────────────────────────── */}
+      <FeaturedProperties />
+
+      {/* ─── Top Agents ───────────────────────────────────────────────────── */}
+      <TopAgents />
+
+      {/* ─── Explore Cities ───────────────────────────────────────────────── */}
+      <CityExplorer />
+
+      {/* ─── Why Choose Us ────────────────────────────────────────────────── */}
+      <section className="py-16 bg-white">
+        <div className="container-max">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Why Choose Think4BuySale?</h2>
+            <p className="text-gray-500 mt-2">Trusted by millions of home buyers &amp; sellers</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {WHY_US.map(({ icon: Icon, title, desc, color }) => (
+              <div
+                key={title}
+                className="group text-center p-6 rounded-2xl border border-gray-100 hover:border-primary-200 hover:shadow-lg transition-all duration-300"
+              >
+                <div
+                  className={`w-16 h-16 ${color} rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform`}
+                >
+                  <Icon className="w-8 h-8" />
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2">{title}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Trust indicators */}
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-6">
+            {['RERA Registered Agents', 'SSL Secured Platform', 'ISO 9001 Certified', 'RBI Approved Partners'].map(
+              (item) => (
+                <div key={item} className="flex items-center gap-2 text-sm text-gray-600">
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  {item}
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Services ─────────────────────────────────────────────────────── */}
+      <ServicesBanner />
+
+      {/* ─── CTA Banner ───────────────────────────────────────────────────── */}
+      <section className="py-16 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+        <div className="container-max text-center relative z-10">
+          <div className="inline-flex items-center gap-2 bg-white/10 text-white/80 text-sm px-4 py-2 rounded-full mb-4">
+            <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+            Join 50,000+ property seekers
+          </div>
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-3">
+            List Your Property for <span className="text-yellow-400">FREE</span>
+          </h2>
+          <p className="text-blue-100/70 mb-8 max-w-lg mx-auto text-lg">
+            Reach millions of buyers and renters. Post your property listing in just 2 minutes.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Link
+              href="/post-property"
+              className="bg-white text-primary-700 hover:bg-yellow-50 font-bold px-8 py-3.5 rounded-2xl transition-all hover:shadow-xl inline-flex items-center gap-2"
+            >
+              Post Property Now <ArrowRight className="w-5 h-5" />
+            </Link>
+            <Link
+              href="/properties"
+              className="text-white border border-white/30 hover:border-white/60 hover:bg-white/10 font-medium px-8 py-3.5 rounded-2xl transition-all inline-flex items-center gap-2"
+            >
+              Browse Properties
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* JSON-LD */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: 'Think4BuySale',
+            url: process.env.NEXT_PUBLIC_APP_URL,
+            potentialAction: {
+              '@type': 'SearchAction',
+              target: {
+                '@type': 'EntryPoint',
+                urlTemplate: `${process.env.NEXT_PUBLIC_APP_URL}/properties?search={search_term_string}`,
+              },
+              'query-input': 'required name=search_term_string',
+            },
+          }),
+        }}
+      />
+    </>
+  );
+}
