@@ -6,7 +6,7 @@ type Params = { city: string };
 
 // Convert slug like "new-delhi" → "New Delhi"
 function slugToCity(slug: string): string {
-  return slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return slug ? slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
 }
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {

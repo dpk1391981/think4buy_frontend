@@ -5,7 +5,7 @@ import PropertyListingPage from '@/app/properties/PropertyListingPage';
 type Params = { city: string };
 
 function slugToCity(slug: string): string {
-  return slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return slug ? slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
 }
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
