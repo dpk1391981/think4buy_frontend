@@ -16,7 +16,22 @@ const TABS = [
   { id: 'recent',    label: '🕐 Just Listed',   params: { sortBy: 'createdAt', sortOrder: 'DESC', limit: 8, approvalStatus: 'approved' } },
 ];
 
-function SkeletonGrid() {
+function SkeletonCards({ mobile }: { mobile?: boolean }) {
+  if (mobile) {
+    return (
+      <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 snap-x snap-mandatory">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex-shrink-0 w-[72vw] snap-start bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <div className="skeleton aspect-[4/3]" />
+            <div className="p-3 space-y-2">
+              <div className="skeleton h-4 w-3/4" />
+              <div className="skeleton h-3 w-1/2" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
       {Array.from({ length: 8 }).map((_, i) => (
@@ -42,7 +57,6 @@ function TabContent({
   stateFilter: string;
   stateIdFilter: string;
 }) {
-  // Prefer stateId (FK) for accurate filtering, fallback to state name
   const locationParams = stateIdFilter
     ? { stateId: stateIdFilter }
     : stateFilter
@@ -59,7 +73,12 @@ function TabContent({
     staleTime: 2 * 60 * 1000,
   });
 
-  if (isLoading) return <SkeletonGrid />;
+  if (isLoading) return (
+    <>
+      <div className="sm:hidden"><SkeletonCards mobile /></div>
+      <div className="hidden sm:block"><SkeletonCards /></div>
+    </>
+  );
 
   if (!properties?.length) {
     return (
@@ -71,11 +90,25 @@ function TabContent({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-      {properties.map((p: any) => (
-        <PropertyCard key={p.id} property={p} />
-      ))}
-    </div>
+    <>
+      {/* Mobile: horizontal snap scroll */}
+      <div className="sm:hidden -mx-4">
+        <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 snap-x snap-mandatory pb-2">
+          {properties.map((p: any) => (
+            <div key={p.id} className="flex-shrink-0 w-[72vw] snap-start">
+              <PropertyCard property={p} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Desktop: grid */}
+      <div className="hidden sm:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        {properties.map((p: any) => (
+          <PropertyCard key={p.id} property={p} />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -92,16 +125,16 @@ export default function FeaturedProperties() {
     '/properties?isFeatured=true';
 
   return (
-    <section className="py-14 bg-white">
+    <section className="py-10 sm:py-14 bg-white">
       <div className="container-max">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="w-5 h-5 text-primary-600" />
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
               <span className="text-xs font-semibold text-primary-600 uppercase tracking-wide">Curated for You</span>
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Top Properties</h2>
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Top Properties</h2>
           </div>
           <Link
             href={viewAllHref}
@@ -111,22 +144,24 @@ export default function FeaturedProperties() {
           </Link>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit mb-8 overflow-x-auto">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={cn(
-                'px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all',
-                activeTab === t.id
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700',
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* Tabs — horizontal scroll on mobile */}
+        <div className="overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 mb-5 sm:mb-8">
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={cn(
+                  'px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all',
+                  activeTab === t.id
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700',
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* State filter indicator */}
@@ -139,9 +174,9 @@ export default function FeaturedProperties() {
         {/* Content */}
         <TabContent tab={tab} stateFilter={selectedState} stateIdFilter={selectedStateId} />
 
-        {/* Mobile view all */}
-        <div className="text-center mt-8 sm:hidden">
-          <Link href={viewAllHref} className="btn-outline">
+        {/* View all — mobile */}
+        <div className="text-center mt-6 sm:hidden">
+          <Link href={viewAllHref} className="btn-outline text-sm py-2">
             View All <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

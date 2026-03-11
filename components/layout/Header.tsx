@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
-import { Menu, X, ChevronDown, Home, User, LogOut, Settings, Heart, MapPin, Building2, TrendingUp, Search } from 'lucide-react';
+import { ChevronDown, Home, User, LogOut, Settings, Heart, MapPin, Building2, TrendingUp, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
@@ -79,7 +79,7 @@ const MEGA_SECTIONS: MegaSection[] = [
 
 // ─── State Selector ───────────────────────────────────────────────────────────
 
-function StateSelector() {
+function StateSelector({ compact = false }: { compact?: boolean }) {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const pathname = usePathname();
@@ -91,7 +91,6 @@ function StateSelector() {
   const [detecting, setDetecting] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Load states from DB
   useEffect(() => {
     locationsApi.getStates().then(r => {
       const data = r.data;
@@ -100,39 +99,33 @@ function StateSelector() {
     }).catch(() => {});
   }, []);
 
-  // Hydrate from localStorage; if nothing saved, auto-detect via geolocation
   useEffect(() => {
     const saved = loadLocationFromLS();
     if (saved.state) {
       if (!selectedState) {
         dispatch(setSelectedLocation({ state: saved.state, stateId: saved.stateId }));
       }
-      return; // already have a location
+      return;
     }
-    // No saved location — try auto-detect silently
     setDetecting(true);
     detectLocation()
       .then((loc) => {
         if (!loc.state) return;
-        // Wait until dbStates is loaded, or fetch now and match
         locationsApi.getStates().then(r => {
           const data = r.data;
           const arr: { id: string; name: string }[] = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-          const match = arr.find(
-            s => s.name.toLowerCase() === loc.state.toLowerCase()
-          );
+          const match = arr.find(s => s.name.toLowerCase() === loc.state.toLowerCase());
           if (match) {
             dispatch(setSelectedLocation({ state: match.name, stateId: match.id }));
             saveLocationToLS(match.name, match.id);
           }
         }).catch(() => {});
       })
-      .catch(() => {}) // silently ignore permission denied / unavailable
+      .catch(() => {})
       .finally(() => setDetecting(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -184,18 +177,23 @@ function StateSelector() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-gray-100 text-sm text-gray-600 transition-colors border border-gray-200"
+        className={cn(
+          'flex items-center gap-1 rounded-lg transition-colors border',
+          compact
+            ? 'px-2 py-1.5 text-xs border-gray-200 bg-gray-50 hover:bg-gray-100'
+            : 'px-3 py-1.5 text-sm border-gray-200 hover:bg-gray-100 text-gray-600'
+        )}
         title="Select State"
       >
-        <MapPin className={cn('w-3.5 h-3.5 flex-shrink-0', detecting ? 'text-orange-500 animate-pulse' : 'text-primary-600')} />
-        <span className="max-w-[100px] truncate font-medium">
-          {detecting ? 'Detecting…' : selectedState || '🇮🇳 All India'}
+        <MapPin className={cn('flex-shrink-0', detecting ? 'text-orange-500 animate-pulse' : 'text-primary-600', compact ? 'w-3 h-3' : 'w-3.5 h-3.5')} />
+        <span className={cn('font-medium truncate', compact ? 'max-w-[70px]' : 'max-w-[100px]')}>
+          {detecting ? '…' : selectedState || (compact ? '🇮🇳 India' : '🇮🇳 All India')}
         </span>
-        <ChevronDown className={cn('w-3 h-3 text-gray-400 transition-transform flex-shrink-0', open && 'rotate-180')} />
+        <ChevronDown className={cn('text-gray-400 transition-transform flex-shrink-0', open && 'rotate-180', compact ? 'w-2.5 h-2.5' : 'w-3 h-3')} />
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+        <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 z-[200] overflow-hidden">
           <div className="p-2 border-b border-gray-100">
             <input
               type="text"
@@ -207,7 +205,6 @@ function StateSelector() {
             />
           </div>
           <div className="max-h-64 overflow-y-auto py-1">
-            {/* Detect my location */}
             <button
               onClick={handleDetectClick}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-blue-50 text-blue-600 transition-colors text-left border-b border-gray-100"
@@ -252,7 +249,6 @@ function StateSelector() {
 function PropertiesMega({ onClose }: { onClose: () => void }) {
   return (
     <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden w-[720px] max-w-[calc(100vw-2rem)]">
-      {/* Top strip */}
       <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-3 flex items-center justify-between">
         <span className="text-white font-semibold text-sm">Browse Properties</span>
         <Link
@@ -264,7 +260,6 @@ function PropertiesMega({ onClose }: { onClose: () => void }) {
         </Link>
       </div>
 
-      {/* 4-column grid */}
       <div className="grid grid-cols-4 divide-x divide-gray-100 p-2">
         {MEGA_SECTIONS.map((section) => (
           <div key={section.heading} className="px-4 py-4">
@@ -295,7 +290,6 @@ function PropertiesMega({ onClose }: { onClose: () => void }) {
         ))}
       </div>
 
-      {/* Bottom quick links */}
       <div className="border-t border-gray-100 bg-gray-50 px-6 py-3 flex items-center gap-6">
         <span className="text-xs text-gray-400 font-medium">Quick:</span>
         {[
@@ -320,7 +314,7 @@ function PropertiesMega({ onClose }: { onClose: () => void }) {
 
 // ─── User Menu ────────────────────────────────────────────────────────────────
 
-function UserMenu() {
+function UserMenu({ compact = false }: { compact?: boolean }) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -348,22 +342,33 @@ function UserMenu() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+        className={cn(
+          'flex items-center gap-2 rounded-lg hover:bg-gray-100 transition-colors',
+          compact ? 'p-1' : 'px-2 py-1.5'
+        )}
       >
-        <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+        <div className={cn(
+          'rounded-full bg-primary-600 flex items-center justify-center text-white font-bold flex-shrink-0',
+          compact ? 'w-8 h-8 text-xs' : 'w-8 h-8 text-xs'
+        )}>
           {initials}
         </div>
-        <div className="hidden lg:block text-left">
-          <div className="text-sm font-medium text-gray-800 leading-tight max-w-[7rem] truncate">
-            {user?.name}
+        {!compact && (
+          <div className="hidden lg:block text-left">
+            <div className="text-sm font-medium text-gray-800 leading-tight max-w-[7rem] truncate">
+              {user?.name}
+            </div>
+            <div className="text-xs text-gray-400 capitalize">{user?.role}</div>
           </div>
-          <div className="text-xs text-gray-400 capitalize">{user?.role}</div>
-        </div>
-        <ChevronDown className={cn('w-3.5 h-3.5 text-gray-400 transition-transform', open && 'rotate-180')} />
+        )}
+        {!compact && <ChevronDown className={cn('w-3.5 h-3.5 text-gray-400 transition-transform', open && 'rotate-180')} />}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-52 bg-white shadow-xl rounded-xl border border-gray-100 py-1.5 z-50">
+        <div className={cn(
+          'absolute bg-white shadow-xl rounded-xl border border-gray-100 py-1.5 z-[200]',
+          compact ? 'right-0 top-full mt-2 w-52' : 'right-0 top-full mt-2 w-52'
+        )}>
           <div className="px-4 py-2.5 border-b border-gray-100">
             <div className="font-semibold text-gray-900 text-sm truncate">{user?.name}</div>
             <div className="text-xs text-gray-400 truncate">{user?.phone || user?.email}</div>
@@ -416,46 +421,11 @@ function UserMenu() {
   );
 }
 
-// ─── Mobile accordion section ─────────────────────────────────────────────────
-
-function MobileSection({ section, onClose }: { section: MegaSection; onClose: () => void }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div>
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
-      >
-        <span className="flex items-center gap-2">
-          <span className="text-primary-600">{section.icon}</span>
-          {section.heading}
-        </span>
-        <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform', open && 'rotate-180')} />
-      </button>
-      {open && (
-        <div className="pl-10 pb-1 space-y-0.5">
-          {section.links.map((link) => (
-            <Link
-              key={link.label}
-              href={link.href}
-              onClick={onClose}
-              className="block py-2 px-3 text-sm text-gray-500 hover:text-primary-600 hover:bg-gray-50 rounded-lg transition-colors"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Main Header ──────────────────────────────────────────────────────────────
 
 export default function Header() {
   const { user, loading } = useAuth();
   const dispatch = useAppDispatch();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [megaOpen, setMegaOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
@@ -467,14 +437,6 @@ export default function Header() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Close mobile menu on resize
-  useEffect(() => {
-    const onResize = () => { if (window.innerWidth >= 768) setMobileOpen(false); };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  // Close mega on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (megaRef.current && !megaRef.current.contains(e.target as Node)) {
@@ -493,159 +455,124 @@ export default function Header() {
         scrolled ? 'shadow-md' : 'border-b border-gray-100'
       )}
     >
-      <div className="container-max">
-        <div className="flex items-center justify-between h-16 gap-2">
-
-          {/* ── Logo ── */}
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <Home className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900">
-              Think<span className="text-primary-600">4Buy</span><span className="text-amber-500">Sale</span>
-            </span>
-          </Link>
-
-          {/* ── Desktop Nav ── */}
-          <nav className="hidden md:flex items-center gap-0.5 flex-1 justify-center">
-
-            {/* Properties mega trigger */}
-            <div ref={megaRef} className="relative">
-              <button
-                onMouseEnter={() => setMegaOpen(true)}
-                onMouseLeave={() => setMegaOpen(false)}
-                onClick={() => setMegaOpen((v) => !v)}
-                className={cn(
-                  'flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-md transition-colors',
-                  megaOpen ? 'text-primary-600 bg-primary-50' : 'text-gray-700 hover:text-primary-600 hover:bg-gray-50'
-                )}
-              >
-                Properties
-                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', megaOpen && 'rotate-180')} />
-              </button>
-
-              {megaOpen && (
-                <div
-                  onMouseEnter={() => setMegaOpen(true)}
-                  onMouseLeave={() => setMegaOpen(false)}
-                >
-                  <PropertiesMega onClose={() => setMegaOpen(false)} />
-                </div>
-              )}
-            </div>
-
-            {/* Standalone links */}
-            {[
-              { label: 'Agents', href: '/agents' },
-              { label: 'Services', href: '/services' },
-              { label: 'New Projects', href: '/new-projects' },
-            ].map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-md transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* ── Right actions ── */}
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <StateSelector />
-
-            {!loading && (
-              user ? (
-                <UserMenu />
-              ) : (
-                <button
-                  onClick={() => dispatch(openAuthModal('login'))}
-                  className="hidden md:block text-sm font-medium text-gray-700 hover:text-primary-600 px-3 py-2 transition-colors"
-                >
-                  Login
-                </button>
-              )
-            )}
-
-            <Link
-              href="/post-property"
-              className="btn-primary text-sm py-2 px-3 lg:px-4 hidden sm:flex items-center gap-1 whitespace-nowrap"
-            >
-              + Post <span className="hidden lg:inline">Property FREE</span>
-            </Link>
-
-            {/* Mobile hamburger */}
-            <button
-              onClick={() => setMobileOpen(!mobileOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              aria-label="Menu"
-            >
-              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
+      {/* ─── Mobile Header ────────────────────────────────────────────────── */}
+      <div className="md:hidden flex items-center justify-between h-14 px-4 gap-3">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-1.5 flex-shrink-0">
+          <div className="w-7 h-7 bg-primary-600 rounded-lg flex items-center justify-center">
+            <Home className="w-4 h-4 text-white" />
           </div>
+          <span className="text-base font-bold text-gray-900 leading-tight">
+            Think<span className="text-primary-600">4Buy</span><span className="text-amber-500">Sale</span>
+          </span>
+        </Link>
+
+        {/* Right: Location + Search + User */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <StateSelector compact />
+          <Link
+            href="/properties"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+            aria-label="Search"
+          >
+            <Search className="w-4.5 h-4.5 text-gray-700" style={{ width: 18, height: 18 }} />
+          </Link>
+          {!loading && (
+            user ? (
+              <UserMenu compact />
+            ) : (
+              <button
+                onClick={() => dispatch(openAuthModal('login'))}
+                className="w-9 h-9 flex items-center justify-center rounded-full bg-primary-50 hover:bg-primary-100 transition-colors"
+                aria-label="Login"
+              >
+                <User className="text-primary-600" style={{ width: 18, height: 18 }} />
+              </button>
+            )
+          )}
         </div>
       </div>
 
-      {/* ── Mobile menu ── */}
-      <div
-        className={cn(
-          'md:hidden overflow-hidden transition-all duration-300 ease-in-out bg-white border-t border-gray-100',
-          mobileOpen ? 'max-h-[90vh] overflow-y-auto' : 'max-h-0'
-        )}
-      >
-        <div className="py-2 px-2 space-y-0.5">
-          {/* Properties accordion sections */}
-          <div className="pb-1">
-            <p className="px-4 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Properties</p>
-            {MEGA_SECTIONS.map((section) => (
-              <MobileSection key={section.heading} section={section} onClose={() => setMobileOpen(false)} />
-            ))}
-          </div>
+      {/* ─── Desktop Header ───────────────────────────────────────────────── */}
+      <div className="hidden md:block">
+        <div className="container-max">
+          <div className="flex items-center justify-between h-16 gap-2">
 
-          <div className="border-t border-gray-100 pt-1">
-            {[
-              { label: 'Agents', href: '/agents' },
-              { label: 'Services', href: '/services' },
-              { label: 'New Projects', href: '/new-projects' },
-            ].map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className="block px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
-                onClick={() => setMobileOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-
-          {/* CTA + Auth */}
-          <div className="border-t border-gray-100 px-2 pt-3 pb-2 space-y-2">
-            {user ? (
-              <div className="flex items-center gap-3 px-2 py-2">
-                <div className="w-9 h-9 rounded-full bg-primary-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                  {user.name?.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-gray-900 truncate">{user.name}</div>
-                  <div className="text-xs text-gray-400 capitalize">{user.role}</div>
-                </div>
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+                <Home className="w-5 h-5 text-white" />
               </div>
-            ) : (
-              <button
-                className="btn-outline justify-center w-full"
-                onClick={() => { setMobileOpen(false); dispatch(openAuthModal('login')); }}
-              >
-                Login / Register
-              </button>
-            )}
-            <Link
-              href="/post-property"
-              className="btn-primary justify-center w-full flex"
-              onClick={() => setMobileOpen(false)}
-            >
-              + Post Property FREE
+              <span className="text-xl font-bold text-gray-900">
+                Think<span className="text-primary-600">4Buy</span><span className="text-amber-500">Sale</span>
+              </span>
             </Link>
+
+            {/* Desktop Nav */}
+            <nav className="flex items-center gap-0.5 flex-1 justify-center">
+              <div ref={megaRef} className="relative">
+                <button
+                  onMouseEnter={() => setMegaOpen(true)}
+                  onMouseLeave={() => setMegaOpen(false)}
+                  onClick={() => setMegaOpen((v) => !v)}
+                  className={cn(
+                    'flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                    megaOpen ? 'text-primary-600 bg-primary-50' : 'text-gray-700 hover:text-primary-600 hover:bg-gray-50'
+                  )}
+                >
+                  Properties
+                  <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', megaOpen && 'rotate-180')} />
+                </button>
+
+                {megaOpen && (
+                  <div
+                    onMouseEnter={() => setMegaOpen(true)}
+                    onMouseLeave={() => setMegaOpen(false)}
+                  >
+                    <PropertiesMega onClose={() => setMegaOpen(false)} />
+                  </div>
+                )}
+              </div>
+
+              {[
+                { label: 'Agents', href: '/agents' },
+                { label: 'Services', href: '/services' },
+                { label: 'New Projects', href: '/new-projects' },
+              ].map((link) => (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-md transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+
+            {/* Right actions */}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <StateSelector />
+
+              {!loading && (
+                user ? (
+                  <UserMenu />
+                ) : (
+                  <button
+                    onClick={() => dispatch(openAuthModal('login'))}
+                    className="text-sm font-medium text-gray-700 hover:text-primary-600 px-3 py-2 transition-colors"
+                  >
+                    Login
+                  </button>
+                )
+              )}
+
+              <Link
+                href="/post-property"
+                className="btn-primary text-sm py-2 px-3 lg:px-4 flex items-center gap-1 whitespace-nowrap"
+              >
+                + Post <span className="hidden lg:inline">Property FREE</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>

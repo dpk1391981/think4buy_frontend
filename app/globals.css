@@ -147,3 +147,12 @@
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* Main content bottom padding to clear fixed bottom nav (64px) + safe area */
+.pb-safe-nav {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+}
+
+/* Hide scrollbar for horizontal scroll carousels */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

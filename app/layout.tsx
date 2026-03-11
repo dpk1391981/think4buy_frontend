@@ -91,7 +91,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <QueryProvider>
             <AuthProvider>
               <Header />
-              <main className="min-h-screen pb-16 md:pb-0">{children}</main>
+              <main className="min-h-screen pb-safe-nav md:pb-0">{children}</main>
               <Footer />
               <MobileBottomNav />
               <AuthModal />

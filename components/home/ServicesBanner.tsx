@@ -32,14 +32,36 @@ export default function ServicesBanner() {
   ];
 
   return (
-    <section className="py-12 bg-white">
+    <section className="py-10 sm:py-12 bg-white">
       <div className="container-max">
-        <h2 className="section-title text-center mb-2">More Services for You</h2>
-        <p className="section-subtitle text-center mb-8">
+        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 text-center mb-1">More Services for You</h2>
+        <p className="text-gray-500 text-center text-sm mb-6 sm:mb-8">
           Everything you need for your property journey
         </p>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        {/* Mobile: horizontal scroll */}
+        <div className="sm:hidden -mx-4">
+          <div className="flex gap-3 overflow-x-auto no-scrollbar px-4 snap-x snap-mandatory pb-2">
+            {displayServices.slice(0, 6).map((service: any) => (
+              <Link
+                key={service.slug}
+                href={`/services/${service.slug}`}
+                className="flex-shrink-0 w-32 snap-start group p-4 rounded-2xl border border-gray-100 bg-white hover:border-primary-200 hover:shadow-md text-center transition-all duration-200 flex flex-col items-center"
+              >
+                <div className="text-3xl mb-2 group-hover:scale-110 transition-transform duration-200">
+                  {SERVICE_ICONS[service.type] || '🏠'}
+                </div>
+                <h3 className="font-semibold text-xs text-gray-900 mb-1 group-hover:text-primary-600 transition-colors leading-tight">
+                  {service.name}
+                </h3>
+                <p className="text-xs text-gray-400 line-clamp-2 leading-tight">{service.description}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Desktop: grid */}
+        <div className="hidden sm:grid grid-cols-3 lg:grid-cols-6 gap-4">
           {displayServices.slice(0, 6).map((service: any) => (
             <Link
               key={service.slug}
