@@ -22,9 +22,19 @@ export function saveLocationToLS(state: string, stateId: string) {
   } catch {}
 }
 
+export type AuthModalReason = 'wishlist' | 'post-property' | 'general' | 'app-open';
+
+export interface OpenAuthModalPayload {
+  mode?: 'login' | 'register';
+  reason?: AuthModalReason;
+  redirectTo?: string;
+}
+
 interface UIState {
   authModalOpen: boolean;
   authModalMode: 'login' | 'register';
+  authModalReason: AuthModalReason;
+  authModalRedirectTo: string;
   mobileMenuOpen: boolean;
   toasts: Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>;
   selectedCountry: string;    // country name, '' = All
@@ -38,6 +48,8 @@ interface UIState {
 const initialState: UIState = {
   authModalOpen: false,
   authModalMode: 'login',
+  authModalReason: 'general',
+  authModalRedirectTo: '',
   mobileMenuOpen: false,
   toasts: [],
   selectedCountry: '',
@@ -52,12 +64,22 @@ export const uiSlice = createSlice({
   name: 'ui',
   initialState,
   reducers: {
-    openAuthModal: (state, action: PayloadAction<'login' | 'register'>) => {
+    openAuthModal: (state, action: PayloadAction<OpenAuthModalPayload | 'login' | 'register'>) => {
       state.authModalOpen = true;
-      state.authModalMode = action.payload;
+      if (typeof action.payload === 'string') {
+        state.authModalMode = action.payload;
+        state.authModalReason = 'general';
+        state.authModalRedirectTo = '';
+      } else {
+        state.authModalMode = action.payload.mode ?? 'login';
+        state.authModalReason = action.payload.reason ?? 'general';
+        state.authModalRedirectTo = action.payload.redirectTo ?? '';
+      }
     },
     closeAuthModal: (state) => {
       state.authModalOpen = false;
+      state.authModalReason = 'general';
+      state.authModalRedirectTo = '';
     },
     toggleMobileMenu: (state) => {
       state.mobileMenuOpen = !state.mobileMenuOpen;

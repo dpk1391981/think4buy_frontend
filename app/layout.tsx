@@ -7,6 +7,7 @@ import QueryProvider from '@/components/providers/QueryProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ReduxProvider } from '@/providers/ReduxProvider';
 import AuthModal from '@/components/auth/AuthModal';
+import MobileGuestLoginPrompt from '@/components/auth/MobileGuestLoginPrompt';
 
 const APP_NAME = 'Think4BuySale';
 const APP_URL  = process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com';
@@ -94,6 +95,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <main className="min-h-screen pb-safe-nav md:pb-0">{children}</main>
               <Footer />
               <MobileBottomNav />
+              <MobileGuestLoginPrompt />
               <AuthModal />
             </AuthProvider>
           </QueryProvider>

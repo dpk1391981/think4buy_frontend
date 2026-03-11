@@ -58,7 +58,7 @@ export default function PropertyCard({ property, className, listView }: Property
     e.preventDefault();
     e.stopPropagation();
     if (!user) {
-      dispatch(openAuthModal('login'));
+      dispatch(openAuthModal({ mode: 'login', reason: 'wishlist' }));
       return;
     }
     toggle(property.id);

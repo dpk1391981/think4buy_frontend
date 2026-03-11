@@ -1,19 +1,45 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Phone, RefreshCw, Shield, CheckCircle, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { X, Phone, RefreshCw, Shield, CheckCircle, Loader2, Heart, Home, BookOpen } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
-import { closeAuthModal } from '@/lib/store/slices/uiSlice';
+import { closeAuthModal, AuthModalReason } from '@/lib/store/slices/uiSlice';
 import { cn } from '@/lib/utils';
+
+const REASON_CONFIG: Record<AuthModalReason, { icon: React.ReactNode; title: string; subtitle: string }> = {
+  wishlist: {
+    icon: <Heart className="w-5 h-5 text-red-500 fill-red-500" />,
+    title: 'Save to Wishlist',
+    subtitle: 'Login to save your favourite properties',
+  },
+  'post-property': {
+    icon: <Home className="w-5 h-5 text-primary-600" />,
+    title: 'Post Property FREE',
+    subtitle: 'Login to list your property in minutes',
+  },
+  'app-open': {
+    icon: <BookOpen className="w-5 h-5 text-primary-600" />,
+    title: 'Welcome to Think4BuySale',
+    subtitle: 'Join 18L+ property seekers across India',
+  },
+  general: {
+    icon: null,
+    title: 'Login / Register',
+    subtitle: 'Use your mobile number to continue',
+  },
+};
 
 type Step = 'phone' | 'otp';
 
 export default function AuthModal() {
   const dispatch = useAppDispatch();
-  const { authModalOpen } = useAppSelector((s) => s.ui);
+  const router = useRouter();
+  const { authModalOpen, authModalReason, authModalRedirectTo } = useAppSelector((s) => s.ui);
   const { login } = useAuth();
+  const reasonConfig = REASON_CONFIG[authModalReason] ?? REASON_CONFIG.general;
 
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
@@ -96,6 +122,9 @@ export default function AuthModal() {
       const { data } = await authApi.verifyOtp(phone, otp, name || undefined);
       login(data.token, data.user);
       dispatch(closeAuthModal());
+      if (authModalRedirectTo) {
+        router.push(authModalRedirectTo);
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid OTP. Try again.');
     } finally { setLoading(false); }
@@ -143,15 +172,22 @@ export default function AuthModal() {
 
         {/* Header */}
         <div className="px-6 pt-5 pb-0 flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">
-              {step === 'phone' ? 'Login / Register' : 'Verify OTP'}
-            </h2>
-            <p className="text-sm text-gray-400 mt-0.5">
-              {step === 'phone'
-                ? 'Use your mobile number to continue'
-                : `Sent to +91 ${phone}`}
-            </p>
+          <div className="flex items-center gap-2.5">
+            {step === 'phone' && reasonConfig.icon && (
+              <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
+                {reasonConfig.icon}
+              </div>
+            )}
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                {step === 'phone' ? reasonConfig.title : 'Verify OTP'}
+              </h2>
+              <p className="text-sm text-gray-400 mt-0.5">
+                {step === 'phone'
+                  ? reasonConfig.subtitle
+                  : `Sent to +91 ${phone}`}
+              </p>
+            </div>
           </div>
           <button
             onClick={() => dispatch(closeAuthModal())}
