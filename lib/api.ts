@@ -62,6 +62,8 @@ export const locationsApi = {
 export const inquiriesApi = {
   create: (propertyId: string, data: any) =>
     api.post(`/inquiries/property/${propertyId}`, data),
+  contactAgent: (agentId: string, data: any) =>
+    api.post(`/inquiries/agent/${agentId}`, data),
   getMyInquiries: () => api.get('/inquiries/my-inquiries'),
 };
 
@@ -84,7 +86,9 @@ export const adminApi = {
   togglePropertyFeatured: (id: string) => api.patch(`/admin/properties/${id}/toggle-featured`),
   // Agents
   getAgents: (params?: Record<string, any>) => api.get('/admin/agents', { params }),
+  getAgent: (id: string) => api.get(`/admin/agents/${id}`),
   createAgent: (data: any) => api.post('/admin/agents', data),
+  updateAgent: (id: string, data: any) => api.patch(`/admin/agents/${id}`, data),
   updateQuota: (id: string, agentFreeQuota: number) =>
     api.patch(`/admin/agents/${id}/quota`, { agentFreeQuota }),
   toggleAgentStatus: (id: string) => api.patch(`/admin/agents/${id}/toggle-status`),

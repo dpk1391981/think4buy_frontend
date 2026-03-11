@@ -1,25 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { adminApi, adminLocationsApi } from '@/lib/api';
+import { adminApi, adminLocationsApi, locationsApi } from '@/lib/api';
 
 interface State { id: string; name: string; code: string; }
 interface City  { id: string; name: string; stateId: string; }
 
-export default function CreateAgentPage() {
+export default function EditAgentPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState('');
-  const [states, setStates] = useState<State[]>([]);
-  const [cities, setCities] = useState<City[]>([]);
+  const [loading, setLoading]   = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const [error, setError]       = useState('');
+  const [states, setStates]     = useState<State[]>([]);
+  const [cities, setCities]     = useState<City[]>([]);
   const [loadingCities, setLoadingCities] = useState(false);
 
   const [form, setForm] = useState({
     name:            '',
     email:           '',
-    password:        '',
     phone:           '',
     company:         '',
     stateId:         '',
@@ -33,19 +34,38 @@ export default function CreateAgentPage() {
     agentTick:       'none' as 'none' | 'blue' | 'gold' | 'diamond',
   });
 
-  // Load states on mount
+  // Load agent data + states on mount
   useEffect(() => {
-    adminLocationsApi.getStates()
-      .then(r => setStates(r.data || []))
-      .catch(() => setStates([]));
-  }, []);
+    Promise.all([
+      adminApi.getAgent(id),
+      adminLocationsApi.getStates(),
+    ]).then(([agentRes, statesRes]) => {
+      const a = agentRes.data;
+      setForm({
+        name:            a.name            ?? '',
+        email:           a.email           ?? '',
+        phone:           a.phone           ?? '',
+        company:         a.company         ?? '',
+        stateId:         a.stateId         ?? '',
+        state:           a.state           ?? '',
+        cityId:          a.cityId          ?? '',
+        city:            a.city            ?? '',
+        agentLicense:    a.agentLicense    ?? '',
+        agentBio:        a.agentBio        ?? '',
+        agentExperience: a.agentExperience != null ? String(a.agentExperience) : '',
+        agentFreeQuota:  a.agentFreeQuota  != null ? String(a.agentFreeQuota)  : '100',
+        agentTick:       a.agentTick       ?? 'none',
+      });
+      setStates(statesRes.data || []);
+    }).catch(() => setError('Failed to load agent data'))
+      .finally(() => setFetching(false));
+  }, [id]);
 
-  // Load cities when state changes
+  // Load cities when stateId changes (after initial load)
   useEffect(() => {
     if (!form.stateId) { setCities([]); return; }
     setLoadingCities(true);
-    import('@/lib/api')
-      .then(({ locationsApi }) => locationsApi.getCitiesByState(form.stateId))
+    locationsApi.getCitiesByState(form.stateId)
       .then(r => setCities(r.data || []))
       .catch(() => setCities([]))
       .finally(() => setLoadingCities(false));
@@ -68,14 +88,14 @@ export default function CreateAgentPage() {
     setError('');
     setLoading(true);
     try {
-      await adminApi.createAgent({
+      await adminApi.updateAgent(id, {
         ...form,
         agentExperience: form.agentExperience ? parseInt(form.agentExperience) : undefined,
         agentFreeQuota:  parseInt(form.agentFreeQuota) || 100,
       });
       router.push('/admin/agents');
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to create agent');
+      setError(err?.response?.data?.message || 'Failed to update agent');
     } finally {
       setLoading(false);
     }
@@ -101,12 +121,32 @@ export default function CreateAgentPage() {
     </div>
   );
 
+  if (fetching) {
+    return (
+      <div className="p-6 max-w-3xl">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-48" />
+          {[1,2,3,4].map(i => (
+            <div key={i} className="bg-white rounded-xl p-6 shadow-sm space-y-3">
+              <div className="h-5 bg-gray-200 rounded w-32" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="h-10 bg-gray-200 rounded" />
+                <div className="h-10 bg-gray-200 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
         <Link href="/admin/agents" className="text-gray-400 hover:text-gray-600 text-sm">← Agents</Link>
         <span className="text-gray-300">/</span>
-        <h1 className="text-2xl font-bold text-gray-900">Create Agent</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Edit Agent</h1>
+        {form.name && <span className="text-gray-400 text-sm">— {form.name}</span>}
       </div>
 
       <form onSubmit={submit} className="space-y-5">
@@ -115,10 +155,10 @@ export default function CreateAgentPage() {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h2 className="font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">Account Details</h2>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Full Name"  name="name"     placeholder="Amit Verma"            required />
-            <Field label="Email"      name="email"     type="email" placeholder="agent@example.com" required />
-            <Field label="Password"   name="password"  type="password" placeholder="Min 8 characters" required />
-            <Field label="Phone"      name="phone"     placeholder="9876543210" />
+            <Field label="Full Name" name="name"  placeholder="Amit Verma"           required />
+            <Field label="Email"     name="email"  type="email" placeholder="agent@example.com" required />
+            <Field label="Phone"     name="phone"  placeholder="9876543210" />
+            <Field label="Company"   name="company" placeholder="PropElite Realty" />
           </div>
         </div>
 
@@ -126,11 +166,10 @@ export default function CreateAgentPage() {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h2 className="font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">Professional Info</h2>
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <Field label="Company"            name="company"         placeholder="PropElite Realty" />
             <Field label="RERA License"       name="agentLicense"    placeholder="MH-RERA-A12345" />
             <Field label="Experience (years)" name="agentExperience" type="number" placeholder="5" />
 
-            {/* Agent Badge / Tick */}
+            {/* Agent Badge */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Agent Badge</label>
               <select
@@ -146,14 +185,13 @@ export default function CreateAgentPage() {
             </div>
           </div>
 
-          {/* Bio */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
             <textarea
               value={form.agentBio}
               onChange={e => set('agentBio', e.target.value)}
               placeholder="Short professional bio..."
-              rows={3}
+              rows={4}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
           </div>
@@ -163,7 +201,7 @@ export default function CreateAgentPage() {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h2 className="font-semibold text-gray-800 mb-1 pb-2 border-b border-gray-100">Location Assignment</h2>
           <p className="text-xs text-gray-500 mb-4 mt-2">
-            Assign this agent to a specific state and city. They will primarily operate in this location.
+            The agent operates primarily in this location. Changing this does not restrict existing listings.
           </p>
           <div className="grid grid-cols-2 gap-4">
             {/* State */}
@@ -179,9 +217,6 @@ export default function CreateAgentPage() {
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
-              {states.length === 0 && (
-                <p className="text-xs text-gray-400 mt-1">No states found. Add states in Locations → States first.</p>
-              )}
             </div>
 
             {/* City */}
@@ -194,25 +229,19 @@ export default function CreateAgentPage() {
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
               >
                 <option value="">
-                  {loadingCities ? 'Loading cities...' : form.stateId ? '— Select City —' : '— Select state first —'}
+                  {loadingCities ? 'Loading...' : form.stateId ? '— Select City —' : '— Select state first —'}
                 </option>
                 {cities.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-              {form.stateId && !loadingCities && cities.length === 0 && (
-                <p className="text-xs text-gray-400 mt-1">No cities in this state. Add cities in Locations first.</p>
-              )}
             </div>
           </div>
 
-          {/* Preview selected location */}
           {(form.city || form.state) && (
             <div className="mt-3 flex items-center gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
               <span>📍</span>
-              <span>
-                Agent will be assigned to: <strong>{[form.city, form.state].filter(Boolean).join(', ')}</strong>
-              </span>
+              <span>Currently assigned to: <strong>{[form.city, form.state].filter(Boolean).join(', ')}</strong></span>
             </div>
           )}
         </div>
@@ -221,7 +250,7 @@ export default function CreateAgentPage() {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h2 className="font-semibold text-gray-800 mb-1">Listing Quota</h2>
           <p className="text-sm text-gray-500 mb-4">
-            Free property listings this agent can post. After the quota, paid plans are required.
+            Free listings this agent can post. Change this to grant or restrict capacity.
           </p>
           <div className="flex items-center gap-4">
             <input
@@ -231,7 +260,7 @@ export default function CreateAgentPage() {
               onChange={e => set('agentFreeQuota', e.target.value)}
               className="w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <span className="text-sm text-gray-500">free listings (default: 100)</span>
+            <span className="text-sm text-gray-500">free listings</span>
           </div>
         </div>
 
@@ -247,7 +276,7 @@ export default function CreateAgentPage() {
             disabled={loading}
             className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {loading ? 'Creating...' : 'Create Agent'}
+            {loading ? 'Saving...' : 'Save Changes'}
           </button>
           <Link
             href="/admin/agents"
