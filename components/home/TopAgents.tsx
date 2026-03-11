@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Star, Phone, MapPin, Building2, ArrowRight, Award, Users } from 'lucide-react';
 import { usersApi } from '@/lib/api';
+import OptimizedImage, { resolveImageSrc } from '@/components/common/OptimizedImage';
 
 interface Agent {
   id: string;
@@ -45,12 +46,12 @@ function AgentCard({ agent }: { agent: Agent }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:border-primary-100 transition-all duration-300 flex flex-col h-full group">
       {/* Clickable top area → profile */}
-      <Link href={`/agent/${slug}`} className="block p-4 sm:p-5 flex-1">
+      <Link href={`/agents/${slug}`} className="block p-4 sm:p-5 flex-1">
         {/* Header */}
         <div className="flex items-start gap-3 mb-3">
-          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0 overflow-hidden shadow-sm`}>
+          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0 overflow-hidden shadow-sm relative`}>
             {agent.avatar ? (
-              <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" />
+              <OptimizedImage src={agent.avatar} alt={agent.name} fill className="object-cover" sizes="56px" />
             ) : (
               initials
             )}
@@ -135,7 +136,7 @@ function AgentCard({ agent }: { agent: Agent }) {
         )}
         {/* View Profile — prominent */}
         <Link
-          href={`/agent/${slug}`}
+          href={`/agents/${slug}`}
           className="flex-1 flex items-center justify-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors"
         >
           <Users className="w-3.5 h-3.5" />

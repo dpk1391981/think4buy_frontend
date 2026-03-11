@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import OptimizedImage from '@/components/common/OptimizedImage';
 import { BedDouble, Bath, Maximize2, MapPin, CheckCircle, Heart, Zap, Phone, Camera } from 'lucide-react';
 import { Property } from '@/types/property';
 import {
@@ -62,7 +62,7 @@ export default function PropertyCard({ property, className, listView }: Property
         <Link href={`/properties/${property.slug}`} className="flex">
           {/* Image */}
           <div className="relative w-56 sm:w-72 flex-shrink-0">
-            <Image
+            <OptimizedImage
               src={primaryImage}
               alt={property.title}
               fill
@@ -172,7 +172,7 @@ export default function PropertyCard({ property, className, listView }: Property
       <Link href={`/properties/${property.slug}`} className="block">
         {/* Image */}
         <div className="relative overflow-hidden" style={{ aspectRatio: '16/10' }}>
-          <Image
+          <OptimizedImage
             src={primaryImage}
             alt={property.title}
             fill

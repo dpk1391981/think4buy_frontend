@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Phone, RefreshCw, Shield, CheckCircle, Loader2 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,6 +47,17 @@ export default function AuthModal() {
         setDevOtp('');
         setTimer(0);
       }, 300);
+    }
+  }, [authModalOpen]);
+
+  // Animate in/out — track mounted state separately so CSS transition plays
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (authModalOpen) {
+      // Tiny delay so the translate-y transition fires after mount
+      requestAnimationFrame(() => setVisible(true));
+    } else {
+      setVisible(false);
     }
   }, [authModalOpen]);
 
@@ -104,16 +115,31 @@ export default function AuthModal() {
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-[100] flex items-end sm:items-center justify-center"
+      className={`fixed inset-0 z-[100] flex items-end sm:items-center justify-center transition-colors duration-300 ${visible ? 'bg-black/60' : 'bg-black/0'}`}
       onClick={() => dispatch(closeAuthModal())}
     >
-      {/* Modal Panel */}
+      {/* Modal Panel — slides up from bottom on mobile, fades in centered on desktop */}
       <div
-        className="bg-white w-full sm:max-w-sm sm:mx-4 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
+        className={`
+          bg-white w-full sm:max-w-sm sm:mx-4
+          rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden
+          transition-all duration-300 ease-out
+          sm:transition-[opacity,transform]
+          ${visible
+            ? 'translate-y-0 opacity-100 sm:scale-100'
+            : 'translate-y-full opacity-0 sm:translate-y-0 sm:scale-95'
+          }
+        `}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drag handle (mobile only) */}
-        <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3 sm:hidden" />
+        {/* Drag handle — tap to close on mobile */}
+        <div
+          className="w-full flex justify-center pt-3 pb-1 sm:hidden cursor-pointer"
+          onClick={() => dispatch(closeAuthModal())}
+          aria-label="Close"
+        >
+          <div className="w-10 h-1.5 bg-gray-300 rounded-full" />
+        </div>
 
         {/* Header */}
         <div className="px-6 pt-5 pb-0 flex items-center justify-between">

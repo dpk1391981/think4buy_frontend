@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { authApi } from '@/lib/api';
+import OptimizedImage from '@/components/common/OptimizedImage';
 
 export default function UserProfilePage() {
   const { user, refresh } = useAuth();
@@ -51,9 +52,9 @@ export default function UserProfilePage() {
 
       {/* Avatar */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6 flex items-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center text-xl font-bold flex-shrink-0 overflow-hidden">
+        <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center text-xl font-bold flex-shrink-0 overflow-hidden">
           {user.avatar ? (
-            <img src={user.avatar} alt={user.name} className="w-16 h-16 rounded-full object-cover" />
+            <OptimizedImage src={user.avatar} alt={user.name} fill className="object-cover" sizes="64px" />
           ) : (
             initials
           )}

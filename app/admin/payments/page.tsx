@@ -48,8 +48,9 @@ export default function AdminPaymentsPage() {
     try {
       const r = await adminWalletApi.getAllTransactions({ page, limit: 20 });
       const data = r.data;
-      setTransactions(data?.items || data || []);
-      setTotal(data?.total || (data?.items || data || []).length);
+      const items = data?.transactions || data?.items || (Array.isArray(data) ? data : []);
+      setTransactions(items);
+      setTotal(data?.total ?? items.length);
     } catch (e) {
       console.error(e);
     } finally {
@@ -85,8 +86,8 @@ export default function AdminPaymentsPage() {
                 <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">{formatDate(tx.createdAt)}</td>
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{tx.user?.name || '—'}</div>
-                    <div className="text-gray-400 text-xs">{tx.user?.email || ''}</div>
+                    <div className="font-medium text-gray-900">{(tx as any).wallet?.user?.name || tx.user?.name || '—'}</div>
+                    <div className="text-gray-400 text-xs">{(tx as any).wallet?.user?.email || tx.user?.email || ''}</div>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[tx.type] || 'bg-gray-100 text-gray-600'}`}>

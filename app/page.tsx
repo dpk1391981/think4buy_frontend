@@ -19,6 +19,7 @@ import CityExplorer from '@/components/home/CityExplorer';
 import ServicesBanner from '@/components/home/ServicesBanner';
 import StatsBar from '@/components/home/StatsBar';
 import TopAgents from '@/components/home/TopAgents';
+import HomeLocationSelector from '@/components/home/HomeLocationSelector';
 
 export const metadata: Metadata = {
   title: 'Think4BuySale – Buy, Rent & Sell Properties in India',
@@ -178,13 +179,16 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ─── Featured Properties ──────────────────────────────────────────── */}
+      {/* ─── Dynamic Location Selector ────────────────────────────────────── */}
+      <HomeLocationSelector />
+
+      {/* ─── Featured Properties (reacts to location Redux state) ─────────── */}
       <FeaturedProperties />
 
       {/* ─── Top Agents ───────────────────────────────────────────────────── */}
       <TopAgents />
 
-      {/* ─── Explore Cities ───────────────────────────────────────────────── */}
+      {/* ─── Explore Cities (dynamic, reacts to location Redux state) ─────── */}
       <CityExplorer />
 
       {/* ─── Why Choose Us ────────────────────────────────────────────────── */}

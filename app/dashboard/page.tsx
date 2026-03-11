@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { savedApi, alertsApi } from '@/lib/api';
 import { formatPrice, timeAgo } from '@/lib/utils';
+import OptimizedImage from '@/components/common/OptimizedImage';
 
 interface SavedProperty {
   id: string;
@@ -161,12 +162,8 @@ export default function UserDashboardPage() {
                     href={`/properties/${prop.slug}`}
                     className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
                   >
-                    <div className="w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
-                      {thumb ? (
-                        <img src={thumb} alt={prop.title} className="w-12 h-12 object-cover" />
-                      ) : (
-                        <div className="w-12 h-12 flex items-center justify-center text-gray-400 text-lg">🏠</div>
-                      )}
+                    <div className="relative w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                      <OptimizedImage src={thumb} alt={prop.title} fill className="object-cover" sizes="48px" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-gray-900 truncate">{prop.title}</div>

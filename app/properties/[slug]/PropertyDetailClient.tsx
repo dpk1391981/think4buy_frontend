@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+import OptimizedImage from '@/components/common/OptimizedImage';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -98,10 +98,8 @@ export default function PropertyDetailClient({ property }: Props) {
             {/* Image Gallery */}
             <div className="bg-black rounded-2xl overflow-hidden mb-6">
               <div className="relative aspect-[16/9] md:aspect-[2/1]">
-                <Image
-                  src={images[activeImage]?.url?.startsWith('http')
-                    ? images[activeImage].url
-                    : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:3001'}${images[activeImage]?.url}`}
+                <OptimizedImage
+                  src={images[activeImage]?.url}
                   alt={images[activeImage]?.alt || property.title}
                   fill
                   className="object-cover"
@@ -169,8 +167,8 @@ export default function PropertyDetailClient({ property }: Props) {
                         activeImage === i ? 'border-primary-500 opacity-100' : 'border-transparent opacity-60 hover:opacity-80',
                       )}
                     >
-                      <Image
-                        src={img.url?.startsWith('http') ? img.url : `http://localhost:3001${img.url}`}
+                      <OptimizedImage
+                        src={img.url}
                         alt=""
                         fill
                         className="object-cover"

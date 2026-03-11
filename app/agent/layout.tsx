@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import OptimizedImage from '@/components/common/OptimizedImage';
 
 const navItems = [
   { href: '/agent', label: 'Dashboard', icon: '📊', exact: true },
@@ -77,9 +78,9 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
 
       {/* User info */}
       <div className="px-4 py-4 border-b border-gray-100 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden">
+        <div className="relative w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden">
           {user.avatar ? (
-            <img src={user.avatar} alt={user.name} className="w-9 h-9 rounded-full object-cover" />
+            <OptimizedImage src={user.avatar} alt={user.name} fill className="object-cover" sizes="36px" />
           ) : (
             initials
           )}

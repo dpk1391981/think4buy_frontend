@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { adminLocationsApi, adminApi, api } from '@/lib/api';
+import OptimizedImage, { resolveImageSrc } from '@/components/common/OptimizedImage';
 
 interface Country {
   id: string;
@@ -282,7 +283,9 @@ export default function AdminLocationsPage() {
                   <tr key={s.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
                       {s.imageUrl ? (
-                        <img src={s.imageUrl.startsWith('http') ? s.imageUrl : `http://localhost:3001${s.imageUrl}`} alt={s.name} className="w-12 h-8 object-cover rounded-md" />
+                        <div className="relative w-12 h-8 rounded-md overflow-hidden">
+                          <OptimizedImage src={s.imageUrl} alt={s.name} fill className="object-cover" sizes="48px" />
+                        </div>
                       ) : (
                         <div className="w-12 h-8 bg-gray-100 rounded-md flex items-center justify-center text-gray-300 text-xs">—</div>
                       )}
@@ -381,11 +384,9 @@ export default function AdminLocationsPage() {
                     <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         {c.imageUrl ? (
-                          <img
-                            src={`http://localhost:3001${c.imageUrl}`}
-                            alt={c.name}
-                            className="w-12 h-8 object-cover rounded-md"
-                          />
+                          <div className="relative w-12 h-8 rounded-md overflow-hidden">
+                            <OptimizedImage src={c.imageUrl} alt={c.name} fill className="object-cover" sizes="48px" />
+                          </div>
                         ) : (
                           <div className="w-12 h-8 bg-gray-100 rounded-md flex items-center justify-center text-gray-300 text-xs">
                             —
@@ -500,11 +501,7 @@ export default function AdminLocationsPage() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">State Image</label>
                 {stateForm.imageUrl && (
                   <div className="mb-2 relative w-full h-28 rounded-lg overflow-hidden bg-gray-100">
-                    <img
-                      src={stateForm.imageUrl.startsWith('http') ? stateForm.imageUrl : `http://localhost:3001${stateForm.imageUrl}`}
-                      alt="State"
-                      className="w-full h-full object-cover"
-                    />
+                    <OptimizedImage src={stateForm.imageUrl} alt="State" fill className="object-cover" sizes="100vw" />
                     <button
                       onClick={() => setStateForm((f) => ({ ...f, imageUrl: '' }))}
                       className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
@@ -591,11 +588,7 @@ export default function AdminLocationsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">City Image</label>
                 {cityImageUrl && (
                   <div className="mb-2 relative w-full h-28 rounded-lg overflow-hidden bg-gray-100">
-                    <img
-                      src={`http://localhost:3001${cityImageUrl}`}
-                      alt="City"
-                      className="w-full h-full object-cover"
-                    />
+                    <OptimizedImage src={cityImageUrl} alt="City" fill className="object-cover" sizes="100vw" />
                     <button
                       onClick={() => setCityImageUrl('')}
                       className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"

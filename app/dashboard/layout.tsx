@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import OptimizedImage from '@/components/common/OptimizedImage';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: '🏠', exact: true },
@@ -67,9 +68,9 @@ export default function UserDashboardLayout({ children }: { children: React.Reac
 
       {/* User info */}
       <div className="px-4 py-4 border-b border-gray-100 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden">
+        <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden">
           {user.avatar ? (
-            <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
+            <OptimizedImage src={user.avatar} alt={user.name} fill className="object-cover" sizes="40px" />
           ) : (
             initials
           )}

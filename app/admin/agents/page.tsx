@@ -223,7 +223,7 @@ export default function AdminAgentsPage() {
 
                           {/* View profile */}
                           <Link
-                            href={`/agent/${slug}`}
+                            href={`/agents/${slug}`}
                             target="_blank"
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
                             title="View public profile"

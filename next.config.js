@@ -9,6 +9,15 @@ const nextConfig = {
         port: '3001',
         pathname: '/uploads/**',
       },
+      {
+        protocol: 'https',
+        hostname: '**',
+        pathname: '/uploads/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'think4buysale.com',
+      },
     ],
   },
   async rewrites() {

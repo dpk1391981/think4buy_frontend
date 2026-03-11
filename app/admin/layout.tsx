@@ -190,11 +190,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content */}
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
-        {/* Mobile Top Bar */}
-        <div className="lg:hidden flex items-center gap-3 bg-slate-900 px-4 py-3 sticky top-0 z-20">
+        {/* Sticky Top Bar — mobile + desktop */}
+        <div className="sticky top-0 z-20 bg-slate-900 border-b border-slate-800 flex items-center gap-3 px-4 lg:px-6 py-3">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+            className="lg:hidden text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
           >
             <Menu size={20} />
           </button>
@@ -202,9 +202,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Shield className="w-4 h-4 text-primary-500" />
             <span className="text-sm font-bold text-white">Think4BuySale Admin</span>
           </div>
+          <div className="flex-1" />
+          <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-1.5">
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white text-[10px] font-bold">
+              {userInitials}
+            </div>
+            <span className="text-xs text-slate-300 hidden sm:block">{user?.name}</span>
+          </div>
         </div>
 
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1">{children}</main>
       </div>
     </div>
   );

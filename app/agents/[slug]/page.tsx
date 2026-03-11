@@ -4,9 +4,10 @@ import Link from 'next/link';
 import {
   MapPin, Phone, Star, Award, Building2, ArrowLeft,
   CheckCircle, TrendingUp, Home, Users,
-  Calendar, Mail, Shield, ChevronRight, Eye,
+  Calendar, Mail, Shield, ChevronRight,
 } from 'lucide-react';
 import AgentContactForm from '@/components/agent/AgentContactForm';
+import AgentListings from '@/components/agent/AgentListings';
 
 type Params = { slug: string };
 
@@ -43,20 +44,6 @@ async function fetchAgent(id: string) {
   } catch { return null; }
 }
 
-async function fetchAgentListings(agentId: string, page = 1, limit = 9) {
-  try {
-    const res = await fetch(
-      `${BASE}/properties?agentId=${agentId}&approvalStatus=approved&limit=${limit}&page=${page}`,
-      { next: { revalidate: 900 } },
-    );
-    if (!res.ok) return { items: [], total: 0 };
-    const data = await res.json();
-    return {
-      items: data?.data || data?.properties || data?.items || [],
-      total: data?.total || 0,
-    };
-  } catch { return { items: [], total: 0 }; }
-}
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const id = parseSlug(params.slug);
@@ -69,7 +56,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title: `${name} – Real Estate Agent in ${city} | Think4BuySale`,
     description: `${agent.agentBio || `${name} is a verified real estate agent in ${city} with ${agent.agentExperience || 0}+ years of experience and ${agent.totalDeals || 0} successful deals.`}`,
     keywords: `${name} real estate agent ${city}, property agent ${city}, buy sell rent property ${city}`,
-    alternates: { canonical: `https://think4buysale.com/agent/${params.slug}` },
+    alternates: { canonical: `https://think4buysale.com/agents/${params.slug}` },
     openGraph: {
       title: `${name} – Real Estate Agent | Think4BuySale`,
       description: agent.agentBio || `Verified real estate agent in ${city}`,
@@ -84,11 +71,6 @@ const TICK_CONFIG: Record<string, { label: string; badgeCls: string; avatarCls: 
   diamond: { label: 'Diamond',   badgeCls: 'bg-violet-100 text-violet-700 border-violet-300',  avatarCls: 'from-violet-500 to-violet-700', icon: '◆' },
 };
 
-function formatPrice(price: number): string {
-  if (price >= 10000000) return `₹${(price / 10000000).toFixed(1)} Cr`;
-  if (price >= 100000) return `₹${(price / 100000).toFixed(1)} L`;
-  return `₹${price.toLocaleString('en-IN')}`;
-}
 
 function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md' }) {
   const sz = size === 'md' ? 'w-5 h-5' : 'w-4 h-4';
@@ -106,10 +88,7 @@ function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md
 
 export default async function AgentProfilePage({ params }: { params: Params }) {
   const id = parseSlug(params.slug);
-  const [agent, listingsData] = await Promise.all([
-    fetchAgent(id),
-    fetchAgentListings(id, 1, 9),
-  ]);
+  const agent = await fetchAgent(id);
 
   if (!agent) notFound();
 
@@ -117,10 +96,7 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
   const initials = agent.name?.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase() || 'AG';
   const avatarGradient = tick?.avatarCls ?? 'from-gray-400 to-gray-600';
 
-  const listings = listingsData.items || [];
-  const totalListings = listingsData.total || 0;
-
-  const profileUrl = `https://think4buysale.com/agent/${params.slug}`;
+  const profileUrl = `https://think4buysale.com/agents/${params.slug}`;
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -227,7 +203,7 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
                   </div>
                   <div className="w-px bg-primary-600" />
                   <div className="text-center">
-                    <div className="text-2xl font-black text-white">{totalListings}</div>
+                    <div className="text-2xl font-black text-white">{agent.agentUsedQuota ?? 0}</div>
                     <div className="text-xs text-primary-300 uppercase tracking-wider">Active Listings</div>
                   </div>
                 </div>
@@ -344,109 +320,8 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
                 </div>
               </section>
 
-              {/* Active Listings */}
-              <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-primary-600" />
-                    Active Listings
-                    {totalListings > 0 && (
-                      <span className="text-xs font-normal text-gray-400 ml-1">({totalListings})</span>
-                    )}
-                  </h2>
-                  {totalListings > 9 && (
-                    <Link
-                      href={`/properties?agentId=${agent.id}`}
-                      className="text-sm text-primary-600 font-medium hover:underline flex items-center gap-1"
-                    >
-                      View all <ChevronRight className="w-4 h-4" />
-                    </Link>
-                  )}
-                </div>
-
-                {listings.length === 0 ? (
-                  <div className="text-center py-12 text-gray-400">
-                    <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-200" />
-                    <p className="text-sm">No active listings at the moment.</p>
-                  </div>
-                ) : (
-                  <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {listings.map((p: any) => (
-                      <Link
-                        key={p.id}
-                        href={`/properties/${p.slug}`}
-                        className="group block border border-gray-100 rounded-xl overflow-hidden hover:border-primary-200 hover:shadow-md transition-all duration-200"
-                      >
-                        {/* Image */}
-                        <div className="relative w-full h-36 bg-gray-100">
-                          {p.images?.[0]?.url ? (
-                            <img
-                              src={p.images[0].url}
-                              alt={p.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Building2 className="w-10 h-10 text-gray-300" />
-                            </div>
-                          )}
-                          {/* Category badge */}
-                          <div className="absolute top-2 left-2">
-                            <span className="text-[10px] font-bold uppercase tracking-wide bg-primary-600 text-white px-2 py-0.5 rounded-md">
-                              {p.category}
-                            </span>
-                          </div>
-                          {/* Featured badge */}
-                          {p.isFeatured && (
-                            <div className="absolute top-2 right-2">
-                              <span className="text-[10px] font-bold uppercase tracking-wide bg-amber-500 text-white px-2 py-0.5 rounded-md">
-                                Featured
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Info */}
-                        <div className="p-3">
-                          <div className="text-[10px] text-primary-600 font-semibold uppercase tracking-wide mb-1">
-                            {p.type?.replace(/_/g, ' ')}
-                          </div>
-                          <h3 className="text-sm font-semibold text-gray-900 line-clamp-1 group-hover:text-primary-600 transition-colors">
-                            {p.title}
-                          </h3>
-                          <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
-                            <MapPin className="w-3 h-3 flex-shrink-0" />
-                            <span className="line-clamp-1">{[p.locality, p.city].filter(Boolean).join(', ')}</span>
-                          </div>
-                          <div className="flex items-center justify-between mt-2">
-                            <div className="text-sm font-bold text-primary-700">{formatPrice(p.price)}</div>
-                            {p.bedrooms && (
-                              <div className="text-xs text-gray-400">{p.bedrooms} BHK</div>
-                            )}
-                          </div>
-                          {p.viewCount > 0 && (
-                            <div className="flex items-center gap-1 text-[10px] text-gray-400 mt-1">
-                              <Eye className="w-3 h-3" />{p.viewCount} views
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-                {totalListings > 9 && (
-                  <div className="mt-5 text-center">
-                    <Link
-                      href={`/properties?agentId=${agent.id}`}
-                      className="inline-flex items-center gap-2 px-6 py-3 border border-primary-200 text-primary-700 rounded-xl font-semibold text-sm hover:bg-primary-50 transition-colors"
-                    >
-                      <Building2 className="w-4 h-4" />
-                      View all {totalListings} listings
-                    </Link>
-                  </div>
-                )}
-              </section>
+              {/* Active Listings — dynamic client component */}
+              <AgentListings agentId={agent.id} agentName={agent.name} />
 
               {/* Location coverage */}
               {(agent.city || agent.state) && (
@@ -522,7 +397,7 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
                       <div className="text-[10px] text-gray-400">Yrs Exp</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-base font-black text-gray-900">{totalListings}</div>
+                      <div className="text-base font-black text-gray-900">{agent.agentUsedQuota ?? 0}</div>
                       <div className="text-[10px] text-gray-400">Listings</div>
                     </div>
                   </div>

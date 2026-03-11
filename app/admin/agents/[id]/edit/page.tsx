@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { adminApi, adminLocationsApi, locationsApi } from '@/lib/api';
@@ -8,8 +8,8 @@ import { adminApi, adminLocationsApi, locationsApi } from '@/lib/api';
 interface State { id: string; name: string; code: string; }
 interface City  { id: string; name: string; stateId: string; }
 
-export default function EditAgentPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function EditAgentPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
   const [loading, setLoading]   = useState(false);
   const [fetching, setFetching] = useState(true);

@@ -27,8 +27,12 @@ interface UIState {
   authModalMode: 'login' | 'register';
   mobileMenuOpen: boolean;
   toasts: Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>;
-  selectedState: string;   // state name, '' = All India
-  selectedStateId: string; // state UUID from DB, '' = All India
+  selectedCountry: string;    // country name, '' = All
+  selectedCountryId: string;  // country UUID
+  selectedState: string;      // state name, '' = All India
+  selectedStateId: string;    // state UUID from DB
+  selectedCity: string;       // city name, '' = All
+  selectedCityId: string;     // city UUID
 }
 
 const initialState: UIState = {
@@ -36,8 +40,12 @@ const initialState: UIState = {
   authModalMode: 'login',
   mobileMenuOpen: false,
   toasts: [],
+  selectedCountry: '',
+  selectedCountryId: '',
   selectedState: '',
   selectedStateId: '',
+  selectedCity: '',
+  selectedCityId: '',
 };
 
 export const uiSlice = createSlice({
@@ -66,13 +74,45 @@ export const uiSlice = createSlice({
     setSelectedState: (state, action: PayloadAction<string>) => {
       state.selectedState = action.payload;
     },
-    // New: set both name + ID together (preferred)
+    // Set country
+    setSelectedCountry: (
+      state,
+      action: PayloadAction<{ country: string; countryId: string }>
+    ) => {
+      state.selectedCountry = action.payload.country;
+      state.selectedCountryId = action.payload.countryId;
+      // Reset state/city when country changes
+      state.selectedState = '';
+      state.selectedStateId = '';
+      state.selectedCity = '';
+      state.selectedCityId = '';
+    },
+    // Set state (and reset city)
     setSelectedLocation: (
       state,
       action: PayloadAction<{ state: string; stateId: string }>
     ) => {
       state.selectedState = action.payload.state;
       state.selectedStateId = action.payload.stateId;
+      state.selectedCity = '';
+      state.selectedCityId = '';
+    },
+    // Set city
+    setSelectedCity: (
+      state,
+      action: PayloadAction<{ city: string; cityId: string }>
+    ) => {
+      state.selectedCity = action.payload.city;
+      state.selectedCityId = action.payload.cityId;
+    },
+    // Clear all location filters
+    clearLocationFilter: (state) => {
+      state.selectedCountry = '';
+      state.selectedCountryId = '';
+      state.selectedState = '';
+      state.selectedStateId = '';
+      state.selectedCity = '';
+      state.selectedCityId = '';
     },
   },
 });
@@ -81,5 +121,6 @@ export const {
   openAuthModal, closeAuthModal, toggleMobileMenu,
   addToast, removeToast,
   setSelectedState, setSelectedLocation,
+  setSelectedCountry, setSelectedCity, clearLocationFilter,
 } = uiSlice.actions;
 export default uiSlice.reducer;

@@ -5,15 +5,30 @@ import { adminWalletApi } from '@/lib/api';
 
 interface WalletUser {
   id: string;
-  name: string;
-  email: string;
-  role: string;
+  userId?: string;
+  // API returns wallet objects with nested user relation
+  user?: { id: string; name: string; email: string; role: string; phone?: string };
+  // OR user fields directly (fallback)
+  name?: string;
+  email?: string;
+  role?: string;
+  balance?: number;
+  totalEarned?: number;
+  totalSpent?: number;
   wallet?: {
     balance: number;
     totalEarned: number;
     totalSpent: number;
   };
 }
+
+function getUserName(w: WalletUser) { return w.user?.name || w.name || '—'; }
+function getUserEmail(w: WalletUser) { return w.user?.email || w.email || ''; }
+function getUserRole(w: WalletUser) { return w.user?.role || w.role || ''; }
+function getUserId(w: WalletUser) { return w.user?.id || w.userId || w.id; }
+function getBalance(w: WalletUser) { return w.balance ?? w.wallet?.balance ?? 0; }
+function getEarned(w: WalletUser) { return w.totalEarned ?? w.wallet?.totalEarned ?? 0; }
+function getSpent(w: WalletUser) { return w.totalSpent ?? w.wallet?.totalSpent ?? 0; }
 
 export default function AdminWalletsPage() {
   const [wallets, setWallets] = useState<WalletUser[]>([]);
@@ -58,7 +73,7 @@ export default function AdminWalletsPage() {
     setTopUpSaving(true);
     setTopUpError('');
     try {
-      await adminWalletApi.topUp(topUpModal.user.id, amount, topUpDesc || undefined);
+      await adminWalletApi.topUp(getUserId(topUpModal.user), amount, topUpDesc || undefined);
       setTopUpModal(null);
       setTopUpAmount('');
       setTopUpDesc('');
@@ -106,32 +121,35 @@ export default function AdminWalletsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {wallets.map((w) => (
+              {wallets.map((w) => {
+                const role = getUserRole(w);
+                return (
                 <tr key={w.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{w.name}</div>
-                    <div className="text-gray-400 text-xs">{w.email}</div>
+                    <div className="font-medium text-gray-900">{getUserName(w)}</div>
+                    <div className="text-gray-400 text-xs">{getUserEmail(w)}</div>
+                    {w.user?.phone && <div className="text-gray-400 text-xs">{w.user.phone}</div>}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                      w.role === 'admin' ? 'bg-purple-100 text-purple-700' :
-                      w.role === 'agent' ? 'bg-blue-100 text-blue-700' :
+                      role === 'admin' ? 'bg-purple-100 text-purple-700' :
+                      role === 'agent' ? 'bg-blue-100 text-blue-700' :
                       'bg-gray-100 text-gray-600'
                     }`}>
-                      {w.role}
+                      {role || '—'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <span className="text-lg">🪙</span>
-                      <span className="font-semibold text-gray-900">{(w.wallet?.balance ?? 0).toLocaleString()}</span>
+                      <span className="font-semibold text-gray-900">{getBalance(w).toLocaleString()}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-green-700 font-medium">
-                    +{(w.wallet?.totalEarned ?? 0).toLocaleString()}
+                    +{getEarned(w).toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-red-600 font-medium">
-                    -{(w.wallet?.totalSpent ?? 0).toLocaleString()}
+                    -{getSpent(w).toLocaleString()}
                   </td>
                   <td className="px-4 py-3">
                     <button
@@ -143,7 +161,8 @@ export default function AdminWalletsPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -167,7 +186,7 @@ export default function AdminWalletsPage() {
           <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
             <h3 className="font-semibold text-gray-900 mb-1">Top Up Wallet</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Adding tokens to <span className="font-medium text-gray-700">{topUpModal.user.name}</span>
+              Adding tokens to <span className="font-medium text-gray-700">{getUserName(topUpModal.user)}</span>
             </p>
             {topUpError && <p className="text-sm text-red-600 mb-3">{topUpError}</p>}
             <div className="space-y-3">

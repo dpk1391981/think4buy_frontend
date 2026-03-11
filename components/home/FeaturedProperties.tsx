@@ -52,20 +52,22 @@ function TabContent({
   tab,
   stateFilter,
   stateIdFilter,
+  cityFilter,
 }: {
   tab: (typeof TABS)[0];
   stateFilter: string;
   stateIdFilter: string;
+  cityFilter: string;
 }) {
-  const locationParams = stateIdFilter
-    ? { stateId: stateIdFilter }
-    : stateFilter
-    ? { state: stateFilter }
-    : {};
+  const locationParams: any = {};
+  if (cityFilter) locationParams.city = cityFilter;
+  else if (stateIdFilter) locationParams.stateId = stateIdFilter;
+  else if (stateFilter) locationParams.state = stateFilter;
+
   const params = { ...tab.params, ...locationParams };
 
   const { data: properties, isLoading } = useQuery({
-    queryKey: ['home-properties', tab.id, stateIdFilter || stateFilter],
+    queryKey: ['home-properties', tab.id, stateIdFilter || stateFilter, cityFilter],
     queryFn: () => propertiesApi.getAll(params).then((r) => {
       const d = r.data;
       return Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [];
@@ -117,6 +119,7 @@ export default function FeaturedProperties() {
   const tab = TABS.find((t) => t.id === activeTab)!;
   const selectedState = useAppSelector((s) => s.ui.selectedState);
   const selectedStateId = useAppSelector((s) => s.ui.selectedStateId);
+  const selectedCity = useAppSelector((s) => s.ui.selectedCity);
 
   const viewAllHref =
     activeTab === 'new' ? '/new-projects' :
@@ -164,15 +167,20 @@ export default function FeaturedProperties() {
           </div>
         </div>
 
-        {/* State filter indicator */}
-        {selectedState && (
+        {/* Location filter indicator */}
+        {(selectedCity || selectedState) && (
           <div className="flex items-center gap-2 mb-4 text-sm text-primary-700 bg-primary-50 px-3 py-2 rounded-xl w-fit">
-            <span>📍 Showing properties in <strong>{selectedState}</strong></span>
+            <span>📍 Showing properties in <strong>{selectedCity || selectedState}</strong></span>
           </div>
         )}
 
         {/* Content */}
-        <TabContent tab={tab} stateFilter={selectedState} stateIdFilter={selectedStateId} />
+        <TabContent
+          tab={tab}
+          stateFilter={selectedState}
+          stateIdFilter={selectedStateId}
+          cityFilter={selectedCity}
+        />
 
         {/* View all — mobile */}
         <div className="text-center mt-6 sm:hidden">
