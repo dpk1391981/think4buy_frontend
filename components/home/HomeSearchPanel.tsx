@@ -7,19 +7,34 @@ import {
   Search, MapPin, Loader2, X, Users, Building2,
   ArrowLeft, ChevronRight, SlidersHorizontal, TrendingUp,
 } from 'lucide-react';
-import { locationsApi } from '@/lib/api';
+import { locationsApi, propertyConfigApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { TOP_CITIES } from '@/lib/utils';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const CATEGORY_TABS = [
-  { value: 'buy',        label: 'Buy',        color: 'from-blue-500 to-blue-600'    },
-  { value: 'rent',       label: 'Rent',       color: 'from-emerald-500 to-emerald-600' },
-  { value: 'pg',         label: 'PG',         color: 'from-purple-500 to-purple-600' },
-  { value: 'commercial', label: 'Commercial', color: 'from-orange-500 to-orange-600' },
-  { value: 'agents',     label: 'Agents',     color: 'from-pink-500 to-rose-600'    },
+// Color palette per slug (fallback for unknown slugs)
+const SLUG_COLORS: Record<string, string> = {
+  buy:             'from-blue-500 to-blue-600',
+  rent:            'from-emerald-500 to-emerald-600',
+  pg:              'from-purple-500 to-purple-600',
+  commercial:      'from-orange-500 to-orange-600',
+  industrial:      'from-amber-500 to-amber-600',
+  builder_project: 'from-cyan-500 to-cyan-600',
+  investment:      'from-indigo-500 to-indigo-600',
+  new_projects:    'from-teal-500 to-teal-600',
+  agents:          'from-pink-500 to-rose-600',
+};
+const DEFAULT_COLOR = 'from-gray-500 to-gray-600';
+
+// Virtual tabs appended after DB categories
+const VIRTUAL_TABS = [
+  // { value: 'new_projects', label: 'New Projects', color: SLUG_COLORS.new_projects },
+  { value: 'agents',       label: 'Agents',       color: SLUG_COLORS.agents },
 ];
+
+interface CategoryTab { value: string; label: string; color: string; }
+interface PropType     { name: string; slug: string; }
 
 const BHK_OPTIONS = ['1 BHK', '2 BHK', '3 BHK', '4 BHK', '5+ BHK'];
 
@@ -40,17 +55,48 @@ const BUDGET_RENT = [
   { label: 'Above ₹75K', min: 75000, max: 0     },
 ];
 
-const TYPES_BUY = ['Apartment', 'Villa', 'Plot', 'House', 'Penthouse', 'Studio'];
-const TYPES_COM = ['Office Space', 'Shop', 'Warehouse'];
-const TYPE_MAP: Record<string, string> = {
-  'Apartment': 'apartment', 'Villa': 'villa', 'Plot': 'plot',
-  'House': 'house', 'Penthouse': 'penthouse', 'Studio': 'studio',
-  'Office Space': 'commercial_office', 'Shop': 'commercial_shop', 'Warehouse': 'commercial_warehouse',
-};
+// ─── Shared hook: fetch categories + types ────────────────────────────────────
+
+function useCategoryData(activeCat: string) {
+  const [tabs, setTabs] = useState<CategoryTab[]>(VIRTUAL_TABS);
+  const [types, setTypes] = useState<PropType[]>([]);
+  const typeCache = useRef<Record<string, PropType[]>>({});
+
+  // Load categories once
+  useEffect(() => {
+    propertyConfigApi.getCategories().then(({ data }) => {
+      const dbTabs: CategoryTab[] = data.map((c: any) => ({
+        value: c.slug,
+        label: c.name,
+        color: SLUG_COLORS[c.slug] ?? DEFAULT_COLOR,
+      }));
+      setTabs([...dbTabs, ...VIRTUAL_TABS]);
+    }).catch(() => {});
+  }, []);
+
+  // Load types when active category changes
+  useEffect(() => {
+    const isVirtual = activeCat === 'agents' || activeCat === 'new_projects';
+    if (isVirtual) { setTypes([]); return; }
+    if (typeCache.current[activeCat]) { setTypes(typeCache.current[activeCat]); return; }
+    propertyConfigApi.getTypesBySlug(activeCat).then(({ data }) => {
+      const mapped: PropType[] = data.map((t: any) => ({ name: t.name, slug: t.slug }));
+      typeCache.current[activeCat] = mapped;
+      setTypes(mapped);
+    }).catch(() => setTypes([]));
+  }, [activeCat]);
+
+  return { tabs, types };
+}
 
 // ─── Mobile Full-Screen Search ────────────────────────────────────────────────
 
-function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: () => void }) {
+function MobileSearch({
+  initialCat, onClose, allTabs, allTypes,
+}: {
+  initialCat: string; onClose: () => void;
+  allTabs: CategoryTab[]; allTypes: PropType[];
+}) {
   const router   = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const debRef   = useRef<NodeJS.Timeout>();
@@ -64,10 +110,25 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
   const [type, setType]     = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  const isAgent    = cat === 'agents';
+  // Fetch types for the currently selected cat inside MobileSearch
+  const [localTypes, setLocalTypes] = useState<PropType[]>(allTypes);
+  const typeCache = useRef<Record<string, PropType[]>>({});
+  useEffect(() => {
+    const isVirtual = cat === 'agents' || cat === 'new_projects';
+    if (isVirtual) { setLocalTypes([]); return; }
+    if (typeCache.current[cat]) { setLocalTypes(typeCache.current[cat]); return; }
+    propertyConfigApi.getTypesBySlug(cat).then(({ data }) => {
+      const mapped: PropType[] = data.map((t: any) => ({ name: t.name, slug: t.slug }));
+      typeCache.current[cat] = mapped;
+      setLocalTypes(mapped);
+    }).catch(() => setLocalTypes([]));
+  }, [cat]);
+
+  const isAgent      = cat === 'agents';
+  const isNewProject = cat === 'new_projects';
   const budgets    = (cat === 'rent' || cat === 'pg') ? BUDGET_RENT : BUDGET_BUY;
-  const types      = cat === 'commercial' ? TYPES_COM : TYPES_BUY;
-  const showBHK    = !isAgent && cat !== 'commercial';
+  const types      = localTypes;
+  const showBHK    = !isAgent && !isNewProject && cat !== 'commercial';
   const filterCount = [type, bhk.length > 0, budget].filter(Boolean).length;
 
   // Android hardware-back support — no body-overflow manipulation (breaks iOS)
@@ -101,6 +162,14 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
       if (c) p.set('city', c);
       if (state) p.set('state', state);
       router.push(`/agents?${p}`);
+    } else if (isNewProject) {
+      const p = new URLSearchParams({ isNewProject: 'true' });
+      if (c)        p.set('city', c);
+      if (locality) p.set('locality', locality);
+      if (budget?.min) p.set('minPrice', String(budget.min));
+      if (budget?.max) p.set('maxPrice', String(budget.max));
+      if (type) p.set('type', type);
+      router.push(`/properties?${p}`);
     } else {
       const p = new URLSearchParams({ category: cat });
       if (c)        p.set('city', c);
@@ -108,7 +177,7 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
       if (bhk.length) p.set('bedrooms', bhk.map(b => b[0]).join(','));
       if (budget?.min) p.set('minPrice', String(budget.min));
       if (budget?.max) p.set('maxPrice', String(budget.max));
-      if (type) p.set('type', TYPE_MAP[type] || '');
+      if (type) p.set('type', type);
       router.push(`/properties?${p}`);
     }
     onClose();
@@ -159,7 +228,7 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
               autoCapitalize="none"
               spellCheck={false}
               value={query}
-              placeholder={isAgent ? 'City or state...' : 'City, locality, project...'}
+              placeholder={isAgent ? 'City or state...' : isNewProject ? 'Search city or locality...' : 'City, locality, project...'}
               onChange={e => {
                 setQuery(e.target.value);
                 clearTimeout(debRef.current);
@@ -184,7 +253,7 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
 
         {/* Category chips */}
         <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
-          {CATEGORY_TABS.map(tab => (
+          {allTabs.map(tab => (
             <button
               key={tab.value}
               onClick={() => changeCat(tab.value)}
@@ -245,7 +314,7 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
               ))}
 
               {/* Filters — only for property search */}
-              {!isAgent && (
+              {!isAgent && !isNewProject && (
                 <>
                   {/* Filter toggle header */}
                   <button
@@ -274,9 +343,9 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
                         <div className="flex flex-wrap gap-2">
                           {types.map(t => (
                             <FilterChip
-                              key={t} label={t}
-                              active={type === t}
-                              onTap={() => setType(type === t ? '' : t)}
+                              key={t.slug} label={t.name}
+                              active={type === t.slug}
+                              onTap={() => setType(type === t.slug ? '' : t.slug)}
                             />
                           ))}
                         </div>
@@ -335,7 +404,7 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
           {filterCount > 0 && (
             <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
               {type && (
-                <ActivePill label={type} onRemove={() => setType('')} />
+                <ActivePill label={types.find(t => t.slug === type)?.name || type} onRemove={() => setType('')} />
               )}
               {bhk.map(b => (
                 <ActivePill key={b} label={b} onRemove={() => setBhk(p => p.filter(x => x !== b))} />
@@ -360,8 +429,8 @@ function MobileSearch({ initialCat, onClose }: { initialCat: string; onClose: ()
             }
             <span className="truncate">
               {query
-                ? (isAgent ? `Find Agents — ${query}` : `Search in ${query}`)
-                : (isAgent ? 'Find Agents' : 'Search Properties')
+                ? (isAgent ? `Find Agents — ${query}` : isNewProject ? `New Projects in ${query}` : `Search in ${query}`)
+                : (isAgent ? 'Find Agents' : isNewProject ? 'Search New Projects' : 'Search Properties')
               }
             </span>
             {filterCount > 0 && (
@@ -496,7 +565,11 @@ function DesktopAgentSearch() {
   );
 }
 
-function DesktopPropertySearch({ category, onSearch }: { category: string; onSearch: (city: string, locality?: string) => void }) {
+function DesktopPropertySearch({
+  category, types, onSearch,
+}: {
+  category: string; types: PropType[]; onSearch: (city: string, locality?: string) => void;
+}) {
   const [q, setQ] = useState('');
   const [suggs, setSuggs] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
@@ -520,7 +593,7 @@ function DesktopPropertySearch({ category, onSearch }: { category: string; onSea
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  const fetch = async (v: string) => {
+  const fetchLocs = async (v: string) => {
     if (!v.trim() || v.length < 2) { setSuggs([]); return; }
     setBusy(true);
     try { const { data } = await locationsApi.search(v); setSuggs(data.slice(0, 6)); }
@@ -530,31 +603,33 @@ function DesktopPropertySearch({ category, onSearch }: { category: string; onSea
   const search = useCallback((city?: string, loc?: string) => { onSearch(city || q, loc); setShowS(false); }, [q, onSearch]);
 
   const budgets = (category === 'rent' || category === 'pg') ? BUDGET_RENT : BUDGET_BUY;
-  const types   = category === 'commercial' ? TYPES_COM : TYPES_BUY;
-  const showBHK = category !== 'commercial';
+  const showBHK = category !== 'commercial' && category !== 'new_projects' && category !== 'industrial';
+  const selectedTypeName = types.find(t => t.slug === type)?.name;
 
   return (
     <div className="flex flex-wrap gap-2">
       {/* Type dropdown */}
-      <div ref={typeRef} className="relative">
-        <button onClick={() => { setShowType(p => !p); setShowBud(false); }}
-          className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 text-sm hover:border-primary-400 min-w-[140px] bg-white">
-          <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-          <span className={type ? 'text-primary-700 font-medium' : 'text-gray-500'}>{type || 'Property Type'}</span>
-          <ChevronRight className={cn('w-3.5 h-3.5 text-gray-400 ml-auto transition-transform', showType && 'rotate-90')} />
-        </button>
-        {showType && (
-          <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 min-w-[180px] overflow-hidden">
-            <div className="p-1">
-              <button onClick={() => { setType(''); setShowType(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg">Any Type</button>
-              {types.map(t => (
-                <button key={t} onClick={() => { setType(t); setShowType(false); }}
-                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${type === t ? 'bg-primary-50 text-primary-700 font-medium' : 'hover:bg-gray-50'}`}>{t}</button>
-              ))}
+      {types.length > 0 && (
+        <div ref={typeRef} className="relative">
+          <button onClick={() => { setShowType(p => !p); setShowBud(false); }}
+            className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 text-sm hover:border-primary-400 min-w-[140px] bg-white">
+            <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+            <span className={type ? 'text-primary-700 font-medium' : 'text-gray-500'}>{selectedTypeName || 'Property Type'}</span>
+            <ChevronRight className={cn('w-3.5 h-3.5 text-gray-400 ml-auto transition-transform', showType && 'rotate-90')} />
+          </button>
+          {showType && (
+            <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 min-w-[180px] overflow-hidden">
+              <div className="p-1">
+                <button onClick={() => { setType(''); setShowType(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg">Any Type</button>
+                {types.map(t => (
+                  <button key={t.slug} onClick={() => { setType(t.slug); setShowType(false); }}
+                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${type === t.slug ? 'bg-primary-50 text-primary-700 font-medium' : 'hover:bg-gray-50'}`}>{t.name}</button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* BHK */}
       {showBHK && (
@@ -593,7 +668,7 @@ function DesktopPropertySearch({ category, onSearch }: { category: string; onSea
         <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100 bg-white">
           <MapPin className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
           <input type="text" placeholder="City, locality, society..." value={q}
-            onChange={e => { setQ(e.target.value); setShowS(true); clearTimeout(deb.current); deb.current = setTimeout(() => fetch(e.target.value), 300); }}
+            onChange={e => { setQ(e.target.value); setShowS(true); clearTimeout(deb.current); deb.current = setTimeout(() => fetchLocs(e.target.value), 300); }}
             onFocus={() => setShowS(true)}
             onKeyDown={e => e.key === 'Enter' && search()}
             className="flex-1 outline-none text-sm bg-transparent" />
@@ -627,15 +702,25 @@ export default function HomeSearchPanel() {
   const [cat, setCat]   = useState('buy');
   const [open, setOpen] = useState(false);
 
-  const isAgent  = cat === 'agents';
-  const catInfo  = CATEGORY_TABS.find(c => c.value === cat)!;
+  const { tabs, types } = useCategoryData(cat);
+
+  const isAgent      = cat === 'agents';
+  const isNewProject = cat === 'new_projects';
+  const catInfo = tabs.find(c => c.value === cat) ?? { value: cat, label: cat, color: DEFAULT_COLOR };
 
   const handleSearch = useCallback((city: string, locality?: string) => {
-    const p = new URLSearchParams({ category: cat });
-    if (city)     p.set('city', city);
-    if (locality) p.set('locality', locality);
-    router.push(`/properties?${p}`);
-  }, [cat, router]);
+    if (isNewProject) {
+      const p = new URLSearchParams({ isNewProject: 'true' });
+      if (city)     p.set('city', city);
+      if (locality) p.set('locality', locality);
+      router.push(`/properties?${p}`);
+    } else {
+      const p = new URLSearchParams({ category: cat });
+      if (city)     p.set('city', city);
+      if (locality) p.set('locality', locality);
+      router.push(`/properties?${p}`);
+    }
+  }, [cat, isNewProject, router]);
 
   return (
     <div className="w-full max-w-5xl mx-auto">
@@ -664,7 +749,7 @@ export default function HomeSearchPanel() {
           {/* Text */}
           <div className="flex-1 text-left min-w-0">
             <div className="text-[13px] font-semibold text-gray-800">
-              {isAgent ? 'Find Agents' : `${catInfo.label} a Property`}
+              {isAgent ? 'Find Agents' : isNewProject ? 'Search New Projects' : `${catInfo.label} a Property`}
             </div>
             <div className="text-xs text-gray-400 mt-0.5 truncate">
               {isAgent ? 'Search by city or state' : 'City, locality, project...'}
@@ -682,7 +767,7 @@ export default function HomeSearchPanel() {
 
         {/* Category strip below trigger */}
         <div className="flex items-center gap-1.5 mt-3 overflow-x-auto no-scrollbar">
-          {CATEGORY_TABS.map(tab => (
+          {tabs.map(tab => (
             <button
               key={tab.value}
               onClick={() => setCat(tab.value)}
@@ -696,17 +781,11 @@ export default function HomeSearchPanel() {
               {tab.label}
             </button>
           ))}
-          <button
-            onClick={() => router.push('/new-projects')}
-            className="flex-shrink-0 h-8 px-4 rounded-full text-xs font-bold bg-white/15 text-white/80"
-          >
-            New Projects
-          </button>
         </div>
 
         {/* Full-screen search overlay */}
         {open && (
-          <MobileSearch initialCat={cat} onClose={() => setOpen(false)} />
+          <MobileSearch initialCat={cat} onClose={() => setOpen(false)} allTabs={tabs} allTypes={types} />
         )}
       </div>
 
@@ -716,13 +795,13 @@ export default function HomeSearchPanel() {
       <div className="hidden sm:block">
         {/* Category tabs */}
         <div className="flex gap-1 overflow-x-auto no-scrollbar">
-          {[...CATEGORY_TABS, { value: '', label: 'New Projects', color: 'from-teal-500 to-teal-600' }].map(tab => (
+          {tabs.map(tab => (
             <button
-              key={tab.label}
-              onClick={() => { if (!tab.value) { router.push('/new-projects'); return; } setCat(tab.value); }}
+              key={tab.value}
+              onClick={() => setCat(tab.value)}
               className={cn(
                 'flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all',
-                cat === tab.value && tab.value
+                cat === tab.value
                   ? 'bg-white text-primary-700 shadow-sm'
                   : 'bg-white/20 text-white hover:bg-white/30',
               )}
@@ -736,7 +815,7 @@ export default function HomeSearchPanel() {
         <div className="bg-white rounded-b-2xl rounded-tr-2xl shadow-2xl p-3">
           {isAgent
             ? <DesktopAgentSearch />
-            : <DesktopPropertySearch category={cat} onSearch={handleSearch} />
+            : <DesktopPropertySearch category={cat} types={types} onSearch={handleSearch} />
           }
         </div>
       </div>

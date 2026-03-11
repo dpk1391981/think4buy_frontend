@@ -1,154 +1,356 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  CheckCircle2, ArrowLeft, ArrowRight, Upload, X, ImagePlus,
-  MapPin, Loader2, Building2, Home, Factory, Users, TrendingUp,
-  Zap, Info, Camera, Eye,
+  CheckCircle2, ArrowLeft, ArrowRight, ImagePlus,
+  MapPin, Loader2, Building2, Home, Factory,
+  Zap, Info, Camera, Eye, ChevronRight,
 } from 'lucide-react';
-import { propertiesApi, locationsApi } from '@/lib/api';
-import { detectLocation, reverseGeocode } from '@/lib/geolocation';
+import { propertiesApi, locationsApi, propertyConfigApi } from '@/lib/api';
+import { detectLocation } from '@/lib/geolocation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
-import { updateForm, nextStep, prevStep, setStep, resetForm, setSubmitting, setSubmitError } from '@/lib/store/slices/postPropertySlice';
 import {
-  PROPERTY_CATEGORIES, PROPERTY_TYPES_ALL, LISTING_TYPES, BHK_OPTIONS,
-  FURNISHING_OPTIONS, POSSESSION_OPTIONS, BROKERAGE_RENT_OPTIONS, BROKERAGE_SALE_OPTIONS,
-  DESCRIPTION_HINTS, generatePropertyTitle, USER_TYPE_OPTIONS,
-  AGENT_DAILY_CREDITS,
+  updateForm, nextStep, prevStep, setStep, resetForm,
+  setConfigCategories, setConfigTypes, setConfigAmenities, setConfigFields, setConfigLoading,
+  toggleAmenity, setDynamicField,
+} from '@/lib/store/slices/postPropertySlice';
+import type { PropConfigField } from '@/lib/store/slices/postPropertySlice';
+import {
+  LISTING_TYPES, BHK_OPTIONS, FURNISHING_OPTIONS, POSSESSION_OPTIONS,
+  BROKERAGE_RENT_OPTIONS, BROKERAGE_SALE_OPTIONS,
+  DESCRIPTION_HINTS, generatePropertyTitle,
 } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 interface MediaFile { file: File; preview: string; type: 'image' | 'video'; }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+const IMPLICIT_LISTING: Record<string, 'rent' | 'buy'> = {
+  buy: 'buy', rent: 'rent', pg: 'rent',
+};
 
-function Tile({ label, icon, selected, onClick, sub, badge }: {
+const STEP_META = [
+  { label: 'Category',    desc: 'Type of listing'      },
+  { label: 'Purpose',     desc: 'Rent or sale'         },
+  { label: 'Property',    desc: 'Property type'        },
+  { label: 'Location',    desc: 'Where is it?'         },
+  { label: 'Title',       desc: 'Auto-generated title' },
+  { label: 'Details',     desc: 'Specifications'       },
+  { label: 'Amenities',   desc: "What's included"      },
+  { label: 'Description', desc: 'Tell the story'       },
+  { label: 'Price',       desc: 'Set your price'       },
+  { label: 'Photos',      desc: 'Attract buyers'       },
+];
+
+// ─── Shared UI Primitives ─────────────────────────────────────────────────────
+
+function SelectTile({ label, icon, selected, onClick, sub, wide = false }: {
   label: string; icon?: React.ReactNode; selected: boolean;
-  onClick: () => void; sub?: string; badge?: string;
+  onClick: () => void; sub?: string; wide?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'relative flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 transition-all text-sm font-semibold cursor-pointer select-none text-center',
+        'relative flex items-center gap-4 rounded-2xl border-2 transition-all cursor-pointer select-none text-left',
+        wide ? 'p-4 w-full' : 'flex-col items-center text-center p-5 justify-center',
         selected
-          ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-md ring-2 ring-primary-200'
-          : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:bg-primary-50/50 hover:shadow-sm',
+          ? 'border-primary-500 bg-primary-50 shadow-md ring-2 ring-primary-200'
+          : 'border-gray-200 bg-white hover:border-primary-300 hover:bg-gray-50 hover:shadow-sm',
       )}
     >
-      {badge && (
-        <span className="absolute -top-2 -right-2 bg-primary-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{badge}</span>
+      {icon && (
+        <span className={cn(
+          'flex-shrink-0 flex items-center justify-center rounded-xl',
+          wide ? 'w-11 h-11 text-xl' : 'w-14 h-14 text-3xl',
+          selected ? 'bg-primary-100' : 'bg-gray-100',
+        )}>{icon}</span>
       )}
-      {icon && <span className="text-2xl leading-none">{icon}</span>}
-      <span>{label}</span>
-      {sub && <span className="text-xs text-gray-400 font-normal mt-0.5 leading-tight">{sub}</span>}
+      <div className="min-w-0">
+        <p className={cn('font-semibold', selected ? 'text-primary-700' : 'text-gray-800',
+          wide ? 'text-sm' : 'text-sm mt-1')}>{label}</p>
+        {sub && <p className="text-xs text-gray-400 mt-0.5 leading-tight line-clamp-2">{sub}</p>}
+      </div>
+      {wide && selected && <ChevronRight className="w-4 h-4 text-primary-500 ml-auto flex-shrink-0" />}
     </button>
   );
 }
 
-function StepIndicator({ current, total }: { current: number; total: number }) {
-  const STEP_LABELS = ['You', 'Category', 'Type', 'Prop Type', 'Location', 'Title', 'Details', 'Desc', 'Price', 'Photos'];
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <div className="w-full">
-      {/* Progress bar */}
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
-        <div
-          className="h-full bg-gradient-to-r from-primary-500 to-primary-700 rounded-full transition-all duration-500"
-          style={{ width: `${((current + 1) / total) * 100}%` }}
-        />
+    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+      {children}{required && <span className="text-red-500 ml-0.5">*</span>}
+    </label>
+  );
+}
+
+function Input({ value, onChange, placeholder, type = 'text', maxLength, className = '' }: any) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      className={cn(
+        'w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white',
+        'focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400',
+        'placeholder:text-gray-400 transition-colors',
+        className
+      )}
+    />
+  );
+}
+
+function Select({ value, onChange, children, className = '' }: any) {
+  return (
+    <select
+      value={value}
+      onChange={onChange}
+      className={cn(
+        'w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white',
+        'focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400',
+        'transition-colors',
+        className
+      )}
+    >
+      {children}
+    </select>
+  );
+}
+
+function ChoiceButton({ label, selected, onClick, icon }: {
+  label: string; selected: boolean; onClick: () => void; icon?: string;
+}) {
+  return (
+    <button type="button" onClick={onClick}
+      className={cn(
+        'px-4 py-2.5 rounded-xl border text-sm font-medium transition-all',
+        selected
+          ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
+          : 'border-gray-200 bg-white text-gray-600 hover:border-primary-300 hover:bg-primary-50',
+      )}>
+      {icon && <span className="mr-1.5">{icon}</span>}{label}
+    </button>
+  );
+}
+
+function SectionCard({ title, children, className = '' }: { title?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn('bg-gray-50 border border-gray-200 rounded-2xl p-5', className)}>
+      {title && <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">{title}</p>}
+      {children}
+    </div>
+  );
+}
+
+// ─── Dynamic Field Renderer ───────────────────────────────────────────────────
+
+function DynamicField({ field, value, onChange }: {
+  field: PropConfigField; value: string; onChange: (v: string) => void;
+}) {
+  const options: string[] = field.optionsJson
+    ? (Array.isArray(field.optionsJson) ? field.optionsJson : JSON.parse(field.optionsJson as any))
+    : [];
+
+  return (
+    <div>
+      <FieldLabel required={field.isRequired}>{field.fieldLabel}</FieldLabel>
+      {field.fieldType === 'text' && (
+        <Input value={value} onChange={(e: any) => onChange(e.target.value)} placeholder={field.placeholder || ''} />
+      )}
+      {field.fieldType === 'number' && (
+        <Input type="number" value={value} onChange={(e: any) => onChange(e.target.value)} placeholder={field.placeholder || ''} />
+      )}
+      {field.fieldType === 'textarea' && (
+        <textarea value={value} onChange={e => onChange(e.target.value)} rows={3}
+          placeholder={field.placeholder || ''}
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none" />
+      )}
+      {field.fieldType === 'dropdown' && (
+        <Select value={value} onChange={(e: any) => onChange(e.target.value)}>
+          <option value="">Select…</option>
+          {options.map(o => <option key={o} value={o}>{o}</option>)}
+        </Select>
+      )}
+      {field.fieldType === 'radio' && (
+        <div className="flex flex-wrap gap-2">
+          {options.map(o => (
+            <ChoiceButton key={o} label={o} selected={value === o} onClick={() => onChange(o)} />
+          ))}
+        </div>
+      )}
+      {field.fieldType === 'checkbox' && (
+        <label className="flex items-center gap-3 cursor-pointer p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+          <input type="checkbox" checked={value === 'true'}
+            onChange={e => onChange(e.target.checked ? 'true' : 'false')}
+            className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-400" />
+          <span className="text-sm text-gray-700">{field.placeholder || field.fieldLabel}</span>
+        </label>
+      )}
+    </div>
+  );
+}
+
+// ─── Sidebar Progress ─────────────────────────────────────────────────────────
+
+function SidebarProgress({ currentStep, form }: { currentStep: number; form: any }) {
+  const total = STEP_META.length;
+
+  return (
+    <aside className="hidden lg:flex flex-col w-72 xl:w-80 flex-shrink-0">
+      <div className="sticky top-24 space-y-6">
+        {/* Brand */}
+        <div className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <Home className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-sm">Post Your Property</p>
+              <p className="text-primary-200 text-xs">Think4BuySale</p>
+            </div>
+          </div>
+          <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-white rounded-full transition-all duration-500"
+              style={{ width: `${((currentStep + 1) / total) * 100}%` }}
+            />
+          </div>
+          <p className="text-xs text-primary-200 mt-2">Step {currentStep + 1} of {total}</p>
+        </div>
+
+        {/* Steps list */}
+        <nav className="space-y-0.5">
+          {STEP_META.map((step, i) => {
+            const isDone = i < currentStep;
+            const isActive = i === currentStep;
+            // Hide Purpose step in sidebar when category has implicit type
+            if (i === 1 && form.mainCategory && IMPLICIT_LISTING[form.mainCategory]) return null;
+            return (
+              <div key={i} className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all',
+                isActive ? 'bg-primary-50' : isDone ? 'opacity-100' : 'opacity-50'
+              )}>
+                <div className={cn(
+                  'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all',
+                  isDone ? 'bg-green-500 text-white' : isActive ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'
+                )}>
+                  {isDone ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
+                </div>
+                <div className="min-w-0">
+                  <p className={cn('text-sm font-semibold truncate', isActive ? 'text-primary-700' : isDone ? 'text-gray-700' : 'text-gray-400')}>
+                    {step.label}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">{step.desc}</p>
+                </div>
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* Property preview card (shown when enough data) */}
+        {(form.propertyType || form.mainCategory) && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Preview</p>
+            <div className="space-y-1.5">
+              {form.mainCategory && (
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-primary-500" />
+                  <span className="text-xs text-gray-600 capitalize">{form.mainCategory.replace('_', ' ')}</span>
+                </div>
+              )}
+              {form.propertyType && (
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-xs text-gray-600 capitalize">{form.propertyType.replace('_', ' ')}</span>
+                </div>
+              )}
+              {form.city && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-3 h-3 text-gray-400" />
+                  <span className="text-xs text-gray-600">{[form.locality, form.city].filter(Boolean).join(', ')}</span>
+                </div>
+              )}
+              {form.price && (
+                <p className="text-base font-bold text-primary-600 mt-2">
+                  ₹{Number(form.price).toLocaleString('en-IN')}
+                  {(form.listingType === 'rent' || form.mainCategory === 'rent' || form.mainCategory === 'pg') ? '/mo' : ''}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
-      {/* Step labels - show only key ones on mobile */}
-      <div className="flex justify-between text-[10px] text-gray-400 font-medium px-0.5">
-        {STEP_LABELS.map((label, i) => (
-          <span key={i} className={cn(
-            'transition-colors hidden sm:block',
-            i === current ? 'text-primary-600 font-bold' : i < current ? 'text-gray-600' : ''
-          )}>{label}</span>
-        ))}
-        <span className="sm:hidden text-primary-600 font-bold text-xs">
-          Step {current + 1} of {total}: {STEP_LABELS[current]}
-        </span>
+    </aside>
+  );
+}
+
+// ─── Mobile Progress Bar ──────────────────────────────────────────────────────
+
+function MobileProgress({ currentStep }: { currentStep: number }) {
+  const total = STEP_META.length;
+  const step = STEP_META[currentStep] || STEP_META[0];
+  return (
+    <div className="lg:hidden bg-white border-b border-gray-100 px-4 py-3 sticky top-16 z-10">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-bold text-gray-800">{step.label}</p>
+        <span className="text-xs text-gray-400 font-medium">{currentStep + 1} / {total}</span>
+      </div>
+      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full transition-all duration-500"
+          style={{ width: `${((currentStep + 1) / total) * 100}%` }}
+        />
       </div>
     </div>
   );
 }
 
-// ─── Individual Step Components ───────────────────────────────────────────────
+// ─── Step: User Type ─────────────────────────────────────────────────────────
 
 function Step0UserType({ form, dispatch }: any) {
   return (
-    <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-1">Who are you listing as?</h2>
-      <p className="text-gray-500 text-sm mb-6">This helps buyers know who to contact</p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
-        {/* Owner tile */}
-        <Tile
-          label="Owner"
-          icon={<Home className="w-6 h-6" />}
-          sub="I own this property"
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">How are you listing?</h2>
+        <p className="text-gray-500 text-sm mt-1">This helps buyers know who to contact directly</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <SelectTile label="Owner" icon="🏠" sub="Listing my own property directly"
           selected={form.userType === 'owner'}
-          onClick={() => dispatch(updateForm({ userType: 'owner', agencyName: '' }))}
-        />
-        {/* Agent tile */}
-        <Tile
-          label="Agent / Broker"
-          icon={<Building2 className="w-6 h-6" />}
-          sub="I'm listing on behalf of a client"
+          onClick={() => dispatch(updateForm({ userType: 'owner', agencyName: '' }))} />
+        <SelectTile label="Agent / Broker" icon="🏢" sub="Listing on behalf of a client"
           selected={form.userType === 'agent'}
-          onClick={() => dispatch(updateForm({ userType: 'agent' }))}
-        />
+          onClick={() => dispatch(updateForm({ userType: 'agent' }))} />
       </div>
 
-      {/* Owner confirmation */}
       {form.userType === 'owner' && (
-        <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-start gap-3">
-          <span className="text-green-600 text-xl mt-0.5">🏠</span>
+        <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-2xl p-4">
+          <span className="text-2xl">✅</span>
           <div>
-            <div className="font-semibold text-green-800 text-sm">Listing as Property Owner</div>
-            <p className="text-green-700 text-xs mt-0.5">
-              Your listing will show <strong>Direct from Owner</strong>. No brokerage paid by buyers.
-            </p>
+            <p className="font-semibold text-green-800 text-sm">Listing as Property Owner</p>
+            <p className="text-green-700 text-xs mt-0.5">Your listing will show <strong>Direct from Owner</strong>. Buyers can contact you with zero brokerage.</p>
           </div>
         </div>
       )}
 
-      {/* Agent: agency name required */}
       {form.userType === 'agent' && (
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Agency / Company Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.agencyName || ''}
-              onChange={(e) => dispatch(updateForm({ agencyName: e.target.value }))}
-              placeholder="e.g., Rahul Properties, Century Real Estate"
-              className={cn(
-                'w-full border-2 rounded-xl px-4 py-3 text-sm focus:outline-none transition-colors',
-                form.agencyName?.trim()
-                  ? 'border-primary-400 focus:border-primary-500 bg-primary-50/30'
-                  : 'border-gray-200 focus:border-primary-400'
-              )}
-              autoFocus
-            />
-            <p className="text-xs text-gray-400 mt-1.5">
-              Displayed on your listing as the listing agency
-            </p>
+            <FieldLabel required>Agency / Company Name</FieldLabel>
+            <Input value={form.agencyName || ''} onChange={(e: any) => dispatch(updateForm({ agencyName: e.target.value }))}
+              placeholder="e.g., Rahul Properties, Century Real Estate" />
+            <p className="text-xs text-gray-400 mt-1.5">Shown on your listing as the listing agency</p>
           </div>
-
           {form.agencyName?.trim() && (
-            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
-              <span className="text-blue-600 text-xl mt-0.5">🏢</span>
+            <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-2xl p-4">
+              <span className="text-2xl">🏢</span>
               <div>
-                <div className="font-semibold text-blue-800 text-sm">Listing via {form.agencyName.trim()}</div>
-                <p className="text-blue-700 text-xs mt-0.5">
-                  Buyers will see your agency name and can contact you directly.
-                </p>
+                <p className="font-semibold text-blue-800 text-sm">Listing via {form.agencyName.trim()}</p>
+                <p className="text-blue-700 text-xs mt-0.5">Buyers will see your agency name and contact you directly.</p>
               </div>
             </div>
           )}
@@ -158,51 +360,29 @@ function Step0UserType({ form, dispatch }: any) {
   );
 }
 
-function Step1MainCategory({ form, dispatch }: any) {
-  const MAIN_CATEGORIES = [
-    { value: 'residential', label: 'Residential', icon: <Home className="w-6 h-6" />, desc: 'Flats, Villas, Houses' },
-    { value: 'commercial', label: 'Commercial', icon: <Building2 className="w-6 h-6" />, desc: 'Office, Shop, Retail' },
-    { value: 'industrial', label: 'Industrial', icon: <Factory className="w-6 h-6" />, desc: 'Factory, Warehouse' },
-    { value: 'pg', label: 'PG / Co-Living', icon: '🛏️', desc: 'Paying Guest, Hostel' },
-    { value: 'builder_project', label: 'New Project', icon: '🏗️', desc: 'Builder Floors, Society' },
-    { value: 'investment', label: 'Investment', icon: <TrendingUp className="w-6 h-6" />, desc: 'Plots, Land, REITs' },
-  ];
-  return (
-    <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-1">Select Property Category</h2>
-      <p className="text-gray-500 text-sm mb-6">What type of property are you listing?</p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {MAIN_CATEGORIES.map((cat) => (
-          <Tile key={cat.value} label={cat.label} icon={cat.icon} sub={cat.desc}
-            selected={form.mainCategory === cat.value}
-            onClick={() => dispatch(updateForm({ mainCategory: cat.value, propertyType: '', listingType: '' }))}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
+// ─── Step: Main Category ─────────────────────────────────────────────────────
 
-function Step2ListingType({ form, dispatch }: any) {
-  const isPG = form.mainCategory === 'pg';
+function Step1MainCategory({ form, dispatch, config }: any) {
+  const { categories, loadingCategories } = config;
   return (
-    <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-1">{isPG ? 'PG Type' : 'Listing Purpose'}</h2>
-      <p className="text-gray-500 text-sm mb-6">
-        {isPG ? 'PG is always for rent' : 'Are you selling or renting this property?'}
-      </p>
-      {isPG ? (
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 text-blue-800">
-          <p className="font-semibold">PG / Co-Living is automatically listed for Rent</p>
-          <p className="text-sm text-blue-600 mt-1">Proceed to next step to fill details.</p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Select Category</h2>
+        <p className="text-gray-500 text-sm mt-1">What are you listing?</p>
+      </div>
+      {loadingCategories ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>
+      ) : categories.length === 0 ? (
+        <div className="text-center py-12 text-gray-400 text-sm">No categories configured. Please contact admin.</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {LISTING_TYPES.map((lt) => (
-            <Tile key={lt.value} label={lt.label} icon={lt.icon} sub={lt.desc}
-              selected={form.listingType === lt.value}
-              onClick={() => dispatch(updateForm({ listingType: lt.value as any }))}
-            />
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-3 gap-3">
+          {categories.map((cat: any) => (
+            <SelectTile key={cat.id} label={cat.name} icon={cat.icon || '🏠'} sub={cat.description || ''}
+              selected={form.categoryId === cat.id}
+              onClick={() => dispatch(updateForm({
+                categoryId: cat.id, mainCategory: cat.slug,
+                propertyType: '', typeId: '', amenityIds: [], dynamicFields: {},
+              }))} />
           ))}
         </div>
       )}
@@ -210,186 +390,172 @@ function Step2ListingType({ form, dispatch }: any) {
   );
 }
 
-function Step3PropertyType({ form, dispatch }: any) {
-  const catMap: Record<string, string[]> = {
-    residential: ['apartment', 'villa', 'house', 'builder_floor', 'penthouse', 'studio', 'farm_house'],
-    commercial: ['commercial_office', 'commercial_shop', 'showroom'],
-    industrial: ['commercial_warehouse', 'factory', 'industrial_shed'],
-    pg: ['pg', 'co_living'],
-    builder_project: ['apartment', 'villa', 'builder_floor'],
-    investment: ['plot', 'land', 'commercial_warehouse'],
-  };
-  const allowed = catMap[form.mainCategory] || [];
-  const types = PROPERTY_TYPES_ALL.filter(t => allowed.includes(t.value));
+// ─── Step: Listing Type ──────────────────────────────────────────────────────
 
+function Step2ListingType({ form, dispatch }: any) {
   return (
-    <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-1">Property Type</h2>
-      <p className="text-gray-500 text-sm mb-6">Select the specific type of property</p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {types.map((t) => (
-          <Tile key={t.value} label={t.label} icon={t.icon}
-            selected={form.propertyType === t.value}
-            onClick={() => dispatch(updateForm({ propertyType: t.value, bedrooms: '' }))}
-          />
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Listing Purpose</h2>
+        <p className="text-gray-500 text-sm mt-1">Are you selling or renting this property?</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {LISTING_TYPES.map((lt) => (
+          <SelectTile key={lt.value} label={lt.label} icon={lt.icon} sub={lt.desc}
+            selected={form.listingType === lt.value}
+            onClick={() => dispatch(updateForm({ listingType: lt.value as any }))} />
         ))}
       </div>
     </div>
   );
 }
 
+// ─── Step: Property Type ─────────────────────────────────────────────────────
+
+function Step3PropertyType({ form, dispatch, config }: any) {
+  const { types, loadingTypes } = config;
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Property Type</h2>
+        <p className="text-gray-500 text-sm mt-1">Select the specific type of property you are listing</p>
+      </div>
+      {loadingTypes ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>
+      ) : types.length === 0 ? (
+        <div className="text-center py-12 text-gray-400 text-sm">No property types configured for this category.</div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+          {types.map((t: any) => (
+            <SelectTile key={t.id} label={t.name} icon={t.icon || '🏢'}
+              selected={form.typeId === t.id}
+              onClick={() => dispatch(updateForm({
+                typeId: t.id, propertyType: t.slug,
+                bedrooms: '', amenityIds: [], dynamicFields: {},
+              }))} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Step: Location ──────────────────────────────────────────────────────────
+
 function Step4Location({ form, dispatch }: any) {
-  const [states, setStates] = useState<{ id: string; name: string }[]>([]);
-  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
-  const [localitySuggestions, setLocalitySuggestions] = useState<any[]>([]);
+  const [states, setStates] = useState<any[]>([]);
+  const [cities, setCities] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
   const [geoStatus, setGeoStatus] = useState<'idle' | 'detecting' | 'found' | 'denied' | 'error'>('idle');
   const debounce = useRef<NodeJS.Timeout>();
   const isAgent = form.userType === 'agent';
 
-  // Load states from DB
   useEffect(() => {
     locationsApi.getStates().then(r => {
-      const data = r.data;
-      const arr = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-      setStates(arr);
+      const d = r.data;
+      setStates(Array.isArray(d) ? d : d?.items || []);
     }).catch(() => {});
   }, []);
 
-  // Load cities when state changes
   useEffect(() => {
-    if (!form.stateId && (!form.state || states.length === 0)) { setCities([]); return; }
-    const stateObj = form.stateId
-      ? states.find(s => s.id === form.stateId)
-      : states.find(s => s.name === form.state);
+    const stateObj = form.stateId ? states.find((s: any) => s.id === form.stateId) : null;
     if (!stateObj) { setCities([]); return; }
     locationsApi.getCitiesByState(stateObj.id).then(r => {
-      const data = r.data;
-      const arr = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-      setCities(arr);
+      const d = r.data;
+      setCities(Array.isArray(d) ? d : d?.items || []);
     }).catch(() => setCities([]));
-  }, [form.stateId, form.state, states]);
+  }, [form.stateId, states]);
 
-  const fetchLocalities = async (city: string, q: string) => {
-    if (!q || q.length < 2) { setLocalitySuggestions([]); return; }
-    try {
-      const { data } = await locationsApi.search(`${q} ${city}`);
-      setLocalitySuggestions(data.slice(0, 6));
-    } catch { setLocalitySuggestions([]); }
-  };
-
-  const handleStateChange = (stateId: string) => {
-    const stateObj = states.find(s => s.id === stateId);
-    dispatch(updateForm({ stateId, state: stateObj?.name || '', city: '', cityId: '' }));
-  };
-
-  const handleCityChange = (cityId: string) => {
-    const cityObj = cities.find(c => c.id === cityId);
-    dispatch(updateForm({ cityId, city: cityObj?.name || '' }));
-  };
-
-  const handleDetectLocation = async () => {
+  const handleDetect = async () => {
     setGeoStatus('detecting');
     try {
       const loc = await detectLocation();
       dispatch(updateForm({ latitude: loc.lat, longitude: loc.lng }));
-      setGeoStatus('found');
-
-      // Auto-fill state/city if matched in DB
       if (loc.state && states.length > 0) {
-        const stateMatch = states.find(s => s.name.toLowerCase() === loc.state.toLowerCase());
-        if (stateMatch) {
-          dispatch(updateForm({ stateId: stateMatch.id, state: stateMatch.name, city: '', cityId: '' }));
-          // Load cities for matched state and try to auto-select city
-          try {
-            const cityRes = await locationsApi.getCitiesByState(stateMatch.id);
-            const cityArr: { id: string; name: string }[] = Array.isArray(cityRes.data) ? cityRes.data : [];
-            if (cityArr.length > 0 && loc.city) {
-              const cityMatch = cityArr.find(c => c.name.toLowerCase() === loc.city.toLowerCase());
-              if (cityMatch) {
-                dispatch(updateForm({ cityId: cityMatch.id, city: cityMatch.name }));
-              } else {
-                dispatch(updateForm({ city: loc.city, cityId: '' }));
-              }
-            }
-          } catch {}
+        const sm = states.find((s: any) => s.name.toLowerCase() === loc.state.toLowerCase());
+        if (sm) {
+          dispatch(updateForm({ stateId: sm.id, state: sm.name, city: '', cityId: '' }));
+          const cr = await locationsApi.getCitiesByState(sm.id).catch(() => null);
+          if (cr) {
+            const ca: any[] = Array.isArray(cr.data) ? cr.data : [];
+            const cm = ca.find((c: any) => c.name.toLowerCase() === (loc.city || '').toLowerCase());
+            if (cm) dispatch(updateForm({ cityId: cm.id, city: cm.name }));
+            else if (loc.city) dispatch(updateForm({ city: loc.city, cityId: '' }));
+          }
         }
       }
-      if (loc.locality && !form.locality) {
-        dispatch(updateForm({ locality: loc.locality }));
-      }
+      if (loc.locality && !form.locality) dispatch(updateForm({ locality: loc.locality }));
+      setGeoStatus('found');
     } catch (err: any) {
       setGeoStatus(err?.code === 1 ? 'denied' : 'error');
     }
   };
 
   return (
-    <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-1">Property Location</h2>
-      <p className="text-gray-500 text-sm mb-4">
-        {isAgent ? 'City is required. Exact address is optional.' : 'All location fields are required.'}
-      </p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Property Location</h2>
+        <p className="text-gray-500 text-sm mt-1">
+          {isAgent ? 'City is required — exact address is optional.' : 'Help buyers find your property.'}
+        </p>
+      </div>
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* State */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
-          <select
-            value={form.stateId}
-            onChange={(e) => handleStateChange(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-          >
+          <FieldLabel required>State</FieldLabel>
+          <Select value={form.stateId}
+            onChange={(e: any) => {
+              const s = states.find((x: any) => x.id === e.target.value);
+              dispatch(updateForm({ stateId: e.target.value, state: s?.name || '', city: '', cityId: '' }));
+            }}>
             <option value="">Select State</option>
-            {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+            {states.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </Select>
         </div>
 
-        {/* City - dropdown from DB if state selected, else text input */}
+        {/* City */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+          <FieldLabel required>City</FieldLabel>
           {form.stateId && cities.length > 0 ? (
-            <select
-              value={form.cityId}
-              onChange={(e) => handleCityChange(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-            >
+            <Select value={form.cityId}
+              onChange={(e: any) => {
+                const c = cities.find((x: any) => x.id === e.target.value);
+                dispatch(updateForm({ cityId: e.target.value, city: c?.name || '' }));
+              }}>
               <option value="">Select City</option>
-              {cities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+              {cities.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
           ) : (
-            <input
-              type="text"
-              value={form.city}
-              onChange={(e) => dispatch(updateForm({ city: e.target.value, cityId: '' }))}
-              placeholder={form.stateId ? 'Type city name' : 'Select state first'}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-            />
+            <Input value={form.city}
+              onChange={(e: any) => dispatch(updateForm({ city: e.target.value, cityId: '' }))}
+              placeholder={form.stateId ? 'Type city name' : 'Select state first'} />
           )}
         </div>
 
         {/* Locality */}
-        <div className="relative">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Area / Locality {!isAgent && '*'}
-          </label>
-          <input
-            type="text"
-            value={form.locality}
-            onChange={(e) => {
+        <div className="relative sm:col-span-2">
+          <FieldLabel required={!isAgent}>Area / Locality</FieldLabel>
+          <Input value={form.locality}
+            onChange={(e: any) => {
               dispatch(updateForm({ locality: e.target.value }));
               clearTimeout(debounce.current);
-              debounce.current = setTimeout(() => fetchLocalities(form.city, e.target.value), 300);
+              debounce.current = setTimeout(async () => {
+                if (e.target.value.length < 2) { setSuggestions([]); return; }
+                try {
+                  const { data } = await locationsApi.search(`${e.target.value} ${form.city}`);
+                  setSuggestions(data.slice(0, 5));
+                } catch { setSuggestions([]); }
+              }, 300);
             }}
-            placeholder="e.g., Koramangala, Bandra West"
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-          />
-          {localitySuggestions.length > 0 && (
-            <div className="absolute top-full left-0 right-0 bg-white border border-gray-100 rounded-xl shadow-lg z-20 overflow-hidden mt-1">
-              {localitySuggestions.map((s, i) => (
+            placeholder="e.g., Koramangala, Bandra West" />
+          {suggestions.length > 0 && (
+            <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-20 mt-1 overflow-hidden">
+              {suggestions.map((s: any, i: number) => (
                 <button key={i} type="button"
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                  onClick={() => { dispatch(updateForm({ locality: s.locality || s.city, city: s.city })); setLocalitySuggestions([]); }}
-                >
-                  <MapPin className="w-3 h-3 text-gray-400" />
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2 border-b border-gray-50 last:border-0"
+                  onClick={() => { dispatch(updateForm({ locality: s.locality || s.city, city: s.city })); setSuggestions([]); }}>
+                  <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                   {s.locality ? `${s.locality}, ${s.city}` : s.city}
                 </button>
               ))}
@@ -397,524 +563,472 @@ function Step4Location({ form, dispatch }: any) {
           )}
         </div>
 
-        {/* Pincode */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
-            <input
-              type="text"
-              maxLength={6}
-              value={form.pincode}
-              onChange={(e) => dispatch(updateForm({ pincode: e.target.value.replace(/\D/g, '') }))}
-              placeholder="110001"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {isAgent ? 'Society / Complex (optional)' : 'Society / Building'}
-            </label>
-            <input
-              type="text"
-              value={form.address}
-              onChange={(e) => dispatch(updateForm({ address: e.target.value }))}
-              placeholder="Prestige Shantiniketan"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-            />
-          </div>
+        {/* Pincode + Society */}
+        <div>
+          <FieldLabel>Pincode</FieldLabel>
+          <Input value={form.pincode}
+            onChange={(e: any) => dispatch(updateForm({ pincode: e.target.value.replace(/\D/g, '') }))}
+            placeholder="110001" maxLength={6} />
         </div>
-
-        {/* Geolocation + Lat/Lng */}
-        <div className="mt-1 bg-blue-50 rounded-2xl p-4 border border-blue-100">
-          <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-blue-600" /> GPS Coordinates (optional)
-          </label>
-
-          {/* Detect button */}
-          <button
-            type="button"
-            onClick={handleDetectLocation}
-            disabled={geoStatus === 'detecting'}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all mb-3',
-              geoStatus === 'detecting'
-                ? 'bg-blue-100 text-blue-500 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95',
-            )}
-          >
-            {geoStatus === 'detecting' ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Detecting location…</>
-            ) : (
-              <><MapPin className="w-4 h-4" /> Auto-detect my location</>
-            )}
-          </button>
-
-          {/* Status messages */}
-          {geoStatus === 'found' && (
-            <p className="text-xs text-green-600 font-medium mb-2">
-              ✓ Location detected — state/city auto-filled below
-            </p>
-          )}
-          {geoStatus === 'denied' && (
-            <p className="text-xs text-orange-600 mb-2">
-              Location permission denied. Enter coordinates manually or select state/city above.
-            </p>
-          )}
-          {geoStatus === 'error' && (
-            <p className="text-xs text-red-500 mb-2">
-              Could not detect location. Please select state/city manually.
-            </p>
-          )}
-
-          {/* Lat/Lng inputs */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Latitude</label>
-              <input
-                type="number"
-                step="any"
-                value={form.latitude ?? ''}
-                onChange={(e) => dispatch(updateForm({ latitude: e.target.value ? Number(e.target.value) : null }))}
-                placeholder="e.g. 19.0760"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Longitude</label>
-              <input
-                type="number"
-                step="any"
-                value={form.longitude ?? ''}
-                onChange={(e) => dispatch(updateForm({ longitude: e.target.value ? Number(e.target.value) : null }))}
-                placeholder="e.g. 72.8777"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-            </div>
-          </div>
-          <p className="text-[11px] text-gray-400 mt-1.5">
-            Coordinates help buyers find your property on maps and improve search ranking.
-          </p>
+        <div>
+          <FieldLabel>{isAgent ? 'Society / Complex (optional)' : 'Society / Building'}</FieldLabel>
+          <Input value={form.address}
+            onChange={(e: any) => dispatch(updateForm({ address: e.target.value }))}
+            placeholder="Prestige Shantiniketan" />
         </div>
       </div>
+
+      {/* GPS */}
+      <SectionCard title="GPS Coordinates (Optional)">
+        <button type="button" onClick={handleDetect} disabled={geoStatus === 'detecting'}
+          className={cn('flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all mb-3',
+            geoStatus === 'detecting' ? 'bg-blue-100 text-blue-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
+          )}>
+          {geoStatus === 'detecting' ? <><Loader2 className="w-4 h-4 animate-spin" />Detecting…</> : <><MapPin className="w-4 h-4" />Auto-detect my location</>}
+        </button>
+        {geoStatus === 'found' && <p className="text-xs text-green-600 font-medium mb-3">✓ Location detected and filled above</p>}
+        {geoStatus === 'denied' && <p className="text-xs text-orange-500 mb-3">Permission denied. Enter coordinates manually.</p>}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <FieldLabel>Latitude</FieldLabel>
+            <Input type="number" value={form.latitude ?? ''}
+              onChange={(e: any) => dispatch(updateForm({ latitude: e.target.value ? Number(e.target.value) : null }))}
+              placeholder="19.0760" />
+          </div>
+          <div>
+            <FieldLabel>Longitude</FieldLabel>
+            <Input type="number" value={form.longitude ?? ''}
+              onChange={(e: any) => dispatch(updateForm({ longitude: e.target.value ? Number(e.target.value) : null }))}
+              placeholder="72.8777" />
+          </div>
+        </div>
+      </SectionCard>
     </div>
   );
 }
+
+// ─── Step: Auto Title ────────────────────────────────────────────────────────
 
 function Step5AutoTitle({ form, dispatch }: any) {
   const autoTitle = generatePropertyTitle({
     category: form.mainCategory,
-    listingType: form.listingType || (form.mainCategory === 'pg' ? 'rent' : 'buy'),
-    propertyType: form.propertyType,
-    bedrooms: form.bedrooms,
-    city: form.city,
-    locality: form.locality,
+    listingType: form.listingType || (form.mainCategory === 'pg' || form.mainCategory === 'rent' ? 'rent' : 'buy'),
+    propertyType: form.propertyType, bedrooms: form.bedrooms,
+    city: form.city, locality: form.locality,
   });
 
-  useEffect(() => {
-    dispatch(updateForm({ autoTitle }));
-  }, [autoTitle, dispatch]);
+  useEffect(() => { dispatch(updateForm({ autoTitle })); }, [autoTitle]);
 
   return (
-    <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-1">Auto-Generated Title</h2>
-      <p className="text-gray-500 text-sm mb-4">Your listing title is auto-generated for best SEO. You can customize it below.</p>
-
-      <div className="bg-primary-50 border-2 border-primary-200 rounded-2xl p-5 mb-4">
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Auto-Generated Title</h2>
+        <p className="text-gray-500 text-sm mt-1">Crafted for SEO — customize if needed</p>
+      </div>
+      <div className="bg-gradient-to-br from-primary-50 to-blue-50 border-2 border-primary-200 rounded-2xl p-6">
         <div className="flex items-start gap-3">
-          <Zap className="w-5 h-5 text-primary-600 mt-0.5 flex-shrink-0" />
+          <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Zap className="w-5 h-5 text-primary-600" />
+          </div>
           <div>
-            <div className="text-xs font-semibold text-primary-600 uppercase tracking-wide mb-1">Auto Title</div>
-            <p className="text-lg font-bold text-primary-900">{autoTitle}</p>
-            <p className="text-xs text-primary-600 mt-1">SEO URL: /{autoTitle.toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,'-')}-{Date.now().toString(36)}</p>
+            <p className="text-xs font-bold text-primary-600 uppercase tracking-wider mb-1">Generated Title</p>
+            <p className="text-xl font-bold text-primary-900 leading-snug">{form.autoTitle || autoTitle}</p>
+            <p className="text-xs text-primary-500 mt-2">
+              URL: /{(form.autoTitle || autoTitle).toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,'-')}-{Date.now().toString(36)}
+            </p>
           </div>
         </div>
       </div>
-
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Customize Title (optional)</label>
-        <input
-          type="text"
-          value={form.autoTitle || autoTitle}
-          onChange={(e) => dispatch(updateForm({ autoTitle: e.target.value }))}
-          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-          placeholder={autoTitle}
-          maxLength={200}
-        />
-        <p className="text-xs text-gray-400 mt-1">Leave blank to use auto-generated title</p>
+        <FieldLabel>Customize Title (optional)</FieldLabel>
+        <Input value={form.autoTitle || autoTitle}
+          onChange={(e: any) => dispatch(updateForm({ autoTitle: e.target.value }))}
+          placeholder={autoTitle} maxLength={200} />
+        <p className="text-xs text-gray-400 mt-1.5">Leave blank to use the auto-generated title above</p>
       </div>
     </div>
   );
 }
 
-function Step6Details({ form, dispatch }: any) {
-  const isResidential = ['residential', 'pg', 'builder_project'].includes(form.mainCategory);
-  const isIndustrial = form.mainCategory === 'industrial';
-  const showBedrooms = isResidential && !['plot', 'land', 'pg', 'co_living'].includes(form.propertyType);
+// ─── Step: Details ───────────────────────────────────────────────────────────
+
+function Step6Details({ form, dispatch, config }: any) {
+  const { fields, loadingFields } = config;
+  const cat = form.mainCategory;
+  const isResidential = ['buy', 'rent', 'pg', 'builder_project'].includes(cat);
+  const isIndustrial = cat === 'industrial';
+  const showBedrooms = isResidential && !['plot', 'land', 'pg', 'co_living', 'farm_house'].includes(form.propertyType);
 
   return (
-    <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-1">Property Details</h2>
-      <p className="text-gray-500 text-sm mb-4">Fill in the specific details about your property</p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Property Details</h2>
+        <p className="text-gray-500 text-sm mt-1">Specific measurements and specifications</p>
+      </div>
 
-      <div className="space-y-4">
-        {/* BHK - Residential only */}
-        {showBedrooms && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">BHK Configuration *</label>
-            <div className="flex flex-wrap gap-2">
-              {BHK_OPTIONS.map(opt => (
-                <button
-                  key={opt.value} type="button"
-                  onClick={() => dispatch(updateForm({ bedrooms: opt.value }))}
-                  className={cn(
-                    'px-4 py-2 rounded-xl border text-sm font-medium transition-all',
-                    form.bedrooms === opt.value
-                      ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
-                      : 'border-gray-200 text-gray-600 hover:border-primary-300'
-                  )}
-                >{opt.label}</button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Area */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {isIndustrial ? 'Built-up Area (sqft) *' : 'Area *'}
-            </label>
-            <input
-              type="number"
-              value={form.area}
-              onChange={(e) => dispatch(updateForm({ area: e.target.value }))}
-              placeholder={isIndustrial ? '5000' : '1200'}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-            <select
-              value={form.areaUnit}
-              onChange={(e) => dispatch(updateForm({ areaUnit: e.target.value }))}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-            >
-              <option value="sqft">Sq.ft</option>
-              <option value="sqmt">Sq.mt</option>
-              <option value="acre">Acre</option>
-              <option value="gaj">Gaj</option>
-              {isIndustrial && <option value="sqyd">Sq.yd</option>}
-            </select>
+      {/* BHK */}
+      {showBedrooms && (
+        <div>
+          <FieldLabel required>BHK Configuration</FieldLabel>
+          <div className="flex flex-wrap gap-2">
+            {BHK_OPTIONS.map(opt => (
+              <ChoiceButton key={opt.value} label={opt.label} selected={form.bedrooms === opt.value}
+                onClick={() => dispatch(updateForm({ bedrooms: opt.value }))} />
+            ))}
           </div>
         </div>
+      )}
 
-        {/* Industrial-specific fields */}
-        {isIndustrial && (
-          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 space-y-3">
-            <h3 className="text-sm font-bold text-orange-800 flex items-center gap-2">
-              <Factory className="w-4 h-4" /> Industrial Specifications
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Ceiling Height (ft)</label>
-                <input
-                  type="number"
-                  value={form.industrialHeight}
-                  onChange={(e) => dispatch(updateForm({ industrialHeight: e.target.value }))}
-                  placeholder="25"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Power Load (KW/KVA)</label>
-                <input
-                  type="text"
-                  value={form.industrialPowerLoad}
-                  onChange={(e) => dispatch(updateForm({ industrialPowerLoad: e.target.value }))}
-                  placeholder="100KW"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-                />
-              </div>
+      {/* Area */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="col-span-2 sm:col-span-2">
+          <FieldLabel required>Area</FieldLabel>
+          <Input type="number" value={form.area}
+            onChange={(e: any) => dispatch(updateForm({ area: e.target.value }))}
+            placeholder={isIndustrial ? '5000' : '1200'} />
+        </div>
+        <div>
+          <FieldLabel>Unit</FieldLabel>
+          <Select value={form.areaUnit} onChange={(e: any) => dispatch(updateForm({ areaUnit: e.target.value }))}>
+            <option value="sqft">Sq.ft</option>
+            <option value="sqmt">Sq.mt</option>
+            <option value="acre">Acre</option>
+            <option value="gaj">Gaj</option>
+            {isIndustrial && <option value="sqyd">Sq.yd</option>}
+          </Select>
+        </div>
+      </div>
+
+      {/* Industrial specifics */}
+      {isIndustrial && (
+        <SectionCard title="Industrial Specifications">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+              <FieldLabel>Ceiling Height (ft)</FieldLabel>
+              <Input type="number" value={form.industrialHeight}
+                onChange={(e: any) => dispatch(updateForm({ industrialHeight: e.target.value }))}
+                placeholder="25" />
             </div>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.hasDock}
-                  onChange={(e) => dispatch(updateForm({ hasDock: e.target.checked }))}
-                  className="rounded"
-                />
-                Loading Dock
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.hasRamp}
-                  onChange={(e) => dispatch(updateForm({ hasRamp: e.target.checked }))}
-                  className="rounded"
-                />
-                Truck Ramp
-              </label>
+            <div>
+              <FieldLabel>Power Load (KW/KVA)</FieldLabel>
+              <Input value={form.industrialPowerLoad}
+                onChange={(e: any) => dispatch(updateForm({ industrialPowerLoad: e.target.value }))}
+                placeholder="100KW" />
             </div>
           </div>
-        )}
+          <div className="flex gap-6">
+            {[{ key: 'hasDock', label: 'Loading Dock' }, { key: 'hasRamp', label: 'Truck Ramp' }].map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={form[key]}
+                  onChange={(e) => dispatch(updateForm({ [key]: e.target.checked }))}
+                  className="w-4 h-4 rounded border-gray-300 text-primary-600" />
+                <span className="text-sm font-medium text-gray-700">{label}</span>
+              </label>
+            ))}
+          </div>
+        </SectionCard>
+      )}
 
-        {/* Residential extras */}
-        {isResidential && (
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bathrooms</label>
-                <select
-                  value={form.bathrooms}
-                  onChange={(e) => dispatch(updateForm({ bathrooms: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-                >
-                  <option value="">Select</option>
-                  {['1','2','3','4','5'].map(n => <option key={n} value={n}>{n} Bath</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Floor</label>
-                <input
-                  type="number"
-                  value={form.floor}
-                  onChange={(e) => dispatch(updateForm({ floor: e.target.value }))}
-                  placeholder="3"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-                />
-              </div>
-            </div>
+      {/* Residential extras */}
+      {isResidential && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div>
+            <FieldLabel>Bathrooms</FieldLabel>
+            <Select value={form.bathrooms} onChange={(e: any) => dispatch(updateForm({ bathrooms: e.target.value }))}>
+              <option value="">Select</option>
+              {['1','2','3','4','5'].map(n => <option key={n} value={n}>{n} Bath</option>)}
+            </Select>
+          </div>
+          <div>
+            <FieldLabel>Floor Number</FieldLabel>
+            <Input type="number" value={form.floor}
+              onChange={(e: any) => dispatch(updateForm({ floor: e.target.value }))} placeholder="3" />
+          </div>
 
-            {!['plot', 'land'].includes(form.propertyType) && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Furnishing Status</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {FURNISHING_OPTIONS.map(opt => (
-                    <button
-                      key={opt.value} type="button"
-                      onClick={() => dispatch(updateForm({ furnishingStatus: opt.value }))}
-                      className={cn(
-                        'py-2 px-3 rounded-xl border text-xs font-medium transition-all',
-                        form.furnishingStatus === opt.value
-                          ? 'bg-primary-600 border-primary-600 text-white'
-                          : 'border-gray-200 text-gray-600 hover:border-primary-300'
-                      )}
-                    >{opt.icon} {opt.label}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Possession Status</label>
-              <div className="grid grid-cols-2 gap-2">
-                {POSSESSION_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value} type="button"
-                    onClick={() => dispatch(updateForm({ possessionStatus: opt.value }))}
-                    className={cn(
-                      'py-2 px-3 rounded-xl border text-xs font-medium transition-all',
-                      form.possessionStatus === opt.value
-                        ? 'bg-primary-600 border-primary-600 text-white'
-                        : 'border-gray-200 text-gray-600 hover:border-primary-300'
-                    )}
-                  >{opt.label}</button>
+          {!['plot', 'land'].includes(form.propertyType) && (
+            <div className="sm:col-span-2">
+              <FieldLabel>Furnishing Status</FieldLabel>
+              <div className="flex flex-wrap gap-2">
+                {FURNISHING_OPTIONS.map(opt => (
+                  <ChoiceButton key={opt.value} label={opt.label} icon={opt.icon}
+                    selected={form.furnishingStatus === opt.value}
+                    onClick={() => dispatch(updateForm({ furnishingStatus: opt.value }))} />
                 ))}
               </div>
             </div>
-          </>
-        )}
+          )}
+
+          <div className="sm:col-span-2">
+            <FieldLabel>Possession Status</FieldLabel>
+            <div className="flex flex-wrap gap-2">
+              {POSSESSION_OPTIONS.map(opt => (
+                <ChoiceButton key={opt.value} label={opt.label}
+                  selected={form.possessionStatus === opt.value}
+                  onClick={() => dispatch(updateForm({ possessionStatus: opt.value }))} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic fields */}
+      {loadingFields ? (
+        <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading additional fields…
+        </div>
+      ) : fields.length > 0 && (
+        <div className="border-t border-gray-100 pt-6">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Additional Details</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {fields.map((field: PropConfigField) => (
+              <div key={field.id} className={['textarea', 'radio', 'checkbox'].includes(field.fieldType) ? 'sm:col-span-2' : ''}>
+                <DynamicField field={field}
+                  value={form.dynamicFields[field.fieldName] || ''}
+                  onChange={(v) => dispatch(setDynamicField({ key: field.fieldName, value: v }))} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Step: Amenities ─────────────────────────────────────────────────────────
+
+function Step7Amenities({ form, dispatch, config }: any) {
+  const { amenities, loadingAmenities } = config;
+  const selected: string[] = form.amenityIds;
+
+  if (loadingAmenities) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Amenities</h2>
+          <p className="text-gray-500 text-sm mt-1">Select available amenities</p>
+        </div>
+        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>
+      </div>
+    );
+  }
+
+  if (amenities.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Amenities</h2>
+          <p className="text-gray-500 text-sm mt-1">No amenities configured for this property type — you can skip this step.</p>
+        </div>
+        <div className="text-center py-10 bg-gray-50 border border-gray-200 rounded-2xl text-gray-400 text-sm">
+          No amenities to select. Click Continue to proceed.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Amenities</h2>
+          <p className="text-gray-500 text-sm mt-1">Select all amenities available in your property</p>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className="text-sm font-bold text-primary-600 bg-primary-50 px-3 py-1 rounded-full">
+            {selected.length} selected
+          </span>
+          {selected.length > 0 && (
+            <button type="button" onClick={() => dispatch(updateForm({ amenityIds: [] }))}
+              className="text-xs text-gray-400 hover:text-red-500 transition-colors">Clear</button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5">
+        {amenities.map((amenity: any) => {
+          const isOn = selected.includes(amenity.id);
+          return (
+            <button key={amenity.id} type="button"
+              onClick={() => dispatch(toggleAmenity(amenity.id))}
+              className={cn(
+                'flex items-center gap-2.5 px-3 py-3 rounded-xl border text-sm font-medium transition-all text-left',
+                isOn
+                  ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm'
+                  : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:bg-gray-50',
+              )}>
+              <div className={cn('w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all',
+                isOn ? 'bg-primary-500' : 'bg-gray-200')}>
+                {isOn && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+              </div>
+              <span className="leading-tight line-clamp-2">
+                {amenity.icon && <span className="mr-1">{amenity.icon}</span>}
+                {amenity.name}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function Step7Description({ form, dispatch }: any) {
-  const catHints = form.mainCategory === 'industrial'
-    ? DESCRIPTION_HINTS.industrial
-    : form.mainCategory === 'commercial'
-    ? DESCRIPTION_HINTS.commercial
-    : form.mainCategory === 'pg'
-    ? DESCRIPTION_HINTS.pg
+// ─── Step: Description ───────────────────────────────────────────────────────
+
+function Step8Description({ form, dispatch }: any) {
+  const hints = form.mainCategory === 'industrial' ? DESCRIPTION_HINTS.industrial
+    : form.mainCategory === 'commercial' ? DESCRIPTION_HINTS.commercial
+    : form.mainCategory === 'pg' ? DESCRIPTION_HINTS.pg
     : DESCRIPTION_HINTS.residential;
 
   const autoSuggest = () => {
     const title = form.autoTitle || generatePropertyTitle({
       category: form.mainCategory, listingType: form.listingType || 'rent',
-      propertyType: form.propertyType, bedrooms: form.bedrooms,
-      city: form.city, locality: form.locality,
+      propertyType: form.propertyType, bedrooms: form.bedrooms, city: form.city, locality: form.locality,
     });
-    const hint = `${title}. `;
-    const details: string[] = [];
-    if (form.bedrooms) details.push(`${form.bedrooms} BHK`);
-    if (form.area) details.push(`${form.area} ${form.areaUnit}`);
-    if (form.locality) details.push(`located in ${form.locality}`);
-    if (form.city) details.push(form.city);
-    const desc = hint + details.join(', ') + '. ' +
-      'Contact us for more details and site visit.';
-    dispatch(updateForm({ description: desc }));
+    const parts: string[] = [];
+    if (form.bedrooms) parts.push(`${form.bedrooms} BHK`);
+    if (form.area) parts.push(`${form.area} ${form.areaUnit}`);
+    if (form.locality) parts.push(`in ${form.locality}`);
+    if (form.city) parts.push(form.city);
+    dispatch(updateForm({ description: `${title}. ${parts.join(', ')}. Contact us for more details and site visit.` }));
   };
 
   return (
-    <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-1">Property Description</h2>
-      <p className="text-gray-500 text-sm mb-4">Describe your property to attract the right buyers/tenants</p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Property Description</h2>
+        <p className="text-gray-500 text-sm mt-1">A great description attracts more serious buyers</p>
+      </div>
 
-      {/* Hint cards */}
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4">
-        <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm mb-2">
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+        <p className="text-sm font-bold text-amber-800 mb-3 flex items-center gap-2">
           <Info className="w-4 h-4" /> Writing Tips
-        </div>
-        <ul className="space-y-1">
-          {(catHints || []).map((hint: string, i: number) => (
+        </p>
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+          {(hints || []).map((hint: string, i: number) => (
             <li key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
-              <span className="text-amber-500 mt-0.5">→</span> {hint}
+              <span className="text-amber-400 mt-0.5 flex-shrink-0">→</span>{hint}
             </li>
           ))}
         </ul>
       </div>
 
-      <button
-        type="button"
-        onClick={autoSuggest}
-        className="mb-3 text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1.5 font-medium"
-      >
-        <Zap className="w-3.5 h-3.5" /> Auto-generate description
-      </button>
-
-      <textarea
-        value={form.description}
-        onChange={(e) => dispatch(updateForm({ description: e.target.value }))}
-        rows={6}
-        placeholder="Describe your property... include location advantages, nearby amenities, connectivity, unique features..."
-        className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
-        maxLength={2000}
-      />
-      <div className="flex justify-between text-xs text-gray-400 mt-1">
-        <span>Min 50 chars recommended</span>
-        <span>{(form.description || '').length}/2000</span>
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <FieldLabel>Description</FieldLabel>
+          <button type="button" onClick={autoSuggest}
+            className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1 transition-colors">
+            <Zap className="w-3.5 h-3.5" /> Auto-generate
+          </button>
+        </div>
+        <textarea value={form.description}
+          onChange={(e) => dispatch(updateForm({ description: e.target.value }))}
+          rows={7}
+          placeholder="Describe your property — location advantages, nearby landmarks, connectivity, unique features, amenities…"
+          className="w-full border border-gray-200 rounded-2xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none leading-relaxed"
+          maxLength={2000} />
+        <div className="flex justify-between text-xs text-gray-400 mt-1.5">
+          <span>Min 50 characters recommended</span>
+          <span className={cn((form.description || '').length > 1800 ? 'text-orange-500' : '')}>
+            {(form.description || '').length}/2000
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-function Step8Price({ form, dispatch }: any) {
-  const isRent = form.listingType === 'rent' || form.mainCategory === 'pg';
+// ─── Step: Price ─────────────────────────────────────────────────────────────
+
+function Step9Price({ form, dispatch }: any) {
+  const isRent = form.listingType === 'rent' || form.mainCategory === 'pg' || form.mainCategory === 'rent';
   const isAgent = form.userType === 'agent';
   const brokerageOpts = isRent ? BROKERAGE_RENT_OPTIONS : BROKERAGE_SALE_OPTIONS;
 
-  const formatPrice = (val: string) => {
+  const fmt = (val: string) => {
     const n = Number(val);
     if (!n) return '';
-    if (n >= 10000000) return `₹${(n/10000000).toFixed(2)} Crore`;
-    if (n >= 100000) return `₹${(n/100000).toFixed(1)} Lakh`;
+    if (n >= 10000000) return `₹${(n/10000000).toFixed(2)} Cr`;
+    if (n >= 100000) return `₹${(n/100000).toFixed(1)} L`;
     return `₹${n.toLocaleString('en-IN')}`;
   };
 
   return (
-    <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-1">
-        {isRent ? 'Rent Amount' : 'Selling Price'}
-      </h2>
-      <p className="text-gray-500 text-sm mb-4">
-        {isRent ? 'Set your monthly rent amount' : 'Set your property selling price'}
-      </p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">{isRent ? 'Rent Amount' : 'Selling Price'}</h2>
+        <p className="text-gray-500 text-sm mt-1">{isRent ? 'Set your monthly rent' : 'Set your asking price'}</p>
+      </div>
 
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {isRent ? 'Monthly Rent (₹) *' : 'Selling Price (₹) *'}
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">₹</span>
-            <input
-              type="number"
-              value={form.price}
-              onChange={(e) => dispatch(updateForm({ price: e.target.value }))}
-              placeholder={isRent ? '25000' : '5000000'}
-              className="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 text-lg font-bold"
-            />
-          </div>
-          {form.price && (
-            <p className="mt-1.5 text-primary-600 font-semibold text-sm">{formatPrice(form.price)}{isRent ? '/month' : ''}</p>
-          )}
+      <div>
+        <FieldLabel required>{isRent ? 'Monthly Rent (₹)' : 'Selling Price (₹)'}</FieldLabel>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-lg">₹</span>
+          <input type="number" value={form.price}
+            onChange={(e) => dispatch(updateForm({ price: e.target.value }))}
+            placeholder={isRent ? '25000' : '5000000'}
+            className="w-full border-2 border-gray-200 rounded-xl pl-10 pr-4 py-4 text-xl font-bold focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all" />
         </div>
-
-        {/* Price unit for commercial/industrial */}
-        {['commercial', 'industrial'].includes(form.mainCategory) && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Price per</label>
-            <div className="flex gap-2">
-              {['total', 'per sqft', 'per month'].map(u => (
-                <button key={u} type="button"
-                  onClick={() => dispatch(updateForm({ priceUnit: u }))}
-                  className={cn(
-                    'px-3 py-1.5 rounded-lg border text-xs font-medium transition-all',
-                    form.priceUnit === u ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-200 text-gray-600'
-                  )}
-                >{u}</button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Brokerage - shown for agents, optional for owners */}
-        {(isAgent || form.userType === 'owner') && (
-          <div className={cn('rounded-2xl p-4 border', isAgent ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200')}>
-            <label className="block text-sm font-bold mb-2 text-gray-700">
-              {isAgent ? '💼 Brokerage Terms (Required for agents)' : '🏠 Brokerage (Optional for owners)'}
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {brokerageOpts.map(opt => (
-                <button
-                  key={opt.value} type="button"
-                  onClick={() => dispatch(updateForm({ brokerage: opt.value }))}
-                  className={cn(
-                    'py-2 px-3 rounded-xl border text-xs font-medium transition-all',
-                    form.brokerage === opt.value
-                      ? 'bg-blue-600 border-blue-600 text-white'
-                      : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'
-                  )}
-                >{opt.label}</button>
-              ))}
-            </div>
-            {form.brokerage === 'custom' && (
-              <input
-                type="text"
-                value={form.brokerageCustom}
-                onChange={(e) => dispatch(updateForm({ brokerageCustom: e.target.value }))}
-                placeholder="e.g., 45 days rent"
-                className="mt-2 w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-            )}
+        {form.price && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-lg font-bold text-primary-600">{fmt(form.price)}</span>
+            {isRent && <span className="text-gray-400 text-sm">/month</span>}
           </div>
         )}
       </div>
+
+      {['commercial', 'industrial'].includes(form.mainCategory) && (
+        <div>
+          <FieldLabel>Price Per</FieldLabel>
+          <div className="flex flex-wrap gap-2">
+            {['total', 'per sqft', 'per month'].map(u => (
+              <ChoiceButton key={u} label={u} selected={form.priceUnit === u}
+                onClick={() => dispatch(updateForm({ priceUnit: u }))} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <SectionCard title={isAgent ? 'Brokerage Terms (Required)' : 'Brokerage (Optional)'}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {brokerageOpts.map(opt => (
+            <button key={opt.value} type="button"
+              onClick={() => dispatch(updateForm({ brokerage: opt.value }))}
+              className={cn('py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all text-center',
+                form.brokerage === opt.value
+                  ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:bg-blue-50',
+              )}>{opt.label}</button>
+          ))}
+        </div>
+        {form.brokerage === 'custom' && (
+          <div className="mt-3">
+            <Input value={form.brokerageCustom}
+              onChange={(e: any) => dispatch(updateForm({ brokerageCustom: e.target.value }))}
+              placeholder="e.g., 45 days rent" />
+          </div>
+        )}
+      </SectionCard>
     </div>
   );
 }
 
-function Step9Photos({ form, dispatch, mediaFiles, setMediaFiles, onSubmit, loading, error }: any) {
+// ─── Step: Photos ────────────────────────────────────────────────────────────
+
+function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, onSubmit, loading, error }: any) {
   const imageRef = useRef<HTMLInputElement>(null);
-  const imageCount = mediaFiles.filter((m: MediaFile) => m.type === 'image').length;
-  const canSubmit = imageCount >= 3;
+  const imgCount = mediaFiles.filter((m: MediaFile) => m.type === 'image').length;
 
   const handleImages = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const remaining = 11 - imageCount;
     setMediaFiles((prev: MediaFile[]) => [
       ...prev,
-      ...files.slice(0, remaining).map(f => ({
-        file: f,
-        preview: URL.createObjectURL(f),
-        type: 'image' as const,
-      })),
+      ...files.slice(0, 11 - imgCount).map(f => ({ file: f, preview: URL.createObjectURL(f), type: 'image' as const })),
     ]);
     e.target.value = '';
   };
 
-  const removeMedia = (idx: number) => {
+  const remove = (idx: number) => {
     setMediaFiles((prev: MediaFile[]) => {
       URL.revokeObjectURL(prev[idx].preview);
       return prev.filter((_: any, i: number) => i !== idx);
@@ -927,76 +1041,80 @@ function Step9Photos({ form, dispatch, mediaFiles, setMediaFiles, onSubmit, load
   });
 
   return (
-    <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-1">Photos &amp; Preview</h2>
-      <p className="text-gray-500 text-sm mb-4">Add minimum 3 photos. More photos = more inquiries!</p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Photos</h2>
+        <p className="text-gray-500 text-sm mt-1">Add at least 3 photos — listings with more photos get 5× more inquiries</p>
+      </div>
 
-      {/* Photo upload */}
       <input type="file" ref={imageRef} multiple accept="image/*" className="hidden" onChange={handleImages} />
 
-      <div className="grid grid-cols-3 gap-2 mb-3">
-        {mediaFiles.map((m: MediaFile, i: number) => (
-          <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100">
-            <img src={m.preview} alt="" className="w-full h-full object-cover" />
-            {i === 0 && <span className="absolute bottom-1 left-1 text-[10px] bg-primary-600 text-white px-1.5 py-0.5 rounded font-medium">Cover</span>}
-            <button
-              onClick={() => removeMedia(i)}
-              className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-            >×</button>
+      {/* Photo grid */}
+      <div>
+        <div className="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-5 gap-3">
+          {mediaFiles.map((m: MediaFile, i: number) => (
+            <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group">
+              <img src={m.preview} alt="" className="w-full h-full object-cover" />
+              {i === 0 && (
+                <span className="absolute bottom-1.5 left-1.5 text-[10px] bg-primary-600 text-white px-2 py-0.5 rounded font-bold">
+                  Cover
+                </span>
+              )}
+              <button onClick={() => remove(i)}
+                className="absolute top-1.5 right-1.5 bg-black/60 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors opacity-0 group-hover:opacity-100">
+                ×
+              </button>
+            </div>
+          ))}
+          {imgCount < 11 && (
+            <button type="button" onClick={() => imageRef.current?.click()}
+              className="aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:border-primary-400 hover:text-primary-500 hover:bg-primary-50/50 transition-all">
+              <ImagePlus className="w-6 h-6" />
+              <span className="text-xs font-semibold">Add Photo</span>
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-3 mt-3">
+          <div className={cn('flex items-center gap-1.5 text-sm font-medium', imgCount >= 3 ? 'text-green-600' : 'text-gray-400')}>
+            {imgCount >= 3 ? <CheckCircle2 className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
+            {imgCount}/3 minimum
           </div>
-        ))}
-        {imageCount < 11 && (
-          <button
-            type="button"
-            onClick={() => imageRef.current?.click()}
-            className="aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-primary-400 hover:text-primary-500 transition-all"
-          >
-            <ImagePlus className="w-5 h-5" />
-            <span className="text-xs font-medium">Add Photo</span>
-          </button>
+          {imgCount < 3 && <span className="text-sm text-orange-500">Need {3 - imgCount} more photo{3 - imgCount > 1 ? 's' : ''}</span>}
+        </div>
+      </div>
+
+      {/* Summary card */}
+      <div className="bg-white border-2 border-gray-100 rounded-2xl p-5 shadow-sm">
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+          <Eye className="w-3.5 h-3.5" /> Listing Preview
+        </p>
+        <h3 className="font-bold text-gray-900 text-base leading-snug mb-1">{title}</h3>
+        <p className="text-gray-500 text-xs flex items-center gap-1 mb-3">
+          <MapPin className="w-3 h-3" /> {[form.locality, form.city, form.state].filter(Boolean).join(', ')}
+        </p>
+        <div className="flex flex-wrap gap-3 text-xs text-gray-500 mb-3">
+          {form.bedrooms && <span className="bg-gray-100 px-2.5 py-1 rounded-full">{form.bedrooms} BHK</span>}
+          {form.area && <span className="bg-gray-100 px-2.5 py-1 rounded-full">{form.area} {form.areaUnit}</span>}
+          {form.furnishingStatus && <span className="bg-gray-100 px-2.5 py-1 rounded-full capitalize">{form.furnishingStatus.replace('_',' ')}</span>}
+          {form.amenityIds?.length > 0 && <span className="bg-primary-50 text-primary-600 px-2.5 py-1 rounded-full">{form.amenityIds.length} amenities</span>}
+        </div>
+        {form.price && (
+          <p className="text-2xl font-black text-primary-600">
+            ₹{Number(form.price).toLocaleString('en-IN')}
+            <span className="text-sm font-normal text-gray-400 ml-1">
+              {(form.listingType === 'rent' || form.mainCategory === 'rent' || form.mainCategory === 'pg') ? '/mo' : ''}
+            </span>
+          </p>
         )}
       </div>
 
-      <div className="flex items-center gap-2 mb-4">
-        <div className={cn('flex items-center gap-1 text-xs font-medium', imageCount >= 3 ? 'text-green-600' : 'text-gray-400')}>
-          {imageCount >= 3 ? <CheckCircle2 className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
-          {imageCount}/3 photos required
-        </div>
-        {imageCount < 3 && <span className="text-xs text-orange-500">(need {3 - imageCount} more)</span>}
-      </div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>
+      )}
 
-      {/* Preview */}
-      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-4">
-        <div className="flex items-center gap-2 text-gray-600 text-sm font-semibold mb-3">
-          <Eye className="w-4 h-4" /> Listing Preview
-        </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <h3 className="font-bold text-gray-900 text-base">{title}</h3>
-          <p className="text-gray-500 text-xs mt-1 flex items-center gap-1">
-            <MapPin className="w-3 h-3" /> {[form.locality, form.city, form.state].filter(Boolean).join(', ')}
-          </p>
-          <div className="flex gap-3 mt-2 flex-wrap text-xs text-gray-500">
-            {form.bedrooms && <span>{form.bedrooms} BHK</span>}
-            {form.area && <span>{form.area} {form.areaUnit}</span>}
-            {form.furnishingStatus && <span className="capitalize">{form.furnishingStatus.replace('_',' ')}</span>}
-          </div>
-          {form.price && (
-            <p className="text-lg font-bold text-primary-700 mt-2">
-              ₹{Number(form.price).toLocaleString('en-IN')}{form.listingType === 'rent' ? '/mo' : ''}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {error && <p className="text-red-600 text-sm mb-3 bg-red-50 rounded-xl p-3">{error}</p>}
-
-      <button
-        type="button"
-        onClick={onSubmit}
-        disabled={loading || !canSubmit}
-        className="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 text-base transition-all shadow-lg shadow-primary-600/30"
-      >
-        {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Submitting...</> : '🎉 Post Property'}
+      <button type="button" onClick={onSubmit} disabled={loading || imgCount < 3}
+        className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 text-base transition-all shadow-xl shadow-primary-600/30">
+        {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Submitting…</> : '🎉 Post Property Now'}
       </button>
     </div>
   );
@@ -1008,47 +1126,72 @@ export default function PostPropertyPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const dispatch = useAppDispatch();
-  const { currentStep, form } = useAppSelector(s => s.postProperty);
+  const { currentStep, form, config } = useAppSelector(s => s.postProperty);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const TOTAL_STEPS = 10;
-  // Agents skip Step 0 — they're always listing as agent
-  const isLoggedInAgent = user?.role === 'agent' || user?.role === 'seller';
+  const isAgent = user?.role === 'agent' || user?.role === 'seller';
 
-  // Auto-configure for logged-in agents: skip step 0, set userType once
+  useEffect(() => {
+    if (!authLoading && !user) router.replace('/post-property/guest');
+  }, [user, authLoading, router]);
+
+  // Auto-derive listing identity from user role — no step needed
   useEffect(() => {
     if (!user) return;
-    if (isLoggedInAgent) {
-      dispatch(updateForm({ userType: 'agent', agencyName: user.company || '' }));
-      // Jump past step 0 if we're still on it
-      if (currentStep === 0) dispatch(setStep(1));
+    if (isAgent) {
+      dispatch(updateForm({ userType: 'agent', agencyName: user.company || user.name || '' }));
     } else {
-      // Pre-select userType from session (guest flow)
-      const saved = typeof window !== 'undefined' ? sessionStorage.getItem('postPropertyUserType') : '';
-      if (saved && !form.userType) {
-        dispatch(updateForm({ userType: saved as any }));
-      }
+      dispatch(updateForm({ userType: 'owner' }));
     }
   }, [user?.id]);
 
+  // Fetch categories once
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/post-property/guest');
-    }
-  }, [user, authLoading, router]);
+    dispatch(setConfigLoading({ key: 'categories', value: true }));
+    propertyConfigApi.getCategories()
+      .then(r => dispatch(setConfigCategories(r.data)))
+      .catch(() => dispatch(setConfigLoading({ key: 'categories', value: false })));
+  }, []);
 
-  // Validation per step
+  // Fetch types when category changes
+  useEffect(() => {
+    if (!form.categoryId) { dispatch(setConfigTypes([])); return; }
+    dispatch(setConfigLoading({ key: 'types', value: true }));
+    propertyConfigApi.getTypes(form.categoryId)
+      .then(r => dispatch(setConfigTypes(r.data)))
+      .catch(() => dispatch(setConfigLoading({ key: 'types', value: false })));
+  }, [form.categoryId]);
+
+  // Fetch amenities + fields when type changes
+  useEffect(() => {
+    if (!form.typeId) { dispatch(setConfigAmenities([])); dispatch(setConfigFields([])); return; }
+    dispatch(setConfigLoading({ key: 'amenities', value: true }));
+    dispatch(setConfigLoading({ key: 'fields', value: true }));
+    Promise.all([
+      propertyConfigApi.getAmenities(form.typeId),
+      propertyConfigApi.getFields(form.typeId),
+    ]).then(([ar, fr]) => {
+      const amenities = (ar.data || []).map((item: any) => item.amenity ?? item);
+      dispatch(setConfigAmenities(amenities));
+      dispatch(setConfigFields(fr.data || []));
+    }).catch(() => {
+      dispatch(setConfigLoading({ key: 'amenities', value: false }));
+      dispatch(setConfigLoading({ key: 'fields', value: false }));
+    });
+  }, [form.typeId]);
+
   const canProceed = () => {
-    switch(currentStep) {
-      case 0: return form.userType === 'owner' || (form.userType === 'agent' && !!form.agencyName?.trim());
-      case 1: return !!form.mainCategory;
-      case 2: return !!form.listingType || form.mainCategory === 'pg';
-      case 3: return !!form.propertyType;
-      case 4: return !!form.city && (form.userType === 'agent' || !!form.locality);
-      case 5: return true;
-      case 6: return !!form.area;
+    switch (currentStep) {
+      case 0: return !!form.categoryId;
+      case 1: return !!form.listingType;
+      case 2: return !!form.typeId;
+      case 3: return !!form.city && (isAgent || !!form.locality);
+      case 4: return true;
+      case 5: return !!form.area;
+      case 6: return true;
       case 7: return true;
       case 8: return !!form.price;
       case 9: return true;
@@ -1057,43 +1200,47 @@ export default function PostPropertyPage() {
   };
 
   const handleNext = () => {
-    if (!canProceed()) { setError('Please complete the required fields before proceeding.'); return; }
+    if (!canProceed()) { setError('Please complete the required fields.'); return; }
     setError('');
-    // Auto-set listingType for PG
-    if (currentStep === 2 && form.mainCategory === 'pg') {
-      dispatch(updateForm({ listingType: 'rent' }));
+    // Skip Purpose step for categories with an implicit listing type (buy/rent/pg)
+    if (currentStep === 0) {
+      const implicit = IMPLICIT_LISTING[form.mainCategory];
+      if (implicit) { dispatch(updateForm({ listingType: implicit })); dispatch(setStep(2)); return; }
     }
     dispatch(nextStep());
+  };
+
+  const handleBack = () => {
+    // When going back to Category from Property Type, skip Purpose if it was auto-set
+    if (currentStep === 2 && IMPLICIT_LISTING[form.mainCategory]) { dispatch(setStep(0)); return; }
+    dispatch(prevStep());
   };
 
   const handleSubmit = async () => {
     setLoading(true); setError('');
     try {
       const effectiveTitle = form.autoTitle || generatePropertyTitle({
-        category: form.mainCategory, listingType: form.listingType || 'rent',
-        propertyType: form.propertyType, bedrooms: form.bedrooms,
-        city: form.city, locality: form.locality,
+        category: form.mainCategory,
+        listingType: form.listingType || (form.mainCategory === 'pg' || form.mainCategory === 'rent' ? 'rent' : 'buy'),
+        propertyType: form.propertyType, bedrooms: form.bedrooms, city: form.city, locality: form.locality,
       });
 
-      // Map mainCategory + listingType to backend category
-      const categoryMap: Record<string, string> = {
-        residential: form.listingType === 'rent' ? 'rent' : 'buy',
-        commercial: 'commercial',
-        industrial: 'industrial',
-        pg: 'pg',
-        builder_project: 'builder_project',
-        investment: form.listingType === 'rent' ? 'rent' : 'buy',
-      };
+      const extraDetails: Record<string, any> = {};
+      if (form.mainCategory === 'industrial') {
+        extraDetails.height = form.industrialHeight;
+        extraDetails.powerLoad = form.industrialPowerLoad;
+        extraDetails.hasDock = form.hasDock;
+        extraDetails.hasRamp = form.hasRamp;
+      }
+      Object.entries(form.dynamicFields).forEach(([k, v]) => { if (v !== '') extraDetails[k] = v; });
 
       const payload: any = {
         title: effectiveTitle,
         description: form.description || effectiveTitle + '. Contact for details.',
-        category: categoryMap[form.mainCategory] || form.mainCategory,
+        category: form.mainCategory,
         type: form.propertyType,
-        city: form.city,
-        cityId: form.cityId || undefined,
-        state: form.state,
-        stateId: form.stateId || undefined,
+        city: form.city, cityId: form.cityId || undefined,
+        state: form.state, stateId: form.stateId || undefined,
         locality: form.locality || form.city,
         address: form.address || undefined,
         pincode: form.pincode || undefined,
@@ -1109,27 +1256,19 @@ export default function PostPropertyPage() {
         furnishingStatus: form.furnishingStatus || undefined,
         possessionStatus: form.possessionStatus,
         listedBy: form.userType === 'agent' ? 'agent' : 'owner',
-        builderName: form.userType === 'agent'
-          ? (form.agencyName?.trim() || user?.company || undefined)
-          : undefined,
+        builderName: form.userType === 'agent' ? (form.agencyName?.trim() || user?.company || undefined) : undefined,
         brokerage: form.brokerage === 'custom' ? form.brokerageCustom : form.brokerage || undefined,
-        extraDetails: form.mainCategory === 'industrial' ? {
-          height: form.industrialHeight,
-          powerLoad: form.industrialPowerLoad,
-          hasDock: form.hasDock,
-          hasRamp: form.hasRamp,
-        } : undefined,
+        amenityIds: form.amenityIds.length > 0 ? form.amenityIds : undefined,
+        extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : undefined,
       };
 
       const { data: property } = await propertiesApi.create(payload);
-
       const images = mediaFiles.filter(m => m.type === 'image');
       if (images.length > 0) {
         const fd = new FormData();
         images.forEach(m => fd.append('images', m.file));
         await propertiesApi.uploadImages(property.id, fd);
       }
-
       dispatch(resetForm());
       router.push(`/properties/${property.slug}?posted=1`);
     } catch (err: any) {
@@ -1147,89 +1286,89 @@ export default function PostPropertyPage() {
     );
   }
 
-  const stepProps = { form, dispatch };
+  const stepProps = { form, dispatch, config };
 
   const renderStep = () => {
     switch (currentStep) {
-      case 0: return <Step0UserType {...stepProps} />;
-      case 1: return <Step1MainCategory {...stepProps} />;
-      case 2: return <Step2ListingType {...stepProps} />;
-      case 3: return <Step3PropertyType {...stepProps} />;
-      case 4: return <Step4Location {...stepProps} />;
-      case 5: return <Step5AutoTitle {...stepProps} />;
-      case 6: return <Step6Details {...stepProps} />;
-      case 7: return <Step7Description {...stepProps} />;
-      case 8: return <Step8Price {...stepProps} />;
-      case 9: return <Step9Photos {...stepProps} mediaFiles={mediaFiles} setMediaFiles={setMediaFiles} onSubmit={handleSubmit} loading={loading} error={error} />;
+      case 0: return <Step1MainCategory {...stepProps} />;
+      case 1: return <Step2ListingType {...stepProps} />;
+      case 2: return <Step3PropertyType {...stepProps} />;
+      case 3: return <Step4Location {...stepProps} />;
+      case 4: return <Step5AutoTitle {...stepProps} />;
+      case 5: return <Step6Details {...stepProps} />;
+      case 6: return <Step7Amenities {...stepProps} />;
+      case 7: return <Step8Description {...stepProps} />;
+      case 8: return <Step9Price {...stepProps} />;
+      case 9: return <Step10Photos {...stepProps} mediaFiles={mediaFiles} setMediaFiles={setMediaFiles} onSubmit={handleSubmit} loading={loading} error={error} />;
       default: return null;
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
-      <div className="max-w-lg mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Post Your Property</h1>
-          {isLoggedInAgent ? (
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">🏢 Agent Listing</span>
-              {user?.company && <span className="text-xs text-gray-500">{user.company}</span>}
+      {/* Mobile progress */}
+      <MobileProgress currentStep={currentStep} />
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+        <div className="flex gap-8 xl:gap-12">
+
+          {/* Sidebar — desktop only */}
+          <SidebarProgress currentStep={currentStep} form={form} />
+
+          {/* Main form area */}
+          <main className="flex-1 min-w-0">
+            {/* Page header — desktop only */}
+            <div className="hidden lg:block mb-8">
+              <h1 className="text-3xl font-black text-gray-900">Post Your Property</h1>
+              <div className="flex items-center gap-2 mt-2">
+                {isAgent ? (
+                  <>
+                    <span className="text-xs px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full font-semibold">🏢 Agent Listing</span>
+                    {user?.company && <span className="text-sm text-gray-500">{user.company}</span>}
+                  </>
+                ) : (
+                  <span className="text-xs px-2.5 py-1 bg-green-100 text-green-700 rounded-full font-semibold">🏠 Owner Listing</span>
+                )}
+              </div>
             </div>
-          ) : (
-            <p className="text-gray-500 text-sm mt-0.5">Free listing for owners · Agents list via agency</p>
-          )}
-        </div>
 
-        {/* Progress */}
-        <div className="mb-6">
-          <StepIndicator
-            current={isLoggedInAgent ? currentStep - 1 : currentStep}
-            total={isLoggedInAgent ? TOTAL_STEPS - 1 : TOTAL_STEPS}
-          />
-        </div>
+            {/* Form card */}
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8 lg:p-10 mb-6">
+              {error && currentStep < 9 && (
+                <div className="mb-6 bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-3 text-sm font-medium">
+                  {error}
+                </div>
+              )}
+              {renderStep()}
+            </div>
 
-        {/* Step card */}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-6">
-          {error && currentStep < 9 && (
-            <div className="mb-4 bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-2.5 text-sm">{error}</div>
-          )}
-          {renderStep()}
-        </div>
-
-        {/* Navigation - not shown on last step (has its own submit button) */}
-        {currentStep < 9 && (
-          <div className="flex items-center gap-3">
-            {/* Back: agents skip step 0 so hide back on step 1 */}
-            {currentStep > 0 && !(isLoggedInAgent && currentStep === 1) && (
-              <button
-                type="button"
-                onClick={() => dispatch(prevStep())}
-                className="flex items-center gap-2 px-5 py-3 rounded-2xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-all"
-              >
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
+            {/* Navigation */}
+            {currentStep < 9 && (
+              <div className="flex items-center gap-3">
+                {currentStep > 0 && (
+                  <button type="button" onClick={handleBack}
+                    className="flex items-center gap-2 px-6 py-3.5 rounded-2xl border-2 border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all">
+                    <ArrowLeft className="w-4 h-4" /> Back
+                  </button>
+                )}
+                <button type="button" onClick={handleNext}
+                  className="flex-1 flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-primary-600/25 text-base">
+                  {currentStep === 8 ? 'Next: Add Photos' : 'Continue'}
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             )}
-            <button
-              type="button"
-              onClick={handleNext}
-              className="flex-1 flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-2xl transition-all shadow-lg shadow-primary-600/25"
-            >
-              {currentStep === 8 ? 'Next: Add Photos' : 'Continue'} <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
 
-        {/* Back button on last step */}
-        {currentStep === 9 && (
-          <button
-            type="button"
-            onClick={() => dispatch(prevStep())}
-            className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm font-medium mx-auto"
-          >
-            <ArrowLeft className="w-4 h-4" /> Go back to edit
-          </button>
-        )}
+            {currentStep === 9 && (
+              <div className="flex justify-center">
+                <button type="button" onClick={handleBack}
+                  className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm font-semibold transition-colors">
+                  <ArrowLeft className="w-4 h-4" /> Go back to edit
+                </button>
+              </div>
+            )}
+          </main>
+        </div>
       </div>
     </div>
   );

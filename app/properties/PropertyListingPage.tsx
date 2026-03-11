@@ -6,7 +6,7 @@ import { SlidersHorizontal, Grid3X3, List, ChevronDown, X, MapPin, Home } from '
 import PropertyCard from '@/components/property/PropertyCard';
 import FilterPanel from '@/components/search/FilterPanel';
 import SearchBar from '@/components/search/SearchBar';
-import { propertiesApi } from '@/lib/api';
+import { propertiesApi, propertyConfigApi } from '@/lib/api';
 import { Property, PaginatedProperties } from '@/types/property';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -19,12 +19,18 @@ const SORT_OPTIONS = [
   { value: 'viewCount:DESC', label: 'Most Popular' },
 ];
 
-const CATEGORY_META: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  buy:        { label: 'Properties for Sale', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', icon: '🏠' },
-  rent:       { label: 'Properties for Rent', color: 'text-blue-700',    bg: 'bg-blue-50 border-blue-200',       icon: '🏢' },
-  pg:         { label: 'PG / Co-Living',       color: 'text-purple-700',  bg: 'bg-purple-50 border-purple-200',   icon: '🛏️' },
-  commercial: { label: 'Commercial Properties',color: 'text-orange-700',  bg: 'bg-orange-50 border-orange-200',   icon: '🏬' },
+// Static fallback style map per slug (colors/icons never change)
+const SLUG_STYLE: Record<string, { color: string; bg: string; icon: string }> = {
+  buy:             { color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', icon: '🏠' },
+  rent:            { color: 'text-blue-700',    bg: 'bg-blue-50 border-blue-200',       icon: '🏢' },
+  pg:              { color: 'text-purple-700',  bg: 'bg-purple-50 border-purple-200',   icon: '🛏️' },
+  commercial:      { color: 'text-orange-700',  bg: 'bg-orange-50 border-orange-200',   icon: '🏬' },
+  industrial:      { color: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200',     icon: '🏭' },
+  builder_project: { color: 'text-cyan-700',    bg: 'bg-cyan-50 border-cyan-200',       icon: '🏗️' },
+  investment:      { color: 'text-indigo-700',  bg: 'bg-indigo-50 border-indigo-200',   icon: '💰' },
+  new_projects:    { color: 'text-teal-700',    bg: 'bg-teal-50 border-teal-200',       icon: '🏗️' },
 };
+const DEFAULT_STYLE = { color: 'text-gray-700', bg: 'bg-gray-50 border-gray-200', icon: '🏠' };
 
 interface Props {
   searchParams: { [key: string]: string | string[] | undefined };
@@ -38,6 +44,15 @@ export default function PropertyListingPage({ searchParams }: Props) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [sortValue, setSortValue] = useState('createdAt:DESC');
+  const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    propertyConfigApi.getCategories().then(({ data }) => {
+      const map: Record<string, string> = {};
+      for (const c of data) map[c.slug] = c.name;
+      setCategoryNames(map);
+    }).catch(() => {});
+  }, []);
 
   const fetchProperties = useCallback(async () => {
     setLoading(true);
@@ -59,15 +74,17 @@ export default function PropertyListingPage({ searchParams }: Props) {
   useEffect(() => { fetchProperties(); }, [fetchProperties]);
 
   const category = urlSearchParams.get('category') || '';
+  const isNewProject = urlSearchParams.get('isNewProject') === 'true';
   const city = urlSearchParams.get('city') || '';
   const search = urlSearchParams.get('search') || '';
-  const meta = CATEGORY_META[category];
 
-  const heading = [
-    meta?.label || 'All Properties',
-    city && `in ${city}`,
-    search && `"${search}"`,
-  ].filter(Boolean).join(' ');
+  const effectiveSlug = isNewProject ? 'new_projects' : category;
+  const style = SLUG_STYLE[effectiveSlug] ?? DEFAULT_STYLE;
+  const catLabel = isNewProject
+    ? 'New Projects'
+    : (categoryNames[category] ? `${categoryNames[category]} Properties` : (category ? `${category} Properties` : 'All Properties'));
+
+  const heading = [catLabel, city && `in ${city}`, search && `"${search}"`].filter(Boolean).join(' ');
 
   // Active filter chips (excluding category/city/search/sort params)
   const FILTER_LABELS: Record<string, string> = {
@@ -124,10 +141,10 @@ export default function PropertyListingPage({ searchParams }: Props) {
       </div>
 
       {/* Category banner */}
-      {meta && (
-        <div className={cn('border-b', meta.bg)}>
+      {(category || isNewProject) && (
+        <div className={cn('border-b', style.bg)}>
           <div className="container-max py-3 flex items-center gap-2">
-            <span className="text-lg">{meta.icon}</span>
+            <span className="text-lg">{style.icon}</span>
             <nav className="flex items-center gap-1 text-sm">
               <Link href="/" className="text-gray-500 hover:text-gray-700 flex items-center gap-1">
                 <Home className="w-3.5 h-3.5" />Home
@@ -135,14 +152,17 @@ export default function PropertyListingPage({ searchParams }: Props) {
               <span className="text-gray-300">/</span>
               {city ? (
                 <>
-                  <Link href={`/properties?category=${category}`} className={cn('hover:underline', meta.color)}>
-                    {meta.label}
+                  <Link
+                    href={isNewProject ? `/properties?isNewProject=true` : `/properties?category=${category}`}
+                    className={cn('hover:underline', style.color)}
+                  >
+                    {catLabel}
                   </Link>
                   <span className="text-gray-300">/</span>
                   <span className="text-gray-700 font-medium">{city}</span>
                 </>
               ) : (
-                <span className={cn('font-medium', meta.color)}>{meta.label}</span>
+                <span className={cn('font-medium', style.color)}>{catLabel}</span>
               )}
             </nav>
           </div>

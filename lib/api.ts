@@ -215,6 +215,45 @@ export const alertsApi = {
   delete: (id: string) => api.delete(`/alerts/${id}`),
 };
 
+// ── Property Config (public) ──────────────────────────────────────────────────
+export const propertyConfigApi = {
+  getCategories: () => api.get('/property-config/categories'),
+  getTypes: (categoryId: string) => api.get('/property-config/types', { params: { categoryId } }),
+  getTypesBySlug: (categorySlug: string) => api.get('/property-config/types', { params: { categorySlug } }),
+  getAmenities: (typeId: string) => api.get('/property-config/amenities', { params: { typeId } }),
+  getFields: (typeId: string) => api.get('/property-config/fields', { params: { typeId } }),
+};
+
+// ── Property Config Admin ─────────────────────────────────────────────────────
+export const propConfigAdminApi = {
+  // Categories
+  getCategories: () => api.get('/property-config/admin/categories'),
+  createCategory: (d: any) => api.post('/property-config/admin/categories', d),
+  updateCategory: (id: string, d: any) => api.patch(`/property-config/admin/categories/${id}`, d),
+  deleteCategory: (id: string) => api.delete(`/property-config/admin/categories/${id}`),
+  // Types
+  getTypes: (categoryId?: string) => api.get('/property-config/admin/types', { params: categoryId ? { categoryId } : {} }),
+  createType: (d: any) => api.post('/property-config/admin/types', d),
+  updateType: (id: string, d: any) => api.patch(`/property-config/admin/types/${id}`, d),
+  deleteType: (id: string) => api.delete(`/property-config/admin/types/${id}`),
+  // Amenities
+  getAmenities: () => api.get('/property-config/admin/amenities'),
+  createAmenity: (d: any) => api.post('/property-config/admin/amenities', d),
+  updateAmenity: (id: string, d: any) => api.patch(`/property-config/admin/amenities/${id}`, d),
+  deleteAmenity: (id: string) => api.delete(`/property-config/admin/amenities/${id}`),
+  // Type-Amenity mapping
+  getTypeAmenities: (typeId: string) => api.get(`/property-config/admin/types/${typeId}/amenities`),
+  setTypeAmenities: (typeId: string, amenityIds: string[]) =>
+    api.post(`/property-config/admin/types/${typeId}/amenities`, { amenityIds }),
+  // Fields
+  getFields: (typeId: string) => api.get(`/property-config/admin/types/${typeId}/fields`),
+  createField: (typeId: string, d: any) => api.post(`/property-config/admin/types/${typeId}/fields`, d),
+  updateField: (id: string, d: any) => api.patch(`/property-config/admin/fields/${id}`, d),
+  deleteField: (id: string) => api.delete(`/property-config/admin/fields/${id}`),
+  reorderFields: (typeId: string, orderedIds: string[]) =>
+    api.post(`/property-config/admin/types/${typeId}/fields/reorder`, { orderedIds }),
+};
+
 // Subscription (Agent)
 export const subscriptionApi = {
   getPlans: () => api.get('/wallet/subscription-plans'),

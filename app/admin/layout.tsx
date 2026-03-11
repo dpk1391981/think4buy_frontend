@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   Tag,
+  Layers,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { href: '/admin/agents', label: 'Agents', icon: Users },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/categories', label: 'Categories', icon: Tag },
+  { href: '/admin/property-config', label: 'Property Config', icon: Layers },
   { href: '/admin/countries', label: 'Countries', icon: Globe },
   { href: '/admin/locations', label: 'Locations', icon: MapPin },
   { href: '/admin/wallets', label: 'Wallets', icon: Wallet },

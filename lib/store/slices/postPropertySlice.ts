@@ -1,13 +1,53 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
+// ─── Config types (from property-config API) ──────────────────────────────────
+export interface PropConfigCategory {
+  id: string;
+  name: string;
+  slug: string;
+  icon?: string;
+  description?: string;
+}
+
+export interface PropConfigType {
+  id: string;
+  name: string;
+  slug: string;
+  icon?: string;
+}
+
+export interface PropConfigAmenity {
+  id: string;
+  name: string;
+  icon?: string;
+  category?: string;
+}
+
+export interface PropConfigField {
+  id: string;
+  fieldName: string;
+  fieldLabel: string;
+  fieldType: 'text' | 'number' | 'dropdown' | 'checkbox' | 'radio' | 'textarea';
+  optionsJson: string[] | string | null;
+  placeholder: string | null;
+  isRequired: boolean;
+  sortOrder: number;
+}
+
+// ─── Form shape ───────────────────────────────────────────────────────────────
 export interface PostPropertyForm {
-  // Step 1
+  // Step 0
   userType: 'owner' | 'agent' | '';
-  // Step 2
-  mainCategory: string; // residential, commercial, industrial, pg, builder_project, investment
-  // Step 3
-  listingType: 'rent' | 'buy' | ''; // rent or sale
-  // Step 4 - Location
+  agencyName: string;
+  // Step 1 — Category (dynamic from config)
+  mainCategory: string;  // slug: buy, rent, pg, commercial, industrial, builder_project, investment
+  categoryId: string;    // UUID from prop_categories
+  // Step 2 — Listing type (shown only for commercial/industrial/builder_project/investment)
+  listingType: 'rent' | 'buy' | '';
+  // Step 3 — Property type (dynamic from config, filtered by categoryId)
+  propertyType: string;  // slug
+  typeId: string;        // UUID from prop_types
+  // Step 4 — Location
   state: string;
   stateId: string;
   city: string;
@@ -17,10 +57,9 @@ export interface PostPropertyForm {
   address: string;
   latitude: number | null;
   longitude: number | null;
-  // Step 5 - Auto title (read-only, generated)
+  // Step 5 — Auto title
   autoTitle: string;
-  // Step 6 - Property Type & Details
-  propertyType: string;
+  // Step 6 — Details (standard)
   bedrooms: string;
   bathrooms: string;
   area: string;
@@ -29,28 +68,33 @@ export interface PostPropertyForm {
   totalFloors: string;
   furnishingStatus: string;
   possessionStatus: string;
-  // Industrial extra
   industrialHeight: string;
   industrialPowerLoad: string;
   hasDock: boolean;
   hasRamp: boolean;
-  // Step 7 - Description
+  // Step 6 cont — Dynamic fields from config
+  dynamicFields: Record<string, string>;
+  // Step 7 — Amenities (dynamic from config)
+  amenityIds: string[];
+  // Step 8 — Description
   description: string;
-  // Agent info
-  agencyName: string;
-  // Step 8 - Price
+  // Step 9 — Price
   price: string;
   priceUnit: string;
   brokerage: string;
   brokerageCustom: string;
-  // Step 9 - Media (file names only for Redux, actual File objects kept in component)
+  // Step 10 — Media
   mediaCount: number;
 }
 
 const initialFormState: PostPropertyForm = {
   userType: '',
+  agencyName: '',
   mainCategory: '',
+  categoryId: '',
   listingType: '',
+  propertyType: '',
+  typeId: '',
   state: 'Delhi',
   stateId: '',
   city: 'Delhi',
@@ -61,7 +105,6 @@ const initialFormState: PostPropertyForm = {
   latitude: null,
   longitude: null,
   autoTitle: '',
-  propertyType: '',
   bedrooms: '',
   bathrooms: '',
   area: '',
@@ -74,7 +117,8 @@ const initialFormState: PostPropertyForm = {
   industrialPowerLoad: '',
   hasDock: false,
   hasRamp: false,
-  agencyName: '',
+  dynamicFields: {},
+  amenityIds: [],
   description: '',
   price: '',
   priceUnit: 'total',
@@ -90,15 +134,35 @@ interface PostPropertyState {
   isSubmitting: boolean;
   submitError: string;
   submittedPropertySlug: string;
+  config: {
+    categories: PropConfigCategory[];
+    types: PropConfigType[];
+    amenities: PropConfigAmenity[];
+    fields: PropConfigField[];
+    loadingCategories: boolean;
+    loadingTypes: boolean;
+    loadingAmenities: boolean;
+    loadingFields: boolean;
+  };
 }
 
 const initialState: PostPropertyState = {
   currentStep: 0,
-  totalSteps: 10,
+  totalSteps: 11,
   form: initialFormState,
   isSubmitting: false,
   submitError: '',
   submittedPropertySlug: '',
+  config: {
+    categories: [],
+    types: [],
+    amenities: [],
+    fields: [],
+    loadingCategories: false,
+    loadingTypes: false,
+    loadingAmenities: false,
+    loadingFields: false,
+  },
 };
 
 export const postPropertySlice = createSlice({
@@ -117,6 +181,15 @@ export const postPropertySlice = createSlice({
     updateForm: (state, action: PayloadAction<Partial<PostPropertyForm>>) => {
       Object.assign(state.form, action.payload);
     },
+    setDynamicField: (state, action: PayloadAction<{ key: string; value: string }>) => {
+      state.form.dynamicFields[action.payload.key] = action.payload.value;
+    },
+    toggleAmenity: (state, action: PayloadAction<string>) => {
+      const id = action.payload;
+      const idx = state.form.amenityIds.indexOf(id);
+      if (idx === -1) state.form.amenityIds.push(id);
+      else state.form.amenityIds.splice(idx, 1);
+    },
     resetForm: () => initialState,
     setSubmitting: (state, action: PayloadAction<boolean>) => {
       state.isSubmitting = action.payload;
@@ -127,17 +200,39 @@ export const postPropertySlice = createSlice({
     setSubmittedSlug: (state, action: PayloadAction<string>) => {
       state.submittedPropertySlug = action.payload;
     },
+    // Config actions
+    setConfigCategories: (state, action: PayloadAction<PropConfigCategory[]>) => {
+      state.config.categories = action.payload;
+      state.config.loadingCategories = false;
+    },
+    setConfigTypes: (state, action: PayloadAction<PropConfigType[]>) => {
+      state.config.types = action.payload;
+      state.config.loadingTypes = false;
+    },
+    setConfigAmenities: (state, action: PayloadAction<PropConfigAmenity[]>) => {
+      state.config.amenities = action.payload;
+      state.config.loadingAmenities = false;
+    },
+    setConfigFields: (state, action: PayloadAction<PropConfigField[]>) => {
+      state.config.fields = action.payload;
+      state.config.loadingFields = false;
+    },
+    setConfigLoading: (state, action: PayloadAction<{ key: 'categories' | 'types' | 'amenities' | 'fields'; value: boolean }>) => {
+      const k = action.payload.key;
+      if (k === 'categories') state.config.loadingCategories = action.payload.value;
+      else if (k === 'types') state.config.loadingTypes = action.payload.value;
+      else if (k === 'amenities') state.config.loadingAmenities = action.payload.value;
+      else if (k === 'fields') state.config.loadingFields = action.payload.value;
+    },
   },
 });
 
 export const {
-  setStep,
-  nextStep,
-  prevStep,
-  updateForm,
+  setStep, nextStep, prevStep,
+  updateForm, setDynamicField, toggleAmenity,
   resetForm,
-  setSubmitting,
-  setSubmitError,
-  setSubmittedSlug,
+  setSubmitting, setSubmitError, setSubmittedSlug,
+  setConfigCategories, setConfigTypes, setConfigAmenities, setConfigFields, setConfigLoading,
 } = postPropertySlice.actions;
+
 export default postPropertySlice.reducer;

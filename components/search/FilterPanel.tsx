@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SlidersHorizontal, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PROPERTY_TYPES, PRICE_RANGES_BUY, PRICE_RANGES_RENT } from '@/lib/utils';
+import { PRICE_RANGES_BUY, PRICE_RANGES_RENT } from '@/lib/utils';
+import { propertyConfigApi } from '@/lib/api';
 
 interface FilterPanelProps {
   className?: string;
@@ -33,6 +34,13 @@ export default function FilterPanel({ className }: FilterPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const category = searchParams.get('category') || 'buy';
+
+  const [propTypes, setPropTypes] = useState<{ value: string; label: string }[]>([]);
+  useEffect(() => {
+    propertyConfigApi.getTypesBySlug(category).then(({ data }) => {
+      setPropTypes(data.map((t: any) => ({ value: t.slug, label: t.name })));
+    }).catch(() => setPropTypes([]));
+  }, [category]);
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     budget: true,
@@ -159,11 +167,7 @@ export default function FilterPanel({ className }: FilterPanelProps) {
           onToggle={() => toggle('type')}
         >
           <div className="space-y-1.5">
-            {PROPERTY_TYPES.filter((t) => {
-              if (category === 'commercial') return t.value.startsWith('commercial');
-              if (category === 'pg') return ['pg', 'co_living'].includes(t.value);
-              return !t.value.startsWith('commercial') && !['pg', 'co_living'].includes(t.value);
-            }).map((type) => {
+            {propTypes.map((type) => {
               const isActive = current('type') === type.value;
               return (
                 <button
