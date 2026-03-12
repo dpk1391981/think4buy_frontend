@@ -177,11 +177,11 @@ export default function TopCategories() {
   if (!isLoading && categories.length === 0) return null;
 
   return (
-    <section className="py-10 sm:py-14 bg-gray-50">
+    <section className="py-5 sm:py-14 bg-gray-50">
       <div className="container-max">
 
         {/* ── Header ── */}
-        <div className="flex items-end justify-between mb-5 sm:mb-7">
+        <div className="flex items-end justify-between mb-3 sm:mb-7">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
               <TrendingUp className="w-4 h-4 text-primary-600" />

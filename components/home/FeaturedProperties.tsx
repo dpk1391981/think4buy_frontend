@@ -128,10 +128,10 @@ export default function FeaturedProperties() {
     '/properties?isFeatured=true';
 
   return (
-    <section className="py-10 sm:py-14 bg-white">
+    <section className="py-5 sm:py-14 bg-white">
       <div className="container-max">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <div className="flex items-center justify-between mb-3 sm:mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />

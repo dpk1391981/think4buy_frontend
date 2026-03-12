@@ -72,28 +72,24 @@ export default function HomePage() {
   return (
     <>
       {/* ─── Hero Section ─────────────────────────────────────────────────── */}
-      <section className="relative min-h-[62vh] sm:min-h-[80vh] flex items-center justify-center bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 pt-14 md:pt-16">
+      <section className="relative sm:min-h-[80vh] flex items-center justify-center bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 pt-14 md:pt-16">
         {/* Background blobs */}
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary-600/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-primary-700/10 rounded-full blur-3xl" />
+        <div className="absolute top-20 left-10 w-72 h-72 bg-primary-600/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-primary-700/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 w-full px-4 py-8 sm:py-14 max-w-5xl mx-auto">
+        <div className="relative z-10 w-full px-4 py-5 sm:py-14 max-w-5xl mx-auto">
 
-          {/* ── Mobile hero text — compact ── */}
-          <div className="sm:hidden text-center mb-7">
-            <div className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm text-white/80 text-xs font-medium px-3 py-1.5 rounded-full mb-4 border border-white/15">
-              <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-              India&apos;s #1 Real Estate Platform
-            </div>
-            <h1 className="text-3xl font-extrabold text-white leading-tight">
-              Find Your<br />
+          {/* ── Mobile hero text — ultra compact ── */}
+          <div className="sm:hidden text-center mb-4">
+            <h1 className="text-2xl font-extrabold text-white leading-tight">
+              Find Your{' '}
               <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
                 Dream Home
               </span>
             </h1>
-            <p className="text-sm text-blue-100/70 mt-2">
-              50,000+ verified properties across India
+            <p className="text-xs text-blue-100/60 mt-1">
+              50,000+ verified properties · India
             </p>
           </div>
 
@@ -138,11 +134,11 @@ export default function HomePage() {
       </section>
 
       {/* ─── Platform Stats ───────────────────────────────────────────────── */}
-      <section className="py-5 sm:py-8 bg-gray-50">
+      <section className="py-3 sm:py-8 bg-gray-50">
         <div className="container-max">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
             {PLATFORM_STATS.map(({ value, label, icon: Icon }) => (
-              <div key={label} className="bg-white rounded-2xl p-4 sm:p-5 text-center border border-gray-100 shadow-sm">
+              <div key={label} className="bg-white rounded-2xl p-3 sm:p-5 text-center border border-gray-100 shadow-sm">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 bg-primary-50 rounded-xl flex items-center justify-center mx-auto mb-2 sm:mb-3">
                   <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
                 </div>
@@ -155,9 +151,9 @@ export default function HomePage() {
       </section>
 
       {/* ─── Category Grid ────────────────────────────────────────────────── */}
-      <section className="py-8 sm:py-12 bg-gray-50">
+      <section className="py-4 sm:py-12 bg-gray-50">
         <div className="container-max">
-          <div className="text-center mb-5 sm:mb-8">
+          <div className="text-center mb-3 sm:mb-8">
             <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">What Are You Looking For?</h2>
             <p className="text-gray-500 mt-1 text-sm sm:mt-2">Browse properties by category</p>
           </div>
@@ -167,10 +163,10 @@ export default function HomePage() {
               <Link
                 key={cat.label}
                 href={cat.href}
-                className="group relative overflow-hidden rounded-2xl p-3 sm:p-5 flex flex-col items-center text-center transition-all duration-300 active:scale-95 hover:shadow-xl hover:-translate-y-1 bg-white border border-gray-100"
+                className="group relative overflow-hidden rounded-2xl p-2.5 sm:p-5 flex flex-col items-center text-center transition-all duration-300 active:scale-95 bg-white border border-gray-100"
               >
                 <div
-                  className={`w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-br ${cat.gradient} rounded-xl flex items-center justify-center mb-2 sm:mb-3 text-xl sm:text-2xl shadow-lg`}
+                  className={`w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br ${cat.gradient} rounded-xl flex items-center justify-center mb-1.5 sm:mb-3 text-lg sm:text-2xl shadow-lg`}
                 >
                   {cat.icon}
                 </div>
@@ -204,18 +200,18 @@ export default function HomePage() {
       {/* <CityExplorer /> */}
 
       {/* ─── Why Choose Us ────────────────────────────────────────────────── */}
-      <section className="py-10 sm:py-16 bg-white">
+      <section className="py-5 sm:py-16 bg-white">
         <div className="container-max">
-          <div className="text-center mb-7 sm:mb-12">
+          <div className="text-center mb-4 sm:mb-12">
             <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Why Choose Think4BuySale?</h2>
             <p className="text-gray-500 mt-1 text-sm sm:mt-2">Trusted by millions of home buyers &amp; sellers</p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-6">
             {WHY_US.map(({ icon: Icon, title, desc, color }) => (
               <div
                 key={title}
-                className="group text-center p-4 sm:p-6 rounded-2xl border border-gray-100 hover:border-primary-200 hover:shadow-lg transition-all duration-300"
+                className="group text-center p-3 sm:p-6 rounded-2xl border border-gray-100 transition-all duration-300"
               >
                 <div
                   className={`w-12 h-12 sm:w-16 sm:h-16 ${color} rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4 group-hover:scale-110 transition-transform`}
@@ -248,7 +244,7 @@ export default function HomePage() {
       <ServicesBanner />
 
       {/* ─── CTA Banner ───────────────────────────────────────────────────── */}
-      <section className="py-10 sm:py-16 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 relative overflow-hidden">
+      <section className="py-6 sm:py-16 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
         <div className="container-max text-center relative z-10 px-4">

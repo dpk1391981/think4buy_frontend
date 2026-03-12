@@ -282,7 +282,7 @@ export default function PropertyListingPage({ searchParams }: Props) {
         </div>
       )}
 
-      <div className="container-max py-5">
+      <div className="container-max py-3 sm:py-5">
         <div className={cn('flex gap-6', viewMode === 'map' ? 'h-[calc(100vh-200px)]' : '')}>
           {/* Desktop Filter Sidebar — hidden in map view */}
           {viewMode !== 'map' && (

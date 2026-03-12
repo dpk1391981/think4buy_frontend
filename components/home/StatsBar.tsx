@@ -42,7 +42,7 @@ export default function StatsBar() {
       <div className="container-max">
         <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-100">
           {items.map(({ icon: Icon, value, label, color }) => (
-            <div key={label} className="flex flex-col sm:flex-row items-center gap-3 p-5 justify-center">
+            <div key={label} className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-3 p-3 sm:p-5 justify-center">
               <div className={`${color} flex-shrink-0`}>
                 <Icon className="w-6 h-6" />
               </div>

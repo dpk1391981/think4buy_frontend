@@ -70,10 +70,10 @@ export default function HomeLocationSelector() {
   if (!selectedState || citiesForState.length === 0) return null;
 
   return (
-    <section className="py-8 sm:py-12 bg-gray-50 border-b border-gray-100">
+    <section className="py-4 sm:py-12 bg-gray-50 border-b border-gray-100">
       <div className="container-max">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6 sm:mb-8">
+        <div className="flex items-center justify-between mb-3 sm:mb-8">
           <div>
             <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">
               {selectedCity ? `Properties in ${selectedCity}` : `Top Cities in ${selectedState}`}

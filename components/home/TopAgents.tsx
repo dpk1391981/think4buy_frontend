@@ -211,10 +211,10 @@ export default function TopAgents() {
     : '/agents';
 
   return (
-    <section className="py-10 sm:py-14 bg-gray-50">
+    <section className="py-5 sm:py-14 bg-gray-50">
       <div className="container-max">
         {/* Header */}
-        <div className="flex items-center justify-between mb-5 sm:mb-6 px-0">
+        <div className="flex items-center justify-between mb-3 sm:mb-6 px-0">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Top Real Estate Agents</h2>
             <p className="text-gray-500 mt-0.5 text-sm">

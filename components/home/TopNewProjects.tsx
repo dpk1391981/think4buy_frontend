@@ -197,11 +197,11 @@ export default function TopNewProjects() {
     : viewAllBase;
 
   return (
-    <section className="py-10 sm:py-14 bg-gray-50 border-t border-gray-100">
+    <section className="py-5 sm:py-14 bg-gray-50 border-t border-gray-100">
       <div className="container-max">
 
         {/* Header */}
-        <div className="flex items-end justify-between mb-5 sm:mb-6">
+        <div className="flex items-end justify-between mb-3 sm:mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
               <span className="inline-flex items-center gap-1.5 bg-primary-100 text-primary-700 text-[11px] font-bold px-3 py-1 rounded-full tracking-wide">
