@@ -14,6 +14,8 @@
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
+    width: 100%;
   }
 
   body {
@@ -21,6 +23,8 @@
     @apply text-gray-800 bg-gray-50;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
+    width: 100%;
+    position: relative;
   }
 
   a {
