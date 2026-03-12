@@ -174,7 +174,7 @@ export default function Footer() {
               </ul>
 
               {/* Partner / Network */}
-              <div className="mt-6">
+              {/* <div className="mt-6">
                 <p className="text-xs text-gray-500 uppercase tracking-wider mb-3 font-semibold">Partner Sites</p>
                 <div className="flex flex-wrap gap-2">
                   {['NoBroker', 'MagicBricks', '99acres', 'Housing'].map((site) => (
@@ -186,7 +186,7 @@ export default function Footer() {
                     </span>
                   ))}
                 </div>
-              </div>
+              </div> */}
             </div>
 
           </div>
