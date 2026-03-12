@@ -980,6 +980,7 @@ export const stateDatabase: Record<string, StateData> = {
 // ─── LOOKUP HELPERS ───────────────────────────────────────────────────────────
 
 export function getCityData(citySlug: string): CityData | null {
+  if (!citySlug) return null;
   const key = citySlug.toLowerCase().replace(/\s+/g, "-");
   if (cityDatabase[key]) return cityDatabase[key];
   const noHyphen = key.replace(/-/g, "");
@@ -990,6 +991,7 @@ export function getCityData(citySlug: string): CityData | null {
 }
 
 export function getStateData(stateSlug: string): StateData | null {
+  if (!stateSlug) return null;
   const key = stateSlug.toLowerCase().replace(/\s+/g, "-");
   return stateDatabase[key] || null;
 }
