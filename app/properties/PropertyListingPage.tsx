@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { SlidersHorizontal, Grid3X3, List, ChevronDown, X, MapPin, Home, Map } from 'lucide-react';
 import PropertyCard from '@/components/property/PropertyCard';
@@ -90,7 +90,7 @@ interface Props {
   searchParams: { [key: string]: string | string[] | undefined };
 }
 
-export default function PropertyListingPage({ searchParams }: Props) {
+export default function PropertyListingPage({ searchParams: propSearchParams }: Props) {
   const urlSearchParams = useSearchParams();
   const router = useRouter();
   const [data, setData] = useState<PaginatedProperties | null>(null);
@@ -99,6 +99,23 @@ export default function PropertyListingPage({ searchParams }: Props) {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [sortValue, setSortValue] = useState('relevance');
   const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
+
+  // Normalise propSearchParams: flatten string[] → string (first value), stable ref
+  const propDefaults = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(propSearchParams || {}).map(([k, v]) => [
+          k,
+          Array.isArray(v) ? v[0] ?? '' : (v ?? ''),
+        ]),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(propSearchParams)],
+  );
+
+  // Merge helper: URL params take precedence over page-level prop defaults
+  const getMerged = (key: string): string =>
+    urlSearchParams.get(key) ?? propDefaults[key] ?? '';
 
   useEffect(() => {
     propertyConfigApi.getCategories().then(({ data }) => {
@@ -111,7 +128,9 @@ export default function PropertyListingPage({ searchParams }: Props) {
   const fetchProperties = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, any> = {};
+      // Start with page-level defaults (e.g. city, category from SEO route)
+      const params: Record<string, any> = { ...propDefaults };
+      // URL params override defaults (user-applied filters)
       urlSearchParams.forEach((val, key) => { params[key] = val; });
 
       if (sortValue === 'relevance') {
@@ -129,15 +148,15 @@ export default function PropertyListingPage({ searchParams }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [urlSearchParams, sortValue]);
+  }, [urlSearchParams, sortValue, propDefaults]);
 
   useEffect(() => { fetchProperties(); }, [fetchProperties]);
 
-  const category = urlSearchParams.get('category') || '';
-  const isNewProject = urlSearchParams.get('isNewProject') === 'true';
-  const city = urlSearchParams.get('city') || '';
-  const search = urlSearchParams.get('search') || '';
-  const keyword = urlSearchParams.get('keyword') || '';
+  const category = getMerged('category');
+  const isNewProject = (urlSearchParams.get('isNewProject') ?? propDefaults['isNewProject']) === 'true';
+  const city = getMerged('city');
+  const search = getMerged('search');
+  const keyword = getMerged('keyword');
 
   const { trackSearch } = useAnalytics();
   useEffect(() => {
@@ -158,7 +177,7 @@ export default function PropertyListingPage({ searchParams }: Props) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSearchParams.toString()]);
-  const locality = urlSearchParams.get('locality') || '';
+  const locality = getMerged('locality');
 
   const effectiveSlug = isNewProject ? 'new_projects' : category;
   const style = SLUG_STYLE[effectiveSlug] ?? DEFAULT_STYLE;
@@ -199,8 +218,8 @@ export default function PropertyListingPage({ searchParams }: Props) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Build searchParams object for map
-  const mapSearchParams: Record<string, string> = {};
+  // Build searchParams object for map — merge prop defaults + URL params
+  const mapSearchParams: Record<string, string> = { ...propDefaults };
   urlSearchParams.forEach((val, key) => { mapSearchParams[key] = val; });
 
   const SkeletonCard = () => (
