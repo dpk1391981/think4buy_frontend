@@ -37,7 +37,7 @@ export default function BuyPropertyInCityPage({ params }: { params: Params }) {
   return (
     <>
       <Suspense fallback={<div className="min-h-screen bg-gray-50 pt-16" />}>
-        <PropertyListingPage searchParams={{ category: 'buy', city }} />
+        <PropertyListingPage searchParams={{ category: 'buy', city, propertyType: 'apartment' }} />
       </Suspense>
       <CityPageContent citySlug={params.city} cityName={city} variant="buy" />
     </>
