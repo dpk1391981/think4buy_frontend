@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 // Resolves backend /uploads/ paths to full URLs
 const BACKEND_URL =
-  (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1').replace(/\/api\/v1\/?$/, '');
+  (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api/v1').replace(/\/api\/v1\/?$/, '');
 
 export function resolveImageSrc(src?: string | null): string {
   if (!src) return '/placeholder-property.svg';
