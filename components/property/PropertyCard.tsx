@@ -18,6 +18,7 @@ import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppDispatch } from '@/lib/store';
 import { openAuthModal } from '@/lib/store/slices/uiSlice';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 interface PropertyCardProps {
   property: Property;
@@ -42,6 +43,7 @@ export default function PropertyCard({ property, className, listView }: Property
   const { isSaved, toggle } = useWishlist();
   const { user } = useAuth();
   const dispatch = useAppDispatch();
+  const { trackPropertyClick, trackPropertySave } = useAnalytics();
   const primaryImage = getPrimaryImage(property.images);
   const saved = isSaved(property.id);
   const plan = property.listingPlan && PLAN_BADGE[property.listingPlan];
@@ -54,6 +56,14 @@ export default function PropertyCard({ property, className, listView }: Property
     ? property.owner?.company || property.owner?.name
     : property.owner?.name;
 
+  const handleCardClick = () => {
+    trackPropertyClick(property.id, {
+      city:  property.city  || undefined,
+      state: property.state || undefined,
+      metadata: { propertyType: property.type },
+    });
+  };
+
   const handleWishlist = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -62,13 +72,20 @@ export default function PropertyCard({ property, className, listView }: Property
       return;
     }
     toggle(property.id);
+    if (!saved) {
+      // Only track when saving (not un-saving)
+      trackPropertySave(property.id, {
+        city:  property.city  || undefined,
+        state: property.state || undefined,
+      });
+    }
   };
 
   // ── List view ─────────────────────────────────────────────────────────────────
   if (listView) {
     return (
       <article className={cn('bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group', className)}>
-        <Link href={`/properties/${property.slug}`} className="flex">
+        <Link href={`/properties/${property.slug}`} className="flex" onClick={handleCardClick}>
           {/* Image */}
           <div className="relative w-56 sm:w-72 flex-shrink-0">
             <OptimizedImage
@@ -178,7 +195,7 @@ export default function PropertyCard({ property, className, listView }: Property
   // ── Grid view ─────────────────────────────────────────────────────────────────
   return (
     <article className={cn('bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden group cursor-pointer', className)}>
-      <Link href={`/properties/${property.slug}`} className="block">
+      <Link href={`/properties/${property.slug}`} className="block" onClick={handleCardClick}>
         {/* Image */}
         <div className="relative overflow-hidden" style={{ aspectRatio: '16/10' }}>
           <OptimizedImage

@@ -7,6 +7,7 @@ import PropertyCard from '@/components/property/PropertyCard';
 import FilterPanel from '@/components/search/FilterPanel';
 import SearchBar from '@/components/search/SearchBar';
 import { propertiesApi, propertyConfigApi } from '@/lib/api';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { Property, PaginatedProperties } from '@/types/property';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -137,6 +138,26 @@ export default function PropertyListingPage({ searchParams }: Props) {
   const city = urlSearchParams.get('city') || '';
   const search = urlSearchParams.get('search') || '';
   const keyword = urlSearchParams.get('keyword') || '';
+
+  const { trackSearch } = useAnalytics();
+  useEffect(() => {
+    const q = search || keyword;
+    if (q || city || category) {
+      trackSearch(q, {
+        city:         city || undefined,
+        state:        urlSearchParams.get('state') || undefined,
+        propertyType: urlSearchParams.get('type')  || undefined,
+        filters: {
+          category,
+          city,
+          minPrice: urlSearchParams.get('minPrice') || undefined,
+          maxPrice: urlSearchParams.get('maxPrice') || undefined,
+          bedrooms: urlSearchParams.get('bedrooms') || undefined,
+        },
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSearchParams.toString()]);
   const locality = urlSearchParams.get('locality') || '';
 
   const effectiveSlug = isNewProject ? 'new_projects' : category;

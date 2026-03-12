@@ -11,6 +11,7 @@ import {
 import { locationsApi, propertyConfigApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { TOP_CITIES } from '@/lib/utils';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1092,6 +1093,7 @@ function ActivePill({ label, onRemove }: { label: string; onRemove: () => void }
 
 export default function HomeSearchPanel() {
   const router  = useRouter();
+  const { trackSearch } = useAnalytics();
   const [cat, setCat]   = useState('buy');
   const [open, setOpen] = useState(false);
 
@@ -1102,6 +1104,15 @@ export default function HomeSearchPanel() {
   const catInfo = tabs.find(c => c.value === cat) ?? { value: cat, label: cat, color: DEFAULT_COLOR };
 
   const handleSearch = useCallback((params: Record<string, string>) => {
+    // Track the search event (fire-and-forget)
+    trackSearch(params.search || params.keyword || '', {
+      city:         params.city   || undefined,
+      state:        params.state  || undefined,
+      propertyType: params.type   || undefined,
+      source:       'home_page',
+      metadata:     { category: isAgent ? 'agents' : cat, ...params },
+    });
+
     if (isAgent) {
       const p = new URLSearchParams(params);
       router.push(`/agents?${p}`);
@@ -1112,7 +1123,7 @@ export default function HomeSearchPanel() {
       const p = new URLSearchParams({ category: cat, ...params });
       router.push(`/properties?${p}`);
     }
-  }, [cat, isAgent, isNewProject, router]);
+  }, [cat, isAgent, isNewProject, router, trackSearch]);
 
   return (
     <div className="w-full max-w-5xl mx-auto">

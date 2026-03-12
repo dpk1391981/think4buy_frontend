@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import AgentContactForm from '@/components/agent/AgentContactForm';
 import AgentListings from '@/components/agent/AgentListings';
+import AgentAnalyticsTracker from '@/components/agent/AgentAnalyticsTracker';
 
 type Params = { slug: string };
 
@@ -122,6 +123,7 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <AgentAnalyticsTracker agentId={agent.id} city={agent.city} state={agent.state} />
 
       <div className="min-h-screen bg-gray-50 pt-16">
 

@@ -265,3 +265,37 @@ export const subscriptionApi = {
   getCurrent: () => api.get('/wallet/subscription'),
   purchase: (planId: string) => api.post('/wallet/subscription/purchase', { planId }),
 };
+
+// ─── Home Analytics APIs ──────────────────────────────────────────────────────
+export const homeApi = {
+  getTopCategories: (params?: { country?: string; state?: string; city?: string; limit?: number }) =>
+    api.get('/home/top-categories', { params }),
+
+  getTopStates: (params?: { country?: string; limit?: number }) =>
+    api.get('/home/top-states', { params }),
+
+  getTopCities: (params?: { state?: string; country?: string; limit?: number }) =>
+    api.get('/home/top-cities', { params }),
+
+  getTopProperties: (params?: { tab?: string; country?: string; state?: string; city?: string; limit?: number; period?: string }) =>
+    api.get('/home/top-properties', { params }),
+
+  getTopAgents: (params?: { country?: string; state?: string; city?: string; limit?: number }) =>
+    api.get('/home/top-agents', { params }),
+
+  getTopProjects: (params?: { country?: string; state?: string; city?: string; limit?: number }) =>
+    api.get('/home/top-projects', { params }),
+
+  trackEvent: (dto: {
+    eventType: string;
+    entityType?: string;
+    entityId?: string;
+    sessionId?: string;
+    country?: string;
+    state?: string;
+    city?: string;
+    deviceType?: string;
+    source?: string;
+    metadata?: Record<string, any>;
+  }) => api.post('/analytics/track', dto).catch(() => {}), // silent fail
+};

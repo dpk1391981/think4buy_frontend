@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -35,6 +35,7 @@ import {
 import { cn } from '@/lib/utils';
 import { inquiriesApi, propertiesApi } from '@/lib/api';
 import PropertyCard from '@/components/property/PropertyCard';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 interface Props {
   property: Property;
@@ -46,6 +47,18 @@ export default function PropertyDetailClient({ property }: Props) {
   const [inquiryForm, setInquiryForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const { trackPropertyView, trackPropertyInquiry } = useAnalytics();
+
+  // Track property view once on mount
+  useEffect(() => {
+    trackPropertyView(property.id, {
+      propertyType: property.type,
+      city:  property.city  || undefined,
+      state: property.state || undefined,
+      source: 'direct',
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [property.id]);
 
   const { data: similar } = useQuery({
     queryKey: ['similar', property.id],
@@ -60,6 +73,10 @@ export default function PropertyDetailClient({ property }: Props) {
     try {
       await inquiriesApi.create(property.id, inquiryForm);
       setSubmitted(true);
+      trackPropertyInquiry(property.id, {
+        city:  property.city  || undefined,
+        state: property.state || undefined,
+      });
     } catch {
       alert('Failed to send inquiry. Please try again.');
     } finally {

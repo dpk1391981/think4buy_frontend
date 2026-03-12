@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { fetchStates } from '@/lib/store/slices/locationsSlice';
 import { setSelectedLocation } from '@/lib/store/slices/uiSlice';
 import OptimizedImage from '@/components/common/OptimizedImage';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { useQuery } from '@tanstack/react-query';
 import { propertiesApi } from '@/lib/api';
 
@@ -46,12 +47,13 @@ function StatePropertyCount({ stateName }: { stateName: string }) {
 
 export default function StateExplorer() {
   const dispatch = useAppDispatch();
+  const { trackStateView } = useAnalytics();
 
-  const selectedCountry = useAppSelector((s) => s.ui.selectedCountry);
+  const selectedCountry   = useAppSelector((s) => s.ui.selectedCountry);
   const selectedCountryId = useAppSelector((s) => s.ui.selectedCountryId);
-  const selectedState = useAppSelector((s) => s.ui.selectedState);
-  const allStates = useAppSelector((s) => s.locations.states);
-  const statesLoaded = useAppSelector((s) => s.locations.statesLoaded);
+  const selectedState     = useAppSelector((s) => s.ui.selectedState);
+  const allStates         = useAppSelector((s) => s.locations.states);
+  const statesLoaded      = useAppSelector((s) => s.locations.statesLoaded);
 
   useEffect(() => {
     if (!statesLoaded) {
@@ -77,6 +79,7 @@ export default function StateExplorer() {
 
   const handleStateClick = (id: string, name: string) => {
     dispatch(setSelectedLocation({ state: name, stateId: id }));
+    trackStateView(name, countryLabel);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 

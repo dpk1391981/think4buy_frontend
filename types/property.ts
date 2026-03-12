@@ -65,6 +65,7 @@ export interface Property {
   furnishingStatus?: FurnishingStatus;
   possessionStatus?: PossessionStatus;
   city: string;
+  state?: string;
   locality: string;
   society?: string;
   address?: string;
