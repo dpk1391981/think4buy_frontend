@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Home, User, LogOut, Settings, Heart, MapPin, Building2, TrendingUp, Search, X } from 'lucide-react';
+import { ChevronDown, Home, User, LogOut, Settings, Heart, MapPin, Building2, TrendingUp, Search, X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
@@ -448,26 +448,18 @@ export default function Header() {
           </span>
         </Link>
 
-        {/* Right: Location + Search + User */}
-        <div className="flex items-center gap-1 flex-shrink-0">
+        {/* Right: Location + User/PostFree */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <StateSelector compact />
-          <Link
-            href="/properties"
-            className="w-11 h-11 flex items-center justify-center rounded-full bg-gray-100 active:bg-gray-200 transition-colors"
-            aria-label="Search"
-          >
-            <Search className="w-5 h-5 text-gray-700" />
-          </Link>
           {!loading && (
             user ? (
               <UserMenu compact />
             ) : (
               <button
-                onClick={() => dispatch(openAuthModal('login'))}
-                className="w-11 h-11 flex items-center justify-center rounded-full bg-primary-50 active:bg-primary-100 transition-colors"
-                aria-label="Login"
+                onClick={() => dispatch(openAuthModal({ mode: 'login', reason: 'post-property', redirectTo: '/post-property' }))}
+                className="flex items-center gap-1 bg-primary-600 active:bg-primary-700 text-white text-[11px] font-bold px-2.5 py-2 rounded-lg transition-colors whitespace-nowrap"
               >
-                <User className="w-5 h-5 text-primary-600" />
+                Post <span className="bg-amber-400 text-gray-900 text-[10px] font-extrabold px-1 py-0.5 rounded leading-none">FREE</span>
               </button>
             )
           )}
