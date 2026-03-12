@@ -6,14 +6,14 @@ import { useRouter } from 'next/navigation';
 import {
   Search, MapPin, Loader2, X, Users, Building2,
   ArrowLeft, ChevronRight, SlidersHorizontal, TrendingUp,
+  ChevronDown, BedDouble, IndianRupee, CheckCircle2, Sliders,
 } from 'lucide-react';
 import { locationsApi, propertyConfigApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { TOP_CITIES } from '@/lib/utils';
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-// Color palette per slug (fallback for unknown slugs)
 const SLUG_COLORS: Record<string, string> = {
   buy:             'from-blue-500 to-blue-600',
   rent:            'from-emerald-500 to-emerald-600',
@@ -27,54 +27,71 @@ const SLUG_COLORS: Record<string, string> = {
 };
 const DEFAULT_COLOR = 'from-gray-500 to-gray-600';
 
-// Virtual tabs appended after DB categories
 const VIRTUAL_TABS = [
-  // { value: 'new_projects', label: 'New Projects', color: SLUG_COLORS.new_projects },
-  { value: 'agents',       label: 'Agents',       color: SLUG_COLORS.agents },
+  { value: 'agents', label: 'Agents', color: SLUG_COLORS.agents },
 ];
 
 interface CategoryTab { value: string; label: string; color: string; }
 interface PropType     { name: string; slug: string; }
 
-const BHK_OPTIONS = ['1 BHK', '2 BHK', '3 BHK', '4 BHK', '5+ BHK'];
+const BHK_OPTIONS = [
+  { label: '1 BHK', value: '1' },
+  { label: '2 BHK', value: '2' },
+  { label: '3 BHK', value: '3' },
+  { label: '4 BHK', value: '4' },
+  { label: '5+ BHK', value: '5+' },
+];
 
 const BUDGET_BUY = [
-  { label: 'Under 25L',  min: 0,        max: 2500000  },
-  { label: '25L–50L',    min: 2500000,  max: 5000000  },
-  { label: '50L–1Cr',    min: 5000000,  max: 10000000 },
-  { label: '1Cr–2Cr',    min: 10000000, max: 20000000 },
-  { label: '2Cr–5Cr',    min: 20000000, max: 50000000 },
-  { label: 'Above 5Cr',  min: 50000000, max: 0        },
+  { label: 'Under ₹25 Lakh',    min: 0,        max: 2500000   },
+  { label: '₹25 – 50 Lakh',     min: 2500000,  max: 5000000   },
+  { label: '₹50 Lakh – 1 Cr',   min: 5000000,  max: 10000000  },
+  { label: '₹1 Cr – 2 Cr',      min: 10000000, max: 20000000  },
+  { label: '₹2 Cr – 5 Cr',      min: 20000000, max: 50000000  },
+  { label: 'Above ₹5 Cr',       min: 50000000, max: 0         },
 ];
 
 const BUDGET_RENT = [
-  { label: 'Under ₹10K', min: 0,     max: 10000 },
-  { label: '₹10–20K',    min: 10000, max: 20000 },
-  { label: '₹20–40K',    min: 20000, max: 40000 },
-  { label: '₹40–75K',    min: 40000, max: 75000 },
-  { label: 'Above ₹75K', min: 75000, max: 0     },
+  { label: 'Under ₹10,000',  min: 0,     max: 10000 },
+  { label: '₹10K – ₹20K',    min: 10000, max: 20000 },
+  { label: '₹20K – ₹40K',    min: 20000, max: 40000 },
+  { label: '₹40K – ₹75K',    min: 40000, max: 75000 },
+  { label: 'Above ₹75,000',  min: 75000, max: 0     },
 ];
 
-// ─── Shared hook: fetch categories + types ────────────────────────────────────
+const POSSESSION_OPTIONS = [
+  { label: 'Ready to Move', value: 'ready_to_move' },
+  { label: 'Under Construction', value: 'under_construction' },
+];
+
+const FURNISHING_OPTIONS = [
+  { label: 'Furnished', value: 'furnished' },
+  { label: 'Semi-Furnished', value: 'semi_furnished' },
+  { label: 'Unfurnished', value: 'unfurnished' },
+];
+
+const POSTED_BY_OPTIONS = [
+  { label: 'Owner', value: 'owner' },
+  { label: 'Agent', value: 'agent' },
+  { label: 'Builder', value: 'builder' },
+];
+
+// ─── Shared hook ──────────────────────────────────────────────────────────────
 
 function useCategoryData(activeCat: string) {
   const [tabs, setTabs] = useState<CategoryTab[]>(VIRTUAL_TABS);
   const [types, setTypes] = useState<PropType[]>([]);
   const typeCache = useRef<Record<string, PropType[]>>({});
 
-  // Load categories once
   useEffect(() => {
     propertyConfigApi.getCategories().then(({ data }) => {
       const dbTabs: CategoryTab[] = data.map((c: any) => ({
-        value: c.slug,
-        label: c.name,
-        color: SLUG_COLORS[c.slug] ?? DEFAULT_COLOR,
+        value: c.slug, label: c.name, color: SLUG_COLORS[c.slug] ?? DEFAULT_COLOR,
       }));
       setTabs([...dbTabs, ...VIRTUAL_TABS]);
     }).catch(() => {});
   }, []);
 
-  // Load types when active category changes
   useEffect(() => {
     const isVirtual = activeCat === 'agents' || activeCat === 'new_projects';
     if (isVirtual) { setTypes([]); return; }
@@ -89,7 +106,632 @@ function useCategoryData(activeCat: string) {
   return { tabs, types };
 }
 
-// ─── Mobile Full-Screen Search ────────────────────────────────────────────────
+// ─── Shared dropdown pill (desktop) ──────────────────────────────────────────
+
+function DropdownPill({
+  icon: Icon, label, active, activeLabel, children, onClear,
+}: {
+  icon: React.ElementType;
+  label: string;
+  active?: boolean;
+  activeLabel?: string;
+  children: React.ReactNode;
+  onClear?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative flex-shrink-0">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className={cn(
+          'flex items-center gap-2 h-10 pl-3 pr-2.5 rounded-xl border-2 text-sm font-medium transition-all duration-150 select-none whitespace-nowrap',
+          active
+            ? 'border-primary-500 bg-primary-50 text-primary-700'
+            : 'border-gray-200 bg-white text-gray-600 hover:border-primary-300 hover:bg-gray-50',
+        )}
+      >
+        <Icon className={cn('w-4 h-4 flex-shrink-0', active ? 'text-primary-600' : 'text-gray-400')} />
+        <span className={cn('max-w-[120px] truncate', active && 'text-primary-700 font-semibold')}>
+          {active && activeLabel ? activeLabel : label}
+        </span>
+        {active && onClear ? (
+          <button
+            onPointerDown={e => { e.stopPropagation(); onClear(); }}
+            className="w-4 h-4 rounded-full bg-primary-200 hover:bg-primary-300 flex items-center justify-center flex-shrink-0 transition-colors"
+            aria-label={`Clear ${label}`}
+          >
+            <X className="w-2.5 h-2.5 text-primary-700" />
+          </button>
+        ) : (
+          <ChevronDown className={cn('w-3.5 h-3.5 flex-shrink-0 transition-transform text-gray-400', open && 'rotate-180')} />
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1.5 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[200] min-w-[220px] overflow-hidden">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Desktop: Property Type dropdown ─────────────────────────────────────────
+
+function TypeDropdown({ types, value, onChange }: {
+  types: PropType[]; value: string; onChange: (v: string) => void;
+}) {
+  const selected = types.find(t => t.slug === value);
+  return (
+    <DropdownPill
+      icon={Building2}
+      label="Property Type"
+      active={!!value}
+      activeLabel={selected?.name}
+      onClear={() => onChange('')}
+    >
+      <div className="py-1.5 max-h-64 overflow-y-auto">
+        <button
+          onClick={() => onChange('')}
+          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-sm text-gray-500 transition-colors"
+        >
+          <span className="flex-1 text-left">Any Type</span>
+        </button>
+        {types.map(t => (
+          <button
+            key={t.slug}
+            onClick={() => onChange(t.slug)}
+            className={cn(
+              'w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
+              value === t.slug ? 'bg-primary-50 text-primary-700 font-semibold' : 'hover:bg-gray-50 text-gray-700',
+            )}
+          >
+            <span className="flex-1 text-left">{t.name}</span>
+            {value === t.slug && <CheckCircle2 className="w-4 h-4 text-primary-600 flex-shrink-0" />}
+          </button>
+        ))}
+      </div>
+    </DropdownPill>
+  );
+}
+
+// ─── Desktop: BHK dropdown ────────────────────────────────────────────────────
+
+function BhkDropdown({ value, onChange }: {
+  value: string[]; onChange: (v: string[]) => void;
+}) {
+  const label = value.length === 0
+    ? undefined
+    : value.length === 1
+    ? `${value[0]} BHK`
+    : `${value.join(', ')} BHK`;
+
+  const toggle = (v: string) =>
+    onChange(value.includes(v) ? value.filter(x => x !== v) : [...value, v]);
+
+  return (
+    <DropdownPill
+      icon={BedDouble}
+      label="BHK / Bedrooms"
+      active={value.length > 0}
+      activeLabel={label}
+      onClear={() => onChange([])}
+    >
+      <div className="p-4">
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">
+          Select BHK
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {BHK_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => toggle(opt.value)}
+              className={cn(
+                'px-4 py-2 rounded-xl text-sm font-semibold border-2 transition-all',
+                value.includes(opt.value)
+                  ? 'border-primary-500 bg-primary-600 text-white shadow-md'
+                  : 'border-gray-200 text-gray-600 hover:border-primary-300 hover:bg-primary-50',
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {value.length > 0 && (
+          <button
+            onClick={() => onChange([])}
+            className="mt-3 text-xs text-gray-400 hover:text-red-500 transition-colors"
+          >
+            Clear selection
+          </button>
+        )}
+      </div>
+    </DropdownPill>
+  );
+}
+
+// ─── Desktop: Budget dropdown ─────────────────────────────────────────────────
+
+function BudgetDropdown({
+  category, value, onChange,
+}: {
+  category: string;
+  value: { label: string; min: number; max: number } | null;
+  onChange: (v: { label: string; min: number; max: number } | null) => void;
+}) {
+  const budgets = (category === 'rent' || category === 'pg') ? BUDGET_RENT : BUDGET_BUY;
+
+  return (
+    <DropdownPill
+      icon={IndianRupee}
+      label="Budget"
+      active={!!value}
+      activeLabel={value?.label}
+      onClear={() => onChange(null)}
+    >
+      <div className="py-1.5">
+        <div className="px-4 py-2 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+          {category === 'rent' || category === 'pg' ? 'Monthly Rent' : 'Total Budget'}
+        </div>
+        <button
+          onClick={() => onChange(null)}
+          className="w-full flex items-center px-4 py-2.5 hover:bg-gray-50 text-sm text-gray-500 transition-colors"
+        >
+          Any Budget
+        </button>
+        {budgets.map(b => (
+          <button
+            key={b.label}
+            onClick={() => onChange(b)}
+            className={cn(
+              'w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
+              value?.label === b.label
+                ? 'bg-primary-50 text-primary-700 font-semibold'
+                : 'hover:bg-gray-50 text-gray-700',
+            )}
+          >
+            <span className="flex-1 text-left">{b.label}</span>
+            {value?.label === b.label && <CheckCircle2 className="w-4 h-4 text-primary-600 flex-shrink-0" />}
+          </button>
+        ))}
+      </div>
+    </DropdownPill>
+  );
+}
+
+// ─── Desktop: More Filters dropdown ──────────────────────────────────────────
+
+interface MoreFilters {
+  possession: string;
+  furnishing: string;
+  postedBy: string;
+}
+
+function MoreFiltersDropdown({
+  value, onChange, category,
+}: {
+  value: MoreFilters;
+  onChange: (v: MoreFilters) => void;
+  category: string;
+}) {
+  const count = [value.possession, value.furnishing, value.postedBy].filter(Boolean).length;
+  const isCommercial = category === 'commercial';
+
+  return (
+    <DropdownPill
+      icon={Sliders}
+      label="More Filters"
+      active={count > 0}
+      activeLabel={`${count} Filter${count > 1 ? 's' : ''}`}
+      onClear={() => onChange({ possession: '', furnishing: '', postedBy: '' })}
+    >
+      <div className="p-4 w-64 space-y-4">
+        {/* Possession */}
+        <div>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+            Possession
+          </p>
+          <div className="flex flex-col gap-1">
+            {POSSESSION_OPTIONS.map(opt => (
+              <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer group">
+                <div
+                  onClick={() => onChange({ ...value, possession: value.possession === opt.value ? '' : opt.value })}
+                  className={cn(
+                    'w-4 h-4 rounded border-2 flex items-center justify-center transition-all cursor-pointer flex-shrink-0',
+                    value.possession === opt.value
+                      ? 'border-primary-600 bg-primary-600'
+                      : 'border-gray-300 group-hover:border-primary-400',
+                  )}
+                >
+                  {value.possession === opt.value && (
+                    <svg viewBox="0 0 10 8" className="w-2.5 h-2 fill-white">
+                      <path d="M1 4l2.5 2.5L9 1" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                    </svg>
+                  )}
+                </div>
+                <span
+                  className="text-sm text-gray-700 cursor-pointer"
+                  onClick={() => onChange({ ...value, possession: value.possession === opt.value ? '' : opt.value })}
+                >
+                  {opt.label}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Furnishing */}
+        {!isCommercial && (
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Furnishing
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {FURNISHING_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => onChange({ ...value, furnishing: value.furnishing === opt.value ? '' : opt.value })}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
+                    value.furnishing === opt.value
+                      ? 'border-primary-500 bg-primary-600 text-white'
+                      : 'border-gray-200 text-gray-600 hover:border-primary-300',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Posted By */}
+        <div>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+            Posted By
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {POSTED_BY_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => onChange({ ...value, postedBy: value.postedBy === opt.value ? '' : opt.value })}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
+                  value.postedBy === opt.value
+                    ? 'border-primary-500 bg-primary-600 text-white'
+                    : 'border-gray-200 text-gray-600 hover:border-primary-300',
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Clear all */}
+        {count > 0 && (
+          <button
+            onClick={() => onChange({ possession: '', furnishing: '', postedBy: '' })}
+            className="w-full text-xs text-center text-red-500 hover:text-red-700 pt-1 transition-colors"
+          >
+            Clear all filters
+          </button>
+        )}
+      </div>
+    </DropdownPill>
+  );
+}
+
+// ─── Desktop: Agent search ────────────────────────────────────────────────────
+
+function DesktopAgentSearch() {
+  const router = useRouter();
+  const [q, setQ] = useState('');
+  const [suggs, setSuggs] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [show, setShow] = useState(false);
+  const deb = useRef<NodeJS.Timeout>();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setShow(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const fetch = async (v: string) => {
+    if (!v.trim() || v.length < 2) { setSuggs([]); return; }
+    setBusy(true);
+    try { const { data } = await locationsApi.search(v); setSuggs(data.slice(0, 6)); }
+    catch { setSuggs([]); } finally { setBusy(false); }
+  };
+
+  const go = (city?: string, state?: string) => {
+    const p = new URLSearchParams();
+    if (city) p.set('city', city);
+    if (state) p.set('state', state);
+    router.push(`/agents?${p}`);
+    setShow(false);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Big search input */}
+      <div className="flex items-center h-14 bg-white rounded-2xl border-2 border-gray-200 focus-within:border-primary-400 focus-within:ring-4 focus-within:ring-primary-100 transition-all overflow-hidden">
+        <div className="flex items-center flex-1 px-4">
+          <MapPin className="w-5 h-5 text-primary-400 flex-shrink-0 mr-3" />
+          <input
+            type="text"
+            value={q}
+            placeholder="Search by city or state to find agents..."
+            onChange={e => {
+              setQ(e.target.value); setShow(true);
+              clearTimeout(deb.current);
+              deb.current = setTimeout(() => fetch(e.target.value), 300);
+            }}
+            onFocus={() => setShow(true)}
+            onKeyDown={e => e.key === 'Enter' && go(q)}
+            className="flex-1 text-base text-gray-800 placeholder-gray-400 outline-none bg-transparent"
+          />
+          {busy ? (
+            <Loader2 className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />
+          ) : q ? (
+            <button onClick={() => { setQ(''); setSuggs([]); }}>
+              <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+            </button>
+          ) : null}
+        </div>
+        <button
+          onClick={() => go(q)}
+          className="h-full px-8 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-bold text-base flex items-center gap-2 transition-colors flex-shrink-0"
+        >
+          <Users className="w-5 h-5" />
+          <span>Find Agents</span>
+        </button>
+      </div>
+
+      {show && suggs.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+          {suggs.map((s, i) => (
+            <button
+              key={i}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-primary-50 text-left transition-colors"
+              onClick={() => { setQ(s.locality ? `${s.locality}, ${s.city}` : s.city); go(s.city, s.state); }}
+            >
+              <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-4 h-4 text-primary-500" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-gray-800">{s.locality || s.city}</div>
+                {s.locality && <div className="text-xs text-gray-400">{s.city}, {s.state}</div>}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Desktop: Property search (the main redesigned component) ─────────────────
+
+function DesktopPropertySearch({
+  category, types, onSearch,
+}: {
+  category: string; types: PropType[];
+  onSearch: (params: Record<string, string>) => void;
+}) {
+  const [q, setQ]           = useState('');
+  const [suggs, setSuggs]   = useState<any[]>([]);
+  const [busy, setBusy]     = useState(false);
+  const [showSugg, setShowSugg] = useState(false);
+  const [type, setType]     = useState('');
+  const [bhk, setBhk]       = useState<string[]>([]);
+  const [budget, setBudget] = useState<{ label: string; min: number; max: number } | null>(null);
+  const [more, setMore]     = useState({ possession: '', furnishing: '', postedBy: '' });
+  const inputRef = useRef<HTMLInputElement>(null);
+  const deb = useRef<NodeJS.Timeout>();
+  const suggRef = useRef<HTMLDivElement>(null);
+
+  // Reset filters when category changes
+  useEffect(() => {
+    setType(''); setBhk([]); setBudget(null);
+    setMore({ possession: '', furnishing: '', postedBy: '' });
+  }, [category]);
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (suggRef.current && !suggRef.current.contains(e.target as Node)) setShowSugg(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const fetchLocs = async (v: string) => {
+    if (!v.trim() || v.length < 2) { setSuggs([]); return; }
+    setBusy(true);
+    try { const { data } = await locationsApi.search(v); setSuggs(data.slice(0, 7)); }
+    catch { setSuggs([]); } finally { setBusy(false); }
+  };
+
+  const buildParams = (city?: string, locality?: string): Record<string, string> => {
+    const p: Record<string, string> = {};
+    if (city)               p.city       = city;
+    if (locality)           p.locality   = locality;
+    if (type)               p.type       = type;
+    if (bhk.length)         p.bedrooms   = bhk.join(',');
+    if (budget?.min)        p.minPrice   = String(budget.min);
+    if (budget?.max)        p.maxPrice   = String(budget.max);
+    if (more.possession)    p.possessionStatus = more.possession;
+    if (more.furnishing)    p.furnishingStatus  = more.furnishing;
+    if (more.postedBy)      p.listedBy   = more.postedBy;
+    return p;
+  };
+
+  const search = useCallback((city?: string, locality?: string) => {
+    onSearch(buildParams(city || q.trim(), locality));
+    setShowSugg(false);
+  }, [q, type, bhk, budget, more, onSearch]);
+
+  const showBHK = category !== 'commercial' && category !== 'new_projects' && category !== 'industrial';
+  const activeFilterCount = [type, bhk.length > 0, budget, more.possession, more.furnishing, more.postedBy].filter(Boolean).length;
+
+  return (
+    <div className="space-y-2.5">
+      {/* ── Big Search Input ── */}
+      <div ref={suggRef} className="relative">
+        <div className="flex items-center h-14 md:h-16 bg-white rounded-2xl border-2 border-gray-200 focus-within:border-primary-400 focus-within:ring-4 focus-within:ring-primary-100 transition-all overflow-hidden shadow-sm">
+          <div className="flex items-center flex-1 px-4 md:px-5 h-full gap-3">
+            <MapPin className="w-5 h-5 text-primary-400 flex-shrink-0" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={q}
+              placeholder="Search city, locality, project, or builder..."
+              onChange={e => {
+                setQ(e.target.value);
+                setShowSugg(true);
+                clearTimeout(deb.current);
+                deb.current = setTimeout(() => fetchLocs(e.target.value), 280);
+              }}
+              onFocus={() => setShowSugg(true)}
+              onKeyDown={e => e.key === 'Enter' && search()}
+              className="flex-1 text-base text-gray-800 placeholder-gray-400 outline-none bg-transparent"
+            />
+            {busy ? (
+              <Loader2 className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />
+            ) : q ? (
+              <button
+                onClick={() => { setQ(''); setSuggs([]); inputRef.current?.focus(); }}
+                className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors"
+                aria-label="Clear"
+              >
+                <X className="w-3 h-3 text-gray-500" />
+              </button>
+            ) : null}
+          </div>
+
+          {/* Divider */}
+          <div className="h-8 w-px bg-gray-200 flex-shrink-0" />
+
+          {/* Search button */}
+          <button
+            onClick={() => search()}
+            className="h-full px-7 md:px-10 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-bold text-base flex items-center gap-2.5 transition-colors flex-shrink-0"
+          >
+            <Search className="w-5 h-5" />
+            <span className="hidden md:inline">Search</span>
+            {activeFilterCount > 0 && (
+              <span className="bg-white/25 text-white text-xs font-bold px-1.5 py-0.5 rounded-full ml-1">
+                +{activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Suggestions dropdown */}
+        {showSugg && suggs.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[200] overflow-hidden">
+            <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50">
+              Locations
+            </div>
+            {suggs.map((s, i) => (
+              <button
+                key={i}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-primary-50 text-left transition-colors"
+                onClick={() => {
+                  setQ(s.locality ? `${s.locality}, ${s.city}` : s.city);
+                  setShowSugg(false);
+                  search(s.city, s.locality);
+                }}
+              >
+                <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-4 h-4 text-primary-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-800 truncate">
+                    {s.locality ? `${s.locality}, ${s.city}` : s.city}
+                  </div>
+                  <div className="text-xs text-gray-400">{s.state}</div>
+                </div>
+                {s.propertyCount > 0 && (
+                  <span className="text-xs text-gray-400 flex-shrink-0">{s.propertyCount}+ props</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Filter Pill Row ── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Property Type */}
+        {types.length > 0 && (
+          <TypeDropdown types={types} value={type} onChange={setType} />
+        )}
+
+        {/* BHK */}
+        {showBHK && (
+          <BhkDropdown value={bhk} onChange={setBhk} />
+        )}
+
+        {/* Budget */}
+        <BudgetDropdown category={category} value={budget} onChange={setBudget} />
+
+        {/* More Filters */}
+        <MoreFiltersDropdown value={more} onChange={setMore} category={category} />
+
+        {/* Active filter summary chips */}
+        {activeFilterCount > 0 && (
+          <div className="flex items-center gap-1.5 ml-1">
+            {type && (
+              <ActivePill label={types.find(t => t.slug === type)?.name || type} onRemove={() => setType('')} />
+            )}
+            {bhk.map(b => (
+              <ActivePill key={b} label={`${b} BHK`} onRemove={() => setBhk(p => p.filter(x => x !== b))} />
+            ))}
+            {budget && (
+              <ActivePill label={budget.label} onRemove={() => setBudget(null)} />
+            )}
+            {more.possession && (
+              <ActivePill
+                label={POSSESSION_OPTIONS.find(o => o.value === more.possession)?.label || more.possession}
+                onRemove={() => setMore(m => ({ ...m, possession: '' }))}
+              />
+            )}
+            {more.furnishing && (
+              <ActivePill
+                label={FURNISHING_OPTIONS.find(o => o.value === more.furnishing)?.label || more.furnishing}
+                onRemove={() => setMore(m => ({ ...m, furnishing: '' }))}
+              />
+            )}
+            {more.postedBy && (
+              <ActivePill
+                label={POSTED_BY_OPTIONS.find(o => o.value === more.postedBy)?.label || more.postedBy}
+                onRemove={() => setMore(m => ({ ...m, postedBy: '' }))}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Mobile full-screen search ────────────────────────────────────────────────
 
 function MobileSearch({
   initialCat, onClose, allTabs, allTypes,
@@ -110,7 +752,6 @@ function MobileSearch({
   const [type, setType]     = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Fetch types for the currently selected cat inside MobileSearch
   const [localTypes, setLocalTypes] = useState<PropType[]>(allTypes);
   const typeCache = useRef<Record<string, PropType[]>>({});
   useEffect(() => {
@@ -131,7 +772,6 @@ function MobileSearch({
   const showBHK    = !isAgent && !isNewProject && cat !== 'commercial';
   const filterCount = [type, bhk.length > 0, budget].filter(Boolean).length;
 
-  // Android hardware-back support — no body-overflow manipulation (breaks iOS)
   useEffect(() => {
     window.history.pushState({ msearch: true }, '');
     const pop = () => onClose();
@@ -174,7 +814,7 @@ function MobileSearch({
       const p = new URLSearchParams({ category: cat });
       if (c)        p.set('city', c);
       if (locality) p.set('locality', locality);
-      if (bhk.length) p.set('bedrooms', bhk.map(b => b[0]).join(','));
+      if (bhk.length) p.set('bedrooms', bhk.join(','));
       if (budget?.min) p.set('minPrice', String(budget.min));
       if (budget?.max) p.set('maxPrice', String(budget.max));
       if (type) p.set('type', type);
@@ -183,40 +823,23 @@ function MobileSearch({
     onClose();
   };
 
-  // Portal ensures the overlay renders at document.body level,
-  // bypassing any parent stacking context (transforms, opacity, etc.)
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   if (!mounted) return null;
 
   const panel = (
-    <div
-      className="fixed inset-0 bg-white flex flex-col"
-      style={{ zIndex: 9999, height: '100dvh' }}
-    >
-
-      {/* ── TOP BAR — flex-shrink-0 ensures it's ALWAYS on screen ───────── */}
+    <div className="fixed inset-0 bg-white flex flex-col" style={{ zIndex: 9999, height: '100dvh' }}>
       <div className="flex-shrink-0 bg-white px-4 pt-5 pb-3 border-b border-gray-100">
-
-        {/* Row: back arrow + search input */}
         <div className="flex items-center gap-3">
-
-          {/* Back button */}
           <button
             onClick={close}
             className="w-11 h-11 rounded-2xl bg-gray-100 active:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors"
-            aria-label="Close search"
+            aria-label="Close"
           >
             <ArrowLeft className="w-5 h-5 text-gray-700" />
           </button>
-
-          {/* Search input — white bg + border so it's always visible on any device */}
-          <div className="flex-1 flex items-center gap-3 bg-white border-2 border-gray-200 rounded-2xl px-4"
-            style={{ height: 52 }}>
-            {busy
-              ? <Loader2 className="w-5 h-5 text-gray-400 animate-spin flex-shrink-0" />
-              : <Search className="w-5 h-5 text-gray-400 flex-shrink-0" />
-            }
+          <div className="flex-1 flex items-center gap-3 bg-white border-2 border-gray-200 rounded-2xl px-4" style={{ height: 52 }}>
+            {busy ? <Loader2 className="w-5 h-5 text-gray-400 animate-spin flex-shrink-0" /> : <Search className="w-5 h-5 text-gray-400 flex-shrink-0" />}
             <input
               ref={inputRef}
               autoFocus
@@ -228,21 +851,20 @@ function MobileSearch({
               autoCapitalize="none"
               spellCheck={false}
               value={query}
-              placeholder={isAgent ? 'City or state...' : isNewProject ? 'Search city or locality...' : 'City, locality, project...'}
+              placeholder={isAgent ? 'City or state...' : 'City, locality, project...'}
               onChange={e => {
                 setQuery(e.target.value);
                 clearTimeout(debRef.current);
                 debRef.current = setTimeout(() => fetchLocs(e.target.value), 250);
               }}
               onKeyDown={e => e.key === 'Enter' && go()}
-              /* text-base = 16px — CRITICAL: iOS auto-zooms any input < 16px */
               className="flex-1 text-base text-gray-900 outline-none placeholder-gray-400"
               style={{ background: 'transparent', border: 'none', WebkitAppearance: 'none' }}
             />
             {query && (
               <button
                 onClick={() => { setQuery(''); setSuggs([]); inputRef.current?.focus(); }}
-                className="w-7 h-7 rounded-full bg-gray-200 active:bg-gray-300 flex items-center justify-center flex-shrink-0 transition-colors"
+                className="w-7 h-7 rounded-full bg-gray-200 active:bg-gray-300 flex items-center justify-center flex-shrink-0"
                 aria-label="Clear"
               >
                 <X className="w-3.5 h-3.5 text-gray-500" />
@@ -250,8 +872,6 @@ function MobileSearch({
             )}
           </div>
         </div>
-
-        {/* Category chips */}
         <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
           {allTabs.map(tab => (
             <button
@@ -270,183 +890,149 @@ function MobileSearch({
         </div>
       </div>
 
-      {/* ── SCROLLABLE BODY — min-h-0 prevents Safari flexbox overflow bug ── */}
       <div className="flex-1 overflow-y-auto overscroll-contain" style={{ minHeight: 0 }}>
+        {query.length >= 2 ? (
+          <div>
+            {suggs.length > 0 ? (
+              <>
+                <SectionHeader icon={<MapPin className="w-3.5 h-3.5" />} label="Locations" />
+                {suggs.map((s, i) => (
+                  <LocationRow
+                    key={i}
+                    primary={s.locality || s.city}
+                    secondary={s.locality ? `${s.city}, ${s.state}` : s.state}
+                    onTap={() => go(s.city, s.locality, s.state)}
+                  />
+                ))}
+              </>
+            ) : !busy && (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                <MapPin className="w-10 h-10 mb-3 text-gray-200" />
+                <p className="text-sm font-medium">No locations found</p>
+                <p className="text-xs mt-1">Try a city or area name</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <SectionHeader icon={<TrendingUp className="w-3.5 h-3.5" />} label="Popular Cities" />
+            {TOP_CITIES.map(city => (
+              <LocationRow
+                key={city.name}
+                primary={city.name}
+                secondary={`${city.count} properties`}
+                onTap={() => go(city.name)}
+                dot={city.gradient}
+              />
+            ))}
 
-          {/* ── STATE A: Suggestions while typing ── */}
-          {query.length >= 2 && (
-            <div>
-              {suggs.length > 0 ? (
-                <>
-                  <SectionHeader icon={<MapPin className="w-3.5 h-3.5" />} label="Locations" />
-                  {suggs.map((s, i) => (
-                    <LocationRow
-                      key={i}
-                      primary={s.locality || s.city}
-                      secondary={s.locality ? `${s.city}, ${s.state}` : s.state}
-                      onTap={() => go(s.city, s.locality, s.state)}
-                    />
-                  ))}
-                </>
-              ) : !busy && (
-                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                  <MapPin className="w-10 h-10 mb-3 text-gray-200" />
-                  <p className="text-sm font-medium">No locations found</p>
-                  <p className="text-xs mt-1">Try a city or area name</p>
-                </div>
-              )}
-            </div>
-          )}
+            {!isAgent && !isNewProject && (
+              <>
+                <button
+                  onClick={() => setShowFilters(v => !v)}
+                  className="w-full flex items-center justify-between px-5 py-3.5 mt-1 border-t border-gray-100"
+                >
+                  <div className="flex items-center gap-2">
+                    <SlidersHorizontal className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm font-bold text-gray-700">Filters</span>
+                    {filterCount > 0 && (
+                      <span className="bg-primary-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                        {filterCount}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-primary-600 font-semibold">{showFilters ? 'Hide' : 'Show'}</span>
+                </button>
 
-          {/* ── STATE B: Default — popular cities + filters ── */}
-          {query.length < 2 && (
-            <>
-              {/* Popular cities */}
-              <SectionHeader icon={<TrendingUp className="w-3.5 h-3.5" />} label="Popular Cities" />
-              {TOP_CITIES.map(city => (
-                <LocationRow
-                  key={city.name}
-                  primary={city.name}
-                  secondary={`${city.count} properties`}
-                  onTap={() => go(city.name)}
-                  dot={city.gradient}
-                />
-              ))}
-
-              {/* Filters — only for property search */}
-              {!isAgent && !isNewProject && (
-                <>
-                  {/* Filter toggle header */}
-                  <button
-                    onClick={() => setShowFilters(v => !v)}
-                    className="w-full flex items-center justify-between px-5 py-3.5 mt-1"
-                  >
-                    <div className="flex items-center gap-2">
-                      <SlidersHorizontal className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm font-bold text-gray-700">Filters</span>
-                      {filterCount > 0 && (
-                        <span className="bg-primary-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                          {filterCount}
-                        </span>
-                      )}
+                {showFilters && (
+                  <div className="px-4 pb-4 space-y-5">
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">Property Type</p>
+                      <div className="flex flex-wrap gap-2">
+                        {types.map(t => (
+                          <FilterChip key={t.slug} label={t.name} active={type === t.slug} onTap={() => setType(type === t.slug ? '' : t.slug)} />
+                        ))}
+                      </div>
                     </div>
-                    <span className="text-xs text-primary-600 font-semibold">
-                      {showFilters ? 'Hide' : 'Show'}
-                    </span>
-                  </button>
-
-                  {showFilters && (
-                    <div className="px-4 pb-4 space-y-4">
-                      {/* Property Type */}
+                    {showBHK && (
                       <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Property Type</p>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">BHK / Bedrooms</p>
                         <div className="flex flex-wrap gap-2">
-                          {types.map(t => (
+                          {BHK_OPTIONS.map(b => (
                             <FilterChip
-                              key={t.slug} label={t.name}
-                              active={type === t.slug}
-                              onTap={() => setType(type === t.slug ? '' : t.slug)}
+                              key={b.value} label={b.label}
+                              active={bhk.includes(b.value)}
+                              onTap={() => setBhk(p => p.includes(b.value) ? p.filter(x => x !== b.value) : [...p, b.value])}
                             />
                           ))}
                         </div>
                       </div>
-
-                      {/* BHK */}
-                      {showBHK && (
-                        <div>
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">BHK</p>
-                          <div className="flex flex-wrap gap-2">
-                            {BHK_OPTIONS.map(b => (
-                              <FilterChip
-                                key={b} label={b}
-                                active={bhk.includes(b)}
-                                onTap={() => setBhk(p => p.includes(b) ? p.filter(x => x !== b) : [...p, b])}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Budget */}
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Budget</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {budgets.map(b => (
-                            <button
-                              key={b.label}
-                              onClick={() => setBudget(budget?.label === b.label ? null : b)}
-                              className={cn(
-                                'px-3 py-3 rounded-xl text-sm font-semibold border-2 text-left transition-all active:scale-95',
-                                budget?.label === b.label
-                                  ? 'border-primary-500 bg-primary-50 text-primary-700'
-                                  : 'border-gray-100 bg-gray-50 text-gray-700',
-                              )}
-                            >
-                              {b.label}
-                            </button>
-                          ))}
-                        </div>
+                    )}
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">Budget</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {budgets.map(b => (
+                          <button
+                            key={b.label}
+                            onClick={() => setBudget(budget?.label === b.label ? null : b)}
+                            className={cn(
+                              'px-3 py-3 rounded-xl text-sm font-semibold border-2 text-left transition-all active:scale-95',
+                              budget?.label === b.label
+                                ? 'border-primary-500 bg-primary-50 text-primary-700'
+                                : 'border-gray-100 bg-gray-50 text-gray-700',
+                            )}
+                          >
+                            {b.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-
-          {/* Extra scroll breathing room */}
-          <div className="h-4" />
-        </div>
-
-        {/* ── BOTTOM BUTTON — always visible ────────────────────────────── */}
-        <div className="flex-shrink-0 bg-white border-t border-gray-100 px-4 py-4">
-          {/* Active filter pills */}
-          {filterCount > 0 && (
-            <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
-              {type && (
-                <ActivePill label={types.find(t => t.slug === type)?.name || type} onRemove={() => setType('')} />
-              )}
-              {bhk.map(b => (
-                <ActivePill key={b} label={b} onRemove={() => setBhk(p => p.filter(x => x !== b))} />
-              ))}
-              {budget && (
-                <ActivePill label={budget.label} onRemove={() => setBudget(null)} />
-              )}
-            </div>
-          )}
-
-          <button
-            onClick={() => go()}
-            className={cn(
-              'w-full h-14 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-3',
-              'bg-gradient-to-r', `from-primary-600 to-primary-700`,
-              'shadow-lg shadow-primary-600/40 active:scale-[0.98] transition-transform',
+                  </div>
+                )}
+              </>
             )}
-          >
-            {isAgent
-              ? <Users className="w-5 h-5 flex-shrink-0" />
-              : <Search className="w-5 h-5 flex-shrink-0" />
+          </>
+        )}
+        <div className="h-4" />
+      </div>
+
+      <div className="flex-shrink-0 bg-white border-t border-gray-100 px-4 py-4">
+        {filterCount > 0 && (
+          <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
+            {type && <ActivePill label={types.find(t => t.slug === type)?.name || type} onRemove={() => setType('')} />}
+            {bhk.map(b => <ActivePill key={b} label={`${b} BHK`} onRemove={() => setBhk(p => p.filter(x => x !== b))} />)}
+            {budget && <ActivePill label={budget.label} onRemove={() => setBudget(null)} />}
+          </div>
+        )}
+        <button
+          onClick={() => go()}
+          className={cn(
+            'w-full h-14 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-3',
+            'bg-gradient-to-r from-primary-600 to-primary-700',
+            'shadow-lg shadow-primary-600/40 active:scale-[0.98] transition-transform',
+          )}
+        >
+          {isAgent ? <Users className="w-5 h-5 flex-shrink-0" /> : <Search className="w-5 h-5 flex-shrink-0" />}
+          <span className="truncate">
+            {query
+              ? (isAgent ? `Find Agents — ${query}` : `Search in ${query}`)
+              : (isAgent ? 'Find Agents' : 'Search Properties')
             }
-            <span className="truncate">
-              {query
-                ? (isAgent ? `Find Agents — ${query}` : isNewProject ? `New Projects in ${query}` : `Search in ${query}`)
-                : (isAgent ? 'Find Agents' : isNewProject ? 'Search New Projects' : 'Search Properties')
-              }
+          </span>
+          {filterCount > 0 && (
+            <span className="bg-white/25 text-white text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+              +{filterCount}
             </span>
-            {filterCount > 0 && (
-              <span className="bg-white/25 text-white text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">
-                +{filterCount}
-              </span>
-            )}
-          </button>
-        </div>
+          )}
+        </button>
+      </div>
     </div>
   );
 
   return createPortal(panel, document.body);
 }
 
-// ─── Small reusable pieces ────────────────────────────────────────────────────
+// ─── Tiny shared atoms ────────────────────────────────────────────────────────
 
 function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
@@ -457,9 +1043,7 @@ function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }
   );
 }
 
-function LocationRow({
-  primary, secondary, onTap, dot,
-}: {
+function LocationRow({ primary, secondary, onTap, dot }: {
   primary: string; secondary?: string; onTap: () => void; dot?: string;
 }) {
   return (
@@ -467,10 +1051,7 @@ function LocationRow({
       onClick={onTap}
       className="w-full flex items-center gap-4 px-5 py-3.5 active:bg-gray-50 transition-colors text-left"
     >
-      <div className={cn(
-        'w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0',
-        dot ? `bg-gradient-to-br ${dot}` : 'bg-primary-50',
-      )}>
+      <div className={cn('w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0', dot ? `bg-gradient-to-br ${dot}` : 'bg-primary-50')}>
         <MapPin className={cn('w-4 h-4', dot ? 'text-white' : 'text-primary-500')} />
       </div>
       <div className="flex-1 min-w-0">
@@ -488,9 +1069,7 @@ function FilterChip({ label, active, onTap }: { label: string; active: boolean; 
       onClick={onTap}
       className={cn(
         'h-9 px-4 rounded-xl text-sm font-semibold border-2 transition-all active:scale-95',
-        active
-          ? 'border-primary-500 bg-primary-50 text-primary-700'
-          : 'border-gray-100 bg-gray-50 text-gray-600',
+        active ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-100 bg-gray-50 text-gray-600',
       )}
     >
       {label}
@@ -500,198 +1079,12 @@ function FilterChip({ label, active, onTap }: { label: string; active: boolean; 
 
 function ActivePill({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="flex-shrink-0 flex items-center gap-1.5 bg-primary-50 text-primary-700 text-xs font-bold px-3 py-1.5 rounded-full">
+    <span className="flex-shrink-0 flex items-center gap-1.5 bg-primary-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
       {label}
-      <button onPointerDown={e => { e.stopPropagation(); onRemove(); }}>
+      <button onPointerDown={e => { e.stopPropagation(); onRemove(); }} aria-label={`Remove ${label}`}>
         <X className="w-3 h-3" />
       </button>
     </span>
-  );
-}
-
-// ─── Desktop panels (unchanged) ───────────────────────────────────────────────
-
-function DesktopAgentSearch() {
-  const router = useRouter();
-  const [q, setQ] = useState('');
-  const [suggs, setSuggs] = useState<any[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [show, setShow] = useState(false);
-  const deb = useRef<NodeJS.Timeout>();
-
-  const fetch = async (v: string) => {
-    if (!v.trim() || v.length < 2) { setSuggs([]); return; }
-    setBusy(true);
-    try { const { data } = await locationsApi.search(v); setSuggs(data.slice(0, 6)); }
-    catch { setSuggs([]); } finally { setBusy(false); }
-  };
-
-  const go = (city?: string, state?: string) => {
-    const p = new URLSearchParams();
-    if (city) p.set('city', city);
-    if (state) p.set('state', state);
-    router.push(`/agents?${p}`);
-    setShow(false);
-  };
-
-  return (
-    <div className="flex flex-wrap gap-2 items-center">
-      <div className="relative flex-1 min-w-[250px]">
-        <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100 bg-white">
-          <MapPin className="w-4 h-4 text-primary-500 mr-2 flex-shrink-0" />
-          <input type="text" placeholder="City, locality or state..." value={q}
-            onChange={e => { setQ(e.target.value); setShow(true); clearTimeout(deb.current); deb.current = setTimeout(() => fetch(e.target.value), 300); }}
-            onFocus={() => setShow(true)}
-            onKeyDown={e => e.key === 'Enter' && go(q)}
-            className="flex-1 outline-none text-sm bg-transparent" />
-          {busy ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin" /> : q && <button onClick={() => { setQ(''); setSuggs([]); }}><X className="w-4 h-4 text-gray-400" /></button>}
-        </div>
-        {show && suggs.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-            {suggs.map((s, i) => (
-              <button key={i} className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-left"
-                onClick={() => { setQ(s.locality ? `${s.locality}, ${s.city}` : s.city); go(s.city, s.state); }}>
-                <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                <div><div className="text-sm font-medium">{s.locality || s.city}</div>{s.locality && <div className="text-xs text-gray-400">{s.city}, {s.state}</div>}</div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      <button onClick={() => go(q)} className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-primary-600/30">
-        <Users className="w-4 h-4" /> Find Agents
-      </button>
-    </div>
-  );
-}
-
-function DesktopPropertySearch({
-  category, types, onSearch,
-}: {
-  category: string; types: PropType[]; onSearch: (city: string, locality?: string) => void;
-}) {
-  const [q, setQ] = useState('');
-  const [suggs, setSuggs] = useState<any[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [showS, setShowS] = useState(false);
-  const [bhk, setBhk] = useState<string[]>([]);
-  const [budget, setBudget] = useState<any>(null);
-  const [type, setType] = useState('');
-  const [showBud, setShowBud] = useState(false);
-  const [showType, setShowType] = useState(false);
-  const deb = useRef<NodeJS.Timeout>();
-  const budRef = useRef<HTMLDivElement>(null);
-  const typeRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => { setBhk([]); setBudget(null); setType(''); }, [category]);
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (budRef.current && !budRef.current.contains(e.target as Node)) setShowBud(false);
-      if (typeRef.current && !typeRef.current.contains(e.target as Node)) setShowType(false);
-    };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, []);
-
-  const fetchLocs = async (v: string) => {
-    if (!v.trim() || v.length < 2) { setSuggs([]); return; }
-    setBusy(true);
-    try { const { data } = await locationsApi.search(v); setSuggs(data.slice(0, 6)); }
-    catch { setSuggs([]); } finally { setBusy(false); }
-  };
-
-  const search = useCallback((city?: string, loc?: string) => { onSearch(city || q, loc); setShowS(false); }, [q, onSearch]);
-
-  const budgets = (category === 'rent' || category === 'pg') ? BUDGET_RENT : BUDGET_BUY;
-  const showBHK = category !== 'commercial' && category !== 'new_projects' && category !== 'industrial';
-  const selectedTypeName = types.find(t => t.slug === type)?.name;
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {/* Type dropdown */}
-      {types.length > 0 && (
-        <div ref={typeRef} className="relative">
-          <button onClick={() => { setShowType(p => !p); setShowBud(false); }}
-            className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 text-sm hover:border-primary-400 min-w-[140px] bg-white">
-            <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-            <span className={type ? 'text-primary-700 font-medium' : 'text-gray-500'}>{selectedTypeName || 'Property Type'}</span>
-            <ChevronRight className={cn('w-3.5 h-3.5 text-gray-400 ml-auto transition-transform', showType && 'rotate-90')} />
-          </button>
-          {showType && (
-            <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 min-w-[180px] overflow-hidden">
-              <div className="p-1">
-                <button onClick={() => { setType(''); setShowType(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg">Any Type</button>
-                {types.map(t => (
-                  <button key={t.slug} onClick={() => { setType(t.slug); setShowType(false); }}
-                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${type === t.slug ? 'bg-primary-50 text-primary-700 font-medium' : 'hover:bg-gray-50'}`}>{t.name}</button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* BHK */}
-      {showBHK && (
-        <div className="flex items-center gap-1 border border-gray-200 rounded-xl px-3 py-2.5 bg-white">
-          {BHK_OPTIONS.slice(0, 4).map(b => (
-            <button key={b} onClick={() => setBhk(p => p.includes(b) ? p.filter(x => x !== b) : [...p, b])}
-              className={`text-xs px-2 py-1 rounded-lg font-medium transition-all ${bhk.includes(b) ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-              {b}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Budget dropdown */}
-      <div ref={budRef} className="relative">
-        <button onClick={() => { setShowBud(p => !p); setShowType(false); }}
-          className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 text-sm hover:border-primary-400 min-w-[130px] bg-white">
-          <span className={budget ? 'text-primary-700 font-medium' : 'text-gray-500'}>{budget?.label || 'Budget'}</span>
-          <ChevronRight className={cn('w-3.5 h-3.5 text-gray-400 ml-auto transition-transform', showBud && 'rotate-90')} />
-        </button>
-        {showBud && (
-          <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 min-w-[200px] overflow-hidden">
-            <div className="p-1">
-              <button onClick={() => { setBudget(null); setShowBud(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg">Any Budget</button>
-              {budgets.map(b => (
-                <button key={b.label} onClick={() => { setBudget(b); setShowBud(false); }}
-                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${budget?.label === b.label ? 'bg-primary-50 text-primary-700 font-medium' : 'hover:bg-gray-50'}`}>{b.label}</button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Location */}
-      <div className="relative flex-1 min-w-[200px]">
-        <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100 bg-white">
-          <MapPin className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
-          <input type="text" placeholder="City, locality, society..." value={q}
-            onChange={e => { setQ(e.target.value); setShowS(true); clearTimeout(deb.current); deb.current = setTimeout(() => fetchLocs(e.target.value), 300); }}
-            onFocus={() => setShowS(true)}
-            onKeyDown={e => e.key === 'Enter' && search()}
-            className="flex-1 outline-none text-sm bg-transparent" />
-          {busy ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin" /> : q && <button onClick={() => { setQ(''); setSuggs([]); }}><X className="w-4 h-4 text-gray-400" /></button>}
-        </div>
-        {showS && suggs.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-            {suggs.map((s, i) => (
-              <button key={i} className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-left"
-                onClick={() => { setQ(s.locality ? `${s.locality}, ${s.city}` : s.city); setShowS(false); search(s.city, s.locality); }}>
-                <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                <div><div className="text-sm font-medium">{s.locality || s.city}</div>{s.locality && <div className="text-xs text-gray-400">{s.city}, {s.state}</div>}</div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Search button */}
-      <button onClick={() => search()} className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-primary-600/30">
-        <Search className="w-4 h-4" /> Search
-      </button>
-    </div>
   );
 }
 
@@ -708,64 +1101,44 @@ export default function HomeSearchPanel() {
   const isNewProject = cat === 'new_projects';
   const catInfo = tabs.find(c => c.value === cat) ?? { value: cat, label: cat, color: DEFAULT_COLOR };
 
-  const handleSearch = useCallback((city: string, locality?: string) => {
-    if (isNewProject) {
-      const p = new URLSearchParams({ isNewProject: 'true' });
-      if (city)     p.set('city', city);
-      if (locality) p.set('locality', locality);
+  const handleSearch = useCallback((params: Record<string, string>) => {
+    if (isAgent) {
+      const p = new URLSearchParams(params);
+      router.push(`/agents?${p}`);
+    } else if (isNewProject) {
+      const p = new URLSearchParams({ isNewProject: 'true', ...params });
       router.push(`/properties?${p}`);
     } else {
-      const p = new URLSearchParams({ category: cat });
-      if (city)     p.set('city', city);
-      if (locality) p.set('locality', locality);
+      const p = new URLSearchParams({ category: cat, ...params });
       router.push(`/properties?${p}`);
     }
-  }, [cat, isNewProject, router]);
+  }, [cat, isAgent, isNewProject, router]);
 
   return (
     <div className="w-full max-w-5xl mx-auto">
 
-      {/* ════════════════════════════════════
-          MOBILE  — single search trigger
-          ════════════════════════════════════ */}
+      {/* ══════════════════════════════════
+          MOBILE — trigger card
+          ══════════════════════════════════ */}
       <div className="sm:hidden w-full">
-
-        {/* Trigger card */}
         <button
           onClick={() => setOpen(true)}
           className="w-full bg-white rounded-2xl shadow-2xl shadow-black/25 p-4 flex items-center gap-3 active:scale-[0.97] transition-transform"
         >
-          {/* Icon */}
-          <div className={cn(
-            'w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br',
-            catInfo.color,
-          )}>
-            {isAgent
-              ? <Users className="w-5 h-5 text-white" />
-              : <Search className="w-5 h-5 text-white" />
-            }
+          <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br', catInfo.color)}>
+            {isAgent ? <Users className="w-5 h-5 text-white" /> : <Search className="w-5 h-5 text-white" />}
           </div>
-
-          {/* Text */}
           <div className="flex-1 text-left min-w-0">
             <div className="text-[13px] font-semibold text-gray-800">
               {isAgent ? 'Find Agents' : isNewProject ? 'Search New Projects' : `${catInfo.label} a Property`}
             </div>
-            <div className="text-xs text-gray-400 mt-0.5 truncate">
-              {isAgent ? 'Search by city or state' : 'City, locality, project...'}
-            </div>
+            <div className="text-xs text-gray-400 mt-0.5 truncate">City, locality, project...</div>
           </div>
-
-          {/* Category badge */}
-          <div className={cn(
-            'flex-shrink-0 flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl text-white bg-gradient-to-r',
-            catInfo.color,
-          )}>
+          <div className={cn('flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-xl text-white bg-gradient-to-r', catInfo.color)}>
             {catInfo.label}
           </div>
         </button>
 
-        {/* Category strip below trigger */}
         <div className="flex items-center gap-1.5 mt-3 overflow-x-auto no-scrollbar">
           {tabs.map(tab => (
             <button
@@ -773,9 +1146,7 @@ export default function HomeSearchPanel() {
               onClick={() => setCat(tab.value)}
               className={cn(
                 'flex-shrink-0 h-8 px-4 rounded-full text-xs font-bold transition-all active:scale-95',
-                cat === tab.value
-                  ? 'bg-white text-gray-900 shadow-md'
-                  : 'bg-white/15 text-white/80',
+                cat === tab.value ? 'bg-white text-gray-900 shadow-md' : 'bg-white/15 text-white/80',
               )}
             >
               {tab.label}
@@ -783,24 +1154,23 @@ export default function HomeSearchPanel() {
           ))}
         </div>
 
-        {/* Full-screen search overlay */}
         {open && (
           <MobileSearch initialCat={cat} onClose={() => setOpen(false)} allTabs={tabs} allTypes={types} />
         )}
       </div>
 
-      {/* ════════════════════════════════════
-          DESKTOP  — full inline search bar
-          ════════════════════════════════════ */}
+      {/* ══════════════════════════════════
+          DESKTOP — full inline panel
+          ══════════════════════════════════ */}
       <div className="hidden sm:block">
         {/* Category tabs */}
-        <div className="flex gap-1 overflow-x-auto no-scrollbar">
+        <div className="flex gap-0.5 overflow-x-auto no-scrollbar">
           {tabs.map(tab => (
             <button
               key={tab.value}
               onClick={() => setCat(tab.value)}
               className={cn(
-                'flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all',
+                'flex-shrink-0 flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-t-xl transition-all',
                 cat === tab.value
                   ? 'bg-white text-primary-700 shadow-sm'
                   : 'bg-white/20 text-white hover:bg-white/30',
@@ -811,8 +1181,8 @@ export default function HomeSearchPanel() {
           ))}
         </div>
 
-        {/* Search panel body */}
-        <div className="bg-white rounded-b-2xl rounded-tr-2xl shadow-2xl p-3">
+        {/* Panel body */}
+        <div className="bg-white rounded-b-2xl rounded-tr-2xl shadow-2xl p-4 md:p-5">
           {isAgent
             ? <DesktopAgentSearch />
             : <DesktopPropertySearch category={cat} types={types} onSearch={handleSearch} />

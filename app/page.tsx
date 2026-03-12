@@ -19,7 +19,9 @@ import CityExplorer from '@/components/home/CityExplorer';
 import ServicesBanner from '@/components/home/ServicesBanner';
 import StatsBar from '@/components/home/StatsBar';
 import TopAgents from '@/components/home/TopAgents';
+import TopNewProjects from '@/components/home/TopNewProjects';
 import HomeLocationSelector from '@/components/home/HomeLocationSelector';
+import StateExplorer from '@/components/home/StateExplorer';
 
 export const metadata: Metadata = {
   title: 'Think4BuySale – Buy, Rent & Sell Properties in India',
@@ -69,7 +71,7 @@ export default function HomePage() {
   return (
     <>
       {/* ─── Hero Section ─────────────────────────────────────────────────── */}
-      <section className="relative min-h-[62vh] sm:min-h-[80vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 pt-14 md:pt-16">
+      <section className="relative min-h-[62vh] sm:min-h-[80vh] flex items-center justify-center bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 pt-14 md:pt-16">
         {/* Background blobs */}
         <div className="absolute top-20 left-10 w-72 h-72 bg-primary-600/20 rounded-full blur-3xl" />
         <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl" />
@@ -179,7 +181,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ─── Dynamic Location Selector ────────────────────────────────────── */}
+      {/* ─── State Explorer (country selected, no state yet) ─────────────── */}
+      <StateExplorer />
+
+      {/* ─── Dynamic Location Selector (state selected → cities) ─────────── */}
       <HomeLocationSelector />
 
       {/* ─── Featured Properties (reacts to location Redux state) ─────────── */}
@@ -187,6 +192,9 @@ export default function HomePage() {
 
       {/* ─── Top Agents ───────────────────────────────────────────────────── */}
       <TopAgents />
+
+      {/* ─── Top New Projects ─────────────────────────────────────────────── */}
+      <TopNewProjects />
 
       {/* ─── Explore Cities (dynamic, reacts to location Redux state) ─────── */}
       <CityExplorer />

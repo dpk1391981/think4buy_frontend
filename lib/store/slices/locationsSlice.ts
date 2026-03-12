@@ -6,6 +6,9 @@ export interface StateEntry {
   name: string;
   code: string;
   isActive: boolean;
+  propertyCount?: number;
+  imageUrl?: string;
+  countryId?: string;
 }
 
 export interface CityEntry {

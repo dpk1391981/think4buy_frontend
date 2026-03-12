@@ -20,6 +20,9 @@ api.interceptors.request.use((config) => {
 // Properties
 export const propertiesApi = {
   getAll: (params?: Record<string, any>) => api.get('/properties', { params }),
+  getForMap: (params?: Record<string, any>) => api.get('/properties/map', { params }),
+  getSearchSuggestions: (q: string) =>
+    api.get('/properties/search/suggestions', { params: { q } }),
   getFeatured: (limit = 8) => api.get('/properties/featured', { params: { limit } }),
   getStats: () => api.get('/properties/stats'),
   getCities: () => api.get('/properties/cities'),
@@ -161,7 +164,9 @@ export const usersApi = {
     page?: number;
     limit?: number;
     city?: string;
+    cityId?: string;
     state?: string;
+    stateId?: string;
     locality?: string;
     search?: string;
   }) => api.get('/users/agents', { params }),

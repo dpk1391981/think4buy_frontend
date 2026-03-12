@@ -7,12 +7,18 @@ export interface FiltersState {
   locality: string;
   minPrice: number | null;
   maxPrice: number | null;
+  minArea: number | null;
+  maxArea: number | null;
   bedrooms: string[];
   type: string;
   furnishingStatus: string;
   possessionStatus: string;
   agentId: string;
   search: string;
+  keyword: string;
+  amenityIds: string[];
+  listedBy: string;
+  builderName: string;
   sortBy: string;
   sortOrder: 'ASC' | 'DESC';
   page: number;
@@ -26,12 +32,18 @@ const initialState: FiltersState = {
   locality: '',
   minPrice: null,
   maxPrice: null,
+  minArea: null,
+  maxArea: null,
   bedrooms: [],
   type: '',
   furnishingStatus: '',
   possessionStatus: '',
   agentId: '',
   search: '',
+  keyword: '',
+  amenityIds: [],
+  listedBy: '',
+  builderName: '',
   sortBy: 'createdAt',
   sortOrder: 'DESC',
   page: 1,
@@ -51,7 +63,7 @@ export const filtersSlice = createSlice({
     },
     clearFilters: (state) => {
       const { category, city } = state;
-      return { ...initialState, category, city }; // keep category + city
+      return { ...initialState, category, city };
     },
     resetAll: () => initialState,
   },

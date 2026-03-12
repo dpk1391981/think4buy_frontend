@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { SlidersHorizontal, Grid3X3, List, ChevronDown, X, MapPin, Home } from 'lucide-react';
+import { SlidersHorizontal, Grid3X3, List, ChevronDown, X, MapPin, Home, Map } from 'lucide-react';
 import PropertyCard from '@/components/property/PropertyCard';
 import FilterPanel from '@/components/search/FilterPanel';
 import SearchBar from '@/components/search/SearchBar';
@@ -10,8 +10,15 @@ import { propertiesApi, propertyConfigApi } from '@/lib/api';
 import { Property, PaginatedProperties } from '@/types/property';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+const MapPropertySearch = dynamic(
+  () => import('@/components/search/MapPropertySearch'),
+  { ssr: false, loading: () => <div className="w-full h-full bg-gray-100 rounded-xl animate-pulse" /> },
+);
 
 const SORT_OPTIONS = [
+  { value: 'relevance', label: 'Relevance' },
   { value: 'createdAt:DESC', label: 'Newest First' },
   { value: 'price:ASC', label: 'Price: Low to High' },
   { value: 'price:DESC', label: 'Price: High to Low' },
@@ -19,7 +26,6 @@ const SORT_OPTIONS = [
   { value: 'viewCount:DESC', label: 'Most Popular' },
 ];
 
-// Static fallback style map per slug (colors/icons never change)
 const SLUG_STYLE: Record<string, { color: string; bg: string; icon: string }> = {
   buy:             { color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', icon: '🏠' },
   rent:            { color: 'text-blue-700',    bg: 'bg-blue-50 border-blue-200',       icon: '🏢' },
@@ -32,6 +38,53 @@ const SLUG_STYLE: Record<string, { color: string; bg: string; icon: string }> = 
 };
 const DEFAULT_STYLE = { color: 'text-gray-700', bg: 'bg-gray-50 border-gray-200', icon: '🏠' };
 
+// Human-readable labels for active filter chips
+const FILTER_LABELS: Record<string, string> = {
+  bedrooms: 'Bedrooms',
+  minPrice: 'Min Price',
+  maxPrice: 'Max Price',
+  minArea: 'Min Area',
+  maxArea: 'Max Area',
+  type: 'Type',
+  furnishingStatus: 'Furnishing',
+  possessionStatus: 'Possession',
+  agentId: 'Agent',
+  amenityIds: 'Amenities',
+  listedBy: 'Posted By',
+  builderName: 'Builder',
+  isVerified: 'Verified',
+  isNewProject: 'New Project',
+  keyword: 'Search',
+  search: 'Search',
+  locality: 'Locality',
+  pincode: 'Pincode',
+};
+
+// Prettier display values for chip labels
+function formatFilterValue(key: string, value: string): string {
+  if (key === 'furnishingStatus') {
+    return { furnished: 'Furnished', semi_furnished: 'Semi-Furnished', unfurnished: 'Unfurnished' }[value] || value;
+  }
+  if (key === 'possessionStatus') {
+    return { ready_to_move: 'Ready to Move', under_construction: 'Under Construction' }[value] || value;
+  }
+  if (key === 'listedBy') {
+    return { owner: 'Owner', agent: 'Agent', builder: 'Builder' }[value] || value;
+  }
+  if (key === 'minPrice' || key === 'maxPrice') {
+    const n = Number(value);
+    if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
+    if (n >= 100000) return `₹${(n / 100000).toFixed(0)}L`;
+    return `₹${(n / 1000).toFixed(0)}K`;
+  }
+  if (key === 'minArea' || key === 'maxArea') return `${value} sqft`;
+  if (key === 'bedrooms') return `${value} BHK`;
+  if (key === 'isVerified') return 'Verified';
+  if (key === 'isNewProject') return 'New Project';
+  if (key === 'amenityIds') return `${value.split(',').length} Amenities`;
+  return value;
+}
+
 interface Props {
   searchParams: { [key: string]: string | string[] | undefined };
 }
@@ -41,9 +94,9 @@ export default function PropertyListingPage({ searchParams }: Props) {
   const router = useRouter();
   const [data, setData] = useState<PaginatedProperties | null>(null);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [sortValue, setSortValue] = useState('createdAt:DESC');
+  const [sortValue, setSortValue] = useState('relevance');
   const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -59,9 +112,15 @@ export default function PropertyListingPage({ searchParams }: Props) {
     try {
       const params: Record<string, any> = {};
       urlSearchParams.forEach((val, key) => { params[key] = val; });
-      const [sortBy, sortOrder] = sortValue.split(':');
-      params.sortBy = sortBy;
-      params.sortOrder = sortOrder;
+
+      if (sortValue === 'relevance') {
+        params.sortBy = 'relevance';
+      } else {
+        const [sortBy, sortOrder] = sortValue.split(':');
+        params.sortBy = sortBy;
+        params.sortOrder = sortOrder;
+      }
+
       const res = await propertiesApi.getAll(params);
       setData(res.data);
     } catch {
@@ -77,29 +136,36 @@ export default function PropertyListingPage({ searchParams }: Props) {
   const isNewProject = urlSearchParams.get('isNewProject') === 'true';
   const city = urlSearchParams.get('city') || '';
   const search = urlSearchParams.get('search') || '';
+  const keyword = urlSearchParams.get('keyword') || '';
+  const locality = urlSearchParams.get('locality') || '';
 
   const effectiveSlug = isNewProject ? 'new_projects' : category;
   const style = SLUG_STYLE[effectiveSlug] ?? DEFAULT_STYLE;
   const catLabel = isNewProject
     ? 'New Projects'
-    : (categoryNames[category] ? `${categoryNames[category]} Properties` : (category ? `${category} Properties` : 'All Properties'));
+    : (categoryNames[category]
+      ? `${categoryNames[category]} Properties`
+      : (category ? `${category} Properties` : 'All Properties'));
 
-  const heading = [catLabel, city && `in ${city}`, search && `"${search}"`].filter(Boolean).join(' ');
+  const headingParts = [catLabel];
+  if (locality) headingParts.push(`in ${locality}`);
+  else if (city) headingParts.push(`in ${city}`);
+  if (keyword) headingParts.push(`"${keyword}"`);
+  else if (search) headingParts.push(`"${search}"`);
+  const heading = headingParts.join(' ');
 
-  // Active filter chips (excluding category/city/search/sort params)
-  const FILTER_LABELS: Record<string, string> = {
-    bedrooms: 'Bedrooms',
-    minPrice: 'Min Price',
-    maxPrice: 'Max Price',
-    type: 'Type',
-    furnishingStatus: 'Furnishing',
-    possessionStatus: 'Possession',
-    agentId: 'Agent',
-  };
-  const activeFilters = Array.from(urlSearchParams.entries()).filter(([k]) => Object.keys(FILTER_LABELS).includes(k));
+  // Active filter chips
+  const activeFilters = Array.from(urlSearchParams.entries()).filter(
+    ([k]) => Object.keys(FILTER_LABELS).includes(k) && k !== 'category' && k !== 'city',
+  );
 
   const removeFilter = (key: string) => {
     const params = new URLSearchParams(urlSearchParams.toString());
+    // For price range, remove both min and max together
+    if (key === 'minPrice') params.delete('maxPrice');
+    if (key === 'maxPrice') params.delete('minPrice');
+    if (key === 'minArea') params.delete('maxArea');
+    if (key === 'maxArea') params.delete('minArea');
     params.delete(key);
     params.set('page', '1');
     router.push(`/properties?${params.toString()}`, { scroll: false });
@@ -111,6 +177,10 @@ export default function PropertyListingPage({ searchParams }: Props) {
     router.push(`/properties?${params.toString()}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Build searchParams object for map
+  const mapSearchParams: Record<string, string> = {};
+  urlSearchParams.forEach((val, key) => { mapSearchParams[key] = val; });
 
   const SkeletonCard = () => (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
@@ -131,12 +201,28 @@ export default function PropertyListingPage({ searchParams }: Props) {
     </div>
   );
 
+  // Deduplicate filter chips (minPrice+maxPrice = one chip)
+  const dedupedFilters: [string, string][] = [];
+  const seen = new Set<string>();
+  for (const [key, value] of activeFilters) {
+    if (key === 'maxPrice' && seen.has('minPrice')) continue;
+    if (key === 'maxArea' && seen.has('minArea')) continue;
+    dedupedFilters.push([key, value]);
+    seen.add(key);
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
       {/* Sticky search bar */}
       <div className="bg-white border-b border-gray-100 shadow-sm sticky top-16 z-30">
         <div className="container-max py-3">
-          <SearchBar size="sm" initialCity={city} initialSearch={search} className="max-w-xl" />
+          <SearchBar
+            size="sm"
+            initialCity={city}
+            initialSearch={search}
+            initialKeyword={keyword}
+            className="max-w-xl"
+          />
         </div>
       </div>
 
@@ -160,6 +246,12 @@ export default function PropertyListingPage({ searchParams }: Props) {
                   </Link>
                   <span className="text-gray-300">/</span>
                   <span className="text-gray-700 font-medium">{city}</span>
+                  {locality && (
+                    <>
+                      <span className="text-gray-300">/</span>
+                      <span className="text-gray-700 font-medium">{locality}</span>
+                    </>
+                  )}
                 </>
               ) : (
                 <span className={cn('font-medium', style.color)}>{catLabel}</span>
@@ -170,11 +262,13 @@ export default function PropertyListingPage({ searchParams }: Props) {
       )}
 
       <div className="container-max py-5">
-        <div className="flex gap-6">
-          {/* Desktop Filter Sidebar */}
-          <aside className="hidden lg:block w-64 flex-shrink-0 sticky top-36 self-start">
-            <FilterPanel />
-          </aside>
+        <div className={cn('flex gap-6', viewMode === 'map' ? 'h-[calc(100vh-200px)]' : '')}>
+          {/* Desktop Filter Sidebar — hidden in map view */}
+          {viewMode !== 'map' && (
+            <aside className="hidden lg:block w-64 flex-shrink-0 sticky top-36 self-start max-h-[calc(100vh-160px)] overflow-y-auto">
+              <FilterPanel />
+            </aside>
+          )}
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
@@ -206,26 +300,29 @@ export default function PropertyListingPage({ searchParams }: Props) {
                   )}
                 </button>
 
-                {/* Sort */}
-                <div className="relative">
-                  <select
-                    value={sortValue}
-                    onChange={(e) => setSortValue(e.target.value)}
-                    className="appearance-none pl-3 pr-8 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white hover:border-primary-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400"
-                  >
-                    {SORT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
+                {/* Sort — hidden in map mode */}
+                {viewMode !== 'map' && (
+                  <div className="relative">
+                    <select
+                      value={sortValue}
+                      onChange={(e) => setSortValue(e.target.value)}
+                      className="appearance-none pl-3 pr-8 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white hover:border-primary-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400"
+                    >
+                      {SORT_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  </div>
+                )}
 
-                {/* View Mode */}
+                {/* View Mode Toggle */}
                 <div className="hidden sm:flex bg-white border border-gray-200 rounded-xl overflow-hidden">
                   <button
                     onClick={() => setViewMode('grid')}
                     className={cn('p-2 transition-colors', viewMode === 'grid' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}
                     aria-label="Grid view"
+                    title="Grid view"
                   >
                     <Grid3X3 className="w-4 h-4" />
                   </button>
@@ -233,27 +330,44 @@ export default function PropertyListingPage({ searchParams }: Props) {
                     onClick={() => setViewMode('list')}
                     className={cn('p-2 transition-colors', viewMode === 'list' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}
                     aria-label="List view"
+                    title="List view"
                   >
                     <List className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('map')}
+                    className={cn('p-2 transition-colors', viewMode === 'map' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}
+                    aria-label="Map view"
+                    title="Map view"
+                  >
+                    <Map className="w-4 h-4" />
                   </button>
                 </div>
               </div>
             </div>
 
             {/* Active Filter Chips */}
-            {activeFilters.length > 0 && (
+            {dedupedFilters.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
-                {activeFilters.map(([key, value]) => (
-                  <span
-                    key={key}
-                    className="flex items-center gap-1.5 bg-primary-50 text-primary-700 border border-primary-200 text-xs font-medium px-3 py-1 rounded-full"
-                  >
-                    {FILTER_LABELS[key]}: {value}
-                    <button onClick={() => removeFilter(key)} className="hover:text-primary-900">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
+                {dedupedFilters.map(([key, value]) => {
+                  const chipLabel = FILTER_LABELS[key] || key;
+                  const chipValue = formatFilterValue(key, value);
+                  return (
+                    <span
+                      key={key}
+                      className="flex items-center gap-1.5 bg-primary-50 text-primary-700 border border-primary-200 text-xs font-medium px-3 py-1 rounded-full"
+                    >
+                      {chipLabel}: {chipValue}
+                      <button
+                        onClick={() => removeFilter(key)}
+                        className="hover:text-primary-900 ml-0.5"
+                        aria-label={`Remove ${chipLabel} filter`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  );
+                })}
                 <button
                   onClick={() => {
                     const params = new URLSearchParams();
@@ -268,8 +382,21 @@ export default function PropertyListingPage({ searchParams }: Props) {
               </div>
             )}
 
-            {/* Properties */}
-            {loading ? (
+            {/* Map View */}
+            {viewMode === 'map' ? (
+              <div className="relative h-full min-h-[500px]">
+                {/* Map filter sidebar */}
+                <div className="absolute left-0 top-0 bottom-0 w-64 z-10 overflow-y-auto hidden lg:block">
+                  <FilterPanel className="rounded-r-none border-r-0" />
+                </div>
+                <div className="lg:ml-64 h-full">
+                  <MapPropertySearch
+                    searchParams={mapSearchParams}
+                    className="h-full min-h-[500px]"
+                  />
+                </div>
+              </div>
+            ) : loading ? (
               <div className={cn('grid gap-4', viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1')}>
                 {Array.from({ length: 9 }).map((_, i) => <SkeletonCard key={i} />)}
               </div>
@@ -317,10 +444,12 @@ export default function PropertyListingPage({ searchParams }: Props) {
                             onClick={() => handlePageChange(p as number)}
                             className={cn(
                               'w-10 h-10 rounded-xl text-sm font-medium transition-colors',
-                              p === cur ? 'bg-primary-600 text-white shadow-sm' : 'bg-white border border-gray-200 hover:border-primary-400 text-gray-700',
+                              p === cur
+                                ? 'bg-primary-600 text-white shadow-sm'
+                                : 'bg-white border border-gray-200 hover:border-primary-400 text-gray-700',
                             )}
                           >{p}</button>
-                        )
+                        ),
                       );
                     })()}
                     <button
@@ -334,7 +463,9 @@ export default function PropertyListingPage({ searchParams }: Props) {
                 )}
 
                 <p className="text-center text-xs text-gray-400 mt-3">
-                  Showing {(data.meta.page - 1) * data.meta.limit + 1}–{Math.min(data.meta.page * data.meta.limit, data.meta.total)} of {data.meta.total.toLocaleString('en-IN')} results
+                  Showing {(data.meta.page - 1) * data.meta.limit + 1}–
+                  {Math.min(data.meta.page * data.meta.limit, data.meta.total)} of{' '}
+                  {data.meta.total.toLocaleString('en-IN')} results
                 </p>
               </>
             ) : (
@@ -375,7 +506,10 @@ export default function PropertyListingPage({ searchParams }: Props) {
                   </span>
                 )}
               </div>
-              <button onClick={() => setShowMobileFilters(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
+              <button
+                onClick={() => setShowMobileFilters(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100"
+              >
                 <X className="w-4 h-4 text-gray-600" />
               </button>
             </div>

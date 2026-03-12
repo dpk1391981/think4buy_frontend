@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useRef } from 'react';
 import Link from 'next/link';
-import { Star, Phone, MapPin, Building2, ArrowRight, Award, Users } from 'lucide-react';
+import { Star, Phone, MapPin, Building2, ArrowRight, Award, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { usersApi } from '@/lib/api';
-import OptimizedImage, { resolveImageSrc } from '@/components/common/OptimizedImage';
+import { useAppSelector } from '@/lib/store';
+import OptimizedImage from '@/components/common/OptimizedImage';
 
 interface Agent {
   id: string;
@@ -23,11 +25,10 @@ interface Agent {
   agentTick?: 'none' | 'blue' | 'gold' | 'diamond';
 }
 
-// Build correct slug — matches AgentsListingClient and profile page parser
 function buildAgentSlug(agent: Agent): string {
   const name = agent.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   const city = (agent.city || 'india').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const uid  = agent.id.replace(/-/g, ''); // 32-char hex, parseable on profile page
+  const uid  = agent.id.replace(/-/g, '');
   return `${name}-in-${city}-${uid}`;
 }
 
@@ -45,20 +46,19 @@ function AgentCard({ agent }: { agent: Agent }) {
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:border-primary-100 transition-all duration-300 flex flex-col h-full group">
-      {/* Clickable top area → profile */}
-      <Link href={`/agents/${slug}`} className="block p-4 sm:p-5 flex-1">
+      <Link href={`/agents/${slug}`} className="block p-4 flex-1">
         {/* Header */}
         <div className="flex items-start gap-3 mb-3">
-          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0 overflow-hidden shadow-sm relative`}>
+          <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-base flex-shrink-0 overflow-hidden shadow-sm relative`}>
             {agent.avatar ? (
-              <OptimizedImage src={agent.avatar} alt={agent.name} fill className="object-cover" sizes="56px" />
+              <OptimizedImage src={agent.avatar} alt={agent.name} fill className="object-cover" sizes="48px" />
             ) : (
               initials
             )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <h3 className="font-bold text-gray-900 text-sm sm:text-base group-hover:text-primary-700 transition-colors">
+              <h3 className="font-bold text-gray-900 text-sm group-hover:text-primary-700 transition-colors leading-tight">
                 {agent.name}
               </h3>
               {tick && (
@@ -90,30 +90,30 @@ function AgentCard({ agent }: { agent: Agent }) {
 
         {/* Bio */}
         {agent.agentBio && (
-          <p className="text-xs sm:text-sm text-gray-500 line-clamp-2 leading-relaxed mb-3">
+          <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed mb-3">
             {agent.agentBio}
           </p>
         )}
 
         {/* Stats */}
-        <div className="flex items-center gap-4 py-2 sm:py-3 border-y border-gray-50">
+        <div className="flex items-center gap-4 py-2.5 border-y border-gray-50">
           {(agent.agentExperience ?? 0) > 0 && (
             <div className="text-center">
-              <div className="text-base sm:text-lg font-bold text-gray-900">{agent.agentExperience}+</div>
-              <div className="text-xs text-gray-400">Yrs Exp.</div>
+              <div className="text-sm font-bold text-gray-900">{agent.agentExperience}+</div>
+              <div className="text-[10px] text-gray-400">Yrs Exp</div>
             </div>
           )}
           {(agent.totalDeals ?? 0) > 0 && (
             <div className="text-center">
-              <div className="text-base sm:text-lg font-bold text-gray-900">{agent.totalDeals}</div>
-              <div className="text-xs text-gray-400">Deals</div>
+              <div className="text-sm font-bold text-gray-900">{agent.totalDeals}</div>
+              <div className="text-[10px] text-gray-400">Deals</div>
             </div>
           )}
           {agent.agentLicense && (
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-gray-400 mb-0.5">RERA</div>
-              <div className="flex items-center gap-1 text-xs font-mono text-emerald-600 truncate">
-                <Award className="w-3 h-3 flex-shrink-0" />
+              <div className="text-[10px] text-gray-400 mb-0.5">RERA</div>
+              <div className="flex items-center gap-1 text-[10px] font-mono text-emerald-600 truncate">
+                <Award className="w-2.5 h-2.5 flex-shrink-0" />
                 {agent.agentLicense}
               </div>
             </div>
@@ -121,33 +121,28 @@ function AgentCard({ agent }: { agent: Agent }) {
         </div>
       </Link>
 
-      {/* Action buttons */}
-      <div className="px-4 sm:px-5 pb-4 sm:pb-5 flex gap-2 flex-shrink-0">
+      {/* Actions */}
+      <div className="px-4 pb-4 flex gap-2 flex-shrink-0">
         {agent.phone && (
           <a
             href={`tel:+91${agent.phone}`}
             onClick={e => e.stopPropagation()}
-            className="flex items-center justify-center gap-1.5 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs sm:text-sm font-medium px-3 py-2.5 rounded-xl transition-colors flex-shrink-0"
-            title={`Call ${agent.name}`}
+            className="flex items-center justify-center gap-1 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-medium px-3 py-2.5 rounded-xl transition-colors flex-shrink-0"
           >
             <Phone className="w-3.5 h-3.5" />
-            Call
           </a>
         )}
-        {/* View Profile — prominent */}
         <Link
           href={`/agents/${slug}`}
-          className="flex-1 flex items-center justify-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold px-3 py-2.5 rounded-xl transition-colors"
         >
           <Users className="w-3.5 h-3.5" />
           View Profile
         </Link>
-        {/* Listings */}
         <Link
           href={`/properties?agentId=${agent.id}`}
           onClick={e => e.stopPropagation()}
-          className="flex items-center justify-center gap-1 bg-gray-50 hover:bg-gray-100 text-gray-600 text-xs sm:text-sm font-medium px-3 py-2.5 rounded-xl transition-colors flex-shrink-0"
-          title="View listings"
+          className="flex items-center justify-center bg-gray-50 hover:bg-gray-100 text-gray-600 text-xs font-medium px-3 py-2.5 rounded-xl transition-colors flex-shrink-0"
         >
           <Building2 className="w-3.5 h-3.5" />
         </Link>
@@ -158,7 +153,7 @@ function AgentCard({ agent }: { agent: Agent }) {
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 animate-pulse flex-shrink-0">
+    <div className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse flex-shrink-0 w-[260px] sm:w-[280px]">
       <div className="flex gap-3 mb-4">
         <div className="w-12 h-12 bg-gray-200 rounded-2xl flex-shrink-0" />
         <div className="flex-1 space-y-2 pt-1">
@@ -172,7 +167,7 @@ function SkeletonCard() {
       </div>
       <div className="h-px bg-gray-100 mb-4" />
       <div className="flex gap-2">
-        <div className="h-9 bg-gray-200 rounded-xl w-16" />
+        <div className="h-9 bg-gray-200 rounded-xl w-10" />
         <div className="h-9 bg-gray-200 rounded-xl flex-1" />
       </div>
     </div>
@@ -180,72 +175,109 @@ function SkeletonCard() {
 }
 
 export default function TopAgents() {
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const scrollRef       = useRef<HTMLDivElement>(null);
+  const selectedState   = useAppSelector(s => s.ui.selectedState);
+  const selectedStateId = useAppSelector(s => s.ui.selectedStateId);
+  const selectedCity    = useAppSelector(s => s.ui.selectedCity);
+  const selectedCityId  = useAppSelector(s => s.ui.selectedCityId);
 
-  useEffect(() => {
-    usersApi
-      .getAgents({ limit: 6 })
-      .then(r => setAgents(r.data?.agents || []))
-      .catch(() => setAgents([]))
-      .finally(() => setLoading(false));
-  }, []);
+  // Same priority as FeaturedProperties: cityId > city > stateId > state name
+  const agentParams: Parameters<typeof usersApi.getAgents>[0] = { limit: 8 };
+  if (selectedCityId)       agentParams.cityId  = selectedCityId;
+  else if (selectedCity)    agentParams.city    = selectedCity;
+  else if (selectedStateId) agentParams.stateId = selectedStateId;
+  else if (selectedState)   agentParams.state   = selectedState;
 
-  if (!loading && agents.length === 0) return null;
+  const { data: agents = [], isLoading } = useQuery({
+    queryKey: ['home-top-agents', selectedStateId || selectedState, selectedCityId || selectedCity],
+    queryFn: () =>
+      usersApi.getAgents(agentParams).then(r => r.data?.agents || []),
+    staleTime: 3 * 60 * 1000,
+  });
+
+  const scroll = (dir: 'left' | 'right') => {
+    scrollRef.current?.scrollBy({ left: dir === 'right' ? 300 : -300, behavior: 'smooth' });
+  };
+
+  if (!isLoading && agents.length === 0) return null;
+
+  const locationLabel = selectedCity
+    ? `in ${selectedCity}`
+    : selectedState ? `in ${selectedState}` : 'across India';
+  const viewAllHref = selectedCity
+    ? `/agents?city=${encodeURIComponent(selectedCity)}`
+    : selectedState
+    ? `/agents?state=${encodeURIComponent(selectedState)}`
+    : '/agents';
 
   return (
     <section className="py-10 sm:py-14 bg-gray-50">
       <div className="container-max">
-        <div className="flex items-center justify-between mb-5 sm:mb-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5 sm:mb-6 px-0">
           <div>
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Top Real Estate Agents</h2>
-            <p className="text-gray-500 mt-1 text-sm">Connect with verified RERA-certified agents across India</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Top Real Estate Agents</h2>
+            <p className="text-gray-500 mt-0.5 text-sm">
+              Verified RERA-certified agents {locationLabel}
+            </p>
           </div>
-          <Link
-            href="/agents"
-            className="hidden sm:flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium text-sm"
-          >
-            View All <ArrowRight className="w-4 h-4" />
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* Desktop scroll arrows */}
+            <div className="hidden sm:flex items-center gap-1">
+              <button
+                onClick={() => scroll('left')}
+                className="w-8 h-8 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-gray-50 hover:border-primary-300 transition-all shadow-sm"
+                aria-label="Scroll left"
+              >
+                <ChevronLeft className="w-4 h-4 text-gray-500" />
+              </button>
+              <button
+                onClick={() => scroll('right')}
+                className="w-8 h-8 rounded-full border border-gray-200 bg-white flex items-center justify-center hover:bg-gray-50 hover:border-primary-300 transition-all shadow-sm"
+                aria-label="Scroll right"
+              >
+                <ChevronRight className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            <Link
+              href={viewAllHref}
+              className="flex items-center gap-1.5 text-primary-600 hover:text-primary-700 font-medium text-sm"
+            >
+              View All <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
 
-        {loading ? (
-          <>
-            <div className="sm:hidden -mx-4">
-              <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 pb-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="flex-shrink-0 w-[72vw]">
-                    <SkeletonCard />
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="hidden sm:grid grid-cols-2 lg:grid-cols-3 gap-5">
-              {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Mobile: horizontal snap scroll */}
-            <div className="sm:hidden -mx-4">
-              <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 snap-x snap-mandatory pb-2">
-                {agents.map(agent => (
-                  <div key={agent.id} className="flex-shrink-0 w-[78vw] snap-start">
-                    <AgentCard agent={agent} />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Desktop: grid */}
-            <div className="hidden sm:grid grid-cols-2 lg:grid-cols-3 gap-5">
-              {agents.map(agent => <AgentCard key={agent.id} agent={agent} />)}
-            </div>
-          </>
+        {/* Location indicator */}
+        {(selectedCity || selectedState) && (
+          <div className="flex items-center gap-2 mb-4 text-sm text-primary-700 bg-primary-50 px-3 py-2 rounded-xl w-fit">
+            <span>📍 Showing agents in <strong>{selectedCity || selectedState}</strong></span>
+          </div>
         )}
 
+        {/* Scroll container — same on mobile + desktop */}
+        <div className="-mx-4 sm:mx-0">
+          <div
+            ref={scrollRef}
+            className="flex gap-4 overflow-x-auto no-scrollbar px-4 sm:px-0 snap-x snap-mandatory pb-2"
+          >
+            {isLoading
+              ? Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
+              : agents.map((agent: Agent) => (
+                  <div key={agent.id} className="flex-shrink-0 w-[78vw] sm:w-[260px] snap-start">
+                    <AgentCard agent={agent} />
+                  </div>
+                ))
+            }
+          </div>
+        </div>
+
+        {/* Mobile view-all */}
         <div className="text-center mt-5 sm:hidden">
-          <Link href="/agents" className="inline-flex items-center gap-2 border border-primary-200 text-primary-700 text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-primary-50 transition-colors">
+          <Link
+            href={viewAllHref}
+            className="inline-flex items-center gap-2 border border-primary-200 text-primary-700 text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-primary-50 transition-colors"
+          >
             View All Agents <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
