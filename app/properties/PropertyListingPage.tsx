@@ -310,7 +310,7 @@ export default function PropertyListingPage({ searchParams }: Props) {
                 {/* Mobile Filter Toggle */}
                 <button
                   onClick={() => setShowMobileFilters(true)}
-                  className="lg:hidden flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white hover:border-primary-400 transition-colors"
+                  className="lg:hidden flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white active:bg-gray-50 transition-colors"
                 >
                   <SlidersHorizontal className="w-4 h-4" />
                   Filters
@@ -338,10 +338,10 @@ export default function PropertyListingPage({ searchParams }: Props) {
                 )}
 
                 {/* View Mode Toggle */}
-                <div className="hidden sm:flex bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden">
                   <button
                     onClick={() => setViewMode('grid')}
-                    className={cn('p-2 transition-colors', viewMode === 'grid' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}
+                    className={cn('p-2.5 transition-colors', viewMode === 'grid' ? 'bg-primary-600 text-white' : 'text-gray-500 active:bg-gray-100')}
                     aria-label="Grid view"
                     title="Grid view"
                   >
@@ -349,7 +349,7 @@ export default function PropertyListingPage({ searchParams }: Props) {
                   </button>
                   <button
                     onClick={() => setViewMode('list')}
-                    className={cn('p-2 transition-colors', viewMode === 'list' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}
+                    className={cn('p-2.5 transition-colors', viewMode === 'list' ? 'bg-primary-600 text-white' : 'text-gray-500 active:bg-gray-100')}
                     aria-label="List view"
                     title="List view"
                   >
@@ -357,7 +357,7 @@ export default function PropertyListingPage({ searchParams }: Props) {
                   </button>
                   <button
                     onClick={() => setViewMode('map')}
-                    className={cn('p-2 transition-colors', viewMode === 'map' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}
+                    className={cn('p-2.5 transition-colors', viewMode === 'map' ? 'bg-primary-600 text-white' : 'text-gray-500 active:bg-gray-100')}
                     aria-label="Map view"
                     title="Map view"
                   >
@@ -374,19 +374,15 @@ export default function PropertyListingPage({ searchParams }: Props) {
                   const chipLabel = FILTER_LABELS[key] || key;
                   const chipValue = formatFilterValue(key, value);
                   return (
-                    <span
+                    <button
                       key={key}
-                      className="flex items-center gap-1.5 bg-primary-50 text-primary-700 border border-primary-200 text-xs font-medium px-3 py-1 rounded-full"
+                      onClick={() => removeFilter(key)}
+                      className="flex items-center gap-1.5 bg-primary-50 text-primary-700 border border-primary-200 text-xs font-medium px-3 py-2 rounded-full active:bg-primary-100 transition-colors"
+                      aria-label={`Remove ${chipLabel} filter`}
                     >
                       {chipLabel}: {chipValue}
-                      <button
-                        onClick={() => removeFilter(key)}
-                        className="hover:text-primary-900 ml-0.5"
-                        aria-label={`Remove ${chipLabel} filter`}
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
+                      <X className="w-3.5 h-3.5 ml-0.5" />
+                    </button>
                   );
                 })}
                 <button
@@ -439,9 +435,9 @@ export default function PropertyListingPage({ searchParams }: Props) {
                     <button
                       onClick={() => handlePageChange(data.meta.page - 1)}
                       disabled={data.meta.page === 1}
-                      className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium disabled:opacity-40 hover:border-primary-400 transition-colors bg-white"
+                      className="px-4 h-11 border border-gray-200 rounded-xl text-sm font-medium disabled:opacity-40 active:bg-gray-50 transition-colors bg-white"
                     >
-                      ← Previous
+                      ← Prev
                     </button>
                     {(() => {
                       const total = data.meta.totalPages;
@@ -464,10 +460,10 @@ export default function PropertyListingPage({ searchParams }: Props) {
                             key={p}
                             onClick={() => handlePageChange(p as number)}
                             className={cn(
-                              'w-10 h-10 rounded-xl text-sm font-medium transition-colors',
+                              'w-11 h-11 rounded-xl text-sm font-medium transition-colors',
                               p === cur
                                 ? 'bg-primary-600 text-white shadow-sm'
-                                : 'bg-white border border-gray-200 hover:border-primary-400 text-gray-700',
+                                : 'bg-white border border-gray-200 active:bg-gray-50 text-gray-700',
                             )}
                           >{p}</button>
                         ),
@@ -476,7 +472,7 @@ export default function PropertyListingPage({ searchParams }: Props) {
                     <button
                       onClick={() => handlePageChange(data.meta.page + 1)}
                       disabled={data.meta.page === data.meta.totalPages}
-                      className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium disabled:opacity-40 hover:border-primary-400 transition-colors bg-white"
+                      className="px-4 h-11 border border-gray-200 rounded-xl text-sm font-medium disabled:opacity-40 active:bg-gray-50 transition-colors bg-white"
                     >
                       Next →
                     </button>

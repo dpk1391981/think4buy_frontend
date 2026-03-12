@@ -68,7 +68,7 @@ export default function MobileBottomNav() {
                 <button
                   key={label}
                   onClick={() => dispatch(openAuthModal('login'))}
-                  className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[56px] transition-colors text-gray-400"
+                  className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] transition-colors text-gray-400"
                 >
                   <div className="w-6 h-6 flex items-center justify-center">
                     <Icon className="w-5 h-5" />
@@ -83,7 +83,7 @@ export default function MobileBottomNav() {
                 key={label}
                 href={accountHref || href}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[56px] transition-colors relative',
+                  'flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] transition-colors relative',
                   isActive ? 'text-primary-600' : 'text-gray-400'
                 )}
               >
@@ -107,7 +107,7 @@ export default function MobileBottomNav() {
               <button
                 key={label}
                 onClick={() => dispatch(openAuthModal({ mode: 'login', reason: 'wishlist', redirectTo: '/wishlist' }))}
-                className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[56px] transition-colors text-gray-400"
+                className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] transition-colors text-gray-400"
               >
                 <div className="w-6 h-6 flex items-center justify-center">
                   <Icon className="w-5 h-5" />
@@ -122,7 +122,7 @@ export default function MobileBottomNav() {
               key={label}
               href={href}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[56px] transition-colors relative',
+                'flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] transition-colors relative',
                 isActive ? 'text-primary-600' : 'text-gray-400'
               )}
             >

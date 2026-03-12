@@ -437,7 +437,7 @@ export default function Header() {
       )}
     >
       {/* ─── Mobile Header ────────────────────────────────────────────────── */}
-      <div className="md:hidden flex items-center justify-between h-14 px-4 gap-3">
+      <div className="md:hidden flex items-center justify-between h-14 px-4 gap-2">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-1.5 flex-shrink-0">
           <div className="w-7 h-7 bg-primary-600 rounded-lg flex items-center justify-center">
@@ -449,14 +449,14 @@ export default function Header() {
         </Link>
 
         {/* Right: Location + Search + User */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <StateSelector compact />
           <Link
             href="/properties"
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-gray-100 active:bg-gray-200 transition-colors"
             aria-label="Search"
           >
-            <Search className="w-4.5 h-4.5 text-gray-700" style={{ width: 18, height: 18 }} />
+            <Search className="w-5 h-5 text-gray-700" />
           </Link>
           {!loading && (
             user ? (
@@ -464,10 +464,10 @@ export default function Header() {
             ) : (
               <button
                 onClick={() => dispatch(openAuthModal('login'))}
-                className="w-9 h-9 flex items-center justify-center rounded-full bg-primary-50 hover:bg-primary-100 transition-colors"
+                className="w-11 h-11 flex items-center justify-center rounded-full bg-primary-50 active:bg-primary-100 transition-colors"
                 aria-label="Login"
               >
-                <User className="text-primary-600" style={{ width: 18, height: 18 }} />
+                <User className="w-5 h-5 text-primary-600" />
               </button>
             )
           )}
