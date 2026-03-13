@@ -100,7 +100,11 @@ export default function PropertyCard({ property, className, listView }: Property
               <span className={cn('text-[11px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide', CATEGORY_BADGE[property.category] || CATEGORY_BADGE.buy)}>
                 {getCategoryLabel(property.category)}
               </span>
-              {plan && (
+              {property.isBoosted ? (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-purple-600 text-white">
+                  <Zap className="w-2.5 h-2.5" />Boosted
+                </span>
+              ) : plan && (
                 <span className={cn('text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1', plan.cls)}>
                   <Zap className="w-2.5 h-2.5" />{plan.label}
                 </span>
@@ -214,7 +218,11 @@ export default function PropertyCard({ property, className, listView }: Property
             <span className={cn('text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide', CATEGORY_BADGE[property.category] || CATEGORY_BADGE.buy)}>
               {getCategoryLabel(property.category)}
             </span>
-            {plan && (
+            {property.isBoosted ? (
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 bg-purple-600 text-white">
+                <Zap className="w-2.5 h-2.5" />Boosted
+              </span>
+            ) : plan && (
               <span className={cn('text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1', plan.cls)}>
                 <Zap className="w-2.5 h-2.5" />{plan.label}
               </span>

@@ -2,11 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { agencyApi } from '@/lib/api';
+import { agencyApi, agentApi } from '@/lib/api';
+import { formatPrice, timeAgo } from '@/lib/utils';
 import {
   Building2, Phone, Mail, Globe, MapPin, CheckCircle, Users,
-  Home, Award, Star, ArrowLeft,
+  Home, Award, Star, ExternalLink,
 } from 'lucide-react';
+
+const APPROVAL_BADGE: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-700',
+};
+
+type PropertiesTab = 'my' | 'assigned';
 
 export default function AgentAgencyPage() {
   const [agency, setAgency] = useState<any>(null);
@@ -15,12 +24,21 @@ export default function AgentAgencyPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Properties
+  const [propsTab, setPropsTab] = useState<PropertiesTab>('my');
+  const [myListings, setMyListings] = useState<any[]>([]);
+  const [assignedProps, setAssignedProps] = useState<any[]>([]);
+  const [propsLoading, setPropsLoading] = useState(false);
+  const [myListingsTotal, setMyListingsTotal] = useState(0);
+  const [assignedTotal, setAssignedTotal] = useState(0);
+
   useEffect(() => {
     async function load() {
       try {
+        // Fix: backend returns { profile, agency, ... } not { agentProfile, agency, ... }
         const dashRes = await agencyApi.getAgentDashboard();
         const data = dashRes.data;
-        setAgentProfile(data.agentProfile ?? null);
+        setAgentProfile(data.profile ?? null);
         setAgency(data.agency ?? null);
 
         if (data.agency?.id) {
@@ -36,6 +54,33 @@ export default function AgentAgencyPage() {
     }
     load();
   }, []);
+
+  // Load properties when tab changes
+  useEffect(() => {
+    async function loadProps() {
+      setPropsLoading(true);
+      try {
+        if (propsTab === 'my') {
+          const r = await agentApi.getMyListings({ page: 1, limit: 10 });
+          const data = r.data;
+          const arr = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+          setMyListings(arr);
+          setMyListingsTotal(data?.total ?? arr.length);
+        } else {
+          const r = await agencyApi.getMyProperties({ page: 1, limit: 10 });
+          const data = r.data;
+          const arr = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+          setAssignedProps(arr);
+          setAssignedTotal(data?.total ?? arr.length);
+        }
+      } catch {
+        // silent
+      } finally {
+        setPropsLoading(false);
+      }
+    }
+    loadProps();
+  }, [propsTab]);
 
   if (loading) {
     return (
@@ -72,6 +117,16 @@ export default function AgentAgencyPage() {
             You haven't been assigned to an agency yet. Contact an admin to get assigned.
           </p>
         </div>
+        {/* Still show My Listings even without agency */}
+        <PropertiesSection
+          propsTab={propsTab}
+          setPropsTab={setPropsTab}
+          myListings={myListings}
+          assignedProps={assignedProps}
+          myListingsTotal={myListingsTotal}
+          assignedTotal={assignedTotal}
+          propsLoading={propsLoading}
+        />
       </div>
     );
   }
@@ -85,7 +140,6 @@ export default function AgentAgencyPage() {
 
       {/* Agency Card */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-5">
-        {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
           <div className="flex items-center gap-4">
             {agency.logo ? (
@@ -176,7 +230,7 @@ export default function AgentAgencyPage() {
         </div>
       </div>
 
-      {/* My Profile in Agency */}
+      {/* My Agent Profile */}
       {agentProfile && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
           <h3 className="font-semibold text-gray-800 mb-4 text-sm flex items-center gap-2">
@@ -214,9 +268,20 @@ export default function AgentAgencyPage() {
         </div>
       )}
 
+      {/* Properties */}
+      <PropertiesSection
+        propsTab={propsTab}
+        setPropsTab={setPropsTab}
+        myListings={myListings}
+        assignedProps={assignedProps}
+        myListingsTotal={myListingsTotal}
+        assignedTotal={assignedTotal}
+        propsLoading={propsLoading}
+      />
+
       {/* Co-agents */}
       {coAgents.length > 1 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mt-5">
           <div className="px-5 py-4 border-b border-gray-100">
             <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
               <Users className="w-4 h-4 text-blue-500" />
@@ -246,6 +311,117 @@ export default function AgentAgencyPage() {
             ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function PropertiesSection({
+  propsTab, setPropsTab, myListings, assignedProps,
+  myListingsTotal, assignedTotal, propsLoading,
+}: {
+  propsTab: PropertiesTab;
+  setPropsTab: (t: PropertiesTab) => void;
+  myListings: any[];
+  assignedProps: any[];
+  myListingsTotal: number;
+  assignedTotal: number;
+  propsLoading: boolean;
+}) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mt-5">
+      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+        <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
+          <Home className="w-4 h-4 text-blue-500" />
+          Properties
+        </h3>
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+          <button
+            onClick={() => setPropsTab('my')}
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+              propsTab === 'my' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            My Listings ({myListingsTotal})
+          </button>
+          <button
+            onClick={() => setPropsTab('assigned')}
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+              propsTab === 'assigned' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Assigned ({assignedTotal})
+          </button>
+        </div>
+      </div>
+
+      {propsLoading ? (
+        <div className="p-6 space-y-2">
+          {[...Array(3)].map((_, i) => <div key={i} className="h-10 bg-gray-100 rounded-lg animate-pulse" />)}
+        </div>
+      ) : propsTab === 'my' ? (
+        myListings.length === 0 ? (
+          <div className="p-10 text-center">
+            <Home className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No listings yet</p>
+            <Link href="/post-property" className="mt-3 inline-block px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
+              Post Property
+            </Link>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {myListings.map((l) => (
+              <div key={l.id} className="flex items-center gap-3 px-5 py-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 truncate">{l.title}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{formatPrice(l.price)} · {(l.type || l.propertyType)?.replace(/_/g, ' ')} · {timeAgo(l.createdAt)}</div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
+                    (APPROVAL_BADGE as any)[l.approvalStatus] || 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {l.approvalStatus}
+                  </span>
+                  {l.slug && (
+                    <Link href={`/properties/${l.slug}`} target="_blank" className="text-gray-400 hover:text-blue-600">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ))}
+            {myListingsTotal > 10 && (
+              <div className="px-5 py-3 text-center">
+                <Link href="/agent/listings" className="text-xs text-blue-600 hover:underline">
+                  View all {myListingsTotal} listings →
+                </Link>
+              </div>
+            )}
+          </div>
+        )
+      ) : (
+        assignedProps.length === 0 ? (
+          <div className="p-10 text-center">
+            <Building2 className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No properties assigned by agency yet</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {assignedProps.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 px-5 py-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-mono text-gray-500 truncate">Property ID: {p.propertyId}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{p.assignedByAdmin ? 'Admin assigned' : 'Agency assigned'} · {timeAgo(p.createdAt)}</div>
+                </div>
+              </div>
+            ))}
+            {assignedTotal > 10 && (
+              <div className="px-5 py-3 text-center text-xs text-gray-400">
+                +{assignedTotal - 10} more assigned properties
+              </div>
+            )}
+          </div>
+        )
       )}
     </div>
   );

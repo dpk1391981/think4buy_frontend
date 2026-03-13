@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { authApi } from '@/lib/api';
-import OptimizedImage from '@/components/common/OptimizedImage';
+import AvatarUpload from '@/components/common/AvatarUpload';
 
 export default function UserProfilePage() {
   const { user, refresh } = useAuth();
@@ -39,10 +39,6 @@ export default function UserProfilePage() {
 
   if (!user) return null;
 
-  const initials = user.name
-    ? user.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-    : 'U';
-
   return (
     <div className="p-4 md:p-8 max-w-2xl">
       <div className="mb-6">
@@ -51,14 +47,8 @@ export default function UserProfilePage() {
       </div>
 
       {/* Avatar */}
-      <div className="bg-white rounded-xl shadow-sm p-6 mb-6 flex items-center gap-4">
-        <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center text-xl font-bold flex-shrink-0 overflow-hidden">
-          {user.avatar ? (
-            <OptimizedImage src={user.avatar} alt={user.name} fill className="object-cover" sizes="64px" />
-          ) : (
-            initials
-          )}
-        </div>
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6 flex items-center gap-5">
+        <AvatarUpload size={80} />
         <div>
           <div className="font-semibold text-gray-900">{user.name}</div>
           <div className="text-sm text-gray-500">{user.email}</div>

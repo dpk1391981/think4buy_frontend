@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { walletApi } from '@/lib/api';
 import { timeAgo } from '@/lib/utils';
 
@@ -8,6 +9,8 @@ interface WalletInfo {
   balance: number;
   totalEarned: number;
   totalSpent: number;
+  quotaUsed: number;
+  quotaTotal: number;
 }
 
 interface Transaction {
@@ -36,12 +39,14 @@ const TYPE_BADGE: Record<string, string> = {
   credit: 'bg-green-100 text-green-700',
   bonus: 'bg-emerald-100 text-emerald-700',
   debit: 'bg-red-100 text-red-700',
+  refund: 'bg-blue-100 text-blue-700',
 };
 
 const TYPE_AMOUNT: Record<string, string> = {
   credit: 'text-green-700',
   bonus: 'text-emerald-700',
   debit: 'text-red-600',
+  refund: 'text-blue-600',
 };
 
 export default function AgentWalletPage() {
@@ -96,30 +101,76 @@ export default function AgentWalletPage() {
     );
   }
 
+  const quotaUsed = wallet?.quotaUsed ?? 0;
+  const quotaTotal = wallet?.quotaTotal ?? 0;
+  const quotaPct = quotaTotal > 0 ? Math.min(100, (quotaUsed / quotaTotal) * 100) : 0;
+
   return (
     <div className="p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Wallet</h1>
-        <p className="text-gray-500 text-sm mt-1">Manage your token balance and transactions</p>
+        <p className="text-gray-500 text-sm mt-1">Manage your token balance and property listing quota</p>
       </div>
 
-      {/* Balance Card */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white mb-6 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm text-blue-100 mb-1">Available Balance</div>
-            <div className="flex items-center gap-3">
-              <span className="text-4xl font-bold">{wallet?.balance?.toLocaleString() ?? 0}</span>
-              <span className="text-3xl">🪙</span>
+      {/* Balance + Quota Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* Balance Card */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white shadow-lg">
+          <div className="text-sm text-blue-100 mb-1">Available Balance</div>
+          <div className="flex items-center gap-3">
+            <span className="text-4xl font-bold">{wallet?.balance?.toLocaleString() ?? 0}</span>
+            <span className="text-3xl">🪙</span>
+          </div>
+          <div className="text-sm text-blue-200 mt-1">tokens</div>
+          <div className="mt-4 flex gap-6 text-sm">
+            <div>
+              <div className="text-blue-200">Total Earned</div>
+              <div className="font-semibold text-green-300">+{wallet?.totalEarned?.toLocaleString() ?? 0} 🪙</div>
             </div>
-            <div className="text-sm text-blue-200 mt-1">tokens</div>
+            <div>
+              <div className="text-blue-200">Total Spent</div>
+              <div className="font-semibold text-red-300">-{wallet?.totalSpent?.toLocaleString() ?? 0} 🪙</div>
+            </div>
           </div>
-          <div className="text-right">
-            <div className="text-sm text-blue-200">Total Earned</div>
-            <div className="text-lg font-semibold text-green-300">+{wallet?.totalEarned?.toLocaleString() ?? 0} 🪙</div>
-            <div className="text-sm text-blue-200 mt-2">Total Spent</div>
-            <div className="text-lg font-semibold text-red-300">-{wallet?.totalSpent?.toLocaleString() ?? 0} 🪙</div>
+        </div>
+
+        {/* Listing Quota Card */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold text-gray-700">Property Listing Quota</div>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              quotaPct >= 90 ? 'bg-red-100 text-red-600' :
+              quotaPct >= 70 ? 'bg-yellow-100 text-yellow-600' :
+              'bg-green-100 text-green-700'
+            }`}>
+              {quotaTotal - quotaUsed} remaining
+            </span>
           </div>
+          <div className="flex items-end gap-2 mb-3">
+            <span className="text-4xl font-bold text-gray-900">{quotaUsed}</span>
+            <span className="text-xl text-gray-400 mb-1">/ {quotaTotal}</span>
+            <span className="text-sm text-gray-500 mb-1">approved listings</span>
+          </div>
+          {/* Progress bar */}
+          <div className="w-full bg-gray-100 rounded-full h-2 mb-3">
+            <div
+              className={`h-2 rounded-full transition-all ${
+                quotaPct >= 90 ? 'bg-red-500' :
+                quotaPct >= 70 ? 'bg-yellow-500' :
+                'bg-green-500'
+              }`}
+              style={{ width: `${quotaPct}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-400">
+            Quota is consumed when your property listing is approved by admin.
+          </p>
+          <Link
+            href="/agent/subscription"
+            className="mt-3 inline-flex items-center gap-1 text-xs text-blue-600 font-medium hover:underline"
+          >
+            Upgrade for more listings →
+          </Link>
         </div>
       </div>
 
@@ -180,52 +231,56 @@ export default function AgentWalletPage() {
         )}
       </div>
 
-      {/* Buy More Tokens Section */}
+      {/* Upgrade Plans Section */}
       <div className="bg-white rounded-xl shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="font-semibold text-gray-800">Buy More Tokens</h2>
-            <p className="text-sm text-gray-500 mt-0.5">Upgrade your plan to get more tokens and listings</p>
+            <h2 className="font-semibold text-gray-800">Subscription Plans</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Get more tokens and listing quota by upgrading your plan</p>
           </div>
-          <span className="inline-flex px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">Coming Soon</span>
+          <Link
+            href="/agent/subscription"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            View All Plans
+          </Link>
         </div>
 
         {subscriptionPlans.length === 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { name: 'Basic Plan', price: '₹999', tokens: '50 tokens', listings: '10 listings', color: 'border-blue-200' },
-              { name: 'Premium Plan', price: '₹2,499', tokens: '150 tokens', listings: '30 listings', color: 'border-purple-200' },
-              { name: 'Featured Plan', price: '₹4,999', tokens: '400 tokens', listings: 'Unlimited', color: 'border-yellow-200' },
+              { name: 'Basic Plan', tokens: '50 tokens', listings: '10 listings', border: 'border-blue-200' },
+              { name: 'Premium Plan', tokens: '150 tokens', listings: '30 listings', border: 'border-purple-200' },
+              { name: 'Featured Plan', tokens: '400 tokens', listings: 'Unlimited', border: 'border-yellow-200' },
             ].map((plan) => (
-              <div key={plan.name} className={`border-2 ${plan.color} rounded-xl p-4 opacity-70`}>
-                <div className="font-semibold text-gray-900 mb-1">{plan.name}</div>
-                <div className="text-2xl font-bold text-gray-800 mb-3">{plan.price}<span className="text-sm font-normal text-gray-500">/mo</span></div>
-                <div className="space-y-1 text-sm text-gray-600">
+              <div key={plan.name} className={`border-2 ${plan.border} rounded-xl p-4`}>
+                <div className="font-semibold text-gray-900 mb-2">{plan.name}</div>
+                <div className="space-y-1 text-sm text-gray-600 mb-4">
                   <div>🪙 {plan.tokens}</div>
                   <div>🏠 {plan.listings}</div>
                 </div>
-                <button disabled className="mt-4 w-full py-2 bg-gray-100 text-gray-500 rounded-lg text-sm font-medium cursor-not-allowed">
-                  Coming Soon
-                </button>
+                <Link href="/agent/subscription" className="block text-center py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                  View Plan
+                </Link>
               </div>
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {subscriptionPlans.filter((p) => p.isActive).map((plan) => (
-              <div key={plan.id} className="border-2 border-gray-200 rounded-xl p-4 opacity-70">
+            {subscriptionPlans.filter((p) => p.isActive).slice(0, 3).map((plan) => (
+              <div key={plan.id} className="border-2 border-gray-200 rounded-xl p-4">
                 <div className="font-semibold text-gray-900 mb-1">{plan.name}</div>
-                <div className="text-2xl font-bold text-gray-800 mb-3">
-                  ₹{plan.price?.toLocaleString()}
-                  <span className="text-sm font-normal text-gray-500">/{plan.durationDays}d</span>
+                <div className="text-xl font-bold text-gray-800 mb-3">
+                  {plan.price?.toLocaleString()}
+                  <span className="text-sm font-normal text-gray-500 ml-1">tokens/{plan.durationDays}d</span>
                 </div>
-                <div className="space-y-1 text-sm text-gray-600">
-                  <div>🪙 {plan.tokensIncluded} tokens</div>
+                <div className="space-y-1 text-sm text-gray-600 mb-4">
+                  <div>🪙 {plan.tokensIncluded} tokens included</div>
                   <div>🏠 {plan.maxListings} listings</div>
                 </div>
-                <button disabled className="mt-4 w-full py-2 bg-gray-100 text-gray-500 rounded-lg text-sm font-medium cursor-not-allowed">
-                  Coming Soon
-                </button>
+                <Link href="/agent/subscription" className="block text-center py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                  Subscribe
+                </Link>
               </div>
             ))}
           </div>

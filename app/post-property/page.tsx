@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useRef, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   CheckCircle2, ArrowLeft, ArrowRight, ImagePlus,
   MapPin, Loader2, Building2, Home, Factory,
@@ -1015,15 +1015,16 @@ function Step9Price({ form, dispatch }: any) {
 
 // ─── Step: Photos ────────────────────────────────────────────────────────────
 
-function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, onSubmit, loading, error }: any) {
+function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImages, onRemoveExisting, onSubmit, loading, error, isEditMode }: any) {
   const imageRef = useRef<HTMLInputElement>(null);
   const imgCount = mediaFiles.filter((m: MediaFile) => m.type === 'image').length;
+  const totalCount = imgCount + (existingImages?.length || 0);
 
   const handleImages = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setMediaFiles((prev: MediaFile[]) => [
       ...prev,
-      ...files.slice(0, 11 - imgCount).map(f => ({ file: f, preview: URL.createObjectURL(f), type: 'image' as const })),
+      ...files.slice(0, 11 - totalCount).map(f => ({ file: f, preview: URL.createObjectURL(f), type: 'image' as const })),
     ]);
     e.target.value = '';
   };
@@ -1052,10 +1053,26 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, onSubmit, loa
       {/* Photo grid */}
       <div>
         <div className="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-5 gap-3">
+          {/* Existing images (edit mode) */}
+          {(existingImages || []).map((img: any, i: number) => (
+            <div key={`existing-${img.id}`} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group">
+              <img src={img.url.startsWith('http') ? img.url : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api','')}${img.url}`} alt="" className="w-full h-full object-cover" />
+              {i === 0 && imgCount === 0 && (
+                <span className="absolute bottom-1.5 left-1.5 text-[10px] bg-primary-600 text-white px-2 py-0.5 rounded font-bold">
+                  Cover
+                </span>
+              )}
+              <button onClick={() => onRemoveExisting(img.id)}
+                className="absolute top-1.5 right-1.5 bg-black/60 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors opacity-0 group-hover:opacity-100">
+                ×
+              </button>
+            </div>
+          ))}
+          {/* New uploads */}
           {mediaFiles.map((m: MediaFile, i: number) => (
-            <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group">
+            <div key={`new-${i}`} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group">
               <img src={m.preview} alt="" className="w-full h-full object-cover" />
-              {i === 0 && (
+              {(existingImages?.length || 0) === 0 && i === 0 && (
                 <span className="absolute bottom-1.5 left-1.5 text-[10px] bg-primary-600 text-white px-2 py-0.5 rounded font-bold">
                   Cover
                 </span>
@@ -1066,7 +1083,7 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, onSubmit, loa
               </button>
             </div>
           ))}
-          {imgCount < 11 && (
+          {totalCount < 11 && (
             <button type="button" onClick={() => imageRef.current?.click()}
               className="aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:border-primary-400 hover:text-primary-500 hover:bg-primary-50/50 transition-all">
               <ImagePlus className="w-6 h-6" />
@@ -1075,11 +1092,11 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, onSubmit, loa
           )}
         </div>
         <div className="flex items-center gap-3 mt-3">
-          <div className={cn('flex items-center gap-1.5 text-sm font-medium', imgCount >= 3 ? 'text-green-600' : 'text-gray-400')}>
-            {imgCount >= 3 ? <CheckCircle2 className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
-            {imgCount}/3 minimum
+          <div className={cn('flex items-center gap-1.5 text-sm font-medium', totalCount >= 3 ? 'text-green-600' : 'text-gray-400')}>
+            {totalCount >= 3 ? <CheckCircle2 className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
+            {totalCount}/3 minimum
           </div>
-          {imgCount < 3 && <span className="text-sm text-orange-500">Need {3 - imgCount} more photo{3 - imgCount > 1 ? 's' : ''}</span>}
+          {totalCount < 3 && <span className="text-sm text-orange-500">Need {3 - totalCount} more photo{3 - totalCount > 1 ? 's' : ''}</span>}
         </div>
       </div>
 
@@ -1112,9 +1129,9 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, onSubmit, loa
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>
       )}
 
-      <button type="button" onClick={onSubmit} disabled={loading || imgCount < 3}
+      <button type="button" onClick={onSubmit} disabled={loading || totalCount < 3}
         className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 text-base transition-all shadow-xl shadow-primary-600/30">
-        {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Submitting…</> : '🎉 Post Property Now'}
+        {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Saving…</> : isEditMode ? '✏️ Update Property' : '🎉 Post Property Now'}
       </button>
     </div>
   );
@@ -1122,13 +1139,20 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, onSubmit, loa
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function PostPropertyPage() {
+function PostPropertyPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('edit');
+  const isEditMode = !!editId;
+
   const { user, loading: authLoading } = useAuth();
   const dispatch = useAppDispatch();
   const { currentStep, form, config } = useAppSelector(s => s.postProperty);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [existingImages, setExistingImages] = useState<{ id: string; url: string; isPrimary: boolean }[]>([]);
+  const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
   const [error, setError] = useState('');
 
   const TOTAL_STEPS = 10;
@@ -1182,6 +1206,88 @@ export default function PostPropertyPage() {
       dispatch(setConfigLoading({ key: 'fields', value: false }));
     });
   }, [form.typeId]);
+
+  // Load existing property data for edit mode
+  useEffect(() => {
+    if (!editId || !user) return;
+    setEditLoading(true);
+    dispatch(resetForm());
+    (async () => {
+      try {
+        const { data: property } = await propertiesApi.getById(editId);
+
+        // Fetch categories, then types, then amenities sequentially to get IDs
+        const { data: categories } = await propertyConfigApi.getCategories();
+        dispatch(setConfigCategories(categories));
+        const category = (Array.isArray(categories) ? categories : categories?.items || [])
+          .find((c: any) => c.slug === property.category);
+
+        let typeId = '';
+        let amenityIds: string[] = [];
+        if (category) {
+          const { data: types } = await propertyConfigApi.getTypes(category.id);
+          dispatch(setConfigTypes(types));
+          const type = (types || []).find((t: any) =>
+            t.slug === property.type || t.name?.toLowerCase().replace(/\s+/g, '_') === property.type
+          );
+          if (type) {
+            typeId = type.id;
+            const [ar, fr] = await Promise.all([
+              propertyConfigApi.getAmenities(type.id),
+              propertyConfigApi.getFields(type.id),
+            ]);
+            const amenities = (ar.data || []).map((item: any) => item.amenity ?? item);
+            dispatch(setConfigAmenities(amenities));
+            dispatch(setConfigFields(fr.data || []));
+            amenityIds = (property.amenities || []).map((a: any) => a.id);
+          }
+        }
+
+        // Populate form
+        dispatch(updateForm({
+          mainCategory: property.category || '',
+          categoryId: category?.id || '',
+          listingType: property.listingType || '',
+          propertyType: property.type || '',
+          typeId,
+          city: property.city || '',
+          cityId: property.cityId || '',
+          state: property.state || '',
+          stateId: property.stateId || '',
+          locality: property.locality || '',
+          address: property.address || '',
+          pincode: property.pincode || '',
+          latitude: property.latitude ?? null,
+          longitude: property.longitude ?? null,
+          autoTitle: property.title || '',
+          area: property.area ? String(property.area) : '',
+          areaUnit: property.areaUnit || 'sqft',
+          bedrooms: property.bedrooms ? String(property.bedrooms) : '',
+          bathrooms: property.bathrooms ? String(property.bathrooms) : '',
+          floor: property.floorNumber ? String(property.floorNumber) : '',
+          furnishingStatus: property.furnishingStatus || 'unfurnished',
+          possessionStatus: property.possessionStatus || 'ready_to_move',
+          price: property.price ? String(property.price) : '',
+          priceUnit: property.priceUnit || 'total',
+          brokerage: property.brokerage || '',
+          description: property.description || '',
+          amenityIds,
+          dynamicFields: property.extraDetails || {},
+          userType: property.listedBy === 'agent' ? 'agent' : 'owner',
+          agencyName: property.builderName || '',
+        }));
+
+        setExistingImages(
+          (property.images || []).sort((a: any, b: any) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0))
+        );
+        dispatch(setStep(0));
+      } catch {
+        setError('Failed to load property for editing.');
+      } finally {
+        setEditLoading(false);
+      }
+    })();
+  }, [editId, user?.id]);
 
   const canProceed = () => {
     switch (currentStep) {
@@ -1262,26 +1368,48 @@ export default function PostPropertyPage() {
         extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : undefined,
       };
 
-      const { data: property } = await propertiesApi.create(payload);
+      let propertyId: string;
+      let propertySlug: string;
+
+      if (isEditMode && editId) {
+        // Delete removed images first
+        await Promise.all(removedImageIds.map(imgId => propertiesApi.deleteImage(editId, imgId)));
+        const { data: updated } = await propertiesApi.update(editId, payload);
+        propertyId = updated.id;
+        propertySlug = updated.slug;
+      } else {
+        const { data: property } = await propertiesApi.create(payload);
+        propertyId = property.id;
+        propertySlug = property.slug;
+      }
+
+      // Upload new images
       const images = mediaFiles.filter(m => m.type === 'image');
       if (images.length > 0) {
         const fd = new FormData();
         images.forEach(m => fd.append('images', m.file));
-        await propertiesApi.uploadImages(property.id, fd);
+        await propertiesApi.uploadImages(propertyId, fd);
       }
+
       dispatch(resetForm());
-      router.push(`/properties/${property.slug}?posted=1`);
+      router.push(isEditMode ? `/properties/${propertySlug}?updated=1` : `/properties/${propertySlug}?posted=1`);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to post property. Please try again.');
+      setError(err.response?.data?.message || (isEditMode ? 'Failed to update property.' : 'Failed to post property. Please try again.'));
     } finally {
       setLoading(false);
     }
   };
 
-  if (authLoading) {
+  const handleRemoveExistingImage = (imageId: string) => {
+    setRemovedImageIds(prev => [...prev, imageId]);
+    setExistingImages(prev => prev.filter(img => img.id !== imageId));
+  };
+
+  if (authLoading || editLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center flex-col gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+        {editLoading && <p className="text-sm text-gray-500">Loading property data…</p>}
       </div>
     );
   }
@@ -1299,7 +1427,7 @@ export default function PostPropertyPage() {
       case 6: return <Step7Amenities {...stepProps} />;
       case 7: return <Step8Description {...stepProps} />;
       case 8: return <Step9Price {...stepProps} />;
-      case 9: return <Step10Photos {...stepProps} mediaFiles={mediaFiles} setMediaFiles={setMediaFiles} onSubmit={handleSubmit} loading={loading} error={error} />;
+      case 9: return <Step10Photos {...stepProps} mediaFiles={mediaFiles} setMediaFiles={setMediaFiles} existingImages={existingImages} onRemoveExisting={handleRemoveExistingImage} onSubmit={handleSubmit} loading={loading} error={error} isEditMode={isEditMode} />;
       default: return null;
     }
   };
@@ -1319,7 +1447,7 @@ export default function PostPropertyPage() {
           <main className="flex-1 min-w-0">
             {/* Page header — desktop only */}
             <div className="hidden lg:block mb-8">
-              <h1 className="text-3xl font-black text-gray-900">Post Your Property</h1>
+              <h1 className="text-3xl font-black text-gray-900">{isEditMode ? 'Edit Property' : 'Post Your Property'}</h1>
               <div className="flex items-center gap-2 mt-2">
                 {isAgent ? (
                   <>
@@ -1371,5 +1499,17 @@ export default function PostPropertyPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PostPropertyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+      </div>
+    }>
+      <PostPropertyPageInner />
+    </Suspense>
   );
 }

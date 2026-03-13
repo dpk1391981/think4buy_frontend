@@ -27,6 +27,7 @@ export const propertiesApi = {
   getStats: () => api.get('/properties/stats'),
   getCities: () => api.get('/properties/cities'),
   getAmenities: () => api.get('/properties/amenities'),
+  getById: (id: string) => api.get(`/properties/id/${id}`),
   getBySlug: (slug: string) => api.get(`/properties/${slug}`),
   getSimilar: (id: string) => api.get(`/properties/${id}/similar`),
   create: (data: any) => api.post('/properties', data),
@@ -36,6 +37,8 @@ export const propertiesApi = {
     api.post(`/properties/${id}/images`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  deleteImage: (propertyId: string, imageId: string) =>
+    api.delete(`/properties/${propertyId}/images/${imageId}`),
 };
 
 // Auth
@@ -46,6 +49,11 @@ export const authApi = {
   getProfile: () => api.get('/auth/profile'),
   updateProfile: (data: { name?: string; email?: string; city?: string; company?: string }) =>
     api.patch('/auth/profile', data),
+  uploadAvatar: (file: File) => {
+    const fd = new FormData();
+    fd.append('avatar', file);
+    return api.post('/auth/profile/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
   sendOtp: (phone: string) => api.post('/auth/otp/send', { phone }),
   verifyOtp: (phone: string, otp: string, name?: string) =>
     api.post('/auth/otp/verify', { phone, otp, name }),
@@ -346,6 +354,58 @@ export const seoApi = {
   adminCreateFooterLink: (data: any) => api.post('/seo/admin/footer-links', data),
   adminUpdateFooterLink: (id: string, data: any) => api.patch(`/seo/admin/footer-links/${id}`, data),
   adminDeleteFooterLink: (id: string) => api.delete(`/seo/admin/footer-links/${id}`),
+};
+
+// ─── Leads API ───────────────────────────────────────────────────────────────
+export const leadsApi = {
+  create: (data: any) => api.post('/leads', data),
+  getAll: (params?: Record<string, any>) => api.get('/leads', { params }),
+  getMy: (params?: Record<string, any>) => api.get('/leads/my', { params }),
+  getStats: (agentId?: string) => api.get('/leads/stats', { params: agentId ? { agentId } : {} }),
+  getOne: (id: string) => api.get(`/leads/${id}`),
+  updateStatus: (id: string, data: { status: string; notes?: string; lostReason?: string }) =>
+    api.patch(`/leads/${id}/status`, data),
+  assign: (id: string, data: { agentId: string; reason?: string }) =>
+    api.patch(`/leads/${id}/assign`, data),
+  addNote: (id: string, notes: string) => api.post(`/leads/${id}/notes`, { notes }),
+  getActivities: (id: string) => api.get(`/leads/${id}/activities`),
+};
+
+// ─── Site Visits API ──────────────────────────────────────────────────────────
+export const siteVisitsApi = {
+  create: (data: any) => api.post('/site-visits', data),
+  getMy: (params?: Record<string, any>) => api.get('/site-visits/my', { params }),
+  getAll: (params?: Record<string, any>) => api.get('/site-visits', { params }),
+  getToday: () => api.get('/site-visits/today'),
+  getByLead: (leadId: string) => api.get(`/site-visits/lead/${leadId}`),
+  getOne: (id: string) => api.get(`/site-visits/${id}`),
+  update: (id: string, data: any) => api.patch(`/site-visits/${id}`, data),
+  complete: (id: string, data: any) => api.patch(`/site-visits/${id}/complete`, data),
+  cancel: (id: string, reason: string) => api.patch(`/site-visits/${id}/cancel`, { reason }),
+};
+
+// ─── Deals API ────────────────────────────────────────────────────────────────
+export const dealsApi = {
+  create: (data: any) => api.post('/deals', data),
+  getMy: (params?: Record<string, any>) => api.get('/deals/my', { params }),
+  getAll: (params?: Record<string, any>) => api.get('/deals', { params }),
+  getStats: (agentId?: string) => api.get('/deals/stats', { params: agentId ? { agentId } : {} }),
+  getOne: (id: string) => api.get(`/deals/${id}`),
+  updateStage: (id: string, data: any) => api.patch(`/deals/${id}/stage`, data),
+};
+
+// ─── Commissions API ──────────────────────────────────────────────────────────
+export const commissionsApi = {
+  create: (data: any) => api.post('/commissions', data),
+  getMy: (params?: Record<string, any>) => api.get('/commissions/my', { params }),
+  getAll: (params?: Record<string, any>) => api.get('/commissions', { params }),
+  getStats: (agentId?: string) =>
+    api.get('/commissions/stats', { params: agentId ? { agentId } : {} }),
+  getOne: (id: string) => api.get(`/commissions/${id}`),
+  approve: (id: string, notes?: string) => api.patch(`/commissions/${id}/approve`, { notes }),
+  markPaid: (id: string, data: { paymentReference: string; paymentDate?: string }) =>
+    api.patch(`/commissions/${id}/pay`, data),
+  dispute: (id: string, reason: string) => api.patch(`/commissions/${id}/dispute`, { reason }),
 };
 
 // ─── Home Analytics APIs ──────────────────────────────────────────────────────

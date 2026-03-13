@@ -36,8 +36,11 @@ export default function MobileBottomNav() {
                   onClick={() => dispatch(openAuthModal({ mode: 'login', reason: 'post-property', redirectTo: '/post-property' }))}
                   className="flex flex-col items-center justify-center -mt-6 relative"
                 >
-                  <div className="w-14 h-14 bg-primary-600 rounded-full flex items-center justify-center shadow-lg shadow-primary-600/40 border-4 border-white">
-                    <Icon className="w-6 h-6 text-white" />
+                  <div className="relative">
+                    <div className="w-14 h-14 bg-primary-600 rounded-full flex items-center justify-center shadow-lg shadow-primary-600/40 border-4 border-white">
+                      <Icon className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="badge-free absolute -top-1 -right-1 text-[9px] px-1.5 py-0.5 rounded-full leading-none">FREE</span>
                   </div>
                   <span className="text-[10px] text-primary-600 font-semibold mt-0.5">{label}</span>
                 </button>

@@ -74,6 +74,9 @@ export interface Property {
   longitude?: number;
   status: PropertyStatus;
   isFeatured: boolean;
+  isBoosted?: boolean;
+  boostExpiry?: string | null;
+  boostExpiresAt?: string | null;
   isPremium: boolean;
   isVerified: boolean;
   listingPlan?: string;

@@ -75,6 +75,8 @@ export default function AgentSubscriptionPage() {
   const [current, setCurrent] = useState<ActiveSubscription | null>(null);
   const [history, setHistory] = useState<SubscriptionHistory[]>([]);
   const [walletBalance, setWalletBalance] = useState(0);
+  const [quotaUsed, setQuotaUsed] = useState(0);
+  const [quotaTotal, setQuotaTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -96,7 +98,10 @@ export default function AgentSubscriptionPage() {
         setHistory(subRes.value.data.history || []);
       }
       if (walletRes.status === 'fulfilled') {
-        setWalletBalance(walletRes.value.data?.balance ?? 0);
+        const wd = walletRes.value.data;
+        setWalletBalance(wd?.balance ?? 0);
+        setQuotaUsed(wd?.quotaUsed ?? 0);
+        setQuotaTotal(wd?.quotaTotal ?? 0);
       }
     } catch (e) {
       console.error(e);
@@ -159,16 +164,38 @@ export default function AgentSubscriptionPage() {
                 })}
               </div>
             </div>
-            <div className="bg-white/20 rounded-lg p-3 text-center">
-              <div className="text-xs text-blue-200">Max Listings</div>
-              <div className="text-2xl font-bold">{current.planSnapshot?.maxListings ?? current.plan.maxListings}</div>
+            <div className="flex gap-3">
+              <div className="bg-white/20 rounded-lg p-3 text-center">
+                <div className="text-xs text-blue-200">Max Listings</div>
+                <div className="text-2xl font-bold">{current.planSnapshot?.maxListings ?? current.plan.maxListings}</div>
+              </div>
+              <div className="bg-white/20 rounded-lg p-3 text-center min-w-[80px]">
+                <div className="text-xs text-blue-200">Quota Used</div>
+                <div className="text-2xl font-bold">{quotaUsed}</div>
+                <div className="text-xs text-blue-300 mt-0.5">of {quotaTotal}</div>
+              </div>
             </div>
           </div>
+          {/* Quota progress bar */}
+          {quotaTotal > 0 && (
+            <div className="mt-4">
+              <div className="flex justify-between text-xs text-blue-200 mb-1">
+                <span>Listing quota used</span>
+                <span>{quotaUsed}/{quotaTotal} ({Math.round((quotaUsed/quotaTotal)*100)}%)</span>
+              </div>
+              <div className="w-full bg-white/20 rounded-full h-1.5">
+                <div
+                  className="h-1.5 rounded-full bg-green-400 transition-all"
+                  style={{ width: `${Math.min(100, (quotaUsed / quotaTotal) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Wallet balance */}
-      <div className="bg-white rounded-xl p-4 shadow-sm mb-6 flex items-center justify-between">
+      {/* Wallet balance + quota (no active subscription) */}
+      <div className="bg-white rounded-xl p-4 shadow-sm mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <span className="text-2xl">🪙</span>
           <div>
@@ -176,6 +203,15 @@ export default function AgentSubscriptionPage() {
             <div className="text-xl font-bold text-gray-900">{walletBalance.toLocaleString()} tokens</div>
           </div>
         </div>
+        {!current && quotaTotal > 0 && (
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🏠</span>
+            <div>
+              <div className="text-sm text-gray-500">Listing Quota</div>
+              <div className="text-xl font-bold text-gray-900">{quotaUsed} / {quotaTotal} used</div>
+            </div>
+          </div>
+        )}
         <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 text-center">
           <div>Plan prices are in</div>
           <div className="font-medium text-gray-700">tokens (1 token ≈ ₹1)</div>

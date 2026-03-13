@@ -24,6 +24,9 @@ import {
   Settings,
   Building2,
   UserCheck,
+  Target,
+  Handshake,
+  IndianRupee,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 
@@ -67,6 +70,14 @@ const NAV_GROUPS = [
     items: [
       { href: '/admin/countries', label: 'Countries', icon: Globe },
       { href: '/admin/locations', label: 'States & Cities', icon: MapPin },
+    ],
+  },
+  {
+    label: 'CRM',
+    items: [
+      { href: '/admin/leads', label: 'Leads', icon: Target },
+      { href: '/admin/deals', label: 'Deals', icon: Handshake },
+      { href: '/admin/commissions', label: 'Commissions', icon: IndianRupee },
     ],
   },
   {

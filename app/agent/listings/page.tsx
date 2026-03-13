@@ -16,6 +16,7 @@ interface BoostPlan {
 interface Listing {
   id: string;
   title: string;
+  type?: string;
   propertyType: string;
   category: string;
   price: number;
@@ -67,9 +68,16 @@ export default function AgentListingsPage() {
       if (statusFilter) params.status = statusFilter;
       const r = await agentApi.getMyListings(params);
       const data = r.data;
-      const arr = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      // Backend returns { items, total } (or legacy { data, meta })
+      const arr = Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data)
+        ? data
+        : [];
       setListings(arr);
-      setTotal(data?.total ?? arr.length);
+      setTotal(data?.total ?? data?.meta?.total ?? arr.length);
     } catch (e) {
       console.error(e);
     } finally {
@@ -116,7 +124,7 @@ export default function AgentListingsPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">My Listings</h1>
           <p className="text-gray-500 text-sm mt-1">{total} total properties</p>
@@ -175,7 +183,7 @@ export default function AgentListingsPage() {
                     <div className="text-gray-400 text-xs">{timeAgo(listing.createdAt)}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="text-gray-700 capitalize">{listing.propertyType?.replace(/_/g, ' ')}</div>
+                    <div className="text-gray-700 capitalize">{(listing.type || listing.propertyType)?.replace(/_/g, ' ')}</div>
                     <div className="text-gray-400 text-xs capitalize">{listing.category}</div>
                   </td>
                   <td className="px-4 py-3 text-gray-700 font-medium whitespace-nowrap">{formatPrice(listing.price)}</td>
@@ -192,7 +200,7 @@ export default function AgentListingsPage() {
                   <td className="px-4 py-3">
                     {listing.isBoosted ? (
                       <div>
-                        <span className="inline-flex px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">Boosted</span>
+                        <span className="inline-flex px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">⚡ Boosted</span>
                         {listing.boostExpiry && (
                           <div className="text-xs text-gray-400 mt-0.5">Until {new Date(listing.boostExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
                         )}
@@ -216,12 +224,12 @@ export default function AgentListingsPage() {
                       >
                         Edit
                       </Link>
-                      {!listing.isBoosted && listing.approvalStatus === 'approved' && (
+                      {listing.approvalStatus === 'approved' && (
                         <button
                           onClick={() => openBoostModal(listing)}
                           className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-md text-xs font-medium hover:bg-purple-200 transition-colors"
                         >
-                          Boost
+                          {listing.isBoosted ? '⚡ Extend' : 'Boost'}
                         </button>
                       )}
                     </div>
@@ -249,8 +257,15 @@ export default function AgentListingsPage() {
       {boostModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
-            <h3 className="font-semibold text-gray-900 mb-1">Boost Property</h3>
+            <h3 className="font-semibold text-gray-900 mb-1">
+              {boostModal.listing.isBoosted ? '⚡ Extend Boost' : '⚡ Boost Property'}
+            </h3>
             <p className="text-sm text-gray-500 mb-1 truncate">{boostModal.listing.title}</p>
+            {boostModal.listing.isBoosted && boostModal.listing.boostExpiry && (
+              <p className="text-xs text-purple-600 mb-2">
+                Currently boosted until {new Date(boostModal.listing.boostExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} — new duration will be added on top.
+              </p>
+            )}
             <div className="flex items-center gap-1.5 mb-4">
               <span className="text-sm text-gray-600">Your balance:</span>
               <span className="text-sm font-semibold text-gray-900">{walletBalance}</span>

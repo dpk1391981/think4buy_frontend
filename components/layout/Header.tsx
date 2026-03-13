@@ -457,9 +457,10 @@ export default function Header() {
             ) : (
               <button
                 onClick={() => dispatch(openAuthModal({ mode: 'login', reason: 'post-property', redirectTo: '/post-property' }))}
-                className="flex items-center gap-1 bg-primary-600 active:bg-primary-700 text-white text-[11px] font-bold px-2.5 py-2 rounded-lg transition-colors whitespace-nowrap"
+                className="flex items-center gap-1.5 bg-primary-600 active:bg-primary-700 text-white text-[11px] font-bold px-2.5 py-2 rounded-lg transition-colors whitespace-nowrap"
               >
-                Post <span className="bg-amber-400 text-gray-900 text-[10px] font-extrabold px-1 py-0.5 rounded leading-none">FREE</span>
+                Post
+                <span className="badge-free text-[10px] px-1.5 py-0.5 rounded-full leading-none">FREE</span>
               </button>
             )
           )}
@@ -541,9 +542,11 @@ export default function Header() {
 
               <Link
                 href="/post-property"
-                className="btn-primary text-sm py-2 px-3 lg:px-4 flex items-center gap-1 whitespace-nowrap"
+                className="btn-primary text-sm py-2 px-3 lg:px-4 flex items-center gap-1.5 whitespace-nowrap"
               >
-                + Post <span className="hidden lg:inline">Property FREE</span>
+                <Plus className="w-3.5 h-3.5" />
+                <span>Post Property</span>
+                <span className="badge-free text-[10px] px-1.5 py-0.5 rounded-full leading-none">FREE</span>
               </Link>
             </div>
           </div>
