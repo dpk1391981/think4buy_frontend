@@ -266,6 +266,37 @@ export const subscriptionApi = {
   purchase: (planId: string) => api.post('/wallet/subscription/purchase', { planId }),
 };
 
+// SEO Admin API
+export const seoApi = {
+  // Public
+  getCityPageBySlug: (slug: string) => api.get(`/seo/city-pages/${slug}`),
+  getFooterLinks: () => api.get('/seo/footer-links'),
+  getSeoConfig: () => api.get('/seo/config'),
+
+  // Admin - City Pages
+  adminGetCityPages: (params?: { page?: number; limit?: number; search?: string }) =>
+    api.get('/seo/admin/city-pages', { params }),
+  adminCreateCityPage: (data: any) => api.post('/seo/admin/city-pages', data),
+  adminUpdateCityPage: (id: string, data: any) => api.patch(`/seo/admin/city-pages/${id}`, data),
+  adminDeleteCityPage: (id: string) => api.delete(`/seo/admin/city-pages/${id}`),
+
+  // Admin - SEO Config
+  adminGetConfigs: () => api.get('/seo/admin/configs'),
+  adminBulkUpsertConfigs: (configs: { key: string; value: string; label?: string; description?: string }[]) =>
+    api.post('/seo/admin/configs/bulk', { configs }),
+  adminUpsertConfig: (key: string, value: string) => api.patch(`/seo/admin/configs/${key}`, { value }),
+  adminDeleteConfig: (id: string) => api.delete(`/seo/admin/configs/${id}`),
+
+  // Admin - Footer Links
+  adminGetFooterGroups: () => api.get('/seo/admin/footer-groups'),
+  adminCreateFooterGroup: (data: any) => api.post('/seo/admin/footer-groups', data),
+  adminUpdateFooterGroup: (id: string, data: any) => api.patch(`/seo/admin/footer-groups/${id}`, data),
+  adminDeleteFooterGroup: (id: string) => api.delete(`/seo/admin/footer-groups/${id}`),
+  adminCreateFooterLink: (data: any) => api.post('/seo/admin/footer-links', data),
+  adminUpdateFooterLink: (id: string, data: any) => api.patch(`/seo/admin/footer-links/${id}`, data),
+  adminDeleteFooterLink: (id: string) => api.delete(`/seo/admin/footer-links/${id}`),
+};
+
 // ─── Home Analytics APIs ──────────────────────────────────────────────────────
 export const homeApi = {
   getTopCategories: (params?: { country?: string; state?: string; city?: string; limit?: number }) =>

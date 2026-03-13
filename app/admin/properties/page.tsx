@@ -238,6 +238,9 @@ export default function AdminPropertiesPage() {
       city: p.city || '',
       locality: p.locality || '',
       address: p.address || '',
+      slug: p.slug || '',
+      metaTitle: p.metaTitle || '',
+      metaDescription: p.metaDescription || '',
     });
     // Load states
     try {
@@ -737,6 +740,51 @@ export default function AdminPropertiesPage() {
                       <option value="premium">Premium</option>
                       <option value="featured">Featured</option>
                     </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* SEO */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">SEO & Slug</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      SEO Slug <span className="text-gray-400 font-normal">(URL-friendly, must be unique)</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-l-xl px-3 py-2 border-r-0">/properties/</span>
+                      <input
+                        value={editForm.slug}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, slug: e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') }))}
+                        placeholder="my-property-slug"
+                        className="flex-1 border border-gray-200 rounded-r-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                    </div>
+                    <p className="text-xs text-amber-600 mt-1">Warning: Changing slug will break existing links to this property.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Meta Title <span className="text-gray-400 font-normal">(max 200 chars)</span></label>
+                    <input
+                      value={editForm.metaTitle}
+                      onChange={(e) => setEditForm((f: any) => ({ ...f, metaTitle: e.target.value }))}
+                      maxLength={200}
+                      placeholder="SEO meta title..."
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                    <p className="text-right text-xs text-gray-400 mt-0.5">{(editForm.metaTitle || '').length}/200</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Meta Description <span className="text-gray-400 font-normal">(max 500 chars)</span></label>
+                    <textarea
+                      value={editForm.metaDescription}
+                      onChange={(e) => setEditForm((f: any) => ({ ...f, metaDescription: e.target.value }))}
+                      maxLength={500}
+                      rows={2}
+                      placeholder="SEO meta description..."
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                    />
+                    <p className="text-right text-xs text-gray-400 mt-0.5">{(editForm.metaDescription || '').length}/500</p>
                   </div>
                 </div>
               </div>

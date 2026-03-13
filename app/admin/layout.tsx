@@ -19,21 +19,56 @@ import {
   X,
   Tag,
   Layers,
+  FileText,
+  Link2,
+  Settings,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 
-const NAV_ITEMS = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/admin/properties', label: 'Properties', icon: Home },
-  { href: '/admin/agents', label: 'Agents', icon: Users },
-  { href: '/admin/users', label: 'Users', icon: Users },
-  { href: '/admin/categories', label: 'Categories', icon: Tag },
-  { href: '/admin/property-config', label: 'Property Config', icon: Layers },
-  { href: '/admin/countries', label: 'Countries', icon: Globe },
-  { href: '/admin/locations', label: 'Locations', icon: MapPin },
-  { href: '/admin/wallets', label: 'Wallets', icon: Wallet },
-  { href: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
-  { href: '/admin/payments', label: 'Payments', icon: Receipt },
+const NAV_GROUPS = [
+  {
+    label: 'Overview',
+    items: [
+      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+    ],
+  },
+  {
+    label: 'Listings',
+    items: [
+      { href: '/admin/properties', label: 'Properties', icon: Home },
+      { href: '/admin/categories', label: 'Categories', icon: Tag },
+      { href: '/admin/property-config', label: 'Property Config', icon: Layers },
+    ],
+  },
+  {
+    label: 'Users',
+    items: [
+      { href: '/admin/agents', label: 'Agents', icon: Users },
+      { href: '/admin/users', label: 'Users', icon: Users },
+    ],
+  },
+  {
+    label: 'SEO',
+    items: [
+      { href: '/admin/seo/footer-links', label: 'Footer SEO Links', icon: Link2 },
+      { href: '/admin/seo/config', label: 'SEO Config', icon: Settings },
+    ],
+  },
+  {
+    label: 'Locations',
+    items: [
+      { href: '/admin/countries', label: 'Countries', icon: Globe },
+      { href: '/admin/locations', label: 'States & Cities', icon: MapPin },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      { href: '/admin/wallets', label: 'Wallets', icon: Wallet },
+      { href: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
+      { href: '/admin/payments', label: 'Payments', icon: Receipt },
+    ],
+  },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -95,33 +130,39 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-2">
-          Main Menu
-        </p>
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
-                active
-                  ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <Icon
-                className={`w-4.5 h-4.5 flex-shrink-0 ${active ? 'text-white' : 'text-slate-500 group-hover:text-white'}`}
-                size={18}
-              />
-              <span className="flex-1">{item.label}</span>
-              {active && <ChevronRight className="w-3.5 h-3.5 text-white/60" />}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 py-4 px-3 space-y-4 overflow-y-auto">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-1.5">
+              {group.label}
+            </p>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
+                      active
+                        ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    <Icon
+                      className={`w-4.5 h-4.5 flex-shrink-0 ${active ? 'text-white' : 'text-slate-500 group-hover:text-white'}`}
+                      size={18}
+                    />
+                    <span className="flex-1">{item.label}</span>
+                    {active && <ChevronRight className="w-3.5 h-3.5 text-white/60" />}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* User Info */}
