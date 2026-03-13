@@ -50,7 +50,7 @@ export default function AdminCommissionsPage() {
   const doApprove = async (id: string) => {
     setActionLoading(id + '_approve');
     try {
-      await commissionsApi.approve(id, {});
+      await commissionsApi.approve(id);
       load();
     } catch (e: any) {
       alert(e?.response?.data?.message || 'Failed');
@@ -64,7 +64,7 @@ export default function AdminCommissionsPage() {
     if (!ref) return;
     setActionLoading(id + '_pay');
     try {
-      await commissionsApi.markPaid(id, { paymentReference: ref, paymentMethod: 'bank_transfer' });
+      await commissionsApi.markPaid(id, { paymentReference: ref });
       load();
     } catch (e: any) {
       alert(e?.response?.data?.message || 'Failed');
