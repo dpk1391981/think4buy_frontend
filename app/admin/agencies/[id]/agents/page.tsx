@@ -50,7 +50,7 @@ export default function AgencyAgentsPage() {
     if (!q.trim()) { setSearchResults([]); return; }
     setSearching(true);
     try {
-      const r = await agencyApi.adminGetAgentProfiles({ search: q, limit: 10, unassigned: true });
+      const r = await agencyApi.adminGetAgentProfiles({ search: q, limit: 10 });
       setSearchResults(r.data?.items ?? r.data ?? []);
     } catch {
       setSearchResults([]);
