@@ -10,13 +10,14 @@ const navItems = [
   { href: '/agent', label: 'Dashboard', icon: '📊', exact: true },
   { href: '/agent/listings', label: 'My Listings', icon: '🏠' },
   { href: '/agent/inquiries', label: 'Inquiries', icon: '💬' },
+  { href: '/agent/agency', label: 'My Agency', icon: '🏢' },
   { href: '/agent/wallet', label: 'Wallet', icon: '💰' },
   { href: '/agent/subscription', label: 'Subscription', icon: '⭐' },
   { href: '/agent/analytics', label: 'Analytics', icon: '📈' },
   { href: '/agent/profile', label: 'Profile', icon: '👤' },
 ];
 
-const ALLOWED_ROLES = ['agent', 'seller', 'admin'];
+const ALLOWED_ROLES = ['agent', 'owner', 'seller', 'admin'];
 
 export default function AgentLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

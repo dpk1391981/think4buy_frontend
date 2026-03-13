@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { adminApi } from '@/lib/api';
-import { MapPin, ExternalLink, Pencil, UserCheck, UserX } from 'lucide-react';
+import { MapPin, ExternalLink, Pencil, UserCheck, UserX, Building2 } from 'lucide-react';
 
 const TICK_BADGE: Record<string, { label: string; cls: string }> = {
   blue:    { label: '✓ Verified', cls: 'bg-blue-100 text-blue-700'     },
@@ -107,7 +107,7 @@ export default function AdminAgentsPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {['Agent', 'Location', 'Company / RERA', 'Listings Quota', 'Rating', 'Status', 'Actions'].map(h => (
+                  {['Agent', 'Agency', 'Location', 'Company / RERA', 'Listings Quota', 'Rating', 'Status', 'Actions'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                       {h}
                     </th>
@@ -141,6 +141,21 @@ export default function AdminAgentsPage() {
                             {agent.phone && <div className="text-gray-400 text-xs">{agent.phone}</div>}
                           </div>
                         </div>
+                      </td>
+
+                      {/* Agency */}
+                      <td className="px-4 py-3">
+                        {agent.agencyName ? (
+                          <Link
+                            href={`/admin/agencies/${agent.agencyId}/agents`}
+                            className="flex items-center gap-1.5 text-xs text-blue-700 hover:underline"
+                          >
+                            <Building2 className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                            <span className="truncate max-w-[120px]">{agent.agencyName}</span>
+                          </Link>
+                        ) : (
+                          <span className="text-gray-300 text-xs">— No agency</span>
+                        )}
                       </td>
 
                       {/* Location */}

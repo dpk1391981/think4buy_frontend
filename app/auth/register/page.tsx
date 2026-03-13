@@ -7,7 +7,7 @@ import { Home, Loader2, Eye, EyeOff, CheckCircle, User, Mail, Phone, Lock, Arrow
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
-type UserType = 'buyer' | 'seller' | 'agent';
+type UserType = 'owner' | 'agent';
 
 interface FormData {
   name: string;
@@ -20,9 +20,8 @@ interface FormData {
 }
 
 const USER_TYPES: { value: UserType; label: string; desc: string; icon: string }[] = [
-  { value: 'buyer',  label: 'Buyer',  desc: 'Looking to buy or rent',  icon: '🏠' },
-  { value: 'seller', label: 'Seller', desc: 'Want to sell or rent out', icon: '🔑' },
-  { value: 'agent',  label: 'Agent',  desc: 'Real estate professional', icon: '🤝' },
+  { value: 'owner', label: 'Owner',  desc: 'I own property to sell/rent', icon: '🏠' },
+  { value: 'agent', label: 'Agent',  desc: 'Real estate professional',     icon: '🤝' },
 ];
 
 function PasswordStrength({ password }: { password: string }) {
@@ -69,7 +68,7 @@ export default function RegisterPage() {
     phone: '',
     password: '',
     confirmPassword: '',
-    userType: 'buyer',
+    userType: 'owner',
     agreeToTerms: false,
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -161,7 +160,7 @@ export default function RegisterPage() {
             {/* User type selector */}
             <div className="bg-gradient-to-br from-primary-600 to-primary-700 p-5">
               <p className="text-white/80 text-xs font-semibold uppercase tracking-wider mb-3">I am a...</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 {USER_TYPES.map((t) => (
                   <button
                     key={t.value}

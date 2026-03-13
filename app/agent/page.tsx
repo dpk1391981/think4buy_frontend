@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { agentApi, walletApi, subscriptionApi } from '@/lib/api';
+import { agentApi, walletApi, subscriptionApi, agencyApi } from '@/lib/api';
 import { formatPrice, timeAgo } from '@/lib/utils';
 
 interface DashboardStats {
@@ -72,17 +72,19 @@ export default function AgentDashboard() {
   const [recentInquiries, setRecentInquiries] = useState<Inquiry[]>([]);
   const [recentListings, setRecentListings] = useState<Listing[]>([]);
   const [subscription, setSubscription] = useState<ActiveSubscription | null>(null);
+  const [agency, setAgency] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [statsRes, inquiriesRes, listingsRes, walletRes, subRes] = await Promise.allSettled([
+        const [statsRes, inquiriesRes, listingsRes, walletRes, subRes, agencyRes] = await Promise.allSettled([
           agentApi.getDashboardStats(),
           agentApi.getMyInquiries({ page: 1, limit: 5 }),
           agentApi.getMyListings({ page: 1, limit: 5 }),
           walletApi.getWallet(),
           subscriptionApi.getCurrent(),
+          agencyApi.getMyAgency(),
         ]);
 
         if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
@@ -104,6 +106,11 @@ export default function AgentDashboard() {
         }
         if (subRes.status === 'fulfilled' && subRes.value.data?.current) {
           setSubscription(subRes.value.data.current);
+        }
+        if (agencyRes.status === 'fulfilled' && agencyRes.value.data) {
+          // backend may return the agency directly or wrapped in { agency }
+          const agencyData = agencyRes.value.data;
+          setAgency(agencyData.agency ?? (agencyData.id ? agencyData : null));
         }
       } catch (e) {
         console.error(e);
@@ -172,6 +179,32 @@ export default function AgentDashboard() {
           </div>
           <Link href="/agent/subscription" className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
             View Plans
+          </Link>
+        </div>
+      )}
+
+      {/* Agency Banner */}
+      {agency && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6 flex items-center gap-4">
+          {agency.logo ? (
+            <img src={agency.logo} alt={agency.name} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+              {agency.name?.slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-gray-800 text-sm truncate">{agency.name}</span>
+              {agency.isVerified && <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">✓ Verified</span>}
+            </div>
+            <div className="text-xs text-gray-500 mt-0.5">{agency.totalAgents ?? 0} agents · {agency.totalListings ?? 0} listings</div>
+          </div>
+          <Link
+            href="/agent/agency"
+            className="text-xs px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg font-medium transition-colors flex-shrink-0"
+          >
+            View Agency
           </Link>
         </div>
       )}

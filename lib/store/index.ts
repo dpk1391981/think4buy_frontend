@@ -7,6 +7,7 @@ import agentsReducer from './slices/agentsSlice';
 import locationsReducer from './slices/locationsSlice';
 import adminReducer from './slices/adminSlice';
 import seoReducer from './slices/seoSlice';
+import agencyReducer from './slices/agencySlice';
 
 export const store = configureStore({
   reducer: {
@@ -17,6 +18,7 @@ export const store = configureStore({
     locations: locationsReducer,
     admin: adminReducer,
     seo: seoReducer,
+    agency: agencyReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({ serializableCheck: false }),

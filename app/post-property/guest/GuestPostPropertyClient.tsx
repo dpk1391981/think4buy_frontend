@@ -13,9 +13,8 @@ import { cn } from '@/lib/utils';
 
 // ── User type options (like 99acres) ──────────────────────────────────────────
 const USER_TYPES = [
-  { value: 'owner',   icon: '🏠', label: 'Owner',           sub: 'I own this property' },
-  { value: 'agent',   icon: '🤝', label: 'Agent / Broker',  sub: 'I represent owner' },
-  { value: 'builder', icon: '🏗️', label: 'Builder',         sub: 'New construction' },
+  { value: 'owner', icon: '🏠', label: 'Owner',          sub: 'I own this property' },
+  { value: 'agent', icon: '🤝', label: 'Agent / Broker', sub: 'I represent owner' },
 ];
 
 const STATS = [
@@ -144,7 +143,7 @@ export default function GuestPostPropertyPage() {
 
                   {/* I am */}
                   <p className="text-sm font-semibold text-gray-700 mb-2">I am a…</p>
-                  <div className="grid grid-cols-3 gap-2 mb-5">
+                  <div className="grid grid-cols-2 gap-2 mb-5">
                     {USER_TYPES.map((ut) => (
                       <button
                         key={ut.value}
@@ -352,7 +351,7 @@ export default function GuestPostPropertyPage() {
       {/* ── SEO content ── */}
       <section className="py-10 container-max max-w-3xl text-center">
         <p className="text-gray-400 text-sm leading-relaxed">
-          Think4BuySale is India's trusted free property listing portal. Whether you're an owner, agent, or builder —
+          Think4BuySale is India's trusted free property listing portal. Whether you're an owner or agent —
           list residential & commercial properties across Mumbai, Delhi, Bangalore, Pune, Hyderabad, Chennai, and 50+ cities.
           Zero commission, instant listing, verified buyer leads.
         </p>

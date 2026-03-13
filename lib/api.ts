@@ -259,6 +259,57 @@ export const propConfigAdminApi = {
     api.post(`/property-config/admin/types/${typeId}/fields/reorder`, { orderedIds }),
 };
 
+// ── Agency & Agent Profile APIs ───────────────────────────────────────────────
+export const agencyApi = {
+  // Public
+  getAgencies: (params?: { page?: number; limit?: number; search?: string; cityId?: string }) =>
+    api.get('/agency', { params }),
+  getAgency: (id: string) => api.get(`/agency/${id}`),
+  getAgencyAgents: (id: string, params?: { page?: number; limit?: number }) =>
+    api.get(`/agency/${id}/agents`, { params }),
+  getAgentsByCity: (cityId: string, params?: { page?: number; limit?: number }) =>
+    api.get(`/agency/agents/by-city/${cityId}`, { params }),
+  getPropertiesByAgent: (agentId: string, params?: { page?: number; limit?: number }) =>
+    api.get(`/agency/agent/${agentId}/properties`, { params }),
+
+  // Agent (my)
+  getMyDashboard: () => api.get('/agency/me/dashboard'),
+  getAgentDashboard: () => api.get('/agency/me/dashboard'),
+  getMyAgency: () => api.get('/agency/me/agency'),
+  getMyProperties: (params?: { page?: number; limit?: number }) =>
+    api.get('/agency/me/properties', { params }),
+  getMyLocations: () => api.get('/agency/me/locations'),
+
+  // Admin — Agencies
+  adminCreateAgency: (data: any) => api.post('/agency/admin/agencies', data),
+  adminUpdateAgency: (id: string, data: any) => api.patch(`/agency/admin/agencies/${id}`, data),
+  adminDeleteAgency: (id: string) => api.delete(`/agency/admin/agencies/${id}`),
+
+  // Admin — Agent Profiles
+  adminGetAgentProfiles: (params?: { search?: string; limit?: number; unassigned?: boolean }) =>
+    api.get('/agency/admin/agent-profiles', { params }),
+  adminCreateAgentProfile: (data: any) => api.post('/agency/admin/agent-profiles', data),
+  adminUpdateAgentProfile: (id: string, data: any) =>
+    api.patch(`/agency/admin/agent-profiles/${id}`, data),
+  adminAssignAgentToAgency: (profileId: string, agencyId: string | null) =>
+    api.patch(`/agency/admin/agent-profiles/${profileId}/assign-agency`, { agencyId }),
+  adminGetAgentProfile: (id: string) => api.get(`/agency/admin/agent-profiles/${id}`),
+
+  // Admin — Property Assignment
+  adminAssignProperty: (data: { propertyId: string; agentId: string; assignedByAdmin?: boolean }) =>
+    api.post('/agency/admin/property-assignments', data),
+  adminReassignProperty: (propertyId: string, newAgentId: string) =>
+    api.patch(`/agency/admin/property-assignments/${propertyId}/reassign`, { newAgentId }),
+  adminGetPropertyAgent: (propertyId: string) =>
+    api.get(`/agency/admin/property-assignments/${propertyId}`),
+
+  // Admin — Agent Locations
+  adminAddAgentLocation: (agentProfileId: string, data: { countryId?: string; stateId?: string; cityId?: string }) =>
+    api.post(`/agency/admin/agent-profiles/${agentProfileId}/locations`, data),
+  adminRemoveAgentLocation: (locationMapId: string) =>
+    api.delete(`/agency/admin/agent-locations/${locationMapId}`),
+};
+
 // Subscription (Agent)
 export const subscriptionApi = {
   getPlans: () => api.get('/wallet/subscription-plans'),

@@ -22,6 +22,8 @@ import {
   FileText,
   Link2,
   Settings,
+  Building2,
+  UserCheck,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 
@@ -41,10 +43,16 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: 'Agencies',
+    items: [
+      { href: '/admin/agencies', label: 'Agencies', icon: Building2 },
+      { href: '/admin/agents', label: 'Agents', icon: UserCheck },
+    ],
+  },
+  {
     label: 'Users',
     items: [
-      { href: '/admin/agents', label: 'Agents', icon: Users },
-      { href: '/admin/users', label: 'Users', icon: Users },
+      { href: '/admin/users', label: 'All Users', icon: Users },
     ],
   },
   {
