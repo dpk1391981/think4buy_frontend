@@ -21,6 +21,9 @@ export default function MobileBottomNav() {
   const { user } = useAuth();
   const dispatch = useAppDispatch();
 
+  // Hide on admin/agent panel pages — those layouts have their own mobile nav
+  if (pathname.startsWith('/admin') || pathname === '/agent' || pathname.startsWith('/agent/')) return null;
+
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 safe-bottom">
       <div className="flex items-center justify-around h-16 px-1">

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+import ConditionalFooter from '@/components/layout/ConditionalFooter';
 import MobileBottomNav from '@/components/layout/MobileBottomNav';
 import QueryProvider from '@/components/providers/QueryProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -93,7 +93,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AuthProvider>
               <Header />
               <main className="min-h-screen pb-safe-nav md:pb-0">{children}</main>
-              <Footer />
+              <ConditionalFooter />
               <MobileBottomNav />
               <MobileGuestLoginPrompt />
               <AuthModal />

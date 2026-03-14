@@ -407,6 +407,7 @@ function UserMenu({ compact = false }: { compact?: boolean }) {
 export default function Header() {
   const { user, loading } = useAuth();
   const dispatch = useAppDispatch();
+  const pathname = usePathname();
   const [megaOpen, setMegaOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
@@ -427,6 +428,10 @@ export default function Header() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Hide on admin/agent panel pages — those layouts have their own top bar
+  const isPanel = pathname.startsWith('/admin') || pathname === '/agent' || pathname.startsWith('/agent/');
+  if (isPanel) return null;
 
   return (
     <header
