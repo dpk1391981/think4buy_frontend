@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { MessageCircle, Phone, Mail, Send, CheckCircle, User } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { MessageCircle, Phone, Mail, Send, CheckCircle, User, LogIn } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { inquiriesApi } from '@/lib/api';
 
@@ -21,11 +23,13 @@ export default function AgentContactForm({
   propertyId,
 }: Props) {
   const { user } = useAuth();
+  const pathname = usePathname();
 
   const [form, setForm] = useState({ name: '', phone: '', message: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted]   = useState(false);
-  const [error, setError]           = useState('');
+  const [submitting, setSubmitting]     = useState(false);
+  const [submitted, setSubmitted]       = useState(false);
+  const [error, setError]               = useState('');
+  const [showLoginGate, setShowLoginGate] = useState(false);
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -36,6 +40,12 @@ export default function AgentContactForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    // Require login before sending
+    if (!user) {
+      setShowLoginGate(true);
+      return;
+    }
 
     if (!name.trim()) { setError('Please enter your name.'); return; }
     if (!phone.trim()) { setError('Please enter your phone number.'); return; }
@@ -89,7 +99,7 @@ export default function AgentContactForm({
           <MessageCircle className="w-5 h-5" />
           <div>
             <h3 className="font-bold text-sm">Contact {agentName.split(' ')[0]}</h3>
-            <p className="text-primary-200 text-xs">Free consultation · No registration needed</p>
+            <p className="text-primary-200 text-xs">Free consultation · Quick login required</p>
           </div>
         </div>
       </div>
@@ -116,9 +126,12 @@ export default function AgentContactForm({
         )}
       </div>
 
-      {/* Form — no login needed */}
+      {/* Form */}
       <form onSubmit={handleSubmit} className="p-4 space-y-3">
-        <p className="text-xs text-gray-400 text-center mb-1">or send a message — no login required</p>
+        <p className="text-xs text-gray-400 text-center mb-1">or send a message</p>
+
+        {/* Form fields — hidden once login gate is shown */}
+        {!showLoginGate && <>
 
         {/* Name */}
         <div className="relative">
@@ -183,9 +196,42 @@ export default function AgentContactForm({
           )}
         </button>
 
-        <p className="text-[10px] text-gray-400 text-center leading-relaxed">
-          Your details are shared only with {agentName.split(' ')[0]}. We never sell your data.
-        </p>
+        </>}
+
+        {!showLoginGate && (
+          <p className="text-[10px] text-gray-400 text-center leading-relaxed">
+            Your details are shared only with {agentName.split(' ')[0]}. We never sell your data.
+          </p>
+        )}
+
+        {/* Login gate — shown after guest tries to submit */}
+        {showLoginGate && (
+          <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 text-center space-y-3">
+            <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center mx-auto">
+              <LogIn className="w-5 h-5 text-primary-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Login to send your message</p>
+              <p className="text-xs text-gray-500 mt-0.5">Create a free account or login to contact {agentName.split(' ')[0]}</p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Link
+                href={`/auth/login?redirect=${encodeURIComponent(pathname)}`}
+                className="flex items-center justify-center gap-2 py-2.5 bg-primary-600 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 transition-colors"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                Login / Sign up Free
+              </Link>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowLoginGate(false)}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              ← Back to message
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

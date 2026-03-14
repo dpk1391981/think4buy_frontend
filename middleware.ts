@@ -25,7 +25,7 @@ const PRIVATE_PREFIXES = [
   '/dashboard',
   '/profile',
   '/my-listings',
-  '/agent',
+  '/agent/',
   '/admin',
 ];
 
