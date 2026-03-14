@@ -1,4 +1,10 @@
 /** @type {import('next').NextConfig} */
+
+// Extract just the origin from the API URL for CSP (works even if the full path is given)
+const _apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+let _apiOrigin = 'http://localhost:3001';
+try { _apiOrigin = new URL(_apiUrl).origin; } catch {}
+
 const nextConfig = {
   // ─── Image Optimization ──────────────────────────────────────────────────
   images: {
@@ -98,8 +104,8 @@ const nextConfig = {
               "img-src 'self' data: blob: https: http://localhost:3001",
               // Fonts
               "font-src 'self' https://fonts.gstatic.com",
-              // API calls: self (proxied) + backend direct (for SSR)
-              `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'} ws: wss:`,
+              // API calls: self (proxied) + backend origin
+              `connect-src 'self' ${_apiOrigin} ws: wss:`,
               // No plugins
               "object-src 'none'",
               // iframes (maps)
