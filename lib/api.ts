@@ -8,14 +8,68 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Add token to requests if available
+// Attach stored JWT to every request
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
+    if (token && token !== 'undefined' && token !== 'null') {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
   }
   return config;
 });
+
+// 401 auto-refresh: try /auth/refresh (uses HTTP-only `rt` cookie) once, then give up
+let isRefreshing = false;
+let refreshQueue: Array<(token: string) => void> = [];
+
+api.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const original = error.config;
+    if (
+      error.response?.status === 401 &&
+      !original._retry &&
+      typeof window !== 'undefined' &&
+      !original.url?.includes('/auth/refresh') &&
+      !original.url?.includes('/auth/login') &&
+      !original.url?.includes('/auth/otp')
+    ) {
+      original._retry = true;
+
+      if (isRefreshing) {
+        return new Promise((resolve) => {
+          refreshQueue.push((token) => {
+            original.headers.Authorization = `Bearer ${token}`;
+            resolve(api(original));
+          });
+        });
+      }
+
+      isRefreshing = true;
+      try {
+        const { data } = await api.post('/auth/refresh', {}, { withCredentials: true });
+        const newToken = data.token || data.accessToken;
+        if (newToken) {
+          localStorage.setItem('token', newToken);
+          api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
+          refreshQueue.forEach((cb) => cb(newToken));
+          refreshQueue = [];
+          original.headers.Authorization = `Bearer ${newToken}`;
+          return api(original);
+        }
+      } catch {
+        // Refresh failed — clear auth and let the page handle redirect
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
+      } finally {
+        isRefreshing = false;
+      }
+    }
+    return Promise.reject(error);
+  },
+);
 
 // Properties
 export const propertiesApi = {
@@ -57,6 +111,9 @@ export const authApi = {
   sendOtp: (phone: string) => api.post('/auth/otp/send', { phone }),
   verifyOtp: (phone: string, otp: string, name?: string) =>
     api.post('/auth/otp/verify', { phone, otp, name }),
+  completeOnboarding: (data: { role: string; name?: string; agentLicense?: string; agentExperience?: number }) =>
+    api.patch('/auth/onboarding', data),
+  upgradeRole: (role: 'owner' | 'agent') => api.patch('/auth/upgrade-role', { role }),
 };
 
 // Locations
@@ -67,6 +124,8 @@ export const locationsApi = {
     api.get('/locations/localities', { params: { city } }),
   getStates: () => api.get('/locations/states'),
   getCitiesByState: (stateId: string) => api.get(`/locations/states/${stateId}/cities`),
+  getSeoContent: (params: { city?: string; state?: string }) =>
+    api.get('/locations/seo', { params }),
 };
 
 // Inquiries
@@ -168,6 +227,7 @@ export const adminPlansApi = {
 
 // Users / Agents (public)
 export const usersApi = {
+  getStats: () => api.get<{ totalAgents: number }>('/users/stats'),
   getAgents: (params?: {
     page?: number;
     limit?: number;
@@ -288,10 +348,19 @@ export const agencyApi = {
     api.get('/agency/me/properties', { params }),
   getMyLocations: () => api.get('/agency/me/locations'),
 
+  // Agent self-registration
+  selfRegisterOrJoin: (data: { agencyName: string; contactPhone?: string; address?: string; city?: string; cityId?: string }) =>
+    api.post('/agency/self/register-or-join', data),
+
   // Admin — Agencies
   adminCreateAgency: (data: any) => api.post('/agency/admin/agencies', data),
   adminUpdateAgency: (id: string, data: any) => api.patch(`/agency/admin/agencies/${id}`, data),
   adminDeleteAgency: (id: string) => api.delete(`/agency/admin/agencies/${id}`),
+  adminGetPendingAgencies: (params?: { page?: number; limit?: number }) =>
+    api.get('/admin/agencies', { params: { ...params, status: 'pending' } }),
+  adminApproveAgency: (id: string) => api.patch(`/admin/agencies/${id}/approve`),
+  adminRejectAgency: (id: string, reason?: string) =>
+    api.patch(`/admin/agencies/${id}/reject`, { reason }),
 
   // Admin — Agent Profiles
   adminGetAgentProfiles: (params?: { search?: string; limit?: number; unassigned?: boolean }) =>
@@ -358,6 +427,8 @@ export const seoApi = {
 
 // ─── Leads API ───────────────────────────────────────────────────────────────
 export const leadsApi = {
+  /** Public — no auth required */
+  capturePublic: (data: Record<string, any>) => api.post('/leads/public', data),
   create: (data: any) => api.post('/leads', data),
   getAll: (params?: Record<string, any>) => api.get('/leads', { params }),
   getMy: (params?: Record<string, any>) => api.get('/leads/my', { params }),

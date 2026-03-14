@@ -124,9 +124,25 @@
     @apply font-bold text-gray-900;
   }
 
-  /* Skeleton loader */
+  /* Skeleton loader — base pulse */
   .skeleton {
     @apply animate-pulse bg-gray-200 rounded;
+  }
+
+  /* Shimmer skeleton — directional sweep for richer feel */
+  .skeleton-shimmer {
+    @apply rounded;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-sweep 1.6s ease-in-out infinite;
+  }
+
+  /* Dark shimmer variant (e.g. over dark backgrounds) */
+  .skeleton-shimmer-dark {
+    @apply rounded;
+    background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.14) 50%, rgba(255,255,255,0.06) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-sweep 1.6s ease-in-out infinite;
   }
 }
 
@@ -168,6 +184,12 @@
 }
 button, a, [role="button"] {
   touch-action: manipulation;
+}
+
+/* ── Skeleton sweep animation ───────────────────────────────────────── */
+@keyframes skeleton-sweep {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
 }
 
 /* ── Golden FREE badge shimmer ───────────────────────────────────────── */

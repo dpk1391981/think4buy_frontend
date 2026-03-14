@@ -98,6 +98,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
+    // Clear stale undefined/null tokens that may have been stored by older code
+    const storedToken = localStorage.getItem('token');
+    if (!storedToken || storedToken === 'undefined' || storedToken === 'null') {
+      localStorage.removeItem('token');
+      router.replace('/auth/login?redirect=/admin');
+      return;
+    }
+
     authApi
       .getProfile()
       .then((r) => {
@@ -108,7 +116,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           setLoading(false);
         }
       })
-      .catch(() => router.replace('/auth/login'));
+      .catch(() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
+        router.replace('/auth/login?redirect=/admin');
+      });
   }, [router]);
 
   if (loading) {
@@ -206,6 +219,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <button
             onClick={() => {
               localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
               router.push('/auth/login');
             }}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-red-400 hover:bg-red-950/30 transition-all"

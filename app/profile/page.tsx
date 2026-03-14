@@ -1,23 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { User, Phone, Mail, MapPin, Building, Shield, Camera, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { authApi } from '@/lib/api';
+import AuthGuard from '@/components/auth/AuthGuard';
 
-export default function ProfilePage() {
-  const { user, loading: authLoading, refresh } = useAuth();
-  const router = useRouter();
+function ProfileContent() {
+  const { user, refresh } = useAuth();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', city: '', company: '' });
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !user) router.push('/auth/login');
     if (user) setForm({ name: user.name || '', email: user.email || '', city: user.city || '', company: user.company || '' });
-  }, [user, authLoading, router]);
+  }, [user]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -33,10 +31,6 @@ export default function ProfilePage() {
       setSaving(false);
     }
   };
-
-  if (authLoading || !user) {
-    return <div className="min-h-screen bg-gray-50 pt-16 flex items-center justify-center"><div className="skeleton w-8 h-8 rounded-full" /></div>;
-  }
 
   const initials = user.name?.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'U';
 
@@ -141,5 +135,13 @@ export default function ProfilePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <AuthGuard>
+      <ProfileContent />
+    </AuthGuard>
   );
 }

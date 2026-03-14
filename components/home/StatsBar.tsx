@@ -1,37 +1,44 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { Building2, Home, Key, Briefcase } from 'lucide-react';
-import { propertiesApi } from '@/lib/api';
+import { useAppDispatch, useAppSelector } from '@/lib/store';
+import { fetchPlatformStats } from '@/lib/store/slices/statsSlice';
+
+function fmt(n: number): string {
+  return n > 0 ? `${n.toLocaleString('en-IN')}+` : '—';
+}
 
 export default function StatsBar() {
-  const { data: stats } = useQuery({
-    queryKey: ['property-stats'],
-    queryFn: () => propertiesApi.getStats().then((r) => r.data),
-  });
+  const dispatch = useAppDispatch();
+  const { data: stats, loading } = useAppSelector((s) => s.stats);
+
+  useEffect(() => {
+    dispatch(fetchPlatformStats() as any);
+  }, [dispatch]);
 
   const items = [
     {
       icon: Building2,
-      value: stats?.total ? `${stats.total.toLocaleString('en-IN')}+` : '50,000+',
+      value: stats ? fmt(stats.total)       : loading ? '…' : '—',
       label: 'Total Properties',
       color: 'text-blue-600',
     },
     {
       icon: Home,
-      value: stats?.forSale ? `${stats.forSale.toLocaleString('en-IN')}+` : '28,000+',
+      value: stats ? fmt(stats.forSale)     : loading ? '…' : '—',
       label: 'Properties for Sale',
       color: 'text-green-600',
     },
     {
       icon: Key,
-      value: stats?.forRent ? `${stats.forRent.toLocaleString('en-IN')}+` : '18,000+',
+      value: stats ? fmt(stats.forRent)     : loading ? '…' : '—',
       label: 'Properties for Rent',
       color: 'text-purple-600',
     },
     {
       icon: Briefcase,
-      value: '50+',
+      value: stats ? fmt(stats.totalCities) : loading ? '…' : '—',
       label: 'Cities Covered',
       color: 'text-orange-600',
     },

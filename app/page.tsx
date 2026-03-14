@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import {
   Building2,
   TrendingUp,
@@ -8,21 +9,27 @@ import {
   ArrowRight,
   Star,
   CheckCircle2,
-  Home,
-  Users,
-  Award,
-  BarChart3,
 } from 'lucide-react';
 import HomeSearchPanel from '@/components/home/HomeSearchPanel';
+import JsonLd, { buildWebSiteSchema, buildOrganizationSchema } from '@/components/seo/JsonLd';
+
+// ─── Above-the-fold: import directly ─────────────────────────────────────────
 import FeaturedProperties from '@/components/home/FeaturedProperties';
-import CityExplorer from '@/components/home/CityExplorer';
-import ServicesBanner from '@/components/home/ServicesBanner';
-import StatsBar from '@/components/home/StatsBar';
-import TopAgents from '@/components/home/TopAgents';
-import TopNewProjects from '@/components/home/TopNewProjects';
-import HomeLocationSelector from '@/components/home/HomeLocationSelector';
 import StateExplorer from '@/components/home/StateExplorer';
-import TopCategories from '@/components/home/TopCategories';
+import HomeLocationSelector from '@/components/home/HomeLocationSelector';
+import PlatformStatsCards from '@/components/home/PlatformStatsCards';
+import CTAStatsText from '@/components/home/CTAStatsText';
+
+// ─── Below-the-fold: lazy-load with next/dynamic ─────────────────────────────
+// These components are large, data-heavy, or not needed for LCP.
+// next/dynamic splits them into separate JS chunks loaded on demand.
+const TopCategories   = dynamic(() => import('@/components/home/TopCategories'),   { ssr: true });
+const TopAgents       = dynamic(() => import('@/components/home/TopAgents'),        { ssr: true });
+const TopNewProjects  = dynamic(() => import('@/components/home/TopNewProjects'),   { ssr: true });
+const ServicesBanner  = dynamic(() => import('@/components/home/ServicesBanner'),   { ssr: true });
+
+// Non-critical / purely decorative sections — defer to client
+const StatsBar        = dynamic(() => import('@/components/home/StatsBar'),         { ssr: false });
 
 export const metadata: Metadata = {
   title: 'Think4BuySale – Buy, Rent & Sell Properties in India',
@@ -56,16 +63,9 @@ const PROPERTY_CATEGORIES = [
 
 const WHY_US = [
   { icon: Shield, title: 'Verified Listings', desc: 'All properties verified by our expert team.', color: 'bg-blue-50 text-blue-600' },
-  { icon: Building2, title: '50,000+ Properties', desc: 'Largest database across 50+ Indian cities.', color: 'bg-green-50 text-green-600' },
+  { icon: Building2, title: 'Largest Database', desc: 'Thousands of properties across Indian cities.', color: 'bg-green-50 text-green-600' },
   { icon: TrendingUp, title: 'Best Prices', desc: 'Compare and get the best market deals.', color: 'bg-orange-50 text-orange-600' },
   { icon: HeadphonesIcon, title: '24/7 Support', desc: 'Expert team available round-the-clock.', color: 'bg-purple-50 text-purple-600' },
-];
-
-const PLATFORM_STATS = [
-  { value: '50,000+', label: 'Active Listings', icon: Home },
-  { value: '2,000+', label: 'Verified Agents', icon: Users },
-  { value: '15,000+', label: 'Happy Buyers', icon: Award },
-  { value: '98%', label: 'Satisfaction Rate', icon: BarChart3 },
 ];
 
 export default function HomePage() {
@@ -136,17 +136,7 @@ export default function HomePage() {
       {/* ─── Platform Stats ───────────────────────────────────────────────── */}
       <section className="py-3 sm:py-8 bg-gray-50">
         <div className="container-max">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
-            {PLATFORM_STATS.map(({ value, label, icon: Icon }) => (
-              <div key={label} className="bg-white rounded-2xl p-3 sm:p-5 text-center border border-gray-100 shadow-sm">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-primary-50 rounded-xl flex items-center justify-center mx-auto mb-2 sm:mb-3">
-                  <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
-                </div>
-                <div className="text-xl sm:text-2xl font-bold text-gray-900">{value}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{label}</div>
-              </div>
-            ))}
-          </div>
+          <PlatformStatsCards />
         </div>
       </section>
 
@@ -248,10 +238,7 @@ export default function HomePage() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
         <div className="container-max text-center relative z-10 px-4">
-          <div className="inline-flex items-center gap-2 bg-white/10 text-white/80 text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded-full mb-3 sm:mb-4">
-            <Star className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-yellow-400 text-yellow-400" />
-            Join 50,000+ property seekers
-          </div>
+          <CTAStatsText />
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2 sm:mb-3">
             List Your Property for <span className="text-yellow-400">FREE</span>
           </h2>
@@ -275,26 +262,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* JSON-LD */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'WebSite',
-            name: 'Think4BuySale',
-            url: process.env.NEXT_PUBLIC_APP_URL,
-            potentialAction: {
-              '@type': 'SearchAction',
-              target: {
-                '@type': 'EntryPoint',
-                urlTemplate: `${process.env.NEXT_PUBLIC_APP_URL}/properties?search={search_term_string}`,
-              },
-              'query-input': 'required name=search_term_string',
-            },
-          }),
-        }}
-      />
+      {/* Structured data for Google rich results */}
+      <JsonLd schema={[
+        buildWebSiteSchema(process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com'),
+        buildOrganizationSchema(process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com'),
+      ]} />
     </>
   );
 }

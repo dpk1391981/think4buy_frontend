@@ -7,7 +7,8 @@ import {
   MapPin, Loader2, Building2, Home, Factory,
   Zap, Info, Camera, Eye, ChevronRight,
 } from 'lucide-react';
-import { propertiesApi, locationsApi, propertyConfigApi } from '@/lib/api';
+import { propertiesApi, locationsApi, propertyConfigApi, authApi, agencyApi } from '@/lib/api';
+import AuthGuard from '@/components/auth/AuthGuard';
 import { detectLocation } from '@/lib/geolocation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
@@ -190,6 +191,180 @@ function DynamicField({ field, value, onChange }: {
           <span className="text-sm text-gray-700">{field.placeholder || field.fieldLabel}</span>
         </label>
       )}
+    </div>
+  );
+}
+
+// ─── Buyer Role Selection Screen ──────────────────────────────────────────────
+
+function BuyerRoleSelectionScreen({
+  onRoleSelected,
+}: {
+  onRoleSelected: (role: 'owner' | 'agent', agencyData?: { agencyName: string; contactPhone?: string; address?: string }) => void;
+}) {
+  const [selectedRole, setSelectedRole] = useState<'owner' | 'agent' | null>(null);
+  const [agencyName, setAgencyName] = useState('');
+  const [agencyPhone, setAgencyPhone] = useState('');
+  const [agencyAddress, setAgencyAddress] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const canProceed =
+    selectedRole === 'owner' ||
+    (selectedRole === 'agent' && agencyName.trim().length > 0);
+
+  async function handleConfirm() {
+    if (!selectedRole || loading) return;
+    setLoading(true);
+    setError('');
+    try {
+      onRoleSelected(
+        selectedRole,
+        selectedRole === 'agent'
+          ? { agencyName: agencyName.trim(), contactPhone: agencyPhone.trim() || undefined, address: agencyAddress.trim() || undefined }
+          : undefined,
+      );
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Something went wrong. Please try again.');
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 pt-16 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-lg border border-gray-100 max-w-lg w-full p-8 sm:p-10">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Building2 className="w-8 h-8 text-primary-600" />
+          </div>
+          <h2 className="text-2xl font-black text-gray-900">How would you like to post this property?</h2>
+          <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+            To list a property, you must be registered as an Owner or Agent.
+          </p>
+        </div>
+
+        {/* Role options */}
+        <div className="space-y-3 mb-6">
+          <button
+            type="button"
+            onClick={() => setSelectedRole('owner')}
+            className={cn(
+              'w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all',
+              selectedRole === 'owner'
+                ? 'border-primary-500 bg-primary-50 shadow-sm'
+                : 'border-gray-200 bg-white hover:border-primary-200 hover:bg-gray-50',
+            )}
+          >
+            <span className={cn(
+              'w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0',
+              selectedRole === 'owner' ? 'bg-primary-100' : 'bg-gray-100',
+            )}>🏠</span>
+            <div>
+              <p className={cn('font-bold text-sm', selectedRole === 'owner' ? 'text-primary-700' : 'text-gray-800')}>
+                Post as Property Owner
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">I own this property and want to list it directly</p>
+            </div>
+            {selectedRole === 'owner' && (
+              <CheckCircle2 className="w-5 h-5 text-primary-500 ml-auto flex-shrink-0" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedRole('agent')}
+            className={cn(
+              'w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all',
+              selectedRole === 'agent'
+                ? 'border-blue-500 bg-blue-50 shadow-sm'
+                : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-gray-50',
+            )}
+          >
+            <span className={cn(
+              'w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0',
+              selectedRole === 'agent' ? 'bg-blue-100' : 'bg-gray-100',
+            )}>🏢</span>
+            <div>
+              <p className={cn('font-bold text-sm', selectedRole === 'agent' ? 'text-blue-700' : 'text-gray-800')}>
+                Post as Real Estate Agent
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">I am a licensed agent listing on behalf of a client</p>
+            </div>
+            {selectedRole === 'agent' && (
+              <CheckCircle2 className="w-5 h-5 text-blue-500 ml-auto flex-shrink-0" />
+            )}
+          </button>
+        </div>
+
+        {/* Agent: Agency details */}
+        {selectedRole === 'agent' && (
+          <div className="space-y-4 p-5 bg-blue-50 rounded-2xl border border-blue-100 mb-6">
+            <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">Agency Details</p>
+
+            <div>
+              <FieldLabel required>Agency Name</FieldLabel>
+              <Input
+                value={agencyName}
+                onChange={(e: any) => setAgencyName(e.target.value)}
+                placeholder="e.g., Prestige Realty Group"
+              />
+              <p className="text-xs text-gray-400 mt-1.5">
+                If this agency already exists, you'll be mapped to it. Otherwise a new agency will be created pending admin approval.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>Agency Phone</FieldLabel>
+                <Input
+                  value={agencyPhone}
+                  onChange={(e: any) => setAgencyPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                />
+              </div>
+              <div>
+                <FieldLabel>Agency Address</FieldLabel>
+                <Input
+                  value={agencyAddress}
+                  onChange={(e: any) => setAgencyAddress(e.target.value)}
+                  placeholder="City / Area"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Owner confirmation */}
+        {selectedRole === 'owner' && (
+          <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
+            <span className="text-xl">✅</span>
+            <div>
+              <p className="font-semibold text-green-800 text-sm">Your role will be updated to Property Owner</p>
+              <p className="text-green-700 text-xs mt-0.5">You'll be able to post unlimited owner listings. This change is saved to your account.</p>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-3 text-sm mb-4">
+            {error}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={handleConfirm}
+          disabled={!canProceed || loading}
+          className="w-full py-4 rounded-2xl bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-all shadow-lg shadow-primary-600/25 flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> Setting up your account…</>
+          ) : (
+            'Continue to Post Property →'
+          )}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1145,14 +1320,19 @@ function PostPropertyPageInner() {
   const editId = searchParams.get('edit');
   const isEditMode = !!editId;
 
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, login, refresh: refreshAuth } = useAuth();
   const dispatch = useAppDispatch();
   const { currentStep, form, config } = useAppSelector(s => s.postProperty);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [existingImages, setExistingImages] = useState<{ id: string; url: string; isPrimary: boolean }[]>([]);
   const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [editLoading, setEditLoading] = useState(false);
+  const [roleUpgrading, setRoleUpgrading] = useState(false);
+  const [agentAgencyInfo, setAgentAgencyInfo] = useState<{ agencyId: string; agentProfileId: string } | null>(null);
+  // Keep server + client initial render identical (both show loader when editId present)
+  // by deferring the false state to after mount.
+  const [editLoading, setEditLoading] = useState(true);
+  const [editAccessDenied, setEditAccessDenied] = useState(false);
   const [error, setError] = useState('');
 
   const TOTAL_STEPS = 10;
@@ -1207,14 +1387,22 @@ function PostPropertyPageInner() {
     });
   }, [form.typeId]);
 
-  // Load existing property data for edit mode
+  // Load existing property data for edit mode (or immediately clear loader for new-property mode)
   useEffect(() => {
-    if (!editId || !user) return;
+    if (!editId) { setEditLoading(false); return; }
+    if (!user) return;
     setEditLoading(true);
     dispatch(resetForm());
     (async () => {
       try {
         const { data: property } = await propertiesApi.getById(editId);
+
+        // Unauthorised: user doesn't own this property
+        if (user.role !== 'admin' && property.ownerId && property.ownerId !== user.id) {
+          setEditAccessDenied(true);
+          setEditLoading(false);
+          return;
+        }
 
         // Fetch categories, then types, then amenities sequentially to get IDs
         const { data: categories } = await propertyConfigApi.getCategories();
@@ -1281,8 +1469,13 @@ function PostPropertyPageInner() {
           (property.images || []).sort((a: any, b: any) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0))
         );
         dispatch(setStep(0));
-      } catch {
-        setError('Failed to load property for editing.');
+      } catch (err: any) {
+        const status = err?.response?.status;
+        if (status === 403 || status === 404) {
+          setEditAccessDenied(true);
+        } else {
+          setError('Failed to load property for editing. Please try again.');
+        }
       } finally {
         setEditLoading(false);
       }
@@ -1366,6 +1559,11 @@ function PostPropertyPageInner() {
         brokerage: form.brokerage === 'custom' ? form.brokerageCustom : form.brokerage || undefined,
         amenityIds: form.amenityIds.length > 0 ? form.amenityIds : undefined,
         extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : undefined,
+        // Pass agent/agency mapping if available (for agent listings)
+        ...(agentAgencyInfo && form.userType === 'agent' ? {
+          agentProfileId: agentAgencyInfo.agentProfileId,
+          agencyId: agentAgencyInfo.agencyId,
+        } : {}),
       };
 
       let propertyId: string;
@@ -1405,11 +1603,78 @@ function PostPropertyPageInner() {
     setExistingImages(prev => prev.filter(img => img.id !== imageId));
   };
 
-  if (authLoading || editLoading) {
+  // Handle buyer role upgrade + optional agency registration
+  const handleBuyerRoleSelected = async (
+    role: 'owner' | 'agent',
+    agencyData?: { agencyName: string; contactPhone?: string; address?: string },
+  ) => {
+    setRoleUpgrading(true);
+    try {
+      const { data } = await authApi.upgradeRole(role);
+      login(data.token || data.accessToken, data.user);
+
+      if (role === 'agent' && agencyData?.agencyName) {
+        const { data: agencyResult } = await agencyApi.selfRegisterOrJoin({
+          agencyName: agencyData.agencyName,
+          contactPhone: agencyData.contactPhone,
+          address: agencyData.address,
+        });
+        if (agencyResult?.agency?.id && agencyResult?.agentProfile?.id) {
+          setAgentAgencyInfo({
+            agencyId: agencyResult.agency.id,
+            agentProfileId: agencyResult.agentProfile.id,
+          });
+        }
+      }
+
+      await refreshAuth();
+    } finally {
+      setRoleUpgrading(false);
+    }
+  };
+
+  if (authLoading || editLoading || roleUpgrading) {
     return (
       <div className="min-h-screen flex items-center justify-center flex-col gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-        {editLoading && <p className="text-sm text-gray-500">Loading property data…</p>}
+        <p className="text-sm text-gray-500">{roleUpgrading ? 'Updating your account…' : isEditMode ? 'Loading property data…' : 'Loading…'}</p>
+      </div>
+    );
+  }
+
+  // Show role selection screen for buyers before showing the property form
+  if (user?.role === 'buyer') {
+    return (
+      <BuyerRoleSelectionScreen onRoleSelected={handleBuyerRoleSelected} />
+    );
+  }
+
+  if (editAccessDenied) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white rounded-3xl shadow-xl max-w-sm w-full p-8 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-5">
+            <span className="text-3xl">🔒</span>
+          </div>
+          <h2 className="text-xl font-black text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-sm text-gray-500 leading-relaxed mb-6">
+            You don't have permission to edit this property. Only the owner or an admin can make changes.
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => router.back()}
+              className="w-full py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm hover:bg-gray-200 transition-colors"
+            >
+              ← Go Back
+            </button>
+            <a
+              href="/my-listings"
+              className="w-full py-3 rounded-2xl bg-primary-600 text-white font-bold text-sm hover:bg-primary-700 transition-colors text-center"
+            >
+              My Listings
+            </a>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1504,12 +1769,14 @@ function PostPropertyPageInner() {
 
 export default function PostPropertyPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-      </div>
-    }>
-      <PostPropertyPageInner />
-    </Suspense>
+    <AuthGuard allowedRoles={['buyer', 'owner', 'agent', 'seller', 'admin']} loginRedirect="/post-property/guest">
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+        </div>
+      }>
+        <PostPropertyPageInner />
+      </Suspense>
+    </AuthGuard>
   );
 }

@@ -7,7 +7,7 @@ import {
   CheckCircle, Loader2, Phone, RefreshCw, Shield,
   ArrowRight, Star, TrendingUp, Clock, Award,
 } from 'lucide-react';
-import { authApi } from '@/lib/api';
+import { authApi, agencyApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -39,11 +39,16 @@ export default function GuestPostPropertyPage() {
   const [phone, setPhone]       = useState('');
   const [name,  setName]        = useState('');
   const [otp,   setOtp]         = useState('');
-  const [step,  setStep]        = useState<'landing' | 'otp'>('landing');
+  const [step,  setStep]        = useState<'landing' | 'otp' | 'agency'>('landing');
   const [loading, setLoading]   = useState(false);
   const [error,   setError]     = useState('');
   const [devOtp,  setDevOtp]    = useState('');
   const [timer,   setTimer]     = useState(0);
+
+  // Agency step state (agents only)
+  const [agencyName,    setAgencyName]    = useState('');
+  const [agencyPhone,   setAgencyPhone]   = useState('');
+  const [agencyAddress, setAgencyAddress] = useState('');
 
   const startTimer = () => {
     setTimer(30);
@@ -65,19 +70,55 @@ export default function GuestPostPropertyPage() {
     } finally { setLoading(false); }
   };
 
-  // ── Step 2: Verify OTP → login → go to post form ──────────────────────────
+  // ── Step 2: Verify OTP → set role → go to post form ─────────────────────
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otp.length < 4) { setError('Enter the OTP sent to your phone'); return; }
+    if (otp.length < 6) { setError('Enter the 6-digit OTP sent to your phone'); return; }
     setLoading(true); setError('');
     try {
       const { data } = await authApi.verifyOtp(phone, otp, name || undefined);
-      login(data.token, data.user);
-      // Store user type in sessionStorage for the form to pick up
-      sessionStorage.setItem('postPropertyUserType', userType);
-      router.replace('/post-property');
+      // Persist the token so subsequent API calls are authenticated
+      login(data.token || data.accessToken, data.user);
+
+      // Resolve the user role based on their selected type on this page
+      const targetRole = userType as 'owner' | 'agent';
+
+      if (data.user?.needsOnboarding) {
+        // New OTP user — complete onboarding to set role (clears needsOnboarding flag)
+        const { data: onboarded } = await authApi.completeOnboarding({ role: targetRole });
+        login(onboarded.token || onboarded.accessToken, onboarded.user);
+      } else if (data.user?.role === 'buyer') {
+        // Existing buyer — upgrade role to owner/agent
+        const { data: upgraded } = await authApi.upgradeRole(targetRole);
+        login(upgraded.token || upgraded.accessToken, upgraded.user);
+      }
+      // If already owner/agent/admin, go straight to form
+
+      // Agents need to register/join an agency before posting
+      if (targetRole === 'agent') {
+        setStep('agency');
+      } else {
+        router.replace('/post-property');
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid OTP. Please try again.');
+    } finally { setLoading(false); }
+  };
+
+  // ── Step 3 (agents): Register/join agency ────────────────────────────────
+  const handleAgencySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!agencyName.trim()) { setError('Agency / firm name is required'); return; }
+    setLoading(true); setError('');
+    try {
+      await agencyApi.selfRegisterOrJoin({
+        agencyName:   agencyName.trim(),
+        contactPhone: agencyPhone.trim() || undefined,
+        address:      agencyAddress.trim() || undefined,
+      });
+      router.replace('/post-property');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to register agency. Please try again.');
     } finally { setLoading(false); }
   };
 
@@ -134,9 +175,75 @@ export default function GuestPostPropertyPage() {
             </div>
 
             {/* Right: Form Card */}
-            <div className="bg-white rounded-2xl shadow-2xl p-7">
+            <div className="bg-white rounded-2xl shadow-2xl p-7 text-gray-900">
 
-              {step === 'landing' ? (
+              {step === 'agency' ? (
+                /* ── Agency Details Step ── */
+                <form onSubmit={handleAgencySubmit} className="space-y-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">Your Agency Details</h2>
+                    <p className="text-gray-500 text-sm">Tell us about your agency or firm. We'll link your listings to it.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Agency / Firm Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={agencyName}
+                      onChange={(e) => { setAgencyName(e.target.value); setError(''); }}
+                      placeholder="e.g. Sharma Properties, ABC Realty"
+                      autoFocus
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">If your agency already exists on our platform, your listings will be linked to it automatically.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Agency Phone (optional)</label>
+                    <input
+                      type="tel"
+                      value={agencyPhone}
+                      onChange={(e) => setAgencyPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="Agency contact number"
+                      maxLength={10}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Office Address (optional)</label>
+                    <input
+                      type="text"
+                      value={agencyAddress}
+                      onChange={(e) => setAgencyAddress(e.target.value)}
+                      placeholder="Agency office address"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-2 text-xs text-blue-700">
+                    <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>New agencies are reviewed by our team. Your listings will be visible once the agency is approved (usually within 24 hrs).</span>
+                  </div>
+
+                  {error && (
+                    <p className="text-red-600 text-xs bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading || !agencyName.trim()}
+                    className="w-full py-3.5 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  >
+                    {loading
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+                      : <><ArrowRight className="w-4 h-4" /> Continue to Post Property</>
+                    }
+                  </button>
+                </form>
+              ) : step === 'landing' ? (
                 <>
                   <h2 className="text-xl font-bold text-gray-900 mb-1">Post Your Property</h2>
                   <p className="text-gray-500 text-sm mb-5">Create a free account and list your property in minutes.</p>
@@ -260,10 +367,10 @@ export default function GuestPostPropertyPage() {
                       inputMode="numeric"
                       value={otp}
                       onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
-                      placeholder="• • • •"
+                      placeholder="• • • • • •"
                       maxLength={6}
                       autoFocus
-                      className="w-full px-4 py-4 border border-gray-200 rounded-xl text-center text-2xl font-bold tracking-[0.5em] outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                      className="w-full px-4 py-4 border border-gray-200 rounded-xl text-center text-2xl font-bold tracking-widest text-gray-900 outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                     />
                   </div>
 
@@ -290,7 +397,7 @@ export default function GuestPostPropertyPage() {
 
                   <button
                     type="submit"
-                    disabled={loading || otp.length < 4}
+                    disabled={loading || otp.length < 6}
                     className="w-full py-4 bg-primary-600 text-white rounded-xl font-bold text-base hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                   >
                     {loading

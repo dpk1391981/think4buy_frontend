@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, TrendingUp } from 'lucide-react';
@@ -8,6 +8,7 @@ import PropertyCard from '@/components/property/PropertyCard';
 import { propertiesApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useAppSelector } from '@/lib/store';
+import { PropertyGridSkeleton, PropertyCarouselSkeleton } from '@/components/skeleton';
 
 const TABS = [
   { id: 'featured',  label: '⚡ Featured',     params: { isFeatured: true, limit: 8, approvalStatus: 'approved' } },
@@ -15,38 +16,6 @@ const TABS = [
   { id: 'new',       label: '🏗 New Projects',  params: { possessionStatus: 'under_construction', limit: 8, approvalStatus: 'approved' } },
   { id: 'recent',    label: '🕐 Just Listed',   params: { sortBy: 'createdAt', sortOrder: 'DESC', limit: 8, approvalStatus: 'approved' } },
 ];
-
-function SkeletonCards({ mobile }: { mobile?: boolean }) {
-  if (mobile) {
-    return (
-      <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 snap-x snap-mandatory">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="flex-shrink-0 w-[72vw] snap-start bg-white rounded-xl border border-gray-100 overflow-hidden">
-            <div className="skeleton aspect-[4/3]" />
-            <div className="p-3 space-y-2">
-              <div className="skeleton h-4 w-3/4" />
-              <div className="skeleton h-3 w-1/2" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <div className="skeleton aspect-[4/3]" />
-          <div className="p-4 space-y-3">
-            <div className="skeleton h-5 w-3/4" />
-            <div className="skeleton h-4 w-1/2" />
-            <div className="skeleton h-4 w-2/3" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function TabContent({
   tab,
@@ -77,8 +46,14 @@ function TabContent({
 
   if (isLoading) return (
     <>
-      <div className="sm:hidden"><SkeletonCards mobile /></div>
-      <div className="hidden sm:block"><SkeletonCards /></div>
+      {/* Mobile: carousel shimmer */}
+      <div className="sm:hidden -mx-4 px-4">
+        <PropertyCarouselSkeleton count={4} />
+      </div>
+      {/* Desktop: grid shimmer */}
+      <div className="hidden sm:block">
+        <PropertyGridSkeleton count={8} />
+      </div>
     </>
   );
 
@@ -116,10 +91,13 @@ function TabContent({
 
 export default function FeaturedProperties() {
   const [activeTab, setActiveTab] = useState('featured');
+  const [mounted, setMounted] = useState(false);
   const tab = TABS.find((t) => t.id === activeTab)!;
   const selectedState = useAppSelector((s) => s.ui.selectedState);
   const selectedStateId = useAppSelector((s) => s.ui.selectedStateId);
   const selectedCity = useAppSelector((s) => s.ui.selectedCity);
+
+  useEffect(() => { setMounted(true); }, []);
 
   const viewAllHref =
     activeTab === 'new' ? '/new-projects' :
@@ -168,7 +146,7 @@ export default function FeaturedProperties() {
         </div>
 
         {/* Location filter indicator */}
-        {(selectedCity || selectedState) && (
+        {mounted && (selectedCity || selectedState) && (
           <div className="flex items-center gap-2 mb-4 text-sm text-primary-700 bg-primary-50 px-3 py-2 rounded-xl w-fit">
             <span>📍 Showing properties in <strong>{selectedCity || selectedState}</strong></span>
           </div>

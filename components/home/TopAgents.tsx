@@ -1,12 +1,13 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Star, Phone, MapPin, Building2, ArrowRight, Award, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { usersApi } from '@/lib/api';
 import { useAppSelector } from '@/lib/store';
 import OptimizedImage from '@/components/common/OptimizedImage';
+import { AgentCardSkeleton } from '@/components/skeleton';
 
 interface Agent {
   id: string;
@@ -151,35 +152,15 @@ function AgentCard({ agent }: { agent: Agent }) {
   );
 }
 
-function SkeletonCard() {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse flex-shrink-0 w-[260px] sm:w-[280px]">
-      <div className="flex gap-3 mb-4">
-        <div className="w-12 h-12 bg-gray-200 rounded-2xl flex-shrink-0" />
-        <div className="flex-1 space-y-2 pt-1">
-          <div className="h-4 bg-gray-200 rounded w-3/4" />
-          <div className="h-3 bg-gray-200 rounded w-1/2" />
-        </div>
-      </div>
-      <div className="space-y-2 mb-4">
-        <div className="h-3 bg-gray-200 rounded" />
-        <div className="h-3 bg-gray-200 rounded w-4/5" />
-      </div>
-      <div className="h-px bg-gray-100 mb-4" />
-      <div className="flex gap-2">
-        <div className="h-9 bg-gray-200 rounded-xl w-10" />
-        <div className="h-9 bg-gray-200 rounded-xl flex-1" />
-      </div>
-    </div>
-  );
-}
-
 export default function TopAgents() {
   const scrollRef       = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
   const selectedState   = useAppSelector(s => s.ui.selectedState);
   const selectedStateId = useAppSelector(s => s.ui.selectedStateId);
   const selectedCity    = useAppSelector(s => s.ui.selectedCity);
   const selectedCityId  = useAppSelector(s => s.ui.selectedCityId);
+
+  useEffect(() => { setMounted(true); }, []);
 
   // Same priority as FeaturedProperties: cityId > city > stateId > state name
   const agentParams: Parameters<typeof usersApi.getAgents>[0] = { limit: 8 };
@@ -201,12 +182,12 @@ export default function TopAgents() {
 
   if (!isLoading && agents.length === 0) return null;
 
-  const locationLabel = selectedCity
-    ? `in ${selectedCity}`
-    : selectedState ? `in ${selectedState}` : 'across India';
-  const viewAllHref = selectedCity
+  const locationLabel = mounted
+    ? (selectedCity ? `in ${selectedCity}` : selectedState ? `in ${selectedState}` : 'across India')
+    : 'across India';
+  const viewAllHref = mounted && selectedCity
     ? `/agents?city=${encodeURIComponent(selectedCity)}`
-    : selectedState
+    : mounted && selectedState
     ? `/agents?state=${encodeURIComponent(selectedState)}`
     : '/agents';
 
@@ -249,7 +230,7 @@ export default function TopAgents() {
         </div>
 
         {/* Location indicator */}
-        {(selectedCity || selectedState) && (
+        {mounted && (selectedCity || selectedState) && (
           <div className="flex items-center gap-2 mb-4 text-sm text-primary-700 bg-primary-50 px-3 py-2 rounded-xl w-fit">
             <span>📍 Showing agents in <strong>{selectedCity || selectedState}</strong></span>
           </div>
@@ -262,7 +243,11 @@ export default function TopAgents() {
             className="flex gap-4 overflow-x-auto no-scrollbar px-4 sm:px-0 snap-x snap-mandatory pb-2"
           >
             {isLoading
-              ? Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
+              ? Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-[78vw] sm:w-[260px] snap-start">
+                    <AgentCardSkeleton />
+                  </div>
+                ))
               : agents.map((agent: Agent) => (
                   <div key={agent.id} className="flex-shrink-0 w-[78vw] sm:w-[260px] snap-start">
                     <AgentCard agent={agent} />

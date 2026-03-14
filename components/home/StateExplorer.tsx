@@ -1,14 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
-import { MapPin, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { fetchStates } from '@/lib/store/slices/locationsSlice';
 import { setSelectedLocation } from '@/lib/store/slices/uiSlice';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import { useQuery } from '@tanstack/react-query';
-import { propertiesApi } from '@/lib/api';
 
 const STATE_GRADIENTS = [
   'from-blue-500 to-blue-700',
@@ -25,22 +23,12 @@ const STATE_GRADIENTS = [
   'from-amber-500 to-orange-600',
 ];
 
-// Live property count per state
-function StatePropertyCount({ stateName }: { stateName: string }) {
-  const { data } = useQuery({
-    queryKey: ['prop-count-state', stateName],
-    queryFn: () =>
-      propertiesApi
-        .getAll({ state: stateName, limit: 1 })
-        .then((r) => r.data?.meta?.total ?? r.data?.total ?? 0),
-    staleTime: 5 * 60 * 1000,
-    enabled: !!stateName,
-  });
-
-  if (!data) return <span className="text-[10px] text-gray-400">Loading…</span>;
+/** Shows the property count already included in the state record — zero extra API calls. */
+function StatePropertyCount({ count }: { count?: number }) {
+  if (!count) return null;
   return (
     <span className="text-[10px] font-semibold text-primary-600">
-      {data.toLocaleString('en-IN')}+ props
+      {count.toLocaleString('en-IN')}+ props
     </span>
   );
 }
@@ -141,6 +129,7 @@ interface StateCircleProps {
     code: string;
     imageUrl?: string;
     propertyCount?: number;
+    _count?: { properties?: number };
   };
   index: number;
   onClick: (id: string, name: string) => void;
@@ -192,8 +181,8 @@ function StateCircle({ state, index, onClick }: StateCircleProps) {
         {state.name}
       </span>
 
-      {/* Property count */}
-      <StatePropertyCount stateName={state.name} />
+      {/* Property count — uses data already in the state record, no extra API call */}
+      <StatePropertyCount count={state.propertyCount ?? state._count?.properties} />
     </button>
   );
 }

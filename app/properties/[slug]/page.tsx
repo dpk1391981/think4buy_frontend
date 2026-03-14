@@ -2,10 +2,20 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import PropertyDetailClient from './PropertyDetailClient';
 import { propertiesApi } from '@/lib/api';
+import JsonLd, { buildRealEstateListingSchema, buildBreadcrumbSchema } from '@/components/seo/JsonLd';
 
 interface Props {
   params: { slug: string };
 }
+
+/**
+ * ISR — revalidate every 5 minutes.
+ *
+ * Property details change infrequently (price, status) and are high-traffic.
+ * ISR serves the cached HTML instantly from CDN while refreshing in background.
+ * For a 20k concurrent platform this is critical — avoids hitting the DB on every view.
+ */
+export const revalidate = 300; // 5 minutes
 
 async function getProperty(slug: string) {
   try {
@@ -57,48 +67,19 @@ export default async function PropertyDetailPage({ params }: Props) {
     notFound();
   }
 
-  // JSON-LD structured data for real estate
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'RealEstateListing',
-    name: property.title,
-    description: property.description,
-    url: `${process.env.NEXT_PUBLIC_APP_URL}/properties/${property.slug}`,
-    image: property.images?.map((img: any) => img.url) || [],
-    offers: {
-      '@type': 'Offer',
-      price: property.price,
-      priceCurrency: 'INR',
-    },
-    address: {
-      '@type': 'PostalAddress',
-      streetAddress: property.address || property.locality,
-      addressLocality: property.city,
-      postalCode: property.pincode,
-      addressCountry: 'IN',
-    },
-    ...(property.latitude && property.longitude
-      ? {
-          geo: {
-            '@type': 'GeoCoordinates',
-            latitude: property.latitude,
-            longitude: property.longitude,
-          },
-        }
-      : {}),
-    floorSize: property.area
-      ? { '@type': 'QuantitativeValue', value: property.area, unitCode: 'FTK' }
-      : undefined,
-    numberOfRooms: property.bedrooms,
-    numberOfBathroomsTotal: property.bathrooms,
-  };
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com';
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <JsonLd schema={[
+        buildRealEstateListingSchema(property, siteUrl),
+        buildBreadcrumbSchema([
+          { name: 'Home',       url: siteUrl },
+          { name: 'Properties', url: `${siteUrl}/properties` },
+          ...(property.city ? [{ name: property.city, url: `${siteUrl}/properties?city=${property.city}` }] : []),
+          { name: property.title, url: `${siteUrl}/properties/${property.slug}` },
+        ]),
+      ]} />
       <PropertyDetailClient property={property} />
     </>
   );

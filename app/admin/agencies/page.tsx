@@ -3,16 +3,33 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { agencyApi } from '@/lib/api';
-import { Building2, MapPin, Phone, Mail, Globe, Pencil, Trash2, Users, CheckCircle, Plus } from 'lucide-react';
+import { Building2, Phone, Mail, Pencil, Trash2, Users, CheckCircle, Plus, Clock, XCircle, CheckCircle2 } from 'lucide-react';
+
+type TabType = 'all' | 'pending';
 
 export default function AdminAgenciesPage() {
+  const [tab, setTab]               = useState<TabType>('all');
   const [agencies, setAgencies]     = useState<any[]>([]);
+  const [pendingAgencies, setPendingAgencies] = useState<any[]>([]);
+  const [pendingTotal, setPendingTotal] = useState(0);
   const [total, setTotal]           = useState(0);
   const [page, setPage]             = useState(1);
   const [search, setSearch]         = useState('');
   const [loading, setLoading]       = useState(true);
   const [deleteModal, setDeleteModal] = useState<{ id: string; name: string } | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [rejectModal, setRejectModal] = useState<{ id: string; name: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+
+  const loadPending = useCallback(async () => {
+    try {
+      const r = await agencyApi.adminGetPendingAgencies({ page: 1, limit: 50 });
+      setPendingAgencies(r.data.items ?? []);
+      setPendingTotal(r.data.total ?? 0);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -27,7 +44,7 @@ export default function AdminAgenciesPage() {
     }
   }, [page, search]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); loadPending(); }, [load, loadPending]);
 
   async function handleDelete(id: string) {
     setActionLoading(id);
@@ -35,6 +52,33 @@ export default function AdminAgenciesPage() {
       await agencyApi.adminDeleteAgency(id);
       setDeleteModal(null);
       load();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleApprove(id: string) {
+    setActionLoading(id);
+    try {
+      await agencyApi.adminApproveAgency(id);
+      loadPending();
+      load();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleReject(id: string, reason: string) {
+    setActionLoading(id);
+    try {
+      await agencyApi.adminRejectAgency(id, reason);
+      setRejectModal(null);
+      setRejectReason('');
+      loadPending();
     } catch (e) {
       console.error(e);
     } finally {
@@ -61,6 +105,107 @@ export default function AdminAgenciesPage() {
         </Link>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2 mb-5">
+        <button
+          onClick={() => setTab('all')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            tab === 'all' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          All Agencies
+        </button>
+        <button
+          onClick={() => setTab('pending')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+            tab === 'pending' ? 'bg-orange-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          Pending Approval
+          {pendingTotal > 0 && (
+            <span className={`inline-flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full ${
+              tab === 'pending' ? 'bg-white text-orange-600' : 'bg-orange-500 text-white'
+            }`}>
+              {pendingTotal}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Pending Agencies Tab */}
+      {tab === 'pending' && (
+        <div>
+          {pendingAgencies.length === 0 ? (
+            <div className="bg-white rounded-xl p-16 text-center border border-gray-100">
+              <CheckCircle2 className="w-12 h-12 text-green-300 mx-auto mb-3" />
+              <p className="text-gray-400 text-sm">No agencies pending approval</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {pendingAgencies.map((agency) => (
+                <div key={agency.id} className="bg-white rounded-xl border border-orange-200 p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-orange-700 font-bold text-sm flex-shrink-0">
+                        {agency.name?.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-gray-900 text-sm">{agency.name}</h3>
+                        <span className="inline-flex items-center gap-1 text-xs text-orange-600 font-medium mt-0.5">
+                          <Clock className="w-3 h-3" /> Pending Approval
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleApprove(agency.id)}
+                        disabled={actionLoading === agency.id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {actionLoading === agency.id ? 'Approving...' : 'Approve'}
+                      </button>
+                      <button
+                        onClick={() => setRejectModal({ id: agency.id, name: agency.name })}
+                        disabled={actionLoading === agency.id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-100 disabled:opacity-50 transition-colors"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-gray-500">
+                    {agency.contactPhone && (
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="w-3 h-3 text-gray-400" />
+                        <span>{agency.contactPhone}</span>
+                      </div>
+                    )}
+                    {agency.contactEmail && (
+                      <div className="flex items-center gap-1.5">
+                        <Mail className="w-3 h-3 text-gray-400" />
+                        <span className="truncate">{agency.contactEmail}</span>
+                      </div>
+                    )}
+                    {agency.address && (
+                      <div className="flex items-center gap-1.5">
+                        <Building2 className="w-3 h-3 text-gray-400" />
+                        <span className="truncate">{agency.address}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* All Agencies Tab */}
+      {tab === 'all' && (
+        <>
       {/* Search */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-5">
         <input
@@ -203,6 +348,8 @@ export default function AdminAgenciesPage() {
           </div>
         </div>
       )}
+        </>
+      )}
 
       {/* Delete confirm modal */}
       {deleteModal && (
@@ -222,6 +369,40 @@ export default function AdminAgenciesPage() {
               </button>
               <button
                 onClick={() => setDeleteModal(null)}
+                className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Agency Modal */}
+      {rejectModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h3 className="font-semibold text-gray-900 mb-1">Reject Agency</h3>
+            <p className="text-sm text-gray-500 mb-3">
+              Rejecting <strong>{rejectModal.name}</strong>. Provide a reason (optional):
+            </p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Reason for rejection..."
+              rows={3}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-400 resize-none mb-4"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleReject(rejectModal.id, rejectReason)}
+                disabled={!!actionLoading}
+                className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                {actionLoading ? 'Rejecting...' : 'Reject Agency'}
+              </button>
+              <button
+                onClick={() => { setRejectModal(null); setRejectReason(''); }}
                 className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
               >
                 Cancel

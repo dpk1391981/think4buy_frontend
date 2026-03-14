@@ -116,13 +116,16 @@ export default function AuthModal() {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otp.length < 4) { setError('Enter the OTP sent to your phone'); return; }
+    if (otp.length < 6) { setError('Enter the 6-digit OTP sent to your phone'); return; }
     setLoading(true); setError('');
     try {
       const { data } = await authApi.verifyOtp(phone, otp, name || undefined);
       login(data.token, data.user);
       dispatch(closeAuthModal());
-      if (authModalRedirectTo) {
+      if (data.isNewUser) {
+        const next = authModalRedirectTo ? `?redirect=${encodeURIComponent(authModalRedirectTo)}` : '';
+        router.push(`/auth/onboarding${next}`);
+      } else if (authModalRedirectTo) {
         router.push(authModalRedirectTo);
       }
     } catch (err: any) {
@@ -339,7 +342,7 @@ export default function AuthModal() {
 
               <button
                 type="submit"
-                disabled={loading || otp.length < 4}
+                disabled={loading || otp.length < 6}
                 className="w-full py-3.5 bg-primary-600 text-white rounded-2xl font-bold text-sm hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 shadow-lg shadow-primary-600/25"
               >
                 {loading

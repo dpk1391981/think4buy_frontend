@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -22,6 +23,7 @@ import {
   ArrowLeft,
   Eye,
   X,
+  Pencil,
 } from 'lucide-react';
 import { Property } from '@/types/property';
 import {
@@ -35,8 +37,15 @@ import {
 } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { inquiriesApi, propertiesApi } from '@/lib/api';
-import PropertyCard from '@/components/property/PropertyCard';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { useLazyComponent } from '@/hooks/useLazyComponent';
+import { PropertyGridSkeleton } from '@/components/skeleton';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAppDispatch } from '@/lib/store';
+import { openAuthModal } from '@/lib/store/slices/uiSlice';
+
+// Lazy-load PropertyCard — it's below the fold on detail pages
+const PropertyCard = dynamic(() => import('@/components/property/PropertyCard'), { ssr: false });
 
 interface Props {
   property: Property;
@@ -49,7 +58,22 @@ export default function PropertyDetailClient({ property }: Props) {
   const [inquiryForm, setInquiryForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [inquiryError, setInquiryError] = useState('');
   const { trackPropertyView, trackPropertyInquiry } = useAnalytics();
+  const { user } = useAuth();
+  const dispatch = useAppDispatch();
+
+  // Pre-fill form fields from logged-in user profile
+  useEffect(() => {
+    if (user) {
+      setInquiryForm((f) => ({
+        ...f,
+        name:  f.name  || (user as any).name  || '',
+        email: f.email || (user as any).email || '',
+        phone: f.phone || (user as any).phone || '',
+      }));
+    }
+  }, [user]);
 
   // Track property view once on mount
   useEffect(() => {
@@ -62,16 +86,26 @@ export default function PropertyDetailClient({ property }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [property.id]);
 
-  const { data: similar } = useQuery({
+  // Defer "Similar Properties" — only fetch once user scrolls near it
+  const [similarRef, similarVisible] = useLazyComponent<HTMLDivElement>({ rootMargin: '400px' });
+
+  const { data: similar, isLoading: similarLoading } = useQuery({
     queryKey: ['similar', property.id],
-    queryFn: () => propertiesApi.getSimilar(property.id).then((r) => r.data),
+    queryFn: ({ signal }) =>
+      propertiesApi.getSimilar(property.id).then((r) => r.data),
+    enabled: similarVisible, // only fires once visible
+    staleTime: 5 * 60 * 1000,
   });
+
+  // Defer map embed — heavy iframe, only mount on scroll
+  const [mapRef, mapVisible] = useLazyComponent<HTMLDivElement>({ rootMargin: '300px' });
 
   const images = property.images?.length ? property.images : [{ url: getPrimaryImage([]), alt: property.title }];
 
   const handleInquiry = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+    setInquiryError('');
     try {
       await inquiriesApi.create(property.id, inquiryForm);
       setSubmitted(true);
@@ -79,8 +113,22 @@ export default function PropertyDetailClient({ property }: Props) {
         city:  property.city  || undefined,
         state: property.state || undefined,
       });
-    } catch {
-      alert('Failed to send inquiry. Please try again.');
+    } catch (err: any) {
+      const status  = err?.response?.status;
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message;
+
+      if (status === 401) {
+        // Not logged in — open auth modal so user can sign in and retry
+        setShowMobileInquiry(false);
+        dispatch(openAuthModal({ mode: 'login' }));
+        setInquiryError('Please log in to send an inquiry.');
+      } else if (status === 400) {
+        setInquiryError(
+          Array.isArray(message) ? message.join(', ') : (message || 'Please fill all required fields correctly.'),
+        );
+      } else {
+        setInquiryError(message || 'Failed to send inquiry. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -255,6 +303,16 @@ export default function PropertyDetailClient({ property }: Props) {
                 {property.reraNumber && (
                   <span className="text-green-600 font-medium">RERA: {property.reraNumber}</span>
                 )}
+                {/* Edit button — visible to owner or admin */}
+                {user && ((user as any).id === property.owner?.id || (user as any).role === 'admin') && (
+                  <Link
+                    href={`/post-property?edit=${property.id}`}
+                    className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-xl text-xs font-semibold hover:bg-blue-100 transition-colors border border-blue-100"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit Listing
+                  </Link>
+                )}
               </div>
             </div>
 
@@ -307,36 +365,53 @@ export default function PropertyDetailClient({ property }: Props) {
                 <MapPin className="w-4 h-4 text-primary-600 flex-shrink-0" />
                 <span>{[property.address, property.locality, property.city, property.pincode].filter(Boolean).join(', ')}</span>
               </div>
-              {/* Map placeholder */}
-              <div className="bg-gray-100 rounded-xl h-48 md:h-64 flex items-center justify-center">
-                <div className="text-center text-gray-400">
-                  <MapPin className="w-8 h-8 mx-auto mb-2" />
-                  <p className="text-sm">Map View</p>
-                  {property.latitude && property.longitude && (
-                    <a
-                      href={`https://maps.google.com/?q=${property.latitude},${property.longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-primary-600 hover:underline mt-1 block"
-                    >
-                      Open in Google Maps
-                    </a>
-                  )}
-                </div>
+              {/* Map — lazy-mounted on scroll */}
+              <div ref={mapRef} className="bg-gray-100 rounded-xl h-48 md:h-64 flex items-center justify-center overflow-hidden">
+                {mapVisible && property.latitude && property.longitude ? (
+                  <iframe
+                    title="Property location"
+                    loading="lazy"
+                    src={`https://maps.google.com/maps?q=${property.latitude},${property.longitude}&z=15&output=embed`}
+                    className="w-full h-full border-0 rounded-xl"
+                    allowFullScreen
+                  />
+                ) : (
+                  <div className="text-center text-gray-400">
+                    <MapPin className="w-8 h-8 mx-auto mb-2" />
+                    <p className="text-sm">Map View</p>
+                    {property.latitude && property.longitude && (
+                      <a
+                        href={`https://maps.google.com/?q=${property.latitude},${property.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary-600 hover:underline mt-1 block"
+                      >
+                        Open in Google Maps
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Similar Properties */}
-            {similar?.length > 0 && (
-              <div className="mb-4">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Similar Properties</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {similar.slice(0, 4).map((p: Property) => (
-                    <PropertyCard key={p.id} property={p} />
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Similar Properties — lazy-fetched on scroll */}
+            <div ref={similarRef} className="mb-4">
+              {similarLoading ? (
+                <>
+                  <div className="skeleton-shimmer h-6 w-44 mb-4 rounded" />
+                  <PropertyGridSkeleton count={4} />
+                </>
+              ) : similar?.length > 0 ? (
+                <>
+                  <h2 className="text-lg font-bold text-gray-900 mb-4">Similar Properties</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {similar.slice(0, 4).map((p: Property) => (
+                      <PropertyCard key={p.id} property={p} />
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </div>
           </div>
 
           {/* Sidebar - Contact */}
@@ -422,6 +497,11 @@ export default function PropertyDetailClient({ property }: Props) {
                       onChange={(e) => setInquiryForm((f) => ({ ...f, message: e.target.value }))}
                       className="input-field resize-none"
                     />
+                    {inquiryError && (
+                      <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                        {inquiryError}
+                      </p>
+                    )}
                     <button
                       type="submit"
                       disabled={submitting}
@@ -522,6 +602,11 @@ export default function PropertyDetailClient({ property }: Props) {
                     onChange={(e) => setInquiryForm((f) => ({ ...f, message: e.target.value }))}
                     className="input-field resize-none"
                   />
+                  {inquiryError && (
+                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      {inquiryError}
+                    </p>
+                  )}
                   <button
                     type="submit"
                     disabled={submitting}

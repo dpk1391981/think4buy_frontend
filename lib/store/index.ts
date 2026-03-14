@@ -8,6 +8,7 @@ import locationsReducer from './slices/locationsSlice';
 import adminReducer from './slices/adminSlice';
 import seoReducer from './slices/seoSlice';
 import agencyReducer from './slices/agencySlice';
+import statsReducer from './slices/statsSlice';
 import siteVisitsReducer from '../../store/siteVisitsSlice';
 
 export const store = configureStore({
@@ -20,6 +21,7 @@ export const store = configureStore({
     admin: adminReducer,
     seo: seoReducer,
     agency: agencyReducer,
+    stats: statsReducer,
     siteVisits: siteVisitsReducer,
   },
   middleware: (getDefaultMiddleware) =>

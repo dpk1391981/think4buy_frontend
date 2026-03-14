@@ -13,6 +13,7 @@ interface AuthUser {
   city?: string;
   company?: string;
   isVerified: boolean;
+  needsOnboarding?: boolean;
 }
 
 interface AuthContextValue {
@@ -37,15 +38,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     const token = localStorage.getItem('token');
-    if (!token) { setLoading(false); return; }
+    if (!token) {
+      setLoading(false);
+      document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
+      return;
+    }
     try {
       const { data } = await authApi.getProfile();
       setUser(data);
       localStorage.setItem('user', JSON.stringify(data));
+      document.cookie = 't4bs_auth=1; path=/; max-age=604800; samesite=strict';
     } catch {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       setUser(null);
+      document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
     } finally {
       setLoading(false);
     }
@@ -64,12 +71,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
+    // Set a non-httpOnly presence cookie so Next.js middleware can detect auth state
+    // without reading localStorage (which is inaccessible server-side).
+    // This is NOT a security token — the real JWT stays in localStorage/HTTP-only cookie.
+    document.cookie = 't4bs_auth=1; path=/; max-age=604800; samesite=strict';
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+    // Clear the presence cookie so middleware correctly blocks private routes
+    document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
   };
 
   return (

@@ -6,12 +6,13 @@ import { SlidersHorizontal, Grid3X3, List, ChevronDown, X, MapPin, Home, Map } f
 import PropertyCard from '@/components/property/PropertyCard';
 import FilterPanel from '@/components/search/FilterPanel';
 import SearchBar from '@/components/search/SearchBar';
-import { propertiesApi, propertyConfigApi } from '@/lib/api';
+import { propertiesApi, propertyConfigApi, locationsApi } from '@/lib/api';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { Property, PaginatedProperties } from '@/types/property';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { PropertyGridSkeleton, InlineLoader } from '@/components/skeleton';
 
 const MapPropertySearch = dynamic(
   () => import('@/components/search/MapPropertySearch'),
@@ -99,6 +100,15 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [sortValue, setSortValue] = useState('relevance');
   const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
+  const [seoContent, setSeoContent] = useState<{
+    type: 'city' | 'state';
+    name: string;
+    h1: string | null;
+    introContent: string | null;
+    seoContent: string | null;
+    faqs: { question: string; answer: string }[];
+  } | null>(null);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   // Normalise propSearchParams: flatten string[] → string (first value), stable ref
   const propDefaults = useMemo(
@@ -124,6 +134,17 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
       setCategoryNames(map);
     }).catch(() => {});
   }, []);
+
+  // Fetch city/state SEO content whenever city or state params change
+  const cityParam  = getMerged('city');
+  const stateParam = getMerged('state');
+  useEffect(() => {
+    if (!cityParam && !stateParam) { setSeoContent(null); return; }
+    locationsApi.getSeoContent({ city: cityParam || undefined, state: stateParam || undefined })
+      .then(({ data }) => setSeoContent(data || null))
+      .catch(() => setSeoContent(null));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cityParam, stateParam]);
 
   const fetchProperties = useCallback(async () => {
     setLoading(true);
@@ -222,25 +243,6 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
   const mapSearchParams: Record<string, string> = { ...propDefaults };
   urlSearchParams.forEach((val, key) => { mapSearchParams[key] = val; });
 
-  const SkeletonCard = () => (
-    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-      <div className="animate-pulse">
-        <div className="bg-gray-200 h-48" />
-        <div className="p-4 space-y-3">
-          <div className="bg-gray-200 h-5 w-1/3 rounded" />
-          <div className="bg-gray-200 h-4 w-2/3 rounded" />
-          <div className="bg-gray-200 h-3 w-1/2 rounded" />
-          <div className="bg-gray-200 h-px w-full" />
-          <div className="flex gap-3">
-            <div className="bg-gray-200 h-3 w-16 rounded" />
-            <div className="bg-gray-200 h-3 w-16 rounded" />
-            <div className="bg-gray-200 h-3 w-20 rounded" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   // Deduplicate filter chips (minPrice+maxPrice = one chip)
   const dedupedFilters: [string, string][] = [];
   const seen = new Set<string>();
@@ -315,14 +317,21 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
             {/* Header Row */}
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
               <div>
-                <h1 className="text-xl font-bold text-gray-900">{heading}</h1>
+                <h1 className="text-xl font-bold text-gray-900">
+                  {seoContent?.h1 || heading}
+                </h1>
                 <p className="text-sm text-gray-500 mt-0.5">
                   {loading ? (
-                    <span className="animate-pulse">Loading...</span>
+                    <InlineLoader className="text-gray-400" />
                   ) : data ? (
                     <>{data.meta.total.toLocaleString('en-IN')} properties found</>
                   ) : null}
                 </p>
+                {seoContent?.introContent && (
+                  <p className="text-sm text-gray-600 mt-2 max-w-2xl leading-relaxed">
+                    {seoContent.introContent}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
@@ -433,9 +442,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
                 </div>
               </div>
             ) : loading ? (
-              <div className={cn('grid gap-4', viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1')}>
-                {Array.from({ length: 9 }).map((_, i) => <SkeletonCard key={i} />)}
-              </div>
+              <PropertyGridSkeleton count={9} listView={viewMode === 'list'} />
             ) : data?.data.length ? (
               <>
                 <div className={cn('grid gap-4', viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1')}>
@@ -521,6 +528,55 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
                 >
                   Clear Filters
                 </button>
+              </div>
+            )}
+            {/* City / State SEO Content Block */}
+            {seoContent && (seoContent.seoContent || seoContent.faqs?.length > 0) && (
+              <div className="mt-10 space-y-6">
+                {seoContent.seoContent && (
+                  <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                    <h2 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-primary-500" />
+                      About Properties in {seoContent.name}
+                    </h2>
+                    <div
+                      className="prose prose-sm max-w-none text-gray-600 leading-relaxed [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-gray-800 [&_h3]:text-sm [&_h3]:font-semibold [&_p]:mb-3 [&_ul]:pl-4 [&_ul]:list-disc [&_li]:mb-1"
+                      dangerouslySetInnerHTML={{ __html: seoContent.seoContent }}
+                    />
+                  </div>
+                )}
+
+                {seoContent.faqs?.length > 0 && (
+                  <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                    <h2 className="text-base font-bold text-gray-900 mb-4">
+                      Frequently Asked Questions
+                    </h2>
+                    <div className="space-y-2">
+                      {seoContent.faqs.map((faq, i) => (
+                        <div key={i} className="border border-gray-100 rounded-xl overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                            className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-gray-50 transition-colors"
+                          >
+                            <span className="text-sm font-medium text-gray-900">{faq.question}</span>
+                            <ChevronDown
+                              className={cn(
+                                'w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200',
+                                openFaq === i ? 'rotate-180' : '',
+                              )}
+                            />
+                          </button>
+                          {openFaq === i && (
+                            <div className="px-4 pb-4 text-sm text-gray-600 leading-relaxed border-t border-gray-50">
+                              <div className="pt-3">{faq.answer}</div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -6,6 +6,7 @@ import { Search, MapPin, Phone, Star, Award, MessageCircle, ChevronDown, Users }
 import { usersApi } from '@/lib/api';
 import { locationsApi } from '@/lib/api';
 import Link from 'next/link';
+import { AgentGridSkeleton, InlineLoader } from '@/components/skeleton';
 
 interface Agent {
   id: string;
@@ -167,8 +168,12 @@ export default function AgentsListingClient({ searchParams }: Props) {
         {/* Stats bar */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">
-              {loading ? 'Loading agents...' : `${total.toLocaleString('en-IN')} Agents Found`}
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              {loading ? (
+                <><InlineLoader className="text-gray-400" /><span className="text-gray-400 font-normal text-sm">Finding agents...</span></>
+              ) : (
+                `${total.toLocaleString('en-IN')} Agents Found`
+              )}
             </h2>
             {city && <p className="text-sm text-gray-500">in {city}</p>}
           </div>
@@ -176,23 +181,7 @@ export default function AgentsListingClient({ searchParams }: Props) {
 
         {/* Agent Grid */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-14 h-14 rounded-full bg-gray-200" />
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                    <div className="h-3 bg-gray-200 rounded w-1/2" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="h-3 bg-gray-200 rounded" />
-                  <div className="h-3 bg-gray-200 rounded w-2/3" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <AgentGridSkeleton count={12} />
         ) : agents.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
             <div className="text-6xl mb-4">🤝</div>

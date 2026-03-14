@@ -3,11 +3,9 @@
 import { useEffect } from 'react';
 import { ArrowRight, X } from 'lucide-react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { setSelectedCity } from '@/lib/store/slices/uiSlice';
 import { fetchCitiesByState } from '@/lib/store/slices/locationsSlice';
-import { propertiesApi } from '@/lib/api';
 import OptimizedImage from '@/components/common/OptimizedImage';
 
 const CITY_GRADIENTS = [
@@ -25,17 +23,9 @@ const CITY_GRADIENTS = [
   'from-lime-500 to-lime-700',
 ];
 
-function CityPropertyCount({ cityName }: { cityName: string }) {
-  const { data: count } = useQuery({
-    queryKey: ['prop-count-city', cityName],
-    queryFn: () =>
-      propertiesApi
-        .getAll({ city: cityName, approvalStatus: 'approved', limit: 1 })
-        .then((r) => r.data?.total ?? r.data?.meta?.total ?? 0),
-    staleTime: 5 * 60 * 1000,
-    enabled: !!cityName,
-  });
-  if (!count) return <span className="text-[10px] text-gray-400">—</span>;
+/** Uses the count already in the city record — zero extra API calls. */
+function CityPropertyCount({ count }: { count?: number }) {
+  if (!count) return null;
   return (
     <span className="text-[10px] font-semibold text-primary-600">
       {count.toLocaleString('en-IN')}+ props
@@ -154,8 +144,8 @@ export default function HomeLocationSelector() {
                     {city.name}
                   </span>
 
-                  {/* Property count */}
-                  <CityPropertyCount cityName={city.name} />
+                  {/* Property count — uses data already in city record, no extra API call */}
+                  <CityPropertyCount count={city.propertyCount ?? city._count?.properties} />
                 </button>
               );
             })}

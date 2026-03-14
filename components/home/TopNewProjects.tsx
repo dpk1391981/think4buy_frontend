@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   MapPin, ArrowRight, ChevronLeft, ChevronRight,
@@ -128,20 +128,12 @@ function ProjectCard({ property }: { property: Property }) {
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
+import { PropertyCardSkeleton } from '@/components/skeleton';
+
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 animate-pulse flex-shrink-0 w-[80vw] sm:w-[280px]">
-      <div className="aspect-[4/3] bg-gray-200" />
-      <div className="px-4 pt-3.5 pb-4 space-y-2.5">
-        <div className="h-3.5 bg-gray-200 rounded-lg w-2/5" />
-        <div className="h-3 bg-gray-200 rounded w-3/5" />
-        <div className="flex gap-2">
-          <div className="h-6 bg-gray-200 rounded-lg w-16" />
-          <div className="h-6 bg-gray-200 rounded-lg w-20" />
-          <div className="h-6 bg-gray-200 rounded-lg w-16" />
-        </div>
-        <div className="h-9 bg-gray-200 rounded-xl mt-2" />
-      </div>
+    <div className="flex-shrink-0 w-[80vw] sm:w-[280px]">
+      <PropertyCardSkeleton />
     </div>
   );
 }
@@ -150,9 +142,12 @@ function SkeletonCard() {
 
 export default function TopNewProjects() {
   const scrollRef       = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
   const selectedState   = useAppSelector(s => s.ui.selectedState);
   const selectedStateId = useAppSelector(s => s.ui.selectedStateId);
   const selectedCity    = useAppSelector(s => s.ui.selectedCity);
+
+  useEffect(() => { setMounted(true); }, []);
 
   // city > stateId > state — same priority as FeaturedProperties
   const locationParams: Record<string, any> = {};
@@ -185,14 +180,14 @@ export default function TopNewProjects() {
 
   if (!isLoading && projects.length === 0) return null;
 
-  const locationLabel = selectedCity
-    ? `in ${selectedCity}`
-    : selectedState ? `in ${selectedState}` : 'across India';
+  const locationLabel = mounted
+    ? (selectedCity ? `in ${selectedCity}` : selectedState ? `in ${selectedState}` : 'across India')
+    : 'across India';
 
   const viewAllBase = '/properties?possessionStatus=under_construction&approvalStatus=approved';
-  const viewAllHref = selectedCity
+  const viewAllHref = mounted && selectedCity
     ? `${viewAllBase}&city=${encodeURIComponent(selectedCity)}`
-    : selectedState
+    : mounted && selectedState
     ? `${viewAllBase}&state=${encodeURIComponent(selectedState)}`
     : viewAllBase;
 
@@ -245,7 +240,7 @@ export default function TopNewProjects() {
         </div>
 
         {/* Location pill */}
-        {(selectedCity || selectedState) && (
+        {mounted && (selectedCity || selectedState) && (
           <div className="flex items-center gap-2 mb-4 text-sm text-primary-700 bg-primary-50 px-3 py-2 rounded-xl w-fit">
             <span>📍 Showing projects in <strong>{selectedCity || selectedState}</strong></span>
           </div>

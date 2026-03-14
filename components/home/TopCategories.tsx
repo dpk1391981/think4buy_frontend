@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { TrendingUp, ArrowRight, ChevronLeft, ChevronRight, Flame } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -144,9 +144,21 @@ function CategoryCard({ cat, city, state }: { cat: CategoryItem; city?: string; 
 
 export default function TopCategories() {
   const scrollRef    = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
   const selectedCity    = useAppSelector(s => s.ui.selectedCity);
   const selectedState   = useAppSelector(s => s.ui.selectedState);
   const selectedCountry = useAppSelector(s => s.ui.selectedCountry);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  // Defer location-dependent text until after hydration to avoid server/client mismatch
+  const locationLabel = mounted
+    ? (selectedCity
+        ? `in ${selectedCity}`
+        : selectedState ? `in ${selectedState}`
+        : selectedCountry ? `in ${selectedCountry}`
+        : 'across India')
+    : 'across India';
 
   const { data: categories = [], isLoading } = useQuery<CategoryItem[]>({
     queryKey: ['top-categories', selectedCountry, selectedState, selectedCity],
@@ -165,12 +177,6 @@ export default function TopCategories() {
   const scroll = (dir: 'left' | 'right') => {
     scrollRef.current?.scrollBy({ left: dir === 'right' ? 320 : -320, behavior: 'smooth' });
   };
-
-  const locationLabel = selectedCity
-    ? `in ${selectedCity}`
-    : selectedState ? `in ${selectedState}`
-    : selectedCountry ? `in ${selectedCountry}`
-    : 'across India';
 
   const trendingCount = categories.filter(c => c.isTrending).length;
 
