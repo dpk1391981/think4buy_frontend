@@ -84,8 +84,10 @@ export const propertiesApi = {
   getById: (id: string) => api.get(`/properties/id/${id}`),
   getBySlug: (slug: string) => api.get(`/properties/${slug}`),
   getSimilar: (id: string) => api.get(`/properties/${id}/similar`),
+  getMyListings: (params?: Record<string, any>) => api.get('/properties/my-listings', { params }),
   create: (data: any) => api.post('/properties', data),
   update: (id: string, data: any) => api.patch(`/properties/${id}`, data),
+  publishDraft: (id: string) => api.patch(`/properties/${id}/publish`),
   delete: (id: string) => api.delete(`/properties/${id}`),
   uploadImages: (id: string, formData: FormData) =>
     api.post(`/properties/${id}/images`, formData, {
@@ -400,6 +402,9 @@ export const seoApi = {
   getCityPageBySlug: (slug: string) => api.get(`/seo/city-pages/${slug}`),
   getFooterLinks: () => api.get('/seo/footer-links'),
   getSeoConfig: () => api.get('/seo/config'),
+  // Public - Categories
+  getCategoryBySlug: (slug: string) => api.get(`/seo/categories/${slug}`),
+  getCategories: () => api.get('/seo/categories'),
 
   // Admin - City Pages
   adminGetCityPages: (params?: { page?: number; limit?: number; search?: string }) =>
@@ -511,4 +516,20 @@ export const homeApi = {
     source?: string;
     metadata?: Record<string, any>;
   }) => api.post('/analytics/track', dto).catch(() => {}), // silent fail
+};
+
+// ─── Articles API ─────────────────────────────────────────────────────────────
+export const articlesApi = {
+  // Public
+  getPublished: (params?: { page?: number; limit?: number; category?: string; search?: string; featured?: boolean }) =>
+    api.get('/articles', { params }),
+  getBySlug: (slug: string) => api.get(`/articles/${slug}`),
+
+  // Admin
+  adminList: (params?: { page?: number; limit?: number; status?: string; category?: string; search?: string }) =>
+    api.get('/articles/admin/list', { params }),
+  adminGetOne: (id: string) => api.get(`/articles/admin/${id}`),
+  adminCreate: (data: any) => api.post('/articles/admin', data),
+  adminUpdate: (id: string, data: any) => api.patch(`/articles/admin/${id}`, data),
+  adminDelete: (id: string) => api.delete(`/articles/admin/${id}`),
 };

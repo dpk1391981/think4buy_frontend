@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   CheckCircle2, ArrowLeft, ArrowRight, ImagePlus,
   MapPin, Loader2, Building2, Home, Factory,
-  Zap, Info, Camera, Eye, ChevronRight,
+  Zap, Info, Camera, Eye, ChevronRight, Save, Clock,
 } from 'lucide-react';
 import { propertiesApi, locationsApi, propertyConfigApi, authApi, agencyApi } from '@/lib/api';
 import AuthGuard from '@/components/auth/AuthGuard';
@@ -16,6 +16,7 @@ import {
   updateForm, nextStep, prevStep, setStep, resetForm,
   setConfigCategories, setConfigTypes, setConfigAmenities, setConfigFields, setConfigLoading,
   toggleAmenity, setDynamicField,
+  setDraftId, setAutoSaveStatus, setLastSaved,
 } from '@/lib/store/slices/postPropertySlice';
 import type { PropConfigField } from '@/lib/store/slices/postPropertySlice';
 import {
@@ -56,7 +57,7 @@ function SelectTile({ label, icon, selected, onClick, sub, wide = false }: {
       onClick={onClick}
       className={cn(
         'relative flex items-center gap-4 rounded-2xl border-2 transition-all cursor-pointer select-none text-left',
-        wide ? 'p-4 w-full' : 'flex-col items-center text-center p-5 justify-center',
+        wide ? 'p-4 w-full' : 'flex-col items-center text-center p-3.5 sm:p-5 justify-center',
         selected
           ? 'border-primary-500 bg-primary-50 shadow-md ring-2 ring-primary-200'
           : 'border-gray-200 bg-white hover:border-primary-300 hover:bg-gray-50 hover:shadow-sm',
@@ -128,7 +129,7 @@ function ChoiceButton({ label, selected, onClick, icon }: {
   return (
     <button type="button" onClick={onClick}
       className={cn(
-        'px-4 py-2.5 rounded-xl border text-sm font-medium transition-all',
+        'px-4 py-2.5 min-h-[44px] rounded-xl border text-sm font-medium transition-all',
         selected
           ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
           : 'border-gray-200 bg-white text-gray-600 hover:border-primary-300 hover:bg-primary-50',
@@ -231,8 +232,8 @@ function BuyerRoleSelectionScreen({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-16 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-lg border border-gray-100 max-w-lg w-full p-8 sm:p-10">
+    <div className="min-h-screen bg-gray-50 pt-16 flex items-start sm:items-center justify-center p-4 sm:p-6">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg border border-gray-100 max-w-lg w-full p-6 sm:p-8 lg:p-10 my-4 sm:my-0">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -369,23 +370,32 @@ function BuyerRoleSelectionScreen({
   );
 }
 
-// ─── Sidebar Progress ─────────────────────────────────────────────────────────
+// ─── Sidebar Progress (left — steps + preview) ───────────────────────────────
 
 function SidebarProgress({ currentStep, form }: { currentStep: number; form: any }) {
   const total = STEP_META.length;
+  const hasPreview = !!(form.mainCategory || form.propertyType || form.city || form.price);
+
+  const fmt = (val: string) => {
+    const n = Number(val);
+    if (!n) return '';
+    if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)} Cr`;
+    if (n >= 100000) return `₹${(n / 100000).toFixed(1)} L`;
+    return `₹${n.toLocaleString('en-IN')}`;
+  };
 
   return (
-    <aside className="hidden lg:flex flex-col w-72 xl:w-80 flex-shrink-0">
-      <div className="sticky top-24 space-y-6">
-        {/* Brand */}
-        <div className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl p-5 text-white">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-              <Home className="w-5 h-5 text-white" />
+    <aside className="hidden lg:flex flex-col w-52 xl:w-60 flex-shrink-0">
+      <div className="sticky top-24 space-y-4">
+        {/* Brand header */}
+        <div className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl p-4 text-white">
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
+              <Home className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="font-bold text-sm">Post Your Property</p>
-              <p className="text-primary-200 text-xs">Think4BuySale</p>
+              <p className="font-bold text-xs">Post Your Property</p>
+              <p className="text-primary-200 text-[10px]">Think4BuySale</p>
             </div>
           </div>
           <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
@@ -394,7 +404,7 @@ function SidebarProgress({ currentStep, form }: { currentStep: number; form: any
               style={{ width: `${((currentStep + 1) / total) * 100}%` }}
             />
           </div>
-          <p className="text-xs text-primary-200 mt-2">Step {currentStep + 1} of {total}</p>
+          <p className="text-[10px] text-primary-200 mt-1.5">Step {currentStep + 1} of {total}</p>
         </div>
 
         {/* Steps list */}
@@ -402,62 +412,339 @@ function SidebarProgress({ currentStep, form }: { currentStep: number; form: any
           {STEP_META.map((step, i) => {
             const isDone = i < currentStep;
             const isActive = i === currentStep;
-            // Hide Purpose step in sidebar when category has implicit type
             if (i === 1 && form.mainCategory && IMPLICIT_LISTING[form.mainCategory]) return null;
             return (
               <div key={i} className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all',
-                isActive ? 'bg-primary-50' : isDone ? 'opacity-100' : 'opacity-50'
+                'flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all',
+                isActive ? 'bg-primary-50' : isDone ? 'opacity-100' : 'opacity-40'
               )}>
                 <div className={cn(
-                  'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all',
+                  'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 transition-all',
                   isDone ? 'bg-green-500 text-white' : isActive ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'
                 )}>
-                  {isDone ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
+                  {isDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : i + 1}
                 </div>
                 <div className="min-w-0">
-                  <p className={cn('text-sm font-semibold truncate', isActive ? 'text-primary-700' : isDone ? 'text-gray-700' : 'text-gray-400')}>
+                  <p className={cn('text-xs font-semibold truncate', isActive ? 'text-primary-700' : isDone ? 'text-gray-700' : 'text-gray-400')}>
                     {step.label}
                   </p>
-                  <p className="text-xs text-gray-400 truncate">{step.desc}</p>
+                  <p className="text-[10px] text-gray-400 truncate">{step.desc}</p>
                 </div>
               </div>
             );
           })}
         </nav>
 
-        {/* Property preview card (shown when enough data) */}
-        {(form.propertyType || form.mainCategory) && (
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Preview</p>
-            <div className="space-y-1.5">
-              {form.mainCategory && (
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-primary-500" />
-                  <span className="text-xs text-gray-600 capitalize">{form.mainCategory.replace('_', ' ')}</span>
+        {/* Live Preview card */}
+        {hasPreview && (
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+            {/* Card header */}
+            <div className="bg-gray-50 border-b border-gray-100 px-3.5 py-2.5 flex items-center gap-1.5">
+              <Eye className="w-3 h-3 text-gray-400" />
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Live Preview</p>
+            </div>
+            <div className="p-3.5 space-y-2">
+              {/* Category + type badges */}
+              {(form.mainCategory || form.propertyType) && (
+                <div className="flex flex-wrap gap-1">
+                  {form.mainCategory && (
+                    <span className="text-[10px] font-semibold bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full capitalize">
+                      {form.mainCategory.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                  {form.listingType && (
+                    <span className="text-[10px] font-semibold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full capitalize">
+                      {form.listingType}
+                    </span>
+                  )}
+                  {form.propertyType && (
+                    <span className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full capitalize">
+                      {form.propertyType.replace(/_/g, ' ')}
+                    </span>
+                  )}
                 </div>
               )}
-              {form.propertyType && (
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500" />
-                  <span className="text-xs text-gray-600 capitalize">{form.propertyType.replace('_', ' ')}</span>
-                </div>
+
+              {/* Title */}
+              {form.autoTitle && (
+                <p className="text-xs font-bold text-gray-800 leading-snug line-clamp-2">{form.autoTitle}</p>
               )}
+
+              {/* Location */}
               {form.city && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-3 h-3 text-gray-400" />
-                  <span className="text-xs text-gray-600">{[form.locality, form.city].filter(Boolean).join(', ')}</span>
+                <div className="flex items-start gap-1.5">
+                  <MapPin className="w-3 h-3 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-[11px] text-gray-500 leading-tight">
+                    {[form.locality, form.city, form.state].filter(Boolean).join(', ')}
+                  </p>
                 </div>
               )}
-              {form.price && (
-                <p className="text-base font-bold text-primary-600 mt-2">
-                  ₹{Number(form.price).toLocaleString('en-IN')}
-                  {(form.listingType === 'rent' || form.mainCategory === 'rent' || form.mainCategory === 'pg') ? '/mo' : ''}
+
+              {/* Specs row */}
+              {(form.bedrooms || form.area || form.furnishingStatus) && (
+                <div className="flex flex-wrap gap-1">
+                  {form.bedrooms && (
+                    <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">{form.bedrooms} BHK</span>
+                  )}
+                  {form.area && (
+                    <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">{form.area} {form.areaUnit}</span>
+                  )}
+                  {form.furnishingStatus && form.furnishingStatus !== 'unfurnished' && (
+                    <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium capitalize">
+                      {form.furnishingStatus.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                  {form.floor && (
+                    <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">Floor {form.floor}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Amenities count */}
+              {form.amenityIds?.length > 0 && (
+                <p className="text-[10px] text-primary-600 font-semibold">
+                  ✓ {form.amenityIds.length} amenit{form.amenityIds.length === 1 ? 'y' : 'ies'} selected
                 </p>
+              )}
+
+              {/* Price */}
+              {form.price && (
+                <div className="pt-1.5 border-t border-gray-100">
+                  <p className="text-base font-black text-primary-600">
+                    {fmt(form.price)}
+                    <span className="text-xs font-normal text-gray-400 ml-1">
+                      {(form.listingType === 'rent' || form.mainCategory === 'rent' || form.mainCategory === 'pg') ? '/mo' : ''}
+                    </span>
+                  </p>
+                  {form.brokerage && form.brokerage !== 'none' && (
+                    <p className="text-[10px] text-gray-400 mt-0.5">Brokerage: {form.brokerage}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Listed by */}
+              {form.userType && (
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  <span className="text-sm">{form.userType === 'agent' ? '🏢' : '🏠'}</span>
+                  <p className="text-[10px] text-gray-500 font-medium">
+                    {form.userType === 'agent' ? (form.agencyName || 'Agent') : 'Direct from Owner'}
+                  </p>
+                </div>
               )}
             </div>
           </div>
         )}
+      </div>
+    </aside>
+  );
+}
+
+// ─── Right Panel (drafts + pending + save draft) ──────────────────────────────
+
+function RightPanel({
+  onSaveDraft,
+  savingDraft,
+  canSaveDraft,
+  autoSaveStatus,
+  lastSaved,
+  userDrafts,
+  userPending,
+  activeDraftId,
+  isEditMode,
+  editingProperty,
+}: {
+  onSaveDraft: () => void;
+  savingDraft: boolean;
+  canSaveDraft: boolean;
+  autoSaveStatus: string;
+  lastSaved: number | null;
+  userDrafts: any[];
+  userPending: any[];
+  activeDraftId: string | null;
+  isEditMode: boolean;
+  editingProperty?: { title?: string; city?: string; locality?: string; approvalStatus?: string } | null;
+}) {
+  const sinceLastSave = lastSaved ? Math.round((Date.now() - lastSaved) / 60000) : null;
+
+  return (
+    <aside className="hidden lg:flex flex-col w-72 xl:w-80 flex-shrink-0">
+      <div className="sticky top-24 space-y-4">
+
+        {/* Edit mode: currently editing banner */}
+        {isEditMode && editingProperty && (
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
+              <p className="text-[10px] font-bold text-blue-200 uppercase tracking-wider mb-0.5">Currently Editing</p>
+              <p className="text-sm font-bold text-white leading-snug line-clamp-2">
+                {editingProperty.title || 'Property'}
+              </p>
+            </div>
+            <div className="px-4 py-3 space-y-2">
+              {editingProperty.city && (
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                  <p className="text-xs text-gray-500 truncate">
+                    {[editingProperty.locality, editingProperty.city].filter(Boolean).join(', ')}
+                  </p>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  'text-[10px] font-bold px-2 py-0.5 rounded-full',
+                  editingProperty.approvalStatus === 'approved' ? 'bg-green-100 text-green-700' :
+                  editingProperty.approvalStatus === 'pending' ? 'bg-amber-100 text-amber-700' :
+                  'bg-gray-100 text-gray-600'
+                )}>
+                  {editingProperty.approvalStatus === 'approved' ? '✓ Approved' :
+                   editingProperty.approvalStatus === 'pending' ? '⏳ Pending Review' : 'Draft'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Save Draft CTA (new property, steps ≥ 6 covered) */}
+        {!isEditMode && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+            <button
+              type="button"
+              onClick={onSaveDraft}
+              disabled={savingDraft || !canSaveDraft}
+              title={!canSaveDraft ? 'Complete at least 6 steps to save a draft' : undefined}
+              className={cn(
+                'w-full flex items-center justify-center gap-2 font-bold py-3.5 rounded-xl transition-all text-sm',
+                canSaveDraft
+                  ? 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white shadow-lg shadow-amber-500/25'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed',
+                savingDraft && 'opacity-60 cursor-not-allowed'
+              )}
+            >
+              {savingDraft ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Saving draft…</>
+              ) : (
+                <><Save className="w-4 h-4" /> Save Draft & Exit</>
+              )}
+            </button>
+            {!canSaveDraft && (
+              <p className="mt-2 text-center text-[10px] text-gray-400">Complete 6 steps to enable drafts</p>
+            )}
+            {/* Auto-save indicator */}
+            {canSaveDraft && (
+              <div className="mt-2.5 flex items-center justify-center gap-1.5 min-h-[16px]">
+                {autoSaveStatus === 'saved' && sinceLastSave !== null && (
+                  <span className="flex items-center gap-1 text-[11px] text-green-500 font-medium">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Auto-saved {sinceLastSave < 1 ? 'just now' : `${sinceLastSave}m ago`}
+                  </span>
+                )}
+                {autoSaveStatus === 'saving' && (
+                  <span className="flex items-center gap-1 text-[11px] text-gray-400">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Auto-saving…
+                  </span>
+                )}
+                {autoSaveStatus === 'error' && (
+                  <span className="text-[11px] text-red-400">Auto-save failed</span>
+                )}
+                {autoSaveStatus === 'idle' && (
+                  <span className="flex items-center gap-1 text-[11px] text-gray-400">
+                    <Clock className="w-3 h-3" /> Auto-saves every 30s
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Drafted Properties */}
+        {userDrafts.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                <Save className="w-3 h-3" /> Drafts
+              </p>
+              <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full">{userDrafts.length}</span>
+            </div>
+            <div className="space-y-2">
+              {userDrafts.slice(0, 5).map((draft: any) => {
+                const isActive = draft.id === activeDraftId;
+                return (
+                  <a key={draft.id} href={`/post-property?edit=${draft.id}`}
+                    className={cn(
+                      'flex items-start gap-2.5 p-2.5 rounded-xl border transition-all',
+                      isActive
+                        ? 'border-amber-300 bg-amber-50'
+                        : 'border-gray-100 hover:border-amber-200 hover:bg-amber-50/40'
+                    )}>
+                    <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-sm',
+                      isActive ? 'bg-amber-100' : 'bg-gray-100')}>
+                      ✏️
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-gray-800 truncate leading-tight">
+                        {draft.title || 'Untitled Draft'}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5 truncate">
+                        {[draft.city, draft.locality].filter(Boolean).join(' · ') || 'No location set'}
+                      </p>
+                    </div>
+                    {isActive && (
+                      <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full flex-shrink-0 self-center">
+                        Current
+                      </span>
+                    )}
+                  </a>
+                );
+              })}
+            </div>
+            {userDrafts.length > 5 && (
+              <a href="/my-listings" className="block text-center text-xs text-gray-400 hover:text-amber-600 mt-2 pt-2 border-t border-gray-100 font-medium transition-colors">
+                +{userDrafts.length - 5} more drafts →
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Pending Review */}
+        {userPending.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                <Clock className="w-3 h-3" /> Pending Review
+              </p>
+              <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full">{userPending.length}</span>
+            </div>
+            <div className="space-y-2">
+              {userPending.slice(0, 5).map((prop: any) => (
+                <div key={prop.id} className="flex items-start gap-2.5 p-2.5 rounded-xl border border-blue-100 bg-blue-50/40">
+                  <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0 text-sm">
+                    🕒
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{prop.title}</p>
+                    <p className="text-[10px] text-blue-600 mt-0.5 font-medium">Awaiting admin approval</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {userPending.length > 5 && (
+              <a href="/my-listings" className="block text-center text-xs text-gray-400 hover:text-blue-600 mt-2 pt-2 border-t border-gray-100 font-medium transition-colors">
+                View all →
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {userDrafts.length === 0 && userPending.length === 0 && !isEditMode && (
+          <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-5 text-center">
+            <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center mx-auto mb-2.5">
+              <Building2 className="w-5 h-5 text-gray-300" />
+            </div>
+            <p className="text-xs font-semibold text-gray-400">No listings yet</p>
+            <p className="text-[10px] text-gray-300 mt-1 leading-relaxed">Your drafts & pending properties will appear here</p>
+          </div>
+        )}
+
       </div>
     </aside>
   );
@@ -469,16 +756,28 @@ function MobileProgress({ currentStep }: { currentStep: number }) {
   const total = STEP_META.length;
   const step = STEP_META[currentStep] || STEP_META[0];
   return (
-    <div className="lg:hidden bg-white border-b border-gray-100 px-4 py-3 sticky top-16 z-10">
+    <div className="lg:hidden bg-white border-b border-gray-100 px-4 pt-3 pb-2.5 sticky top-16 z-10">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-sm font-bold text-gray-800">{step.label}</p>
-        <span className="text-xs text-gray-400 font-medium">{currentStep + 1} / {total}</span>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-gray-900 leading-tight">{step.label}</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">{step.desc}</p>
+        </div>
+        <span className="ml-3 flex-shrink-0 text-[11px] font-bold text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full">
+          {currentStep + 1} / {total}
+        </span>
       </div>
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full transition-all duration-500"
-          style={{ width: `${((currentStep + 1) / total) * 100}%` }}
-        />
+      {/* Step dots */}
+      <div className="flex items-center gap-0.5">
+        {STEP_META.map((_, i) => (
+          <div key={i} className={cn(
+            'h-1 rounded-full transition-all duration-300',
+            i < currentStep
+              ? 'bg-green-400 flex-1'
+              : i === currentStep
+              ? 'bg-primary-600 flex-[2]'
+              : 'bg-gray-200 flex-1'
+          )} />
+        ))}
       </div>
     </div>
   );
@@ -1190,7 +1489,7 @@ function Step9Price({ form, dispatch }: any) {
 
 // ─── Step: Photos ────────────────────────────────────────────────────────────
 
-function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImages, onRemoveExisting, onSubmit, loading, error, isEditMode }: any) {
+function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImages, onRemoveExisting, onSubmit, onSaveDraft, loading, savingDraft, error, isEditMode }: any) {
   const imageRef = useRef<HTMLInputElement>(null);
   const imgCount = mediaFiles.filter((m: MediaFile) => m.type === 'image').length;
   const totalCount = imgCount + (existingImages?.length || 0);
@@ -1304,10 +1603,19 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImage
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>
       )}
 
-      <button type="button" onClick={onSubmit} disabled={loading || totalCount < 3}
-        className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 text-base transition-all shadow-xl shadow-primary-600/30">
-        {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Saving…</> : isEditMode ? '✏️ Update Property' : '🎉 Post Property Now'}
-      </button>
+      <div className="flex flex-col gap-3">
+        <button type="button" onClick={onSubmit} disabled={loading || totalCount < 3}
+          className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 active:from-primary-800 active:to-primary-900 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 text-base transition-all shadow-xl shadow-primary-600/30">
+          {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Saving…</> : isEditMode ? '✏️ Update Property' : '🎉 Publish Property'}
+        </button>
+        {!isEditMode && (
+          <button type="button" onClick={onSaveDraft} disabled={savingDraft || loading}
+            className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl border-2 border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 transition-all text-sm">
+            {savingDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Save Draft & Exit
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -1322,11 +1630,12 @@ function PostPropertyPageInner() {
 
   const { user, loading: authLoading, login, refresh: refreshAuth } = useAuth();
   const dispatch = useAppDispatch();
-  const { currentStep, form, config } = useAppSelector(s => s.postProperty);
+  const { currentStep, form, config, draftId, autoSaveStatus, lastSaved } = useAppSelector(s => s.postProperty);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [existingImages, setExistingImages] = useState<{ id: string; url: string; isPrimary: boolean }[]>([]);
   const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [roleUpgrading, setRoleUpgrading] = useState(false);
   const [agentAgencyInfo, setAgentAgencyInfo] = useState<{ agencyId: string; agentProfileId: string } | null>(null);
   // Keep server + client initial render identical (both show loader when editId present)
@@ -1334,6 +1643,12 @@ function PostPropertyPageInner() {
   const [editLoading, setEditLoading] = useState(true);
   const [editAccessDenied, setEditAccessDenied] = useState(false);
   const [error, setError] = useState('');
+  const [userDrafts, setUserDrafts] = useState<any[]>([]);
+  const [userPending, setUserPending] = useState<any[]>([]);
+  const [editingProperty, setEditingProperty] = useState<any>(null);
+
+  // Refs so auto-save interval always reads the latest values
+  const latestRef = useRef({ form, draftId, agentAgencyInfo, isEditMode: false, currentStep: 0 });
 
   const TOTAL_STEPS = 10;
   const isAgent = user?.role === 'agent' || user?.role === 'seller';
@@ -1386,6 +1701,120 @@ function PostPropertyPageInner() {
       dispatch(setConfigLoading({ key: 'fields', value: false }));
     });
   }, [form.typeId]);
+
+  // Load user's existing drafts + pending listings for right panel display
+  useEffect(() => {
+    if (!user) return;
+    propertiesApi.getMyListings({ limit: 20 })
+      .then(res => {
+        const items = res.data?.items ?? res.data?.data ?? [];
+        setUserDrafts(items.filter((p: any) => p.isDraft));
+        setUserPending(items.filter((p: any) => !p.isDraft && p.approvalStatus === 'pending'));
+      })
+      .catch(() => {});
+  }, [user?.id]);
+
+  // Keep latest-values ref in sync for the auto-save interval
+  useEffect(() => {
+    latestRef.current = { form, draftId, agentAgencyInfo, isEditMode, currentStep };
+  });
+
+  // Build payload from form data (with fallback values for required fields)
+  const buildDraftPayload = (formData: typeof form, info: typeof agentAgencyInfo) => {
+    const effectiveTitle = formData.autoTitle || generatePropertyTitle({
+      category: formData.mainCategory,
+      listingType: formData.listingType || (formData.mainCategory === 'pg' || formData.mainCategory === 'rent' ? 'rent' : 'buy'),
+      propertyType: formData.propertyType, bedrooms: formData.bedrooms, city: formData.city, locality: formData.locality,
+    }) || 'Draft Property';
+    const extraDetails: Record<string, any> = {};
+    if (formData.mainCategory === 'industrial') {
+      extraDetails.height = formData.industrialHeight;
+      extraDetails.powerLoad = formData.industrialPowerLoad;
+      extraDetails.hasDock = formData.hasDock;
+      extraDetails.hasRamp = formData.hasRamp;
+    }
+    Object.entries(formData.dynamicFields).forEach(([k, v]) => { if (v !== '') extraDetails[k] = v; });
+    return {
+      title: effectiveTitle,
+      description: formData.description || effectiveTitle,
+      category: formData.mainCategory || 'buy',
+      type: formData.propertyType || 'apartment',
+      city: formData.city || 'Delhi',
+      cityId: formData.cityId || undefined,
+      state: formData.state || undefined,
+      stateId: formData.stateId || undefined,
+      locality: formData.locality || formData.city || 'Delhi',
+      address: formData.address || undefined,
+      pincode: formData.pincode || undefined,
+      latitude: formData.latitude ?? undefined,
+      longitude: formData.longitude ?? undefined,
+      price: Number(formData.price) || 0,
+      priceUnit: formData.priceUnit,
+      area: formData.area ? Number(formData.area) : undefined,
+      areaUnit: formData.areaUnit,
+      bedrooms: formData.bedrooms ? Number(formData.bedrooms) : undefined,
+      bathrooms: formData.bathrooms ? Number(formData.bathrooms) : undefined,
+      floorNumber: formData.floor ? Number(formData.floor) : undefined,
+      furnishingStatus: formData.furnishingStatus || undefined,
+      possessionStatus: formData.possessionStatus,
+      listedBy: formData.userType === 'agent' ? 'agent' : 'owner',
+      builderName: formData.userType === 'agent' ? (formData.agencyName?.trim() || undefined) : undefined,
+      brokerage: formData.brokerage === 'custom' ? formData.brokerageCustom : formData.brokerage || undefined,
+      amenityIds: formData.amenityIds.length > 0 ? formData.amenityIds : undefined,
+      extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : undefined,
+      isDraft: true,
+      ...(info && formData.userType === 'agent' ? {
+        agentProfileId: info.agentProfileId,
+        agencyId: info.agencyId,
+      } : {}),
+    };
+  };
+
+  // Save current form state as a draft
+  const saveDraft = async (silent = false) => {
+    const { form: f, draftId: did, agentAgencyInfo: info } = latestRef.current;
+    if (!f.mainCategory) return; // Nothing meaningful to save yet
+    if (!silent) setSavingDraft(true);
+    dispatch(setAutoSaveStatus('saving'));
+    try {
+      const payload = buildDraftPayload(f, info);
+      if (did) {
+        await propertiesApi.update(did, payload);
+      } else {
+        const { data } = await propertiesApi.create(payload);
+        dispatch(setDraftId(data.id));
+        if (typeof window !== 'undefined') localStorage.setItem('t4bs_draft_id', data.id);
+      }
+      dispatch(setLastSaved(Date.now()));
+      dispatch(setAutoSaveStatus('saved'));
+    } catch {
+      dispatch(setAutoSaveStatus('error'));
+    } finally {
+      if (!silent) setSavingDraft(false);
+    }
+  };
+
+  // Auto-save every 30 seconds — only when not editing and at least 6 steps covered
+  useEffect(() => {
+    if (isEditMode) return;
+    const interval = setInterval(() => {
+      const { isEditMode: em, form: f, currentStep: cs } = latestRef.current;
+      if (em || !f.mainCategory || cs < 5) return;
+      saveDraft(true);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [isEditMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSaveDraftAndExit = async () => {
+    await saveDraft(false);
+    // Redirect to edit the saved draft so user can resume later
+    const savedId = latestRef.current.draftId;
+    if (savedId) {
+      router.push(`/post-property?edit=${savedId}`);
+    } else {
+      router.push('/my-listings');
+    }
+  };
 
   // Load existing property data for edit mode (or immediately clear loader for new-property mode)
   useEffect(() => {
@@ -1468,6 +1897,12 @@ function PostPropertyPageInner() {
         setExistingImages(
           (property.images || []).sort((a: any, b: any) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0))
         );
+        setEditingProperty({
+          title: property.title,
+          city: property.city,
+          locality: property.locality,
+          approvalStatus: property.isDraft ? 'draft' : (property.approvalStatus || 'pending'),
+        });
         dispatch(setStep(0));
       } catch (err: any) {
         const status = err?.response?.status;
@@ -1575,6 +2010,13 @@ function PostPropertyPageInner() {
         const { data: updated } = await propertiesApi.update(editId, payload);
         propertyId = updated.id;
         propertySlug = updated.slug;
+      } else if (draftId) {
+        // Publish an existing draft: update with final data then submit for approval
+        await propertiesApi.update(draftId, payload);
+        const { data: published } = await propertiesApi.publishDraft(draftId);
+        propertyId = published.id;
+        propertySlug = published.slug;
+        if (typeof window !== 'undefined') localStorage.removeItem('t4bs_draft_id');
       } else {
         const { data: property } = await propertiesApi.create(payload);
         propertyId = property.id;
@@ -1692,28 +2134,34 @@ function PostPropertyPageInner() {
       case 6: return <Step7Amenities {...stepProps} />;
       case 7: return <Step8Description {...stepProps} />;
       case 8: return <Step9Price {...stepProps} />;
-      case 9: return <Step10Photos {...stepProps} mediaFiles={mediaFiles} setMediaFiles={setMediaFiles} existingImages={existingImages} onRemoveExisting={handleRemoveExistingImage} onSubmit={handleSubmit} loading={loading} error={error} isEditMode={isEditMode} />;
+      case 9: return <Step10Photos {...stepProps} mediaFiles={mediaFiles} setMediaFiles={setMediaFiles} existingImages={existingImages} onRemoveExisting={handleRemoveExistingImage} onSubmit={handleSubmit} onSaveDraft={handleSaveDraftAndExit} savingDraft={savingDraft} loading={loading} error={error} isEditMode={isEditMode} />;
       default: return null;
     }
   };
 
+  const mobileSaveLabel = autoSaveStatus === 'saving'
+    ? 'Saving…'
+    : autoSaveStatus === 'saved' && lastSaved && Math.round((Date.now() - lastSaved) / 60000) < 1
+    ? 'Saved just now'
+    : null;
+
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
-      {/* Mobile progress */}
+      {/* Mobile sticky progress bar */}
       <MobileProgress currentStep={currentStep} />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <div className="flex gap-8 xl:gap-12">
+      <div className="max-w-screen-xl mx-auto px-0 sm:px-6 lg:px-8 py-4 sm:py-8 lg:py-12">
+        <div className="flex gap-6 xl:gap-8">
 
-          {/* Sidebar — desktop only */}
+          {/* Left — steps/status + preview (desktop only) */}
           <SidebarProgress currentStep={currentStep} form={form} />
 
-          {/* Main form area */}
+          {/* Middle — form */}
           <main className="flex-1 min-w-0">
             {/* Page header — desktop only */}
-            <div className="hidden lg:block mb-8">
-              <h1 className="text-3xl font-black text-gray-900">{isEditMode ? 'Edit Property' : 'Post Your Property'}</h1>
-              <div className="flex items-center gap-2 mt-2">
+            <div className="hidden lg:block mb-6">
+              <h1 className="text-2xl font-black text-gray-900">{isEditMode ? 'Edit Property' : 'Post Your Property'}</h1>
+              <div className="flex items-center gap-2 mt-1.5">
                 {isAgent ? (
                   <>
                     <span className="text-xs px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full font-semibold">🏢 Agent Listing</span>
@@ -1725,44 +2173,131 @@ function PostPropertyPageInner() {
               </div>
             </div>
 
-            {/* Form card */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8 lg:p-10 mb-6">
+            {/* Mobile page title */}
+            <div className="lg:hidden px-4 pt-2 pb-3">
+              <h1 className="text-lg font-black text-gray-900">{isEditMode ? 'Edit Property' : 'Post Your Property'}</h1>
+              <span className={cn(
+                'inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full mt-1',
+                isAgent ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+              )}>
+                {isAgent ? '🏢 Agent Listing' : '🏠 Owner Listing'}
+              </span>
+            </div>
+
+            {/* Form card — full bleed on mobile, rounded on sm+ */}
+            <div className="bg-white rounded-none sm:rounded-3xl shadow-none sm:shadow-sm border-y sm:border border-gray-100 p-5 sm:p-8 lg:p-10 mb-4 sm:mb-6">
               {error && currentStep < 9 && (
-                <div className="mb-6 bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-3 text-sm font-medium">
+                <div className="mb-5 bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-3 text-sm font-medium">
                   {error}
                 </div>
               )}
               {renderStep()}
             </div>
 
-            {/* Navigation */}
+            {/* Desktop navigation (steps 0–8) */}
             {currentStep < 9 && (
-              <div className="flex items-center gap-3">
-                {currentStep > 0 && (
-                  <button type="button" onClick={handleBack}
-                    className="flex items-center gap-2 px-6 py-3.5 rounded-2xl border-2 border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all">
-                    <ArrowLeft className="w-4 h-4" /> Back
+              <div className="hidden lg:block space-y-3">
+                <div className="flex items-center gap-3">
+                  {currentStep > 0 && (
+                    <button type="button" onClick={handleBack}
+                      className="flex items-center gap-2 px-6 py-3.5 rounded-2xl border-2 border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all">
+                      <ArrowLeft className="w-4 h-4" /> Back
+                    </button>
+                  )}
+                  <button type="button" onClick={handleNext}
+                    className="flex-1 flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-primary-600/25 text-base">
+                    {currentStep === 8 ? 'Next: Add Photos' : 'Continue'}
+                    <ArrowRight className="w-4 h-4" />
                   </button>
-                )}
-                <button type="button" onClick={handleNext}
-                  className="flex-1 flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-primary-600/25 text-base">
-                  {currentStep === 8 ? 'Next: Add Photos' : 'Continue'}
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+                </div>
               </div>
             )}
 
+            {/* Desktop back link (step 9) */}
             {currentStep === 9 && (
-              <div className="flex justify-center">
+              <div className="hidden lg:flex justify-center">
                 <button type="button" onClick={handleBack}
                   className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm font-semibold transition-colors">
                   <ArrowLeft className="w-4 h-4" /> Go back to edit
                 </button>
               </div>
             )}
+
+            {/* Mobile back link (step 9) + spacer for sticky nav */}
+            {currentStep === 9 && (
+              <div className="lg:hidden flex justify-center mt-4 mb-28">
+                <button type="button" onClick={handleBack}
+                  className="flex items-center gap-2 text-gray-500 text-sm font-semibold py-3 px-5 rounded-2xl border border-gray-200 bg-white">
+                  <ArrowLeft className="w-4 h-4" /> Go back to edit
+                </button>
+              </div>
+            )}
+
+            {/* Mobile spacer — prevents content hiding behind sticky nav */}
+            {currentStep < 9 && <div className="h-28 lg:hidden" />}
           </main>
+
+          {/* Right — drafts + pending + save draft (desktop only) */}
+          <RightPanel
+            onSaveDraft={handleSaveDraftAndExit}
+            savingDraft={savingDraft}
+            canSaveDraft={currentStep >= 5}
+            autoSaveStatus={autoSaveStatus}
+            lastSaved={lastSaved}
+            userDrafts={userDrafts}
+            userPending={userPending}
+            activeDraftId={draftId}
+            isEditMode={isEditMode}
+            editingProperty={editingProperty}
+          />
         </div>
       </div>
+
+      {/* ── Mobile sticky bottom navigation ─────────────────────────────── */}
+      {currentStep < 9 && (
+        <div className="fixed inset-x-0 bottom-0 z-40 lg:hidden bg-white border-t border-gray-100 shadow-[0_-4px_24px_rgba(0,0,0,0.07)] px-4 pt-3 pb-7">
+          <div className="flex items-center gap-3 mb-2">
+            {currentStep > 0 && (
+              <button type="button" onClick={handleBack}
+                className="flex items-center justify-center gap-1.5 h-12 px-5 rounded-2xl border-2 border-gray-200 text-gray-700 font-semibold text-sm active:bg-gray-100 transition-colors">
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+            )}
+            <button type="button" onClick={handleNext}
+              className="flex-1 flex items-center justify-center gap-2 bg-primary-600 active:bg-primary-700 text-white font-bold h-12 rounded-2xl shadow-lg shadow-primary-600/20 text-[15px] transition-colors">
+              {currentStep === 8 ? 'Add Photos' : 'Continue'}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Save draft row (mobile) — visible once 6 steps done */}
+          {!isEditMode && (
+            <div className="flex items-center justify-between min-h-[20px]">
+              {currentStep >= 5 ? (
+                <button type="button" onClick={handleSaveDraftAndExit} disabled={savingDraft}
+                  className="flex items-center gap-1.5 text-sm text-gray-500 font-medium disabled:opacity-50 active:text-amber-600 transition-colors">
+                  {savingDraft
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Save className="w-3.5 h-3.5" />}
+                  Save Draft
+                </button>
+              ) : (
+                <span className="text-xs text-gray-300">Drafts available from step 6</span>
+              )}
+              {mobileSaveLabel && (
+                <span className="flex items-center gap-1 text-[11px] text-green-500 font-medium">
+                  <CheckCircle2 className="w-3 h-3" />{mobileSaveLabel}
+                </span>
+              )}
+              {autoSaveStatus === 'saving' && (
+                <span className="flex items-center gap-1 text-[11px] text-gray-400">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Saving…
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

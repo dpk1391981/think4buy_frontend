@@ -57,7 +57,7 @@ export default function Footer() {
                   <Home className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-xl font-bold text-white">
-                  think<span className="text-primary-400">4buy</span><span className="text-amber-400">sale</span>
+                  Think<span className="text-primary-400">4Buy</span><span className="text-amber-400">Sale</span>
                 </span>
               </Link>
 

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { propertiesApi } from '@/lib/api';
+import { useRouter } from 'next/navigation';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import {
   formatPrice, formatArea, getPrimaryImage,
@@ -26,6 +27,7 @@ const STATUS_CONFIG = {
   active:   { label: 'Active',   dot: 'bg-emerald-500', pill: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', icon: CheckCircle, color: 'text-emerald-600' },
   pending:  { label: 'Pending',  dot: 'bg-amber-400',   pill: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',       icon: Clock,        color: 'text-amber-600' },
   rejected: { label: 'Rejected', dot: 'bg-red-500',     pill: 'bg-red-50 text-red-600 ring-1 ring-red-200',            icon: XCircle,      color: 'text-red-500' },
+  draft:    { label: 'Draft',    dot: 'bg-gray-400',    pill: 'bg-gray-50 text-gray-600 ring-1 ring-gray-200',          icon: Clock,        color: 'text-gray-500' },
 } as const;
 
 type StatusKey = keyof typeof STATUS_CONFIG;
@@ -43,6 +45,7 @@ const NAV_ITEMS = [
 
 function MyListingsContent() {
   const { user } = useAuth();
+  const router = useRouter();
 
   const [all, setAll]             = useState<any[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -61,8 +64,9 @@ function MyListingsContent() {
   const load = useCallback(async (silent = false) => {
     silent ? setRefreshing(true) : setLoading(true);
     try {
-      const res = await propertiesApi.getAll({ limit: 200, sortBy: 'createdAt', sortOrder: 'DESC' });
-      setAll(res.data?.data ?? res.data?.items ?? []);
+      const res = await propertiesApi.getMyListings({ limit: 200 });
+      // getMyListings returns { items, total, page, limit }
+      setAll(res.data?.items ?? res.data?.data ?? []);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -83,13 +87,18 @@ function MyListingsContent() {
 
   const counts = useMemo(() => ({
     '': all.length,
-    active:   all.filter(p => p.status === 'active').length,
-    pending:  all.filter(p => p.status === 'pending').length,
-    rejected: all.filter(p => p.status === 'rejected').length,
+    active:   all.filter(p => p.status === 'active' && !p.isDraft).length,
+    pending:  all.filter(p => p.status === 'pending' && !p.isDraft).length,
+    rejected: all.filter(p => p.status === 'rejected' && !p.isDraft).length,
+    draft:    all.filter(p => p.isDraft).length,
   }), [all]);
 
   const filtered = useMemo(() => {
-    let list = tab ? all.filter(p => p.status === tab) : all;
+    let list = tab === 'draft'
+      ? all.filter(p => p.isDraft)
+      : tab
+        ? all.filter(p => p.status === tab && !p.isDraft)
+        : all;
     if (debouncedQ) {
       const q = debouncedQ.toLowerCase();
       list = list.filter(p =>
@@ -107,6 +116,15 @@ function MyListingsContent() {
   const paginated  = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
   const changeTab = (v: string) => { setTab(v); setPage(1); };
+
+  const handlePublish = async (id: string) => {
+    try {
+      await propertiesApi.publishDraft(id);
+      await load(true);
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Failed to publish draft');
+    }
+  };
 
   const goPage = (n: number) => {
     setPage(n);
@@ -278,6 +296,7 @@ function MyListingsContent() {
           <div className="px-4 lg:px-6 flex items-center gap-1.5 pb-3 overflow-x-auto scrollbar-hide">
             {[{ value: '', label: 'All' }, ...Object.entries(STATUS_CONFIG).map(([v, c]) => ({ value: v, label: c.label }))].map(({ value, label }) => {
               const cfg = value ? STATUS_CONFIG[value as StatusKey] : null;
+              if (value !== '' && counts[value as string] === 0) return null; // Hide empty tabs
               return (
                 <button key={value} onClick={() => changeTab(value)}
                   className={cn(
@@ -367,8 +386,8 @@ function MyListingsContent() {
             )}>
               {paginated.map(p => (
                 view === 'list'
-                  ? <ListingRow key={p.id} p={p} />
-                  : <ListingCard key={p.id} p={p} />
+                  ? <ListingRow key={p.id} p={p} onPublish={handlePublish} />
+                  : <ListingCard key={p.id} p={p} onPublish={handlePublish} />
               ))}
             </div>
           )}
@@ -417,8 +436,8 @@ function MyListingsContent() {
 
 // ─── Grid card ────────────────────────────────────────────────────────────────
 
-function ListingCard({ p }: { p: any }) {
-  const status = STATUS_CONFIG[p.status as StatusKey] ?? STATUS_CONFIG.pending;
+function ListingCard({ p, onPublish }: { p: any; onPublish?: (id: string) => void }) {
+  const status = p.isDraft ? STATUS_CONFIG.draft : (STATUS_CONFIG[p.status as StatusKey] ?? STATUS_CONFIG.pending);
   const thumb  = p.images?.[0]?.url || getPrimaryImage([]);
 
   return (
@@ -466,14 +485,31 @@ function ListingCard({ p }: { p: any }) {
         </div>
 
         <div className="flex gap-2 pt-3 border-t border-gray-100">
-          <Link href={`/properties/${p.slug}`}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 active:scale-95 transition-all">
-            <Eye className="w-3.5 h-3.5" /> View
-          </Link>
-          <Link href={`/post-property?edit=${p.id}`}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all shadow-sm shadow-blue-600/20">
-            <Pencil className="w-3.5 h-3.5" /> Edit
-          </Link>
+          {p.isDraft ? (
+            <>
+              <Link href={`/post-property?edit=${p.id}`}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 active:scale-95 transition-all">
+                <Pencil className="w-3.5 h-3.5" /> Continue
+              </Link>
+              {onPublish && (
+                <button onClick={() => onPublish(p.id)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 active:scale-95 transition-all">
+                  <TrendingUp className="w-3.5 h-3.5" /> Publish
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <Link href={`/properties/${p.slug}`}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 active:scale-95 transition-all">
+                <Eye className="w-3.5 h-3.5" /> View
+              </Link>
+              <Link href={`/post-property?edit=${p.id}`}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all shadow-sm shadow-blue-600/20">
+                <Pencil className="w-3.5 h-3.5" /> Edit
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -482,8 +518,8 @@ function ListingCard({ p }: { p: any }) {
 
 // ─── List row ─────────────────────────────────────────────────────────────────
 
-function ListingRow({ p }: { p: any }) {
-  const status = STATUS_CONFIG[p.status as StatusKey] ?? STATUS_CONFIG.pending;
+function ListingRow({ p, onPublish }: { p: any; onPublish?: (id: string) => void }) {
+  const status = p.isDraft ? STATUS_CONFIG.draft : (STATUS_CONFIG[p.status as StatusKey] ?? STATUS_CONFIG.pending);
   const thumb  = p.images?.[0]?.url || getPrimaryImage([]);
 
   return (
@@ -515,14 +551,31 @@ function ListingRow({ p }: { p: any }) {
         </div>
 
         <div className="flex items-center gap-2 mt-2">
-          <Link href={`/properties/${p.slug}`}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 active:scale-95 transition-all">
-            <Eye className="w-3 h-3" /> View
-          </Link>
-          <Link href={`/post-property?edit=${p.id}`}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all">
-            <Pencil className="w-3 h-3" /> Edit
-          </Link>
+          {p.isDraft ? (
+            <>
+              <Link href={`/post-property?edit=${p.id}`}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 active:scale-95 transition-all">
+                <Pencil className="w-3 h-3" /> Continue
+              </Link>
+              {onPublish && (
+                <button onClick={() => onPublish(p.id)}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 active:scale-95 transition-all">
+                  <TrendingUp className="w-3 h-3" /> Publish
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <Link href={`/properties/${p.slug}`}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 active:scale-95 transition-all">
+                <Eye className="w-3 h-3" /> View
+              </Link>
+              <Link href={`/post-property?edit=${p.id}`}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all">
+                <Pencil className="w-3 h-3" /> Edit
+              </Link>
+            </>
+          )}
           <span className="ml-auto text-[10px] text-gray-300">{timeAgo(p.createdAt)}</span>
         </div>
       </div>

@@ -1,9 +1,20 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import PropertyListingPage from './PropertyListingPage';
+import CategoryPageContent from '@/components/seo/CategoryPageContent';
 
 interface Props {
   searchParams: { [key: string]: string | string[] | undefined };
+}
+
+async function fetchCategorySeo(categorySlug?: string) {
+  if (!categorySlug) return null;
+  try {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+    const res = await fetch(`${apiBase}/seo/categories/${categorySlug}`, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
 }
 
 async function fetchLocationSeo(city?: string, state?: string) {
@@ -46,10 +57,15 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   };
 }
 
-export default function Page({ searchParams }: Props) {
+export default async function Page({ searchParams }: Props) {
+  const category = (searchParams.category as string) || 'buy';
+  const categorySeo = await fetchCategorySeo(category);
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 pt-16" />}>
-      <PropertyListingPage searchParams={searchParams} />
-    </Suspense>
+    <>
+      <Suspense fallback={<div className="min-h-screen bg-gray-50 pt-16" />}>
+        <PropertyListingPage searchParams={searchParams} />
+      </Suspense>
+      {categorySeo && <CategoryPageContent category={categorySeo} />}
+    </>
   );
 }

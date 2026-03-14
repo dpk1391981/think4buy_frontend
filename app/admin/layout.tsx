@@ -27,6 +27,8 @@ import {
   Target,
   Handshake,
   IndianRupee,
+  BookOpen,
+  Navigation,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 
@@ -56,6 +58,13 @@ const NAV_GROUPS = [
     label: 'Users',
     items: [
       { href: '/admin/users', label: 'All Users', icon: Users },
+    ],
+  },
+  {
+    label: 'Content',
+    items: [
+      { href: '/admin/articles', label: 'Articles', icon: BookOpen },
+      { href: '/admin/menu', label: 'Menu', icon: Navigation },
     ],
   },
   {

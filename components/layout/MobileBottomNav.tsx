@@ -25,7 +25,7 @@ export default function MobileBottomNav() {
   if (pathname.startsWith('/admin') || pathname === '/agent' || pathname.startsWith('/agent/')) return null;
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 safe-bottom">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 safe-bottom">
       <div className="flex items-center justify-around h-16 px-1">
         {navItems.map(({ icon: Icon, label, href, isPrimary }) => {
           const isActive = pathname === href || (href !== '/' && pathname.startsWith(href));
@@ -43,7 +43,8 @@ export default function MobileBottomNav() {
                     <div className="w-14 h-14 bg-primary-600 rounded-full flex items-center justify-center shadow-lg shadow-primary-600/40 border-4 border-white">
                       <Icon className="w-6 h-6 text-white" />
                     </div>
-                    <span className="badge-free absolute -top-1 -right-1 text-[9px] px-1.5 py-0.5 rounded-full leading-none">FREE</span>
+                    <span className="badge-free absolute -top-1 -right-1 text-[9px] px-1 py-0.5 rounded-full leading-none">
+                      {/* <s>₹99</s> */}&nbsp;FREE</span>
                   </div>
                   <span className="text-[10px] text-primary-600 font-semibold mt-0.5">{label}</span>
                 </button>
@@ -55,8 +56,12 @@ export default function MobileBottomNav() {
                 href={href}
                 className="flex flex-col items-center justify-center -mt-6 relative"
               >
-                <div className="w-14 h-14 bg-primary-600 rounded-full flex items-center justify-center shadow-lg shadow-primary-600/40 border-4 border-white">
-                  <Icon className="w-6 h-6 text-white" />
+                <div className="relative">
+                  <div className="w-14 h-14 bg-primary-600 rounded-full flex items-center justify-center shadow-lg shadow-primary-600/40 border-4 border-white">
+                    <Icon className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="badge-free absolute -top-1 -right-1 text-[9px] px-1 py-0.5 rounded-full leading-none">
+                    {/* <s>₹99</s> */}&nbsp;FREE</span>
                 </div>
                 <span className="text-[10px] text-primary-600 font-semibold mt-0.5">{label}</span>
               </Link>

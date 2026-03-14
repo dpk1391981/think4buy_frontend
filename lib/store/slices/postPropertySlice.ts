@@ -134,6 +134,9 @@ interface PostPropertyState {
   isSubmitting: boolean;
   submitError: string;
   submittedPropertySlug: string;
+  draftId: string | null;
+  lastSaved: number | null; // epoch ms
+  autoSaveStatus: 'idle' | 'saving' | 'saved' | 'error';
   config: {
     categories: PropConfigCategory[];
     types: PropConfigType[];
@@ -153,6 +156,9 @@ const initialState: PostPropertyState = {
   isSubmitting: false,
   submitError: '',
   submittedPropertySlug: '',
+  draftId: null,
+  lastSaved: null,
+  autoSaveStatus: 'idle',
   config: {
     categories: [],
     types: [],
@@ -200,6 +206,15 @@ export const postPropertySlice = createSlice({
     setSubmittedSlug: (state, action: PayloadAction<string>) => {
       state.submittedPropertySlug = action.payload;
     },
+    setDraftId: (state, action: PayloadAction<string | null>) => {
+      state.draftId = action.payload;
+    },
+    setAutoSaveStatus: (state, action: PayloadAction<'idle' | 'saving' | 'saved' | 'error'>) => {
+      state.autoSaveStatus = action.payload;
+    },
+    setLastSaved: (state, action: PayloadAction<number | null>) => {
+      state.lastSaved = action.payload;
+    },
     // Config actions
     setConfigCategories: (state, action: PayloadAction<PropConfigCategory[]>) => {
       state.config.categories = action.payload;
@@ -232,6 +247,7 @@ export const {
   updateForm, setDynamicField, toggleAmenity,
   resetForm,
   setSubmitting, setSubmitError, setSubmittedSlug,
+  setDraftId, setAutoSaveStatus, setLastSaved,
   setConfigCategories, setConfigTypes, setConfigAmenities, setConfigFields, setConfigLoading,
 } = postPropertySlice.actions;
 
