@@ -830,6 +830,8 @@ function MobileSearch({
   const [budget, setBudget] = useState<(typeof BUDGET_BUY)[0] | null>(null);
   const [type, setType]     = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [detecting, setDetecting]     = useState(false);
+  const [detectErr, setDetectErr]     = useState('');
 
   const [localTypes, setLocalTypes] = useState<PropType[]>(allTypes);
   const typeCache = useRef<Record<string, PropType[]>>({});
@@ -902,65 +904,128 @@ function MobileSearch({
     onClose();
   };
 
+  const handleDetect = async () => {
+    setDetecting(true);
+    setDetectErr('');
+    try {
+      const loc = await detectLocation();
+      const city = loc.city || loc.locality;
+      if (city) {
+        const locality = loc.locality && loc.locality !== city ? loc.locality : undefined;
+        go(city, locality);
+      } else {
+        setDetectErr('City not found');
+        setTimeout(() => setDetectErr(''), 4000);
+      }
+    } catch (e: any) {
+      const msg = e?.code === 1 ? 'Access denied' : 'Unavailable';
+      setDetectErr(msg);
+      setTimeout(() => setDetectErr(''), 4000);
+    } finally {
+      setDetecting(false);
+    }
+  };
+
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   if (!mounted) return null;
 
   const panel = (
-    <div className="fixed inset-0 bg-white flex flex-col" style={{ zIndex: 9999, height: '100dvh' }}>
-      <div className="flex-shrink-0 bg-white px-4 pt-5 pb-3 border-b border-gray-100">
-        <div className="flex items-center gap-3">
+    <div className="fixed inset-0 flex flex-col bg-gray-50" style={{ zIndex: 9999, height: '100dvh' }}>
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 px-4 pt-4 pb-4">
+
+        {/* Back + title row */}
+        <div className="flex items-center gap-3 mb-4">
           <button
             onClick={close}
-            className="w-11 h-11 rounded-2xl bg-gray-100 active:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors"
+            className="w-10 h-10 rounded-xl bg-white/15 active:bg-white/25 flex items-center justify-center flex-shrink-0 transition-colors"
             aria-label="Close"
           >
-            <ArrowLeft className="w-5 h-5 text-gray-700" />
+            <ArrowLeft className="w-5 h-5 text-white" />
           </button>
-          <div className="flex-1 flex items-center gap-3 bg-white border-2 border-gray-200 rounded-2xl px-4" style={{ height: 52 }}>
-            {busy ? <Loader2 className="w-5 h-5 text-gray-400 animate-spin flex-shrink-0" /> : <Search className="w-5 h-5 text-gray-400 flex-shrink-0" />}
-            <input
-              ref={inputRef}
-              autoFocus
-              type="text"
-              inputMode="search"
-              enterKeyHint="search"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              value={query}
-              placeholder={isAgent ? 'City or state...' : 'City, locality, project...'}
-              onChange={e => {
-                setQuery(e.target.value);
-                clearTimeout(debRef.current);
-                debRef.current = setTimeout(() => fetchLocs(e.target.value), 250);
-              }}
-              onKeyDown={e => e.key === 'Enter' && go()}
-              className="flex-1 text-base text-gray-900 outline-none placeholder-gray-400"
-              style={{ background: 'transparent', border: 'none', WebkitAppearance: 'none' }}
-            />
-            {query && (
-              <button
-                onClick={() => { setQuery(''); setSuggs([]); inputRef.current?.focus(); }}
-                className="w-7 h-7 rounded-full bg-gray-200 active:bg-gray-300 flex items-center justify-center flex-shrink-0"
-                aria-label="Clear"
-              >
-                <X className="w-3.5 h-3.5 text-gray-500" />
-              </button>
-            )}
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-bold text-[15px] leading-tight">
+              {isAgent ? 'Find Agents' : isNewProject ? 'New Projects' : 'Search Properties'}
+            </p>
+            <p className="text-white/55 text-xs mt-0.5">City, locality or project name</p>
           </div>
         </div>
+
+        {/* Search input row */}
+        <div className="flex items-center gap-2 bg-white rounded-2xl pl-4 pr-3 shadow-xl" style={{ height: 50 }}>
+          {busy
+            ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />
+            : <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          }
+          <input
+            ref={inputRef}
+            autoFocus
+            type="text"
+            inputMode="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={query}
+            placeholder={isAgent ? 'City or state...' : 'City, locality, project...'}
+            onChange={e => {
+              setQuery(e.target.value);
+              clearTimeout(debRef.current);
+              debRef.current = setTimeout(() => fetchLocs(e.target.value), 250);
+            }}
+            onKeyDown={e => e.key === 'Enter' && go()}
+            className="flex-1 text-sm font-medium text-gray-900 outline-none placeholder-gray-400 min-w-0"
+            style={{ background: 'transparent', border: 'none', WebkitAppearance: 'none' }}
+          />
+
+          {/* Inline locate button */}
+          <button
+            onClick={handleDetect}
+            disabled={detecting}
+            title={detectErr || 'Use my location'}
+            className={cn(
+              'flex items-center gap-1.5 h-8 px-3 rounded-xl border text-xs font-bold flex-shrink-0 transition-all active:scale-95',
+              detectErr
+                ? 'bg-red-50 border-red-200 text-red-500'
+                : detecting
+                ? 'bg-primary-50 border-primary-200 text-primary-500'
+                : 'bg-primary-50 border-primary-200 text-primary-600 active:bg-primary-100',
+            )}
+          >
+            {detecting
+              ? <Loader2 className="w-3 h-3 animate-spin" />
+              : <LocateFixed className={cn('w-3 h-3', detectErr ? 'text-red-400' : 'text-primary-500')} />
+            }
+            <span className="whitespace-nowrap">
+              {detecting ? '…' : detectErr ? 'Retry' : 'Locate'}
+            </span>
+          </button>
+
+          {query && (
+            <button
+              onClick={() => { setQuery(''); setSuggs([]); inputRef.current?.focus(); }}
+              className="w-7 h-7 rounded-full bg-gray-100 active:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors ml-1"
+              aria-label="Clear"
+            >
+              <X className="w-3.5 h-3.5 text-gray-500" />
+            </button>
+          )}
+        </div>
+
+        {/* Category tabs */}
         <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
           {allTabs.map(tab => (
             <button
               key={tab.value}
               onClick={() => changeCat(tab.value)}
               className={cn(
-                'flex-shrink-0 h-9 px-4 rounded-full text-sm font-bold transition-all active:scale-95',
+                'flex-shrink-0 h-8 px-4 rounded-full text-xs font-bold transition-all active:scale-95',
                 cat === tab.value
                   ? `bg-gradient-to-r ${tab.color} text-white shadow-md`
-                  : 'bg-gray-100 text-gray-500',
+                  : 'bg-white/15 text-white/65 active:bg-white/25',
               )}
             >
               {tab.label}
@@ -969,7 +1034,8 @@ function MobileSearch({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ minHeight: 0 }}>
+      {/* ── Content ────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto overscroll-contain bg-white" style={{ minHeight: 0 }}>
         {query.length >= 2 ? (
           <div>
             {suggs.length > 0 ? (
@@ -994,6 +1060,43 @@ function MobileSearch({
           </div>
         ) : (
           <>
+            {/* Detect my location — prominent row */}
+            <button
+              onClick={handleDetect}
+              disabled={detecting}
+              className={cn(
+                'w-full flex items-center gap-4 px-5 py-4 border-b transition-colors',
+                detectErr
+                  ? 'border-red-100 active:bg-red-50'
+                  : 'border-gray-100 active:bg-blue-50',
+              )}
+            >
+              <div className={cn(
+                'w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm',
+                detectErr
+                  ? 'bg-red-50'
+                  : 'bg-gradient-to-br from-blue-500 to-primary-600',
+              )}>
+                {detecting
+                  ? <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  : detectErr
+                  ? <LocateFixed className="w-5 h-5 text-red-400" />
+                  : <LocateFixed className="w-5 h-5 text-white" />
+                }
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <div className={cn('text-sm font-bold leading-tight', detectErr ? 'text-red-500' : 'text-primary-600')}>
+                  {detecting ? 'Detecting your location…' : detectErr ? `Failed: ${detectErr}` : 'Use my current location'}
+                </div>
+                <div className="text-xs text-gray-400 mt-0.5">
+                  {detecting ? 'Please wait' : detectErr ? 'Tap to try again' : 'Auto-detect city & locality'}
+                </div>
+              </div>
+              {!detecting && (
+                <ChevronRight className={cn('w-4 h-4 flex-shrink-0', detectErr ? 'text-red-300' : 'text-gray-300')} />
+              )}
+            </button>
+
             <SectionHeader icon={<TrendingUp className="w-3.5 h-3.5" />} label="Popular Cities" />
             {TOP_CITIES.map(city => (
               <LocationRow
@@ -1210,24 +1313,46 @@ export default function HomeSearchPanel() {
           MOBILE — trigger card
           ══════════════════════════════════ */}
       <div className="sm:hidden w-full">
-        <button
-          onClick={() => setOpen(true)}
-          className="w-full bg-white rounded-2xl shadow-2xl shadow-black/25 p-4 flex items-center gap-3 active:scale-[0.97] transition-transform"
-        >
-          <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br', catInfo.color)}>
-            {isAgent ? <Users className="w-5 h-5 text-white" /> : <Search className="w-5 h-5 text-white" />}
-          </div>
-          <div className="flex-1 text-left min-w-0">
-            <div className="text-[13px] font-semibold text-gray-800">
-              {isAgent ? 'Find Agents' : isNewProject ? 'Search New Projects' : `${catInfo.label} a Property`}
-            </div>
-            <div className="text-xs text-gray-400 mt-0.5 truncate">City, locality, project...</div>
-          </div>
-          <div className={cn('flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-xl text-white bg-gradient-to-r', catInfo.color)}>
-            {catInfo.label}
-          </div>
-        </button>
 
+        {/* Search card */}
+        <div className="bg-white rounded-2xl shadow-2xl shadow-black/25 overflow-hidden">
+          {/* ── Main search row ── */}
+          <button
+            onClick={() => setOpen(true)}
+            className="w-full flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 transition-colors"
+          >
+            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br shadow-sm', catInfo.color)}>
+              {isAgent ? <Users className="w-5 h-5 text-white" /> : <Search className="w-5 h-5 text-white" />}
+            </div>
+            <div className="flex-1 text-left min-w-0">
+              <div className="text-[13px] font-semibold text-gray-800 truncate">
+                {isAgent ? 'Find Agents' : isNewProject ? 'Search New Projects' : `Search ${catInfo.label} Properties`}
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5">City, locality, project...</div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+          </button>
+
+          {/* ── Divider ── */}
+          <div className="h-px bg-gray-100 mx-4" />
+
+          {/* ── Detect location row ── */}
+          <button
+            onClick={() => setOpen(true)}
+            className="w-full flex items-center gap-3 px-4 py-3 active:bg-blue-50 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-primary-600 shadow-sm">
+              <LocateFixed className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 text-left min-w-0">
+              <div className="text-[13px] font-semibold text-primary-600">Use my current location</div>
+              <div className="text-xs text-gray-400 mt-0.5">Auto-detect &amp; find properties near you</div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+          </button>
+        </div>
+
+        {/* Category tabs */}
         <div className="flex items-center gap-1.5 mt-3 overflow-x-auto no-scrollbar">
           {tabs.map(tab => (
             <button

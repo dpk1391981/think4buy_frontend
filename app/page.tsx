@@ -85,19 +85,19 @@ export default function HomePage() {
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 lg:pt-12 pb-10 sm:pb-14 lg:pb-16">
 
-          {/* ── Top row: headline (left) + visual (right) ── */}
-          <div className="flex items-center gap-6 xl:gap-10 mb-7 sm:mb-9 lg:mb-10">
+          {/* ── Top row: headline (left) + visual (right) — always side-by-side ── */}
+          <div className="flex items-center gap-3 sm:gap-6 xl:gap-10 mb-7 sm:mb-9 lg:mb-10">
 
             {/* Headline column */}
             <div className="flex-1 min-w-0">
-              {/* Trust badge — all sizes */}
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-white/90 text-xs sm:text-sm font-medium px-3 sm:px-4 py-1.5 sm:py-2 rounded-full mb-4 sm:mb-6 border border-white/20">
+              {/* Trust badge — hidden on mobile (no room with visual column) */}
+              <div className="hidden sm:inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-white/90 text-xs sm:text-sm font-medium px-3 sm:px-4 py-1.5 sm:py-2 rounded-full mb-4 sm:mb-6 border border-white/20">
                 <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-yellow-400 text-yellow-400" />
                 India&apos;s #1 Trusted Real Estate Platform
               </div>
 
               {/* Headline */}
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-white leading-tight mb-3 sm:mb-4">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-white leading-tight mb-3 sm:mb-4">
                 Find Your Perfect
                 <span className="block bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
                   Dream Property
@@ -127,8 +127,8 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Animated visual — desktop only */}
-            <div className="hidden lg:block w-[380px] xl:w-[430px] flex-shrink-0 relative">
+            {/* Visual — small on mobile, full on desktop */}
+            <div className="w-[108px] sm:w-[220px] lg:w-[380px] xl:w-[430px] flex-shrink-0">
               <HeroVisual />
             </div>
           </div>

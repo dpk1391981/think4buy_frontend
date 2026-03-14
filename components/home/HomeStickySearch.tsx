@@ -87,11 +87,11 @@ export default function HomeStickySearch() {
     >
       {/* Bar */}
       <div className="bg-white border-b border-gray-200 shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5">
-          <div ref={containerRef} className="relative flex items-center gap-3 max-w-3xl">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2">
+          <div ref={containerRef} className="relative flex items-center gap-2 sm:gap-3 max-w-3xl">
 
             {/* ── Search pill ── */}
-            <div className="flex-1 flex items-center h-11 bg-gray-50 border-2 border-gray-200 rounded-2xl focus-within:bg-white focus-within:border-primary-400 focus-within:ring-4 focus-within:ring-primary-100/60 transition-all duration-200 overflow-visible relative">
+            <div className="flex-1 flex items-center h-10 sm:h-11 bg-gray-50 border-2 border-gray-200 rounded-xl sm:rounded-2xl focus-within:bg-white focus-within:border-primary-400 focus-within:ring-4 focus-within:ring-primary-100/60 transition-all duration-200 overflow-visible relative">
 
               {/* Left icon */}
               <div className="flex items-center pl-3.5 pr-2 flex-shrink-0">
@@ -103,7 +103,7 @@ export default function HomeStickySearch() {
                 ref={inputRef}
                 type="text"
                 value={q}
-                placeholder="Search city, locality or project..."
+                placeholder="City, locality or project..."
                 onChange={e => {
                   setQ(e.target.value);
                   setShowSugg(true);
@@ -138,7 +138,7 @@ export default function HomeStickySearch() {
               disabled={detecting}
               title={detectErr || 'Detect my location'}
               className={cn(
-                'flex items-center gap-2 h-11 px-4 rounded-2xl border-2 font-semibold text-sm flex-shrink-0 transition-all duration-200',
+                'flex items-center justify-center h-10 sm:h-11 w-10 sm:w-auto sm:px-4 sm:gap-2 rounded-xl sm:rounded-2xl border-2 font-semibold text-sm flex-shrink-0 transition-all duration-200',
                 detectErr
                   ? 'border-red-200 bg-red-50 text-red-500'
                   : detecting
@@ -159,7 +159,7 @@ export default function HomeStickySearch() {
             {/* ── Search button ── */}
             <button
               onClick={() => doSearch()}
-              className="flex items-center gap-2 h-11 px-5 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 active:scale-95 text-white font-bold text-sm rounded-2xl flex-shrink-0 transition-all duration-200 shadow-md shadow-primary-600/30"
+              className="flex items-center justify-center h-10 sm:h-11 w-10 sm:w-auto sm:px-5 sm:gap-2 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 active:scale-95 text-white font-bold text-sm rounded-xl sm:rounded-2xl flex-shrink-0 transition-all duration-200 shadow-md shadow-primary-600/30"
             >
               <Search className="w-4 h-4 flex-shrink-0" />
               <span className="hidden sm:inline">Search</span>
@@ -167,7 +167,7 @@ export default function HomeStickySearch() {
 
             {/* Suggestions */}
             {showSugg && suggs.length > 0 && (
-              <div className="absolute top-[calc(100%+6px)] left-0 right-[112px] sm:right-[200px] bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+              <div className="absolute top-[calc(100%+6px)] left-0 right-0 sm:right-[-88px] bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
                 <div className="px-4 py-2 border-b border-gray-50">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Locations</span>
                 </div>

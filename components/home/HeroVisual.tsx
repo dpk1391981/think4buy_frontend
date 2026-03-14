@@ -5,7 +5,7 @@
 
 export default function HeroVisual() {
   return (
-    <div className="relative w-full h-full min-h-[420px] xl:min-h-[460px] select-none">
+    <div className="relative w-full h-full min-h-[80px] sm:min-h-[260px] lg:min-h-[420px] xl:min-h-[460px] select-none">
 
       {/* ── Central city skyline SVG ──────────────────────────────────────── */}
       <div className="absolute inset-0 flex items-end justify-center pb-4 hero-scene-enter">
@@ -148,7 +148,7 @@ export default function HeroVisual() {
       </div>
 
       {/* ── Floating property card — top left ─────────────────────────────── */}
-      <div className="absolute top-4 left-0 xl:-left-4 hero-float-1">
+      <div className="hidden lg:block absolute top-4 left-0 xl:-left-4 hero-float-1">
         <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/50 p-3 w-48">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center flex-shrink-0 text-base">🏠</div>
@@ -173,7 +173,7 @@ export default function HeroVisual() {
       </div>
 
       {/* ── Floating stats pill — top right ───────────────────────────────── */}
-      <div className="absolute top-6 right-0 xl:-right-2 hero-float-2">
+      <div className="hidden lg:block absolute top-6 right-0 xl:-right-2 hero-float-2">
         <div className="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-xl shadow-primary-600/30 p-3 text-white w-44">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center">
@@ -194,7 +194,7 @@ export default function HeroVisual() {
       </div>
 
       {/* ── Sold badge — middle left ───────────────────────────────────────── */}
-      <div className="absolute top-[44%] -left-1 xl:-left-6 hero-float-3">
+      <div className="hidden lg:block absolute top-[44%] -left-1 xl:-left-6 hero-float-3">
         <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-white/50 px-3 py-2 flex items-center gap-2">
           <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
             <svg className="w-3.5 h-3.5 fill-green-600" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
@@ -207,7 +207,7 @@ export default function HeroVisual() {
       </div>
 
       {/* ── New listing pill — middle right ───────────────────────────────── */}
-      <div className="absolute top-[38%] right-0 xl:-right-4 hero-float-4">
+      <div className="hidden lg:block absolute top-[38%] right-0 xl:-right-4 hero-float-4">
         <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-white/50 px-3 py-2 flex items-center gap-2">
           <div className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
             <svg className="w-3.5 h-3.5 fill-amber-500" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
@@ -220,7 +220,7 @@ export default function HeroVisual() {
       </div>
 
       {/* ── Rating pill — bottom ──────────────────────────────────────────── */}
-      <div className="absolute bottom-10 left-4 xl:left-0 hero-float-2" style={{ animationDelay: '1.5s' }}>
+      <div className="hidden lg:block absolute bottom-10 left-4 xl:left-0 hero-float-2" style={{ animationDelay: '1.5s' }}>
         <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-white/50 px-3 py-2">
           <div className="flex items-center gap-1.5">
             <div className="flex -space-x-1">
@@ -245,7 +245,7 @@ export default function HeroVisual() {
       </div>
 
       {/* ── Pulsing ring behind the tallest building ──────────────────────── */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[55%] pointer-events-none">
+      <div className="hidden lg:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[55%] pointer-events-none">
         <div className="w-24 h-24 rounded-full border border-primary-400/20 hero-pulse-ring" />
         <div className="absolute inset-0 w-24 h-24 rounded-full border border-blue-400/15 hero-pulse-ring" style={{ animationDelay: '0.7s' }} />
       </div>
