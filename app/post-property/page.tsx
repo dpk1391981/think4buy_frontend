@@ -756,7 +756,7 @@ function MobileProgress({ currentStep }: { currentStep: number }) {
   const total = STEP_META.length;
   const step = STEP_META[currentStep] || STEP_META[0];
   return (
-    <div className="lg:hidden bg-white border-b border-gray-100 px-4 pt-3 pb-2.5 sticky top-16 z-10">
+    <div className="lg:hidden bg-white border-b border-gray-100 px-4 pt-3 pb-2.5 sticky top-14 md:top-16 z-20">
       <div className="flex items-center justify-between mb-2">
         <div className="min-w-0">
           <p className="text-sm font-bold text-gray-900 leading-tight">{step.label}</p>
@@ -2146,7 +2146,7 @@ function PostPropertyPageInner() {
     : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-16">
+    <div className="min-h-screen bg-gray-50 pt-14 md:pt-16">
       {/* Mobile sticky progress bar */}
       <MobileProgress currentStep={currentStep} />
 
@@ -2234,7 +2234,7 @@ function PostPropertyPageInner() {
             )}
 
             {/* Mobile spacer — prevents content hiding behind sticky nav */}
-            {currentStep < 9 && <div className="h-28 lg:hidden" />}
+            {currentStep < 9 && <div className="h-36 lg:hidden" />}
           </main>
 
           {/* Right — drafts + pending + save draft (desktop only) */}
@@ -2255,47 +2255,61 @@ function PostPropertyPageInner() {
 
       {/* ── Mobile sticky bottom navigation ─────────────────────────────── */}
       {currentStep < 9 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 lg:hidden bg-white border-t border-gray-100 shadow-[0_-4px_24px_rgba(0,0,0,0.07)] px-4 pt-3 pb-7">
-          <div className="flex items-center gap-3 mb-2">
-            {currentStep > 0 && (
-              <button type="button" onClick={handleBack}
-                className="flex items-center justify-center gap-1.5 h-12 px-5 rounded-2xl border-2 border-gray-200 text-gray-700 font-semibold text-sm active:bg-gray-100 transition-colors">
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
-            )}
-            <button type="button" onClick={handleNext}
-              className="flex-1 flex items-center justify-center gap-2 bg-primary-600 active:bg-primary-700 text-white font-bold h-12 rounded-2xl shadow-lg shadow-primary-600/20 text-[15px] transition-colors">
-              {currentStep === 8 ? 'Add Photos' : 'Continue'}
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Save draft row (mobile) — visible once 6 steps done */}
-          {!isEditMode && (
-            <div className="flex items-center justify-between min-h-[20px]">
-              {currentStep >= 5 ? (
-                <button type="button" onClick={handleSaveDraftAndExit} disabled={savingDraft}
-                  className="flex items-center gap-1.5 text-sm text-gray-500 font-medium disabled:opacity-50 active:text-amber-600 transition-colors">
-                  {savingDraft
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <Save className="w-3.5 h-3.5" />}
-                  Save Draft
+        <div
+          className="fixed inset-x-0 bottom-0 z-[60] lg:hidden bg-white border-t border-gray-200"
+          style={{ boxShadow: '0 -4px 24px rgba(0,0,0,0.10)', paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
+        >
+          <div className="px-4 pt-3 pb-1">
+            {/* Main nav row */}
+            <div className="flex items-center gap-3 mb-2.5">
+              {currentStep > 0 ? (
+                <button type="button" onClick={handleBack}
+                  className="flex items-center justify-center gap-1.5 h-12 w-12 rounded-2xl border-2 border-gray-200 text-gray-600 active:bg-gray-100 transition-colors flex-shrink-0">
+                  <ArrowLeft className="w-5 h-5" />
                 </button>
-              ) : (
-                <span className="text-xs text-gray-300">Drafts available from step 6</span>
-              )}
-              {mobileSaveLabel && (
-                <span className="flex items-center gap-1 text-[11px] text-green-500 font-medium">
-                  <CheckCircle2 className="w-3 h-3" />{mobileSaveLabel}
-                </span>
-              )}
-              {autoSaveStatus === 'saving' && (
-                <span className="flex items-center gap-1 text-[11px] text-gray-400">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Saving…
-                </span>
-              )}
+              ) : null}
+              <button type="button" onClick={handleNext}
+                className="flex-1 flex items-center justify-center gap-2 bg-primary-600 active:bg-primary-700 text-white font-bold h-12 rounded-2xl shadow-md shadow-primary-600/25 text-[15px] transition-colors">
+                {currentStep === 8 ? 'Add Photos' : 'Continue'}
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
-          )}
+
+            {/* Save draft + auto-save status row */}
+            {!isEditMode && (
+              <div className="flex items-center justify-between h-8">
+                {currentStep >= 5 ? (
+                  <button type="button" onClick={handleSaveDraftAndExit} disabled={savingDraft}
+                    className="flex items-center gap-1.5 h-8 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold disabled:opacity-50 active:bg-amber-100 transition-colors">
+                    {savingDraft
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Save className="w-3.5 h-3.5" />}
+                    Save Draft
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5 h-8 px-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 text-xs font-medium">
+                    <Save className="w-3.5 h-3.5" />
+                    Save Draft
+                    <span className="text-[10px] bg-gray-200 text-gray-400 px-1.5 py-0.5 rounded-full ml-0.5">
+                      step {5 - currentStep + 1} more
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1">
+                  {autoSaveStatus === 'saving' && (
+                    <span className="flex items-center gap-1 text-[11px] text-gray-400">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Saving…
+                    </span>
+                  )}
+                  {autoSaveStatus === 'saved' && mobileSaveLabel && (
+                    <span className="flex items-center gap-1 text-[11px] text-green-500 font-medium">
+                      <CheckCircle2 className="w-3 h-3" />{mobileSaveLabel}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -144,7 +144,28 @@ function StateSelector({ compact = false }: { compact?: boolean }) {
     detectLocation()
       .then((loc) => {
         if (!loc.state) return;
-        const match = dbStates.find(s => s.name.toLowerCase() === loc.state.toLowerCase());
+        // Normalize: strip common Indian administrative prefixes before matching
+        const normalize = (s: string) =>
+          s.toLowerCase()
+            .replace(/national capital territory of\s+/i, '')
+            .replace(/union territory of\s+/i, '')
+            .replace(/state of\s+/i, '')
+            .trim();
+        const det = normalize(loc.state);
+        // 1. Exact match
+        let match = dbStates.find(s => normalize(s.name) === det);
+        // 2. Substring match (either direction)
+        if (!match) match = dbStates.find(s => {
+          const n = normalize(s.name);
+          return det.includes(n) || n.includes(det);
+        });
+        // 3. First-word match (e.g. "Uttarakhand" vs "Uttaranchal")
+        if (!match) {
+          const firstWord = det.split(' ')[0];
+          if (firstWord.length > 3) {
+            match = dbStates.find(s => normalize(s.name).startsWith(firstWord));
+          }
+        }
         if (match) {
           dispatch(setSelectedLocation({ state: match.name, stateId: match.id }));
           saveLocationToLS(match.name, match.id);

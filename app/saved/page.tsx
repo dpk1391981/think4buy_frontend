@@ -34,8 +34,27 @@ function SavedContent() {
     setLoading(true);
     try {
       const res = await savedApi.getSaved({ page, limit: PER_PAGE });
-      setItems(res.data?.items ?? []);
-      setTotal(res.data?.total ?? 0);
+      const items: any[] = res.data?.items ?? [];
+      const total: number = res.data?.total ?? 0;
+
+      // If backend has no records, check localStorage for IDs saved by old system
+      // and push them to the backend, then reload
+      if (items.length === 0 && page === 1) {
+        try {
+          const localIds: string[] = JSON.parse(localStorage.getItem('pf_wishlist') || '[]');
+          if (localIds.length > 0) {
+            await Promise.allSettled(localIds.map(id => savedApi.save(id)));
+            // Re-fetch after syncing
+            const res2 = await savedApi.getSaved({ page, limit: PER_PAGE });
+            setItems(res2.data?.items ?? []);
+            setTotal(res2.data?.total ?? 0);
+            return;
+          }
+        } catch {}
+      }
+
+      setItems(items);
+      setTotal(total);
     } catch {
       setItems([]);
     } finally {

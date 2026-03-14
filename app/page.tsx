@@ -11,6 +11,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import HomeSearchPanel from '@/components/home/HomeSearchPanel';
+import HeroVisual from '@/components/home/HeroVisual';
 import JsonLd, { buildWebSiteSchema, buildOrganizationSchema } from '@/components/seo/JsonLd';
 
 // ─── Above-the-fold: import directly ─────────────────────────────────────────
@@ -29,7 +30,8 @@ const TopNewProjects  = dynamic(() => import('@/components/home/TopNewProjects')
 const ServicesBanner  = dynamic(() => import('@/components/home/ServicesBanner'),   { ssr: true });
 
 // Non-critical / purely decorative sections — defer to client
-const StatsBar        = dynamic(() => import('@/components/home/StatsBar'),         { ssr: false });
+const StatsBar           = dynamic(() => import('@/components/home/StatsBar'),            { ssr: false });
+const HomeStickySearch   = dynamic(() => import('@/components/home/HomeStickySearch'),    { ssr: false });
 
 export const metadata: Metadata = {
   title: 'Think4BuySale – Buy, Rent & Sell Properties in India',
@@ -71,51 +73,78 @@ const WHY_US = [
 export default function HomePage() {
   return (
     <>
+      {/* ─── Sticky search bar (appears on scroll) ───────────────────────── */}
+      <HomeStickySearch />
+
       {/* ─── Hero Section ─────────────────────────────────────────────────── */}
-      <section className="relative sm:min-h-[80vh] flex items-center justify-center bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 pt-14 md:pt-16">
+      <section className="relative flex items-center bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 pt-14 md:pt-16 overflow-hidden">
         {/* Background blobs */}
         <div className="absolute top-20 left-10 w-72 h-72 bg-primary-600/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-primary-700/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-10 right-10 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/3 left-1/3 w-[500px] h-[400px] bg-indigo-700/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 w-full px-4 py-5 sm:py-14 max-w-5xl mx-auto">
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 lg:pt-12 pb-10 sm:pb-14 lg:pb-16">
 
-          {/* ── Mobile hero text — ultra compact ── */}
-          <div className="sm:hidden text-center mb-4">
-            <h1 className="text-2xl font-extrabold text-white leading-tight">
-              Find Your{' '}
-              <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                Dream Home
-              </span>
-            </h1>
-            <p className="text-xs text-blue-100/60 mt-1">
-              50,000+ verified properties · India
-            </p>
-          </div>
+          {/* ── Top row: headline (left) + visual (right) ── */}
+          <div className="flex items-center gap-6 xl:gap-10 mb-7 sm:mb-9 lg:mb-10">
 
-          {/* ── Desktop hero text ── */}
-          <div className="hidden sm:block max-w-4xl mx-auto text-center mb-8">
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-white/90 text-sm font-medium px-4 py-2 rounded-full mb-6 border border-white/20">
-              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-              India&apos;s #1 Trusted Real Estate Platform
+            {/* Headline column */}
+            <div className="flex-1 min-w-0">
+              {/* Trust badge — all sizes */}
+              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-white/90 text-xs sm:text-sm font-medium px-3 sm:px-4 py-1.5 sm:py-2 rounded-full mb-4 sm:mb-6 border border-white/20">
+                <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-yellow-400 text-yellow-400" />
+                India&apos;s #1 Trusted Real Estate Platform
+              </div>
+
+              {/* Headline */}
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-white leading-tight mb-3 sm:mb-4">
+                Find Your Perfect
+                <span className="block bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                  Dream Property
+                </span>
+              </h1>
+
+              {/* Sub-text — desktop only */}
+              <p className="hidden sm:block text-base lg:text-lg text-blue-100/75 mb-4 lg:mb-5 max-w-xl leading-relaxed">
+                50,000+ verified properties across India. Buy, rent, or invest with total confidence.
+              </p>
+              <p className="sm:hidden text-xs text-blue-100/60 mb-1">
+                50,000+ verified properties · India
+              </p>
+
+              {/* Trust pills — desktop */}
+              <div className="hidden sm:flex flex-wrap gap-4 lg:gap-5">
+                {[
+                  { icon: '✓', text: 'Verified Listings' },
+                  { icon: '🏙️', text: '100+ Cities' },
+                  { icon: '🤝', text: 'Zero Brokerage' },
+                  { icon: '⭐', text: '10K+ Happy Buyers' },
+                ].map(({ icon, text }) => (
+                  <span key={text} className="flex items-center gap-1.5 text-sm text-blue-100/80 font-medium">
+                    <span className="text-green-400 font-bold">{icon}</span>{text}
+                  </span>
+                ))}
+              </div>
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold text-white leading-tight mb-4">
-              Find Your Perfect
-              <span className="block bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                Dream Property
-              </span>
-            </h1>
-            <p className="text-lg text-blue-100/80 mb-8 max-w-2xl mx-auto">
-              50,000+ verified properties across India. Buy, rent, or invest in your ideal home with confidence.
-            </p>
+
+            {/* Animated visual — desktop only */}
+            <div className="hidden lg:block w-[380px] xl:w-[430px] flex-shrink-0 relative">
+              <HeroVisual />
+            </div>
           </div>
 
-          {/* Search Panel */}
-          <HomeSearchPanel />
+          {/* ── Full-width search panel ── */}
+          <div className="relative">
+            {/* Glow ring behind the search bar */}
+            <div className="absolute -inset-x-2 -inset-y-3 bg-gradient-to-r from-primary-500/20 via-blue-500/15 to-primary-500/20 rounded-3xl blur-xl pointer-events-none" />
+            <div className="relative">
+              <HomeSearchPanel />
+            </div>
+          </div>
 
-          {/* Quick links — desktop only */}
-          <div className="hidden sm:flex flex-wrap items-center justify-center gap-2 mt-6">
-            <span className="text-blue-300/70 text-xs font-medium uppercase tracking-wide">Quick:</span>
+          {/* ── Quick links ── */}
+          <div className="hidden sm:flex flex-wrap items-center gap-2 mt-5">
+            <span className="text-blue-300/60 text-xs font-medium uppercase tracking-wide mr-1">Quick:</span>
             {QUICK_LINKS.map((link) => (
               <Link key={link.label} href={link.href}
                 className="text-xs bg-white/10 hover:bg-white/20 text-white/80 hover:text-white px-3 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/30">
@@ -123,6 +152,7 @@ export default function HomePage() {
               </Link>
             ))}
           </div>
+
         </div>
 
         {/* Wave */}

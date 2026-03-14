@@ -7,19 +7,37 @@ export interface DetectedLocation {
   locality: string;
 }
 
-/** Reverse-geocode using OpenStreetMap Nominatim (free, no API key). */
+/** Reverse-geocode via our own proxy route (avoids CSP issues with direct Nominatim calls). */
 export async function reverseGeocode(lat: number, lng: number): Promise<Omit<DetectedLocation, 'lat' | 'lng'>> {
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
-    { headers: { 'Accept-Language': 'en' } },
-  );
+  const res = await fetch(`/api/geo/reverse?lat=${lat}&lon=${lng}`, { cache: 'no-store' });
   const data = await res.json();
   const addr = data.address || {};
+
+  // Indian cities often appear in city_district / state_district / municipality
+  // before falling back to county/village
+  const city =
+    addr.city ||
+    addr.city_district ||
+    addr.town ||
+    addr.municipality ||
+    addr.state_district ||
+    addr.village ||
+    addr.county ||
+    '';
+
+  const locality =
+    addr.suburb ||
+    addr.neighbourhood ||
+    addr.quarter ||
+    addr.residential ||
+    addr.village ||
+    '';
+
   return {
-    state: addr.state || '',
-    city: addr.city || addr.town || addr.village || addr.county || '',
+    state:   addr.state   || '',
+    city,
     country: addr.country || '',
-    locality: addr.suburb || addr.neighbourhood || addr.quarter || addr.village || '',
+    locality,
   };
 }
 
@@ -42,7 +60,7 @@ export function detectLocation(): Promise<DetectedLocation> {
         }
       },
       (err) => reject(err),
-      { timeout: 10000, maximumAge: 300000 },
+      { timeout: 10000, maximumAge: 0 },  // maximumAge: 0 — always get a fresh fix
     );
   });
 }

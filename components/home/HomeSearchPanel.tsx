@@ -6,12 +6,13 @@ import { useRouter } from 'next/navigation';
 import {
   Search, MapPin, Loader2, X, Users, Building2,
   ArrowLeft, ChevronRight, SlidersHorizontal, TrendingUp,
-  ChevronDown, BedDouble, IndianRupee, CheckCircle2, Sliders,
+  ChevronDown, BedDouble, IndianRupee, CheckCircle2, Sliders, LocateFixed,
 } from 'lucide-react';
 import { locationsApi, propertyConfigApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { TOP_CITIES } from '@/lib/utils';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { detectLocation } from '@/lib/geolocation';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -120,20 +121,44 @@ function DropdownPill({
   onClear?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const portalRef  = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
+    if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      const inWrapper = wrapperRef.current?.contains(t) ?? false;
+      const inPortal  = portalRef.current?.contains(t) ?? false;
+      if (!inWrapper && !inPortal) setOpen(false);
     };
+    const onScroll = () => setOpen(false);
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [open]);
+
+  const toggle = () => {
+    if (triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 6, left: r.left });
+    }
+    setOpen(v => !v);
+  };
 
   return (
-    <div ref={ref} className="relative flex-shrink-0">
+    <div ref={wrapperRef} className="relative flex-shrink-0">
       <button
-        onClick={() => setOpen(v => !v)}
+        ref={triggerRef}
+        onClick={toggle}
         className={cn(
           'flex items-center gap-2 h-10 pl-3 pr-2.5 rounded-xl border-2 text-sm font-medium transition-all duration-150 select-none whitespace-nowrap',
           active
@@ -158,10 +183,15 @@ function DropdownPill({
         )}
       </button>
 
-      {open && (
-        <div className="absolute top-full left-0 mt-1.5 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[200] min-w-[220px] overflow-hidden">
+      {open && pos && mounted && createPortal(
+        <div
+          ref={portalRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="bg-white rounded-2xl shadow-2xl border border-gray-100 min-w-[220px] overflow-hidden"
+        >
           {children}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -542,6 +572,8 @@ function DesktopPropertySearch({
   const [bhk, setBhk]       = useState<string[]>([]);
   const [budget, setBudget] = useState<{ label: string; min: number; max: number } | null>(null);
   const [more, setMore]     = useState({ possession: '', furnishing: '', postedBy: '' });
+  const [detecting, setDetecting] = useState(false);
+  const [detectErr, setDetectErr] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const deb = useRef<NodeJS.Timeout>();
   const suggRef = useRef<HTMLDivElement>(null);
@@ -587,6 +619,29 @@ function DesktopPropertySearch({
     setShowSugg(false);
   }, [q, type, bhk, budget, more, onSearch]);
 
+  const handleDetect = async () => {
+    setDetecting(true);
+    setDetectErr('');
+    try {
+      const loc = await detectLocation();
+      const city = loc.city || loc.locality;
+      if (city) {
+        const locality = loc.locality && loc.locality !== city ? loc.locality : undefined;
+        setQ(locality ? `${locality}, ${city}` : city);
+        search(city, locality);
+      } else {
+        setDetectErr('City not found');
+        setTimeout(() => setDetectErr(''), 3000);
+      }
+    } catch (e: any) {
+      const msg = e?.code === 1 ? 'Location access denied' : 'Location unavailable';
+      setDetectErr(msg);
+      setTimeout(() => setDetectErr(''), 3000);
+    } finally {
+      setDetecting(false);
+    }
+  };
+
   const showBHK = category !== 'commercial' && category !== 'new_projects' && category !== 'industrial';
   const activeFilterCount = [type, bhk.length > 0, budget, more.possession, more.furnishing, more.postedBy].filter(Boolean).length;
 
@@ -594,9 +649,9 @@ function DesktopPropertySearch({
     <div className="space-y-2.5">
       {/* ── Big Search Input ── */}
       <div ref={suggRef} className="relative">
-        <div className="flex items-center h-14 md:h-16 bg-white rounded-2xl border-2 border-gray-200 focus-within:border-primary-400 focus-within:ring-4 focus-within:ring-primary-100 transition-all overflow-hidden shadow-sm">
-          <div className="flex items-center flex-1 px-4 md:px-5 h-full gap-3">
-            <MapPin className="w-5 h-5 text-primary-400 flex-shrink-0" />
+        <div className="flex items-center h-14 md:h-[68px] bg-white rounded-2xl border-2 border-gray-200 focus-within:border-primary-400 focus-within:ring-4 focus-within:ring-primary-100 transition-all overflow-hidden shadow-lg shadow-black/10">
+          <div className="flex items-center flex-1 px-4 md:px-6 h-full gap-2">
+            <MapPin className="w-5 h-5 text-primary-500 flex-shrink-0" />
             <input
               ref={inputRef}
               type="text"
@@ -610,11 +665,34 @@ function DesktopPropertySearch({
               }}
               onFocus={() => setShowSugg(true)}
               onKeyDown={e => e.key === 'Enter' && search()}
-              className="flex-1 text-base text-gray-800 placeholder-gray-400 outline-none bg-transparent"
+              className="flex-1 text-base md:text-lg text-gray-800 placeholder-gray-400 outline-none bg-transparent font-medium min-w-0"
             />
-            {busy ? (
+            {/* GPS detect button */}
+            {detecting ? (
+              <div className="flex items-center gap-1.5 px-3 h-8 rounded-xl bg-primary-50 border border-primary-200 flex-shrink-0">
+                <Loader2 className="w-3.5 h-3.5 text-primary-500 animate-spin" />
+                <span className="hidden sm:inline text-xs font-semibold text-primary-600">Detecting…</span>
+              </div>
+            ) : (
+              <button
+                onClick={handleDetect}
+                title={detectErr || 'Detect my location'}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 h-8 rounded-xl border font-semibold text-xs flex-shrink-0 transition-all duration-150 whitespace-nowrap',
+                  detectErr
+                    ? 'bg-red-50 border-red-200 text-red-500'
+                    : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-600',
+                )}
+                aria-label="Detect my location"
+              >
+                <LocateFixed className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="hidden sm:inline">{detectErr || 'Near Me'}</span>
+              </button>
+            )}
+            {/* Suggestion loader / clear */}
+            {!detecting && busy ? (
               <Loader2 className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />
-            ) : q ? (
+            ) : !detecting && q ? (
               <button
                 onClick={() => { setQ(''); setSuggs([]); inputRef.current?.focus(); }}
                 className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors"
@@ -631,10 +709,10 @@ function DesktopPropertySearch({
           {/* Search button */}
           <button
             onClick={() => search()}
-            className="h-full px-7 md:px-10 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-bold text-base flex items-center gap-2.5 transition-colors flex-shrink-0"
+            className="h-full px-6 md:px-10 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-bold text-base flex items-center gap-2 md:gap-2.5 transition-colors flex-shrink-0"
           >
-            <Search className="w-5 h-5" />
-            <span className="hidden md:inline">Search</span>
+            <Search className="w-5 h-5 md:w-5 md:h-5" />
+            <span className="hidden sm:inline text-[15px] md:text-base">Search</span>
             {activeFilterCount > 0 && (
               <span className="bg-white/25 text-white text-xs font-bold px-1.5 py-0.5 rounded-full ml-1">
                 +{activeFilterCount}
@@ -1126,7 +1204,7 @@ export default function HomeSearchPanel() {
   }, [cat, isAgent, isNewProject, router, trackSearch]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto">
+    <div className="w-full">
 
       {/* ══════════════════════════════════
           MOBILE — trigger card
@@ -1193,7 +1271,7 @@ export default function HomeSearchPanel() {
         </div>
 
         {/* Panel body */}
-        <div className="bg-white rounded-b-2xl rounded-tr-2xl shadow-2xl p-4 md:p-5">
+        <div className="bg-white rounded-b-2xl rounded-tr-2xl shadow-2xl p-4 md:p-6">
           {isAgent
             ? <DesktopAgentSearch />
             : <DesktopPropertySearch category={cat} types={types} onSearch={handleSearch} />
