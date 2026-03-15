@@ -11,6 +11,7 @@ import {
   Wallet, Crown, User, Plus, Bell,
   MoreHorizontal, X, ExternalLink, ChevronRight,
 } from 'lucide-react';
+import type { MenuItem } from '@/contexts/AuthContext';
 
 // ─── Nav groups (desktop sidebar) ─────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ const MORE_ITEMS = [
 ];
 
 const ALL_NAV = NAV_GROUPS.flatMap(g => g.items);
-const ALLOWED_ROLES = ['agent', 'owner', 'seller', 'admin'];
+const ALLOWED_ROLES = ['agent', 'admin'];
 
 // ─── Main layout ───────────────────────────────────────────────────────────────
 
@@ -86,8 +87,12 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!loading && mounted) {
-      if (!user) router.replace('/auth/login?redirect=/agent');
-      else if (!ALLOWED_ROLES.includes(user.role)) router.replace('/');
+      if (!user) { router.replace('/auth/login?redirect=/agent'); return; }
+      if (!ALLOWED_ROLES.includes(user.role)) {
+        if (user.role === 'buyer') router.replace('/buyer');
+        else if (user.role === 'owner' || user.role === 'seller') router.replace('/owner');
+        else router.replace('/');
+      }
     }
   }, [user, loading, mounted, router]);
 
@@ -111,6 +116,13 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
   const initials = user.name
     ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : 'AG';
+
+  const TICK_CONFIG: Record<string, { label: string; className: string }> = {
+    blue:    { label: '✓', className: 'bg-blue-500 text-white' },
+    gold:    { label: '★', className: 'bg-yellow-500 text-white' },
+    diamond: { label: '◆', className: 'bg-purple-600 text-white' },
+  };
+  const tickInfo = user.agentTick && user.agentTick !== 'none' ? TICK_CONFIG[user.agentTick] : null;
 
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href);
@@ -157,7 +169,14 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
         <Link href="/agent/profile" className="mx-3 my-3 flex items-center gap-3 p-2.5 rounded-2xl hover:bg-slate-800 transition-colors group">
           <Avatar size={9} />
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-white truncate leading-tight">{user.name}</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-semibold text-white truncate leading-tight">{user.name}</span>
+              {tickInfo && (
+                <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-black flex-shrink-0 ${tickInfo.className}`}>
+                  {tickInfo.label}
+                </span>
+              )}
+            </div>
             <div className="text-xs text-slate-400 capitalize mt-0.5">{user.role}</div>
           </div>
           <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition-colors flex-shrink-0" />
@@ -353,7 +372,14 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
                   <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 rounded-full ring-2 ring-white" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold text-gray-900 text-sm truncate">{user.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-gray-900 text-sm truncate">{user.name}</span>
+                    {tickInfo && (
+                      <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-black flex-shrink-0 ${tickInfo.className}`}>
+                        {tickInfo.label}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-gray-500 capitalize">{user.role} · Online</div>
                 </div>
                 <button

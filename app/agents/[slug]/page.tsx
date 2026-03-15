@@ -9,6 +9,7 @@ import {
 import AgentContactForm from '@/components/agent/AgentContactForm';
 import AgentListings from '@/components/agent/AgentListings';
 import AgentAnalyticsTracker from '@/components/agent/AgentAnalyticsTracker';
+import AgentFeedbackSection from '@/components/agent/AgentFeedbackSection';
 
 type Params = { slug: string };
 
@@ -324,6 +325,9 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
 
               {/* Active Listings — dynamic client component */}
               <AgentListings agentId={agent.id} agentName={agent.name} />
+
+              {/* Reviews & Ratings */}
+              <AgentFeedbackSection agentId={agent.id} />
 
               {/* Location coverage */}
               {(agent.city || agent.state) && (

@@ -25,7 +25,9 @@ const PRIVATE_PREFIXES = [
   '/dashboard',
   '/profile',
   '/my-listings',
-  '/agent/',
+  '/agent/',   // NOTE: trailing slash so /agents/* (public) is NOT blocked
+  '/owner',
+  '/buyer',
   '/admin',
 ];
 

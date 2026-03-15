@@ -29,6 +29,7 @@ import {
   IndianRupee,
   BookOpen,
   Navigation,
+  LayoutGrid,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 
@@ -65,6 +66,7 @@ const NAV_GROUPS = [
     items: [
       { href: '/admin/articles', label: 'Articles', icon: BookOpen },
       { href: '/admin/menu', label: 'Menu', icon: Navigation },
+      { href: '/admin/role-menus', label: 'Role Menus', icon: LayoutGrid },
     ],
   },
   {

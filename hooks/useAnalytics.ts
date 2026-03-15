@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef } from 'react';
-import { homeApi } from '@/lib/api';
+import { homeApi, propertiesApi } from '@/lib/api';
 
 type DeviceType = 'mobile' | 'desktop' | 'tablet';
 type Source = 'home_page' | 'search' | 'recommendation' | 'direct' | 'category';
@@ -68,11 +68,24 @@ export function useAnalytics() {
   }, []);
 
   return {
-    trackPropertyView: (propertyId: string, opts?: TrackOptions & { propertyType?: string }) =>
+    /**
+     * Records a unique property view via the dedicated dedup endpoint.
+     * Also fires a generic analytics event for dashboard stats.
+     */
+    trackPropertyView: (propertyId: string, opts?: TrackOptions & { propertyType?: string }) => {
+      // 1. Unique-view endpoint (handles dedup on the server)
+      propertiesApi.trackView(propertyId, {
+        sessionId:  sessionId.current,
+        source:     opts?.source ?? 'direct',
+        referrer:   typeof window !== 'undefined' ? document.referrer || undefined : undefined,
+        deviceType: getDeviceType(),
+      });
+      // 2. Generic analytics event (for dashboard/charts — already has its own dedup at the event level)
       track('property_view', 'property', propertyId, {
         ...opts,
         metadata: { ...(opts?.metadata || {}), propertyType: opts?.propertyType },
-      }),
+      });
+    },
 
     trackPropertyInquiry: (propertyId: string, opts?: TrackOptions) =>
       track('property_inquiry', 'property', propertyId, opts),

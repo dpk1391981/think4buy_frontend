@@ -9,32 +9,22 @@ export function useWishlist() {
   const [ids, setIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    // 1. Load localStorage immediately for instant optimistic UI
-    let localIds: string[] = [];
+    // Load localStorage immediately for instant optimistic UI (guest/offline)
     try {
-      localIds = JSON.parse(localStorage.getItem(KEY) || '[]');
+      const localIds: string[] = JSON.parse(localStorage.getItem(KEY) || '[]');
       if (localIds.length) setIds(new Set(localIds));
     } catch {}
 
-    // 2. Sync with backend
+    // Sync with backend — API response is the source of truth for logged-in users
     savedApi.getSavedIds()
       .then(res => {
         const raw = res.data;
-        // Handle both plain array and { ids: [...] } shaped responses
         const apiIds: string[] = Array.isArray(raw) ? raw : Array.isArray(raw?.ids) ? raw.ids : [];
-
-        // Push any localStorage-only IDs up to the backend (covers old localStorage-only saves)
-        const missing = localIds.filter(id => !apiIds.includes(id));
-        missing.forEach(id => savedApi.save(id).catch(() => {}));
-
-        // Merge backend + localStorage into UI state
-        const all = Array.from(new Set(localIds.concat(apiIds)));
-        if (all.length) {
-          localStorage.setItem(KEY, JSON.stringify(all));
-          setIds(new Set(all));
-        }
+        // Replace local state with backend state (avoids cross-user localStorage pollution)
+        localStorage.setItem(KEY, JSON.stringify(apiIds));
+        setIds(new Set(apiIds));
       })
-      .catch(() => {}); // not logged in or network error — fall back to localStorage
+      .catch(() => {}); // not logged in — keep localStorage state
   }, []);
 
   const toggle = useCallback((id: string) => {
@@ -42,10 +32,10 @@ export function useWishlist() {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
-        savedApi.unsave(id).catch(() => {}); // fire-and-forget — API syncs backend
+        savedApi.unsave(id).catch(() => {});
       } else {
         next.add(id);
-        savedApi.save(id).catch(() => {});   // fire-and-forget
+        savedApi.save(id).catch(() => {});
       }
       localStorage.setItem(KEY, JSON.stringify(Array.from(next)));
       return next;

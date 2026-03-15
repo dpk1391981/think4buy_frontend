@@ -89,6 +89,12 @@ export interface Property {
   images: PropertyImage[];
   amenities: Amenity[];
   owner: PropertyOwner;
+  listedBy?: 'owner' | 'agent';
+  agentId?: string;
+  agencyId?: string;
+  brokerage?: string;
+  possessionDate?: string;
+  isNewProject?: boolean;
   createdAt: string;
   updatedAt: string;
 }

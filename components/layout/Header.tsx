@@ -378,22 +378,31 @@ function UserMenu({ compact = false }: { compact?: boolean }) {
 
           {user?.role === 'admin' && (
             <Link href="/admin" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-              <Settings className="w-4 h-4 text-gray-400" /> Admin Panel
+              <Settings className="w-4 h-4 text-orange-400" /> Admin Panel
             </Link>
           )}
-          {(user?.role === 'agent' || user?.role === 'seller') && (
+          {user?.role === 'agent' && (
             <Link href="/agent" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-              <Settings className="w-4 h-4 text-gray-400" /> Agent Panel
+              <Settings className="w-4 h-4 text-violet-400" /> Agent Dashboard
+            </Link>
+          )}
+          {(user?.role === 'owner' || user?.role === 'seller') && (
+            <Link href="/owner" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+              <Home className="w-4 h-4 text-emerald-400" /> Owner Dashboard
             </Link>
           )}
           {user?.role === 'buyer' && (
-            <Link href="/dashboard" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-              <Home className="w-4 h-4 text-gray-400" /> My Dashboard
+            <Link href="/buyer" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+              <Home className="w-4 h-4 text-cyan-400" /> Buyer Dashboard
             </Link>
           )}
 
           <Link
-            href={user?.role === 'buyer' ? '/dashboard/saved' : '/my-listings'}
+            href={
+              user?.role === 'buyer' ? '/buyer/saved' :
+              (user?.role === 'owner' || user?.role === 'seller') ? '/owner/properties' :
+              '/agent/listings'
+            }
             onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
           >
@@ -402,7 +411,11 @@ function UserMenu({ compact = false }: { compact?: boolean }) {
           </Link>
 
           <Link
-            href={user?.role === 'buyer' ? '/dashboard/profile' : '/agent/profile'}
+            href={
+              user?.role === 'buyer' ? '/buyer/profile' :
+              (user?.role === 'owner' || user?.role === 'seller') ? '/owner/profile' :
+              '/agent/profile'
+            }
             onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
           >
@@ -497,7 +510,17 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
     ? user.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
     : 'U';
 
-  const dashHref = user?.role === 'admin' ? '/admin' : user?.role === 'buyer' ? '/dashboard' : '/agent';
+  const dashHref =
+    user?.role === 'admin'  ? '/admin'  :
+    user?.role === 'agent'  ? '/agent'  :
+    user?.role === 'owner' || user?.role === 'seller' ? '/owner' :
+    '/buyer';
+
+  const dashLabel =
+    user?.role === 'admin'  ? 'Admin Panel'      :
+    user?.role === 'agent'  ? 'Agent Dashboard'  :
+    user?.role === 'owner' || user?.role === 'seller' ? 'Owner Dashboard' :
+    'Buyer Dashboard';
 
   return (
     <>
@@ -577,13 +600,30 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
         <div className="flex-1 overflow-y-auto py-2">
           <Link href={dashHref} onClick={onClose} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
             <Settings className="w-4 h-4 text-gray-400" />
-            {user?.role === 'admin' ? 'Admin Panel' : user?.role === 'buyer' ? 'My Dashboard' : 'Agent Panel'}
+            {dashLabel}
           </Link>
-          <Link href={user?.role === 'buyer' ? '/dashboard/saved' : '/my-listings'} onClick={onClose} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+          <Link
+            href={
+              user?.role === 'buyer' ? '/buyer/saved' :
+              (user?.role === 'owner' || user?.role === 'seller') ? '/owner/properties' :
+              '/agent/listings'
+            }
+            onClick={onClose}
+            className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
             <Heart className="w-4 h-4 text-gray-400" />
             {user?.role === 'buyer' ? 'Saved Properties' : 'My Listings'}
           </Link>
-          <Link href={user?.role === 'buyer' ? '/dashboard/profile' : '/agent/profile'} onClick={onClose} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+          <Link
+            href={
+              user?.role === 'buyer' ? '/buyer/profile' :
+              (user?.role === 'owner' || user?.role === 'seller') ? '/owner/profile' :
+              user?.role === 'admin' ? '/admin' :
+              '/agent/profile'
+            }
+            onClick={onClose}
+            className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
             <User className="w-4 h-4 text-gray-400" />
             Profile
           </Link>
@@ -685,8 +725,12 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Hide on admin/agent panel pages — those layouts have their own top bar
-  const isPanel = pathname.startsWith('/admin') || pathname === '/agent' || pathname.startsWith('/agent/');
+  // Hide on dashboard panels — those layouts have their own top bar
+  const isPanel =
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/agent') ||
+    pathname.startsWith('/owner') ||
+    pathname.startsWith('/buyer');
   if (isPanel) return null;
 
   return (

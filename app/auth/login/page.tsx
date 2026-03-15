@@ -60,12 +60,19 @@ function LoginForm() {
     setLoading(true); setError('');
     try {
       const { data } = await authApi.verifyOtp(phone, otp, name || undefined);
-      login(data.token, data.user);
-      const redirect = searchParams.get('redirect') || '/';
+      login(data.token, data.user, data.menus);
+      const redirect = searchParams.get('redirect') || '';
       if (data.isNewUser) {
-        router.replace(`/auth/onboarding?redirect=${encodeURIComponent(redirect)}`);
-      } else {
+        router.replace(`/auth/onboarding?redirect=${encodeURIComponent(redirect || '/')}`);
+      } else if (redirect && redirect !== '/') {
         router.replace(redirect);
+      } else {
+        // Role-based redirect for existing users
+        const role = data.user?.role;
+        if (role === 'admin') router.replace('/admin');
+        else if (role === 'agent') router.replace('/agent');
+        else if (role === 'owner' || role === 'seller') router.replace('/owner');
+        else router.replace('/buyer');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid OTP. Try again.');

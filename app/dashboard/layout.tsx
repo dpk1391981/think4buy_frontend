@@ -23,8 +23,18 @@ export default function UserDashboardLayout({ children }: { children: React.Reac
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    if (!loading && mounted && !user) {
-      router.replace('/auth/login?redirect=/dashboard');
+    if (!loading && mounted) {
+      if (!user) {
+        router.replace('/auth/login?redirect=/dashboard');
+      } else if (user.role === 'buyer') {
+        router.replace('/buyer');
+      } else if (user.role === 'owner' || user.role === 'seller') {
+        router.replace('/owner');
+      } else if (user.role === 'agent') {
+        router.replace('/agent');
+      } else if (user.role === 'admin') {
+        router.replace('/admin');
+      }
     }
   }, [user, loading, mounted, router]);
 

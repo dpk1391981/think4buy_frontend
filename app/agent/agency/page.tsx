@@ -32,6 +32,12 @@ export default function AgentAgencyPage() {
   const [myListingsTotal, setMyListingsTotal] = useState(0);
   const [assignedTotal, setAssignedTotal] = useState(0);
 
+  // Agency self-registration
+  const [regForm, setRegForm] = useState({ agencyName: '', contactPhone: '', address: '' });
+  const [regLoading, setRegLoading] = useState(false);
+  const [regError, setRegError] = useState('');
+  const [regSuccess, setRegSuccess] = useState('');
+
   useEffect(() => {
     async function load() {
       try {
@@ -103,21 +109,97 @@ export default function AgentAgencyPage() {
     );
   }
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regForm.agencyName.trim()) { setRegError('Agency name is required.'); return; }
+    setRegLoading(true);
+    setRegError('');
+    setRegSuccess('');
+    try {
+      await agencyApi.selfRegisterOrJoin({
+        agencyName: regForm.agencyName.trim(),
+        contactPhone: regForm.contactPhone.trim() || undefined,
+        address: regForm.address.trim() || undefined,
+      });
+      setRegSuccess('Your agency registration has been submitted for admin approval.');
+      setRegForm({ agencyName: '', contactPhone: '', address: '' });
+    } catch (err: any) {
+      setRegError(err?.response?.data?.message || 'Failed to submit registration.');
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
   if (!agency) {
     return (
       <div className="p-4 md:p-8 max-w-2xl">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">My Agency</h1>
-          <p className="text-gray-500 mt-1 text-sm">Agency membership details</p>
+          <p className="text-gray-500 mt-1 text-sm">Register or join an agency</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          <Building2 className="w-14 h-14 text-gray-200 mx-auto mb-4" />
-          <h3 className="font-semibold text-gray-700 mb-1">Not Assigned to an Agency</h3>
-          <p className="text-sm text-gray-400">
-            You haven't been assigned to an agency yet. Contact an admin to get assigned.
-          </p>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-5">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <Building2 className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Register Your Agency</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Enter your company name — an existing agency with the same name will be joined, otherwise a new agency request will be submitted for admin approval.</p>
+            </div>
+          </div>
+
+          {regSuccess ? (
+            <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-4 py-3 rounded-lg">
+              ✓ {regSuccess}
+            </div>
+          ) : (
+            <form onSubmit={handleRegister} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Agency / Company Name *</label>
+                <input
+                  type="text"
+                  value={regForm.agencyName}
+                  onChange={e => setRegForm(f => ({ ...f, agencyName: e.target.value }))}
+                  placeholder="e.g. PropElite Realty Pvt Ltd"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Contact Phone</label>
+                  <input
+                    type="tel"
+                    value={regForm.contactPhone}
+                    onChange={e => setRegForm(f => ({ ...f, contactPhone: e.target.value }))}
+                    placeholder="+91 XXXXX XXXXX"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Office Address</label>
+                  <input
+                    type="text"
+                    value={regForm.address}
+                    onChange={e => setRegForm(f => ({ ...f, address: e.target.value }))}
+                    placeholder="e.g. 123 Business Park, Mumbai"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              {regError && <p className="text-xs text-red-600">{regError}</p>}
+              <button
+                type="submit"
+                disabled={regLoading}
+                className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {regLoading ? 'Submitting...' : 'Submit for Approval'}
+              </button>
+            </form>
+          )}
         </div>
-        {/* Still show My Listings even without agency */}
+
         <PropertiesSection
           propsTab={propsTab}
           setPropsTab={setPropsTab}

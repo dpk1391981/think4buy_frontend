@@ -110,7 +110,19 @@ export default function AgentProfilePage() {
         <div className="bg-white rounded-xl shadow-sm p-6 flex items-center gap-5">
           <AvatarUpload size={88} />
           <div>
-            <div className="font-semibold text-gray-900 text-base">{user?.name}</div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-gray-900 text-base">{user?.name}</span>
+              {user?.agentTick && user.agentTick !== 'none' && (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                  user.agentTick === 'blue'    ? 'bg-blue-100 text-blue-700' :
+                  user.agentTick === 'gold'    ? 'bg-yellow-100 text-yellow-700' :
+                  user.agentTick === 'diamond' ? 'bg-purple-100 text-purple-700' : ''
+                }`}>
+                  {user.agentTick === 'blue' ? '✓' : user.agentTick === 'gold' ? '★' : '◆'}
+                  {' '}{user.agentTick.charAt(0).toUpperCase() + user.agentTick.slice(1)} Badge
+                </span>
+              )}
+            </div>
             <div className="text-sm text-gray-500 capitalize">{user?.role}</div>
             <div className="text-xs text-gray-400 mt-0.5">{user?.email}</div>
           </div>

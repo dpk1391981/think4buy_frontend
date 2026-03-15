@@ -2,6 +2,13 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { authApi } from '@/lib/api';
+import { api } from '@/lib/api';
+
+export interface MenuItem {
+  name: string;
+  slug: string;
+  icon: string;
+}
 
 interface AuthUser {
   id: string;
@@ -14,18 +21,21 @@ interface AuthUser {
   company?: string;
   isVerified: boolean;
   needsOnboarding?: boolean;
+  agentTick?: 'none' | 'blue' | 'gold' | 'diamond';
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
+  menus: MenuItem[];
   loading: boolean;
-  login: (token: string, user: AuthUser) => void;
+  login: (token: string, user: AuthUser, menus?: MenuItem[]) => void;
   logout: () => void;
   refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
+  menus: [],
   loading: true,
   login: () => {},
   logout: () => {},
@@ -34,6 +44,7 @@ const AuthContext = createContext<AuthContextValue>({
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [menus, setMenus] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -44,14 +55,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const { data } = await authApi.getProfile();
-      setUser(data);
-      localStorage.setItem('user', JSON.stringify(data));
+      const [profileRes, menusRes] = await Promise.all([
+        authApi.getProfile(),
+        api.get('/menus/me').catch(() => ({ data: [] })),
+      ]);
+      const userData = profileRes.data;
+      const menusData: MenuItem[] = menusRes.data || [];
+
+      setUser(userData);
+      setMenus(menusData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('menus', JSON.stringify(menusData));
       document.cookie = 't4bs_auth=1; path=/; max-age=604800; samesite=strict';
     } catch {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem('menus');
       setUser(null);
+      setMenus([]);
       document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
     } finally {
       setLoading(false);
@@ -61,32 +82,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Seed from localStorage first (instant), then validate with API
     const stored = localStorage.getItem('user');
+    const storedMenus = localStorage.getItem('menus');
     if (stored) {
       try { setUser(JSON.parse(stored)); } catch {}
+    }
+    if (storedMenus) {
+      try { setMenus(JSON.parse(storedMenus)); } catch {}
     }
     refresh();
   }, [refresh]);
 
-  const login = (token: string, userData: AuthUser) => {
+  const login = (token: string, userData: AuthUser, loginMenus?: MenuItem[]) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
+    if (loginMenus) {
+      setMenus(loginMenus);
+      localStorage.setItem('menus', JSON.stringify(loginMenus));
+    }
     // Set a non-httpOnly presence cookie so Next.js middleware can detect auth state
-    // without reading localStorage (which is inaccessible server-side).
-    // This is NOT a security token — the real JWT stays in localStorage/HTTP-only cookie.
     document.cookie = 't4bs_auth=1; path=/; max-age=604800; samesite=strict';
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('menus');
+    localStorage.removeItem('pf_wishlist'); // clear saved state so next user starts fresh
     setUser(null);
-    // Clear the presence cookie so middleware correctly blocks private routes
+    setMenus([]);
     document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refresh }}>
+    <AuthContext.Provider value={{ user, menus, loading, login, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

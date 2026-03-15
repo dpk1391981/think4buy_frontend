@@ -95,6 +95,8 @@ export const propertiesApi = {
     }),
   deleteImage: (propertyId: string, imageId: string) =>
     api.delete(`/properties/${propertyId}/images/${imageId}`),
+  trackView: (id: string, body: { sessionId?: string; source?: string; referrer?: string; deviceType?: string }) =>
+    api.post(`/properties/${id}/view`, body).catch(() => {}), // fire-and-forget, never throws
 };
 
 // Auth
@@ -116,6 +118,18 @@ export const authApi = {
   completeOnboarding: (data: { role: string; name?: string; agentLicense?: string; agentExperience?: number }) =>
     api.patch('/auth/onboarding', data),
   upgradeRole: (role: 'owner' | 'agent') => api.patch('/auth/upgrade-role', { role }),
+};
+
+// Menus
+export const menusApi = {
+  getMyMenus: () => api.get('/menus/me'),
+  getMenusByRole: (role: string) => api.get(`/menus/by-role/${role}`),
+  adminGetMatrix: () => api.get('/menus/admin/matrix'),
+  adminTogglePermission: (role: string, menuId: number, isVisible: boolean) =>
+    api.patch('/menus/admin/permission', { role, menuId, isVisible }),
+  adminUpdateOrder: (menuId: number, sortOrder: number) =>
+    api.patch(`/menus/admin/${menuId}/order`, { sortOrder }),
+  adminSeed: () => api.get('/menus/admin/seed'),
 };
 
 // Locations
@@ -516,6 +530,16 @@ export const homeApi = {
     source?: string;
     metadata?: Record<string, any>;
   }) => api.post('/analytics/track', dto).catch(() => {}), // silent fail
+};
+
+// ─── Agent Feedback API ───────────────────────────────────────────────────────
+export const agentFeedbackApi = {
+  submit: (agentId: string, data: { rating: number; comment?: string }) =>
+    api.post(`/agent-feedback/${agentId}`, data),
+  list: (agentId: string, params?: { page?: number; limit?: number }) =>
+    api.get(`/agent-feedback/${agentId}`, { params }),
+  hasReviewed: (agentId: string) =>
+    api.get(`/agent-feedback/${agentId}/has-reviewed`),
 };
 
 // ─── Articles API ─────────────────────────────────────────────────────────────

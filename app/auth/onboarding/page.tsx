@@ -85,6 +85,7 @@ function OnboardingForm() {
   const [selectedRole, setSelectedRole] = useState<RoleId>('buyer');
   const [agentLicense, setAgentLicense] = useState('');
   const [agentExperience, setAgentExperience] = useState('');
+  const [agencyName, setAgencyName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -106,23 +107,24 @@ function OnboardingForm() {
     setLoading(true);
     setError('');
     try {
-      const payload: { role: string; agentLicense?: string; agentExperience?: number } = {
+      const payload: { role: string; agentLicense?: string; agentExperience?: number; agencyName?: string } = {
         role: selectedRole,
       };
       if (selectedRole === 'agent') {
         if (agentLicense.trim()) payload.agentLicense = agentLicense.trim();
         if (agentExperience) payload.agentExperience = Number(agentExperience);
+        if (agencyName.trim()) payload.agencyName = agencyName.trim();
       }
 
       const { data } = await authApi.completeOnboarding(payload);
       // Re-login with updated user (new role, needsOnboarding = false)
-      login(data.token, data.user);
+      login(data.token, data.user, data.menus);
 
-      // Redirect to role-appropriate destination
+      // Redirect to role-appropriate dashboard
       const dest =
-        selectedRole === 'agent' ? '/agent/dashboard' :
-        selectedRole === 'owner' ? '/my-listings' :
-        redirect;
+        selectedRole === 'agent' ? '/agent' :
+        selectedRole === 'owner' ? '/owner' :
+        '/buyer';
 
       router.replace(dest);
     } catch (err: any) {
@@ -232,6 +234,17 @@ function OnboardingForm() {
                 Agent Profile (optional — helps verify your listing)
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Agency / Company Name</label>
+                  <input
+                    type="text"
+                    value={agencyName}
+                    onChange={(e) => setAgencyName(e.target.value)}
+                    placeholder="e.g. PropElite Realty Pvt Ltd"
+                    className="w-full px-3 py-2.5 border border-violet-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                  />
+                  <p className="text-[10px] text-violet-500 mt-1">Will be submitted for admin approval as a pending agency</p>
+                </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">RERA / License Number</label>
                   <input

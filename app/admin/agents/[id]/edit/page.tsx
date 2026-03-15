@@ -8,6 +8,35 @@ import { adminApi, adminLocationsApi, locationsApi } from '@/lib/api';
 interface State { id: string; name: string; code: string; }
 interface City  { id: string; name: string; stateId: string; }
 
+// Defined outside component to keep a stable reference and prevent focus-loss on each keystroke
+function Field({
+  label, name, form, onChange, type = 'text', placeholder, required,
+}: {
+  label: string;
+  name: string;
+  form: Record<string, string>;
+  onChange: (name: string, value: string) => void;
+  type?: string;
+  placeholder?: string;
+  required?: boolean;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type={type}
+        value={form[name] ?? ''}
+        onChange={e => onChange(name, e.target.value)}
+        placeholder={placeholder}
+        required={required}
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+    </div>
+  );
+}
+
 export default function EditAgentPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const router = useRouter();
@@ -101,26 +130,6 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
     }
   }
 
-  const Field = ({
-    label, name, type = 'text', placeholder, required,
-  }: {
-    label: string; name: keyof typeof form; type?: string; placeholder?: string; required?: boolean;
-  }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      <input
-        type={type}
-        value={form[name] as string}
-        onChange={e => set(name, e.target.value)}
-        placeholder={placeholder}
-        required={required}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-      />
-    </div>
-  );
-
   if (fetching) {
     return (
       <div className="p-6 max-w-3xl">
@@ -155,10 +164,10 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h2 className="font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">Account Details</h2>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Full Name" name="name"  placeholder="Amit Verma"           required />
-            <Field label="Email"     name="email"  type="email" placeholder="agent@example.com" required />
-            <Field label="Phone"     name="phone"  placeholder="9876543210" />
-            <Field label="Company"   name="company" placeholder="PropElite Realty" />
+            <Field label="Full Name" name="name"  form={form} onChange={set} placeholder="Amit Verma"           required />
+            <Field label="Email"     name="email"  form={form} onChange={set} type="email" placeholder="agent@example.com" required />
+            <Field label="Phone"     name="phone"  form={form} onChange={set} placeholder="9876543210" />
+            <Field label="Company"   name="company" form={form} onChange={set} placeholder="PropElite Realty" />
           </div>
         </div>
 
@@ -166,8 +175,8 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h2 className="font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">Professional Info</h2>
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <Field label="RERA License"       name="agentLicense"    placeholder="MH-RERA-A12345" />
-            <Field label="Experience (years)" name="agentExperience" type="number" placeholder="5" />
+            <Field label="RERA License"       name="agentLicense"    form={form} onChange={set} placeholder="MH-RERA-A12345" />
+            <Field label="Experience (years)" name="agentExperience" form={form} onChange={set} type="number" placeholder="5" />
 
             {/* Agent Badge */}
             <div>
