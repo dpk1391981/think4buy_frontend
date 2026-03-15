@@ -726,9 +726,10 @@ export default function Header() {
   }, []);
 
   // Hide on dashboard panels — those layouts have their own top bar
+  // NOTE: use '/agent/' with trailing slash so '/agents/*' (public) is NOT hidden
   const isPanel =
     pathname.startsWith('/admin') ||
-    pathname.startsWith('/agent') ||
+    pathname.startsWith('/agent/') || pathname === '/agent' ||
     pathname.startsWith('/owner') ||
     pathname.startsWith('/buyer');
   if (isPanel) return null;
