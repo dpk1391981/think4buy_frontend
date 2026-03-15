@@ -18,6 +18,7 @@ import {
   formatPrice, formatArea, getPropertyTypeLabel, getCategoryLabel,
   getFurnishingLabel, getPrimaryImage, timeAgo,
 } from '@/lib/utils';
+import { resolveImageUrl } from '@/lib/imageUtils';
 import { cn } from '@/lib/utils';
 import { inquiriesApi, propertiesApi, savedApi } from '@/lib/api';
 import { useAnalytics } from '@/hooks/useAnalytics';
@@ -93,7 +94,7 @@ export default function PropertyDetailClient({ property }: Props) {
   const [descExpanded, setDescExpanded] = useState(false);
 
   const images = property.images?.length
-    ? property.images
+    ? property.images.map((img) => ({ ...img, url: resolveImageUrl(img.url) }))
     : [{ url: getPrimaryImage([]), alt: property.title, id: '0', isPrimary: true, sortOrder: 0 }];
 
   // Pre-fill form from logged-in user

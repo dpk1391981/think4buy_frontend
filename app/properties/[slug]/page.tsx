@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import PropertyDetailClient from './PropertyDetailClient';
 import { propertiesApi } from '@/lib/api';
 import JsonLd, { buildRealEstateListingSchema, buildBreadcrumbSchema } from '@/components/seo/JsonLd';
+import { resolveImageUrl } from '@/lib/imageUtils';
 
 interface Props {
   params: { slug: string };
@@ -45,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title,
       description,
       images: property.images?.[0]
-        ? [{ url: property.images[0].url }]
+        ? [{ url: resolveImageUrl(property.images[0].url) }]
         : [],
       type: 'website',
     },

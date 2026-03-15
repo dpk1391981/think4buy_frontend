@@ -5,6 +5,7 @@
  *   <JsonLd schema={propertySchema} />
  *   <JsonLd schema={[breadcrumbSchema, orgSchema]} />
  */
+import { resolveImageUrl } from '@/lib/imageUtils';
 
 interface Props {
   schema: Record<string, unknown> | Record<string, unknown>[];
@@ -103,7 +104,7 @@ export function buildRealEstateListingSchema(property: {
     name: property.title,
     description: property.description,
     url: `${siteUrl}/properties/${property.slug}`,
-    image: property.images?.map((img) => img.url) ?? [],
+    image: property.images?.map((img) => resolveImageUrl(img.url)) ?? [],
     ...(property.price && {
       offers: {
         '@type': 'Offer',

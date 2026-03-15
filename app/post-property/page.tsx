@@ -8,6 +8,7 @@ import {
   Zap, Info, Camera, Eye, ChevronRight, Save, Clock,
 } from 'lucide-react';
 import { propertiesApi, locationsApi, propertyConfigApi, authApi, agencyApi } from '@/lib/api';
+import { resolveImageUrl } from '@/lib/imageUtils';
 import AuthGuard from '@/components/auth/AuthGuard';
 import { detectLocation } from '@/lib/geolocation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -1530,7 +1531,7 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImage
           {/* Existing images (edit mode) */}
           {(existingImages || []).map((img: any, i: number) => (
             <div key={`existing-${img.id}`} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group">
-              <img src={img.url.startsWith('http') ? img.url : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api','')}${img.url}`} alt="" className="w-full h-full object-cover" />
+              <img src={resolveImageUrl(img.url)} alt="" className="w-full h-full object-cover" />
               {i === 0 && imgCount === 0 && (
                 <span className="absolute bottom-1.5 left-1.5 text-[10px] bg-primary-600 text-white px-2 py-0.5 rounded font-bold">
                   Cover

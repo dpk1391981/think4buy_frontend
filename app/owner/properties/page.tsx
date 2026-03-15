@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { resolveImageUrl } from '@/lib/imageUtils';
 import { Home, Plus, MapPin, IndianRupee, CheckCircle, Clock, XCircle } from 'lucide-react';
 
 interface Property {
@@ -68,7 +69,7 @@ export default function OwnerProperties() {
             <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
               <div className="h-36 bg-gray-100 relative">
                 {p.images?.[0]?.url
-                  ? <img src={p.images[0].url} alt={p.title} className="w-full h-full object-cover" />
+                  ? <img src={resolveImageUrl(p.images[0].url)} alt={p.title} className="w-full h-full object-cover" />
                   : <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">🏠</div>
                 }
                 <span className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${

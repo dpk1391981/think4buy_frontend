@@ -9,6 +9,7 @@ import {
 import Link from 'next/link';
 import { adminApi, adminLocationsApi, locationsApi } from '@/lib/api';
 import OptimizedImage from '@/components/common/OptimizedImage';
+import { resolveImageUrl } from '@/lib/imageUtils';
 
 const STATUS_TABS = [
   { label: 'All',      value: '' },
@@ -371,7 +372,7 @@ export default function AdminPropertiesPage() {
                       <div className="flex items-start gap-3">
                         {p.images?.[0]?.url ? (
                           <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 border border-gray-100">
-                            <OptimizedImage src={p.images[0].url} alt="" fill className="object-cover" sizes="40px" />
+                            <OptimizedImage src={resolveImageUrl(p.images[0].url)} alt="" fill className="object-cover" sizes="40px" />
                           </div>
                         ) : (
                           <div className="w-10 h-10 rounded-lg bg-gray-100 flex-shrink-0" />

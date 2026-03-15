@@ -8,6 +8,29 @@
  *  3. CDN URL builder for ImageKit / Cloudinary
  */
 
+// ─── API Image URL Resolution ────────────────────────────────────────────────
+
+/**
+ * Converts a relative upload path (e.g. `/uploads/properties/id/img.webp`)
+ * to a full URL pointing at the API server.
+ *
+ * Uploaded images are stored on the API server, not the Next.js frontend.
+ * When PUBLIC_API_URL is not set in the backend env, URLs are stored as
+ * relative paths in the DB. This helper ensures the browser always gets
+ * an absolute URL regardless of how the URL was stored.
+ *
+ * Usage:
+ *   <Image src={resolveImageUrl(img.url)} ... />
+ */
+export function resolveImageUrl(url: string | undefined | null): string {
+  if (!url) return '/placeholder-property.svg';
+  if (url.startsWith('http')) return url;
+  // Strip "/api/v1" suffix to get just the origin (e.g. https://reales-api.vtechxhub.com)
+  const apiOrigin =
+    (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/api\/v1\/?$/, '');
+  return `${apiOrigin}${url.startsWith('/') ? url : `/${url}`}`;
+}
+
 // ─── Blur Placeholder ────────────────────────────────────────────────────────
 
 /**
