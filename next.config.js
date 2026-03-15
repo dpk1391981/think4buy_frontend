@@ -23,6 +23,9 @@ const nextConfig = {
       // Self-hosted uploads (any subdomain of think4buysale.com)
       { protocol: 'https', hostname: '*.think4buysale.com' },
       { protocol: 'https', hostname: 'think4buysale.com' },
+      // API server (vtechxhub hosted backend)
+      { protocol: 'https', hostname: 'reales-api.vtechxhub.com', pathname: '/uploads/**' },
+      { protocol: 'https', hostname: '*.vtechxhub.com', pathname: '/uploads/**' },
       // Common CDN / storage providers
       { protocol: 'https', hostname: '**.amazonaws.com' },
       { protocol: 'https', hostname: '**.cloudinary.com' },
