@@ -16,26 +16,68 @@ export default function PropertyCardSkeleton({ listView, className }: Props) {
       <div
         aria-label="Loading property"
         className={cn(
-          'bg-white rounded-xl border border-gray-100 overflow-hidden flex gap-0',
+          'bg-white rounded-2xl border border-gray-100 overflow-hidden',
           className,
         )}
       >
-        {/* Image */}
-        <Shimmer className="w-56 flex-shrink-0 h-40 rounded-none" />
-        {/* Content */}
-        <div className="flex-1 p-4 space-y-3">
-          <Shimmer className="h-5 w-1/4" />
-          <Shimmer className="h-4 w-2/3" />
-          <Shimmer className="h-3 w-1/2" />
-          <div className="h-px bg-gray-100" />
-          <div className="flex gap-4">
-            <Shimmer className="h-3 w-14" />
-            <Shimmer className="h-3 w-14" />
-            <Shimmer className="h-3 w-20" />
+        <div className="flex flex-col sm:flex-row">
+          {/* Image */}
+          <Shimmer className="sm:w-64 lg:w-72 xl:w-80 flex-shrink-0 aspect-[4/3] rounded-none" />
+          {/* Content */}
+          <div className="flex-1 flex flex-col sm:flex-row">
+            <div className="flex-1 p-4 sm:p-5 space-y-3">
+              {/* Title */}
+              <div className="flex items-start justify-between gap-2">
+                <Shimmer className="h-5 w-3/4" />
+                <Shimmer className="h-3 w-14 flex-shrink-0" />
+              </div>
+              {/* Location */}
+              <Shimmer className="h-4 w-1/2" />
+              {/* Specs */}
+              <div className="flex gap-4">
+                <Shimmer className="h-4 w-16" />
+                <Shimmer className="h-4 w-16" />
+                <Shimmer className="h-4 w-20" />
+              </div>
+              {/* Type + age */}
+              <div className="flex gap-2">
+                <Shimmer className="h-6 w-20 rounded-lg" />
+                <Shimmer className="h-6 w-24 rounded-lg" />
+              </div>
+              {/* Highlights */}
+              <div className="flex gap-2">
+                <Shimmer className="h-6 w-28 rounded-full" />
+                <Shimmer className="h-6 w-24 rounded-full" />
+                <Shimmer className="h-6 w-20 rounded-full" />
+              </div>
+              {/* Agent row */}
+              <div className="flex items-center gap-2 pt-1 border-t border-gray-50">
+                <Shimmer circle className="h-7 w-7" />
+                <Shimmer className="h-3 w-28" />
+              </div>
+            </div>
+            {/* Right CTA */}
+            <div className="hidden sm:flex flex-col items-end gap-3 p-4 sm:p-5 border-l border-gray-100 sm:w-44 lg:w-48 flex-shrink-0">
+              <Shimmer className="h-8 w-full" />
+              <Shimmer className="h-3 w-20" />
+              <div className="flex flex-col gap-2 w-full mt-2">
+                <Shimmer className="h-9 w-full rounded-xl" />
+                <Shimmer className="h-9 w-full rounded-xl" />
+                <Shimmer className="h-9 w-full rounded-xl" />
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2 pt-1">
-            <Shimmer circle className="h-6 w-6" />
-            <Shimmer className="h-3 w-24" />
+        </div>
+        {/* Mobile price + CTA */}
+        <div className="sm:hidden px-4 pb-4 space-y-3">
+          <div className="flex justify-between">
+            <Shimmer className="h-6 w-32" />
+            <Shimmer className="h-5 w-24" />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Shimmer className="h-10 rounded-xl" />
+            <Shimmer className="h-10 rounded-xl" />
+            <Shimmer className="h-10 rounded-xl" />
           </div>
         </div>
       </div>

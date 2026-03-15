@@ -32,7 +32,7 @@ export default function PropertiesLoading() {
                 <div className="skeleton-shimmer h-9 w-24 rounded-xl" />
               </div>
             </div>
-            <PropertyGridSkeleton count={9} />
+            <PropertyGridSkeleton count={6} listView />
           </div>
         </div>
       </div>

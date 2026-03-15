@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search, MapPin, Phone, Star, Shield, CheckCircle, Building2,
@@ -384,9 +384,8 @@ export default function AgentsListingClient({
   const activePage  = parseInt(param('page', '1'), 10) || 1;
   const activeSearch = param('search');
 
-  // Local UI state only
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [total, setTotal] = useState(0);
+  // Local UI state
+  const [allAgents, setAllAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -446,49 +445,66 @@ export default function AgentsListingClient({
     router.push('/agents', { scroll: false });
   };
 
-  // Fetch agents
+  // Fetch ALL agents from API (server-side filters: city, badge only).
+  // minExp / minDeals / sort are applied client-side so they always work
+  // across all results, not just the current page's 15 items.
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params: any = { page: activePage, limit: LIMIT };
+      const params: any = { page: 1, limit: 500 };
       if (activeCity)  params.city = activeCity;
       if (activeBadge) params.agentTick = activeBadge;
       const r = await usersApi.getAgents(params);
       const data = r.data;
-      const items: Agent[] = data?.agents || data?.items || data || [];
-      // client-side filter for minExp / minDeals (API may not support them)
-      const filtered = items.filter(a => {
-        if (activeMinExp   && (a.agentExperience ?? 0) < parseInt(activeMinExp))  return false;
-        if (activeMinDeals && (a.totalDeals ?? 0)      < parseInt(activeMinDeals)) return false;
-        return true;
-      });
-      const sorted = clientSort(filtered, activeSort);
-      setAgents(sorted);
-      setTotal(data?.total ?? items.length);
+      const items: Agent[] = data?.agents || data?.items || (Array.isArray(data) ? data : []);
+      setAllAgents(items);
     } catch {
-      setAgents([]);
-      setTotal(0);
+      setAllAgents([]);
     } finally {
       setLoading(false);
     }
-  }, [activePage, activeCity, activeBadge, activeSort, activeMinExp, activeMinDeals]);
+  }, [activeCity, activeBadge]); // only refetch when server-supported filters change
 
   useEffect(() => { load(); }, [load]);
 
-  const totalPages = Math.ceil(total / LIMIT);
-  const verifiedCount = agents.filter(a => a.isVerified || (a.agentTick && a.agentTick !== 'none')).length;
+  // Client-side filter + sort — instant, no API call
+  const filteredAgents = useMemo(() => {
+    const result = allAgents.filter(a => {
+      if (activeMinExp   && (a.agentExperience ?? 0) < parseInt(activeMinExp))  return false;
+      if (activeMinDeals && (a.totalDeals ?? 0)      < parseInt(activeMinDeals)) return false;
+      return true;
+    });
+    return clientSort(result, activeSort);
+  }, [allAgents, activeMinExp, activeMinDeals, activeSort]);
 
-  // Active filter chips (for "remove" UI)
+  // Client-side pagination
+  const total      = filteredAgents.length;
+  const totalPages = Math.ceil(total / LIMIT);
+  const agents     = useMemo(
+    () => filteredAgents.slice((activePage - 1) * LIMIT, activePage * LIMIT),
+    [filteredAgents, activePage],
+  );
+
+  const verifiedCount = filteredAgents.filter(a => a.isVerified || (a.agentTick && a.agentTick !== 'none')).length;
+
+  // Active filter chips
   const activeFilterChips: { key: string; label: string }[] = [];
+  if (activeCity)     activeFilterChips.push({ key: 'city',     label: `City: ${activeCity}` });
   if (activeBadge)    activeFilterChips.push({ key: 'badge',    label: BADGE_OPTIONS.find(b => b.value === activeBadge)?.label ?? activeBadge });
   if (activeMinExp)   activeFilterChips.push({ key: 'minExp',   label: `${activeMinExp}+ yrs exp` });
   if (activeMinDeals) activeFilterChips.push({ key: 'minDeals', label: `${activeMinDeals}+ deals` });
 
   const hasActiveFilters = !!(activeCity || activeBadge || activeMinExp || activeMinDeals || (activeSort !== 'rating'));
 
+  // Chip removal — also clears local cityQuery state for city chip
+  const removeChip = useCallback((key: string) => {
+    if (key === 'city') setCityQuery('');
+    pushFilter({ [key]: null });
+  }, [pushFilter]);
+
   // ── Sidebar content ────────────────────────────────────────────────────────
 
-  const Sidebar = (
+  const makeSidebar = (idPrefix: string) => (
     <aside className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       {/* Sidebar header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
@@ -508,7 +524,7 @@ export default function AgentsListingClient({
         <div className="space-y-1">
           {SORT_OPTIONS.map(o => (
             <label key={o.value} className="flex items-center gap-2.5 py-1.5 cursor-pointer group">
-              <input type="radio" name="sort" value={o.value} checked={activeSort === o.value}
+              <input type="radio" name={`${idPrefix}-sort`} value={o.value} checked={activeSort === o.value}
                 onChange={() => pushFilter({ sort: o.value })}
                 className="accent-primary-600 w-3.5 h-3.5" />
               <span className={`text-sm transition-colors ${activeSort === o.value ? 'text-primary-700 font-semibold' : 'text-gray-600 group-hover:text-gray-900'}`}>
@@ -523,14 +539,14 @@ export default function AgentsListingClient({
       <SidebarSection title="Agent Badge">
         <div className="space-y-1">
           <label className="flex items-center gap-2.5 py-1.5 cursor-pointer group">
-            <input type="radio" name="badge" value="" checked={!activeBadge}
+            <input type="radio" name={`${idPrefix}-badge`} value="" checked={!activeBadge}
               onChange={() => pushFilter({ badge: null })}
               className="accent-primary-600 w-3.5 h-3.5" />
             <span className={`text-sm ${!activeBadge ? 'text-primary-700 font-semibold' : 'text-gray-600 group-hover:text-gray-900'}`}>All Agents</span>
           </label>
           {BADGE_OPTIONS.map(o => (
             <label key={o.value} className="flex items-center gap-2.5 py-1.5 cursor-pointer group">
-              <input type="radio" name="badge" value={o.value} checked={activeBadge === o.value}
+              <input type="radio" name={`${idPrefix}-badge`} value={o.value} checked={activeBadge === o.value}
                 onChange={() => pushFilter({ badge: o.value })}
                 className="accent-primary-600 w-3.5 h-3.5" />
               <span className={`text-sm flex items-center gap-1 ${activeBadge === o.value ? 'text-primary-700 font-semibold' : 'text-gray-600 group-hover:text-gray-900'}`}>
@@ -547,7 +563,8 @@ export default function AgentsListingClient({
         <div className="space-y-1">
           {EXP_OPTIONS.map(o => (
             <label key={o.value} className="flex items-center gap-2.5 py-1.5 cursor-pointer group">
-              <input type="radio" name="minExp" value={o.value} checked={activeMinExp === o.value}
+              <input type="radio" name={`${idPrefix}-minExp`} value={o.value}
+                checked={activeMinExp === o.value}
                 onChange={() => pushFilter({ minExp: o.value || null })}
                 className="accent-primary-600 w-3.5 h-3.5" />
               <span className={`text-sm ${activeMinExp === o.value ? 'text-primary-700 font-semibold' : 'text-gray-600 group-hover:text-gray-900'}`}>
@@ -563,7 +580,8 @@ export default function AgentsListingClient({
         <div className="space-y-1">
           {DEALS_OPTIONS.map(o => (
             <label key={o.value} className="flex items-center gap-2.5 py-1.5 cursor-pointer group">
-              <input type="radio" name="minDeals" value={o.value} checked={activeMinDeals === o.value}
+              <input type="radio" name={`${idPrefix}-minDeals`} value={o.value}
+                checked={activeMinDeals === o.value}
                 onChange={() => pushFilter({ minDeals: o.value || null })}
                 className="accent-primary-600 w-3.5 h-3.5" />
               <span className={`text-sm ${activeMinDeals === o.value ? 'text-primary-700 font-semibold' : 'text-gray-600 group-hover:text-gray-900'}`}>
@@ -577,7 +595,7 @@ export default function AgentsListingClient({
       {/* Popular Cities */}
       <SidebarSection title="Browse by City" defaultOpen={false}>
         <div className="flex flex-col gap-0.5">
-          <button onClick={() => pushFilter({ city: null })}
+          <button onClick={() => { setCityQuery(''); pushFilter({ city: null }); }}
             className={cn('text-left text-sm py-1.5 px-2 rounded-lg transition-colors', !activeCity ? 'bg-primary-50 text-primary-700 font-semibold' : 'text-gray-600 hover:bg-gray-50')}>
             🇮🇳 All India
           </button>
@@ -663,7 +681,7 @@ export default function AgentsListingClient({
 
           {/* Desktop sidebar */}
           <div className="hidden lg:block w-64 flex-shrink-0 sticky top-36 self-start max-h-[calc(100vh-160px)] overflow-y-auto">
-            {Sidebar}
+            {makeSidebar('d')}
           </div>
 
           {/* Main content */}
@@ -692,7 +710,7 @@ export default function AgentsListingClient({
             {activeFilterChips.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {activeFilterChips.map(chip => (
-                  <button key={chip.key} onClick={() => pushFilter({ [chip.key]: null })}
+                  <button key={chip.key} onClick={() => removeChip(chip.key)}
                     className="flex items-center gap-1.5 bg-primary-50 text-primary-700 border border-primary-200 text-xs font-medium px-3 py-1.5 rounded-full hover:bg-primary-100 transition-colors">
                     {chip.label}
                     <X className="w-3 h-3" />
@@ -751,7 +769,7 @@ export default function AgentsListingClient({
               <h3 className="font-bold text-gray-900">Filter Agents</h3>
               <button onClick={() => setShowMobileFilters(false)} className="p-2 rounded-xl hover:bg-gray-100"><X className="w-5 h-5" /></button>
             </div>
-            {Sidebar}
+            {makeSidebar('m')}
             <div className="p-4 border-t border-gray-100">
               <button onClick={() => setShowMobileFilters(false)}
                 className="w-full py-3 bg-primary-600 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 transition-colors">

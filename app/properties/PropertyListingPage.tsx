@@ -96,7 +96,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
   const router = useRouter();
   const [data, setData] = useState<PaginatedProperties | null>(null);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('list');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [sortValue, setSortValue] = useState('relevance');
   const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
