@@ -11,7 +11,7 @@ import {
   Building, Calendar, ArrowLeft, Eye, X, Pencil,
   Building2, Star, Shield, Clock, Zap, Send,
   Layers, Home, Award, ExternalLink,
-  ChevronDown, ChevronUp, UserCircle, Lock,
+  ChevronDown, ChevronUp, UserCircle, Lock, AlertTriangle,
 } from 'lucide-react';
 import { Property } from '@/types/property';
 import {
@@ -131,10 +131,13 @@ export default function PropertyDetailClient({ property }: Props) {
   const [mapRef, mapVisible]             = useLazyComponent<HTMLDivElement>({ rootMargin: '300px' });
   const [ownerPropsRef, ownerPropsVisible] = useLazyComponent<HTMLDivElement>({ rootMargin: '500px' });
 
+  const isInactiveListing = property.status !== 'active';
+
   const { data: similar, isLoading: similarLoading } = useQuery({
     queryKey: ['similar', property.id],
     queryFn: () => propertiesApi.getSimilar(property.id).then(r => r.data),
-    enabled: similarVisible,
+    // Load immediately for inactive listings (shown near top), lazily otherwise
+    enabled: isInactiveListing || similarVisible,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -481,6 +484,51 @@ export default function PropertyDetailClient({ property }: Props) {
           <span className="text-gray-800 line-clamp-1">{property.title}</span>
         </nav>
 
+        {/* ── Status Banner (SOLD / RENTED / INACTIVE) ─────────────────────── */}
+        {property.status !== 'active' && (
+          <div className={cn(
+            'mb-4 rounded-2xl p-4 border flex flex-col sm:flex-row sm:items-center gap-3',
+            property.status === 'sold'
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : property.status === 'rented'
+              ? 'bg-orange-50 border-orange-200 text-orange-800'
+              : 'bg-gray-50 border-gray-200 text-gray-700',
+          )}>
+            <div className="flex items-center gap-2.5 flex-1">
+              <AlertTriangle className={cn(
+                'w-5 h-5 flex-shrink-0',
+                property.status === 'sold' ? 'text-red-500' :
+                property.status === 'rented' ? 'text-orange-500' : 'text-gray-400',
+              )} />
+              <div>
+                <p className="font-bold text-base leading-tight">
+                  {property.status === 'sold' && 'This property has been SOLD'}
+                  {property.status === 'rented' && 'This property has been RENTED'}
+                  {(property.status === 'inactive' || property.status === 'pending') && 'This listing is currently inactive'}
+                </p>
+                <p className="text-sm mt-0.5 opacity-80">
+                  {property.status === 'sold' && 'The listing is no longer available. Browse similar properties below.'}
+                  {property.status === 'rented' && 'This rental is no longer available. Browse similar rentals below.'}
+                  {(property.status === 'inactive' || property.status === 'pending') && 'This listing has been taken off the market temporarily.'}
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/properties?city=${property.city}&type=${property.type}&category=${property.category}`}
+              className={cn(
+                'flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition-colors',
+                property.status === 'sold'
+                  ? 'bg-red-100 hover:bg-red-200 text-red-800'
+                  : property.status === 'rented'
+                  ? 'bg-orange-100 hover:bg-orange-200 text-orange-800'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800',
+              )}
+            >
+              Browse Similar →
+            </Link>
+          </div>
+        )}
+
         <div className="flex gap-6">
           {/* ── Main Content ──────────────────────────────────────────────── */}
           <div className="flex-1 min-w-0">
@@ -633,6 +681,42 @@ export default function PropertyDetailClient({ property }: Props) {
               </div>
             </div>
 
+            {/* ── Prominent Similar Properties (non-active listings only) ─── */}
+            {property.status !== 'active' && (
+              <div className="mb-4">
+                {similarLoading ? (
+                  <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                    <div className="h-6 w-56 bg-gray-200 rounded animate-pulse mb-4" />
+                    <PropertyGridSkeleton count={4} />
+                  </div>
+                ) : similar && similar.length > 0 ? (
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 md:p-6 border border-blue-100 shadow-sm">
+                    <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
+                      <Building className="w-5 h-5 text-blue-500" />
+                      Available Similar Properties
+                    </h2>
+                    <p className="text-sm text-gray-500 mb-4">
+                      This listing is no longer active — here are similar options in {property.city}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {similar.slice(0, 4).map((p: Property) => (
+                        <PropertyCard key={p.id} property={p} />
+                      ))}
+                    </div>
+                    <div className="mt-4 text-center">
+                      <Link
+                        href={`/properties?city=${property.city}&type=${property.type}&category=${property.category}`}
+                        className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors"
+                      >
+                        View All {property.city} {getPropertyTypeLabel(property.type)}s
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
             {/* ── Quick Highlights ────────────────────────────────────────── */}
             {highlights.length > 0 && (
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-4 mb-4 border border-blue-100">
@@ -651,47 +735,49 @@ export default function PropertyDetailClient({ property }: Props) {
             )}
 
             {/* ── Mobile Contact Buttons ────────────────────────────────── */}
-            <div className="md:hidden bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Contact {isAgent ? 'Agent' : 'Owner'}</p>
-              <div className="grid grid-cols-2 gap-2">
-                <a
-                  href={phone ? `tel:${phone}` : '#'}
-                  onClick={() => trackPropertyInquiry(property.id, { city: property.city || undefined })}
-                  className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all"
-                >
-                  <Phone className="w-4 h-4" /> Call Now
-                </a>
-                {waLink ? (
+            {!isInactiveListing && (
+              <div className="md:hidden bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Contact {isAgent ? 'Agent' : 'Owner'}</p>
+                <div className="grid grid-cols-2 gap-2">
                   <a
-                    href={waLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 active:scale-95 transition-all"
+                    href={phone ? `tel:${phone}` : '#'}
+                    onClick={() => trackPropertyInquiry(property.id, { city: property.city || undefined })}
+                    className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all"
                   >
-                    <MessageSquare className="w-4 h-4" /> WhatsApp
+                    <Phone className="w-4 h-4" /> Call Now
                   </a>
-                ) : (
+                  {waLink ? (
+                    <a
+                      href={waLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 active:scale-95 transition-all"
+                    >
+                      <MessageSquare className="w-4 h-4" /> WhatsApp
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => openInquiryModal('general')}
+                      className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700"
+                    >
+                      <MessageSquare className="w-4 h-4" /> Message
+                    </button>
+                  )}
+                  <button
+                    onClick={() => openInquiryModal('site_visit')}
+                    className="flex items-center justify-center gap-2 py-2.5 border-2 border-blue-500 text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-50 active:scale-95 transition-all"
+                  >
+                    <Calendar className="w-4 h-4" /> Schedule Visit
+                  </button>
                   <button
                     onClick={() => openInquiryModal('general')}
-                    className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700"
+                    className="flex items-center justify-center gap-2 py-2.5 border-2 border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-50 active:scale-95 transition-all"
                   >
-                    <MessageSquare className="w-4 h-4" /> Message
+                    <Send className="w-4 h-4" /> Send Inquiry
                   </button>
-                )}
-                <button
-                  onClick={() => openInquiryModal('site_visit')}
-                  className="flex items-center justify-center gap-2 py-2.5 border-2 border-blue-500 text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-50 active:scale-95 transition-all"
-                >
-                  <Calendar className="w-4 h-4" /> Schedule Visit
-                </button>
-                <button
-                  onClick={() => openInquiryModal('general')}
-                  className="flex items-center justify-center gap-2 py-2.5 border-2 border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-50 active:scale-95 transition-all"
-                >
-                  <Send className="w-4 h-4" /> Send Inquiry
-                </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* ── Property Details ──────────────────────────────────────── */}
             {specs.length > 0 && (
@@ -1043,82 +1129,100 @@ export default function PropertyDetailClient({ property }: Props) {
                 </div>
               </div>
 
-              {/* Contact buttons */}
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
-                  <div className="relative w-12 h-12 flex-shrink-0">
-                    {owner?.avatar ? (
-                      <Image src={owner.avatar} alt={owner.name || ''} fill className="object-cover rounded-xl" sizes="48px" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">
-                        {owner?.name?.charAt(0) || (isAgent ? 'A' : 'O')}
-                      </div>
-                    )}
-                    {owner?.isVerified && (
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center ring-2 ring-white">
-                        <CheckCircle className="w-2.5 h-2.5 text-white fill-white" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-bold text-gray-900 text-sm truncate">{owner?.name || (isAgent ? 'Agent' : 'Owner')}</p>
-                    {owner?.company && <p className="text-xs text-gray-500 truncate">{owner.company}</p>}
-                    {owner?.isVerified && <p className="text-xs text-green-600 font-semibold flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Verified {isAgent ? 'Agent' : 'Owner'}</p>}
-                    {isAgent && owner?.id && (
-                      <Link
-                        href={`/agents/${buildAgentSlug(owner.name, property.city, owner.id)}`}
-                        className="inline-flex items-center gap-1 mt-1 text-xs text-violet-600 font-semibold hover:text-violet-700"
-                      >
-                        <UserCircle className="w-3 h-3" /> View Profile →
-                      </Link>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {phone ? (
-                    <a
-                      href={`tel:${phone}`}
-                      onClick={() => setShowPhone(true)}
-                      className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors"
-                    >
-                      <Phone className="w-4 h-4" />
-                      {showPhone ? phone : 'Show Phone Number'}
-                    </a>
-                  ) : (
-                    <button
-                      onClick={() => setShowPhone(v => !v)}
-                      className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors"
-                    >
-                      <Phone className="w-4 h-4" />
-                      {showPhone ? 'No phone available' : 'Show Phone Number'}
-                    </button>
-                  )}
-                  {waLink && (
-                    <a
-                      href={waLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 w-full py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors"
-                    >
-                      <MessageSquare className="w-4 h-4" /> WhatsApp
-                    </a>
-                  )}
-                  <button
-                    onClick={() => openInquiryModal('site_visit')}
-                    className="flex items-center justify-center gap-2 w-full py-3 border-2 border-blue-500 text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-50 transition-colors"
+              {/* Contact buttons — hidden for inactive/sold/rented listings */}
+              {isInactiveListing ? (
+                <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 text-center">
+                  <AlertTriangle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="font-bold text-gray-700 mb-1">
+                    {property.status === 'sold' ? 'Property Sold' : property.status === 'rented' ? 'Property Rented' : 'Listing Unavailable'}
+                  </p>
+                  <p className="text-xs text-gray-500 mb-4">This listing is no longer accepting inquiries.</p>
+                  <Link
+                    href={`/properties?city=${property.city}&type=${property.type}&category=${property.category}`}
+                    className="block w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors"
                   >
-                    <Calendar className="w-4 h-4" /> Schedule a Visit
-                  </button>
+                    Browse Similar Properties
+                  </Link>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+                    <div className="relative w-12 h-12 flex-shrink-0">
+                      {owner?.avatar ? (
+                        <Image src={owner.avatar} alt={owner.name || ''} fill className="object-cover rounded-xl" sizes="48px" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">
+                          {owner?.name?.charAt(0) || (isAgent ? 'A' : 'O')}
+                        </div>
+                      )}
+                      {owner?.isVerified && (
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center ring-2 ring-white">
+                          <CheckCircle className="w-2.5 h-2.5 text-white fill-white" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-900 text-sm truncate">{owner?.name || (isAgent ? 'Agent' : 'Owner')}</p>
+                      {owner?.company && <p className="text-xs text-gray-500 truncate">{owner.company}</p>}
+                      {owner?.isVerified && <p className="text-xs text-green-600 font-semibold flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Verified {isAgent ? 'Agent' : 'Owner'}</p>}
+                      {isAgent && owner?.id && (
+                        <Link
+                          href={`/agents/${buildAgentSlug(owner.name, property.city, owner.id)}`}
+                          className="inline-flex items-center gap-1 mt-1 text-xs text-violet-600 font-semibold hover:text-violet-700"
+                        >
+                          <UserCircle className="w-3 h-3" /> View Profile →
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {phone ? (
+                      <a
+                        href={`tel:${phone}`}
+                        onClick={() => setShowPhone(true)}
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors"
+                      >
+                        <Phone className="w-4 h-4" />
+                        {showPhone ? phone : 'Show Phone Number'}
+                      </a>
+                    ) : (
+                      <button
+                        onClick={() => setShowPhone(v => !v)}
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors"
+                      >
+                        <Phone className="w-4 h-4" />
+                        {showPhone ? 'No phone available' : 'Show Phone Number'}
+                      </button>
+                    )}
+                    {waLink && (
+                      <a
+                        href={waLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors"
+                      >
+                        <MessageSquare className="w-4 h-4" /> WhatsApp
+                      </a>
+                    )}
+                    <button
+                      onClick={() => openInquiryModal('site_visit')}
+                      className="flex items-center justify-center gap-2 w-full py-3 border-2 border-blue-500 text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-50 transition-colors"
+                    >
+                      <Calendar className="w-4 h-4" /> Schedule a Visit
+                    </button>
+                  </div>
+                </div>
+              )}
 
-              {/* Desktop inquiry form */}
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <h3 className="font-bold text-gray-900 mb-4 text-sm flex items-center gap-2">
-                  <Send className="w-4 h-4 text-blue-500" /> Send Inquiry
-                </h3>
-                {renderInquiryForm()}
-              </div>
+              {/* Desktop inquiry form — only for active listings */}
+              {!isInactiveListing && (
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                  <h3 className="font-bold text-gray-900 mb-4 text-sm flex items-center gap-2">
+                    <Send className="w-4 h-4 text-blue-500" /> Send Inquiry
+                  </h3>
+                  {renderInquiryForm()}
+                </div>
+              )}
 
             </div>
           </div>
@@ -1126,7 +1230,7 @@ export default function PropertyDetailClient({ property }: Props) {
       </div>
 
       {/* ── Mobile Sticky Bottom Bar ─────────────────────────────────────────── */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl safe-bottom">
+      {!isInactiveListing && <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl safe-bottom">
         <div className="flex items-center gap-2 px-3 py-3">
           {phone ? (
             <a
@@ -1156,7 +1260,7 @@ export default function PropertyDetailClient({ property }: Props) {
             <Send className="w-4 h-4" /> {(!phone && !waLink) ? 'Send Inquiry' : 'Inquire'}
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* ── Inquiry Modal (works on all screen sizes) ──────────────────────── */}
       {showInquiryModal && (
