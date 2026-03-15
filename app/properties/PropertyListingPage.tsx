@@ -7,10 +7,6 @@ import {
   MapPin, Home, Map, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import PropertyCard from '@/components/property/PropertyCard';
-const FilterPanel = dynamic(
-  () => import('@/components/search/FilterPanel'),
-  { ssr: false, loading: () => <div className="bg-white rounded-2xl border border-gray-100 h-96 animate-pulse" /> },
-);
 import SearchBar from '@/components/search/SearchBar';
 import { propertiesApi, propertyConfigApi, locationsApi } from '@/lib/api';
 import { useAnalytics } from '@/hooks/useAnalytics';
@@ -20,9 +16,12 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { PropertyGridSkeleton, InlineLoader } from '@/components/skeleton';
 
+// ssr:false — FilterPanel uses useSearchParams + renders SVG icons that differ on server/client
+const FilterPanel = dynamic(() => import('@/components/search/FilterPanel'), { ssr: false });
+
 const MapPropertySearch = dynamic(
   () => import('@/components/search/MapPropertySearch'),
-  { ssr: false, loading: () => <div className="w-full h-full bg-gray-100 rounded-pulse animate-pulse" /> },
+  { ssr: false },
 );
 
 const SORT_OPTIONS = [
