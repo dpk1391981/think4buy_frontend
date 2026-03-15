@@ -532,6 +532,16 @@ export const homeApi = {
   }) => api.post('/analytics/track', dto).catch(() => {}), // silent fail
 };
 
+// Notifications
+export const notificationsApi = {
+  getAll: (params?: { page?: number; limit?: number; type?: string; isRead?: boolean }) =>
+    api.get('/notifications', { params }),
+  getRecent: () => api.get('/notifications/recent'),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+  markRead: (id: string) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.patch('/notifications/mark-all-read'),
+};
+
 // ─── Agent Feedback API ───────────────────────────────────────────────────────
 export const agentFeedbackApi = {
   submit: (agentId: string, data: { rating: number; comment?: string }) =>

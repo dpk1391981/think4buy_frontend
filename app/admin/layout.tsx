@@ -32,6 +32,7 @@ import {
   LayoutGrid,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
+import NotificationBell from '@/components/notifications/NotificationBell';
 
 const NAV_GROUPS = [
   {
@@ -291,6 +292,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span className="text-sm font-bold text-white">Think4BuySale Admin</span>
           </div>
           <div className="flex-1" />
+          <NotificationBell panelHref="/admin/notifications" accentClass="bg-orange-600" />
           <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-1.5">
             <div className="w-6 h-6 rounded-md bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white text-[10px] font-bold">
               {userInitials}

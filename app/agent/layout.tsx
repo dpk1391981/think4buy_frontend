@@ -8,9 +8,10 @@ import OptimizedImage from '@/components/common/OptimizedImage';
 import {
   LayoutDashboard, Target, MapPin, Handshake,
   BadgeDollarSign, Home, MessageSquare, Building2,
-  Wallet, Crown, User, Plus, Bell,
+  Wallet, Crown, User, Plus,
   MoreHorizontal, X, ExternalLink, ChevronRight,
 } from 'lucide-react';
+import NotificationBell from '@/components/notifications/NotificationBell';
 import type { MenuItem } from '@/contexts/AuthContext';
 
 // ─── Nav groups (desktop sidebar) ─────────────────────────────────────────────
@@ -251,10 +252,7 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
             <span className="text-base font-bold text-gray-900">{pageTitle}</span>
           </div>
           <div className="flex items-center gap-2">
-            <button className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-1 ring-white" />
-            </button>
+            <NotificationBell panelHref="/agent/notifications" accentClass="bg-blue-600" />
             <Link
               href="/post-property"
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-sm active:scale-[0.98]"
@@ -285,10 +283,7 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
               <span className="text-sm font-bold text-gray-900 truncate">{pageTitle}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <button className="relative p-2 text-gray-400 hover:text-gray-600 rounded-xl">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-1 ring-white" />
-              </button>
+              <NotificationBell panelHref="/agent/notifications" accentClass="bg-blue-600" />
               <Link
                 href="/post-property"
                 className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 active:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors"

@@ -6,7 +6,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth, MenuItem } from '@/contexts/AuthContext';
 import { getMenuIcon } from '@/lib/menuIcons';
 import OptimizedImage from '@/components/common/OptimizedImage';
-import { Bell, ExternalLink, ChevronRight, MoreHorizontal, X } from 'lucide-react';
+import { ExternalLink, ChevronRight, MoreHorizontal, X } from 'lucide-react';
+import NotificationBell from '@/components/notifications/NotificationBell';
 
 // ── Slug → href mapping for buyer panel ────────────────────────────────────────
 
@@ -189,9 +190,7 @@ export default function BuyerLayout({ children }: { children: React.ReactNode })
         <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-gray-100 px-8 h-14 flex items-center justify-between">
           <span className="text-base font-bold text-gray-900">{pageTitle}</span>
           <div className="flex items-center gap-2">
-            <button className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
-              <Bell className="w-5 h-5" />
-            </button>
+            <NotificationBell panelHref="/buyer/notifications" accentClass="bg-purple-600" />
             <Link
               href="/properties"
               className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-bold rounded-xl transition-all shadow-sm"
@@ -217,9 +216,7 @@ export default function BuyerLayout({ children }: { children: React.ReactNode })
               <span className="text-sm font-bold text-gray-900 truncate">{pageTitle}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <button className="relative p-2 text-gray-400 hover:text-gray-600 rounded-xl">
-                <Bell className="w-5 h-5" />
-              </button>
+              <NotificationBell panelHref="/buyer/notifications" accentClass="bg-purple-600" />
             </div>
           </div>
         </header>
