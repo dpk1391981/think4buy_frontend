@@ -16,13 +16,15 @@ interface Props {
  * ISR serves the cached HTML instantly from CDN while refreshing in background.
  * For a 20k concurrent platform this is critical — avoids hitting the DB on every view.
  */
-export const revalidate = 300; // 5 minutes
+export const revalidate = 0; // disable ISR cache temporarily for debugging
 
 async function getProperty(slug: string) {
   try {
     const res = await propertiesApi.getBySlug(slug);
+    console.log('[PropertyDetail] API response images:', JSON.stringify(res.data?.images ?? [], null, 2));
     return res.data;
-  } catch {
+  } catch (err) {
+    console.error('[PropertyDetail] API error:', err);
     return null;
   }
 }

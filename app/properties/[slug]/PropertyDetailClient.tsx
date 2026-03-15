@@ -93,13 +93,12 @@ export default function PropertyDetailClient({ property }: Props) {
   // Desc expand
   const [descExpanded, setDescExpanded] = useState(false);
 
+  console.log('[PropertyDetailClient] property.images raw:', property.images);
   const images = property.images?.length
     ? property.images.map((img) => ({ ...img, url: resolveImageUrl(img.url) }))
     : [{ url: getPrimaryImage([]), alt: property.title, id: '0', isPrimary: true, sortOrder: 0 }];
+  console.log('[PropertyDetailClient] resolved images:', images);
 
-    console.log('=====images===============================');
-    console.log(images, property.images);
-    console.log('====================================');
   // Pre-fill form from logged-in user
   useEffect(() => {
     if (user) {
