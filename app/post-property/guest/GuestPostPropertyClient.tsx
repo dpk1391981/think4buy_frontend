@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -32,14 +32,14 @@ const BENEFITS = [
 ];
 
 export default function GuestPostPropertyPage() {
-  const router       = useRouter();
-  const { login }    = useAuth();
+  const router          = useRouter();
+  const { login, user } = useAuth();
 
   const [userType, setUserType] = useState('owner');
   const [phone, setPhone]       = useState('');
   const [name,  setName]        = useState('');
   const [otp,   setOtp]         = useState('');
-  const [step,  setStep]        = useState<'landing' | 'otp' | 'agency'>('landing');
+  const [step,  setStep]        = useState<'landing' | 'otp' | 'agency' | 'success'>('landing');
   const [loading, setLoading]   = useState(false);
   const [error,   setError]     = useState('');
   const [devOtp,  setDevOtp]    = useState('');
@@ -49,6 +49,15 @@ export default function GuestPostPropertyPage() {
   const [agencyName,    setAgencyName]    = useState('');
   const [agencyPhone,   setAgencyPhone]   = useState('');
   const [agencyAddress, setAgencyAddress] = useState('');
+
+  // Redirect once the AuthContext confirms the user is logged in.
+  // Using `user` as the trigger (not a fixed timer) means we navigate
+  // the instant the state is ready — no unnecessary wait.
+  useEffect(() => {
+    if (step === 'success' && user) {
+      router.replace('/post-property');
+    }
+  }, [step, user, router]);
 
   const startTimer = () => {
     setTimer(30);
@@ -98,7 +107,7 @@ export default function GuestPostPropertyPage() {
       if (targetRole === 'agent') {
         setStep('agency');
       } else {
-        router.replace('/post-property');
+        setStep('success');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid OTP. Please try again.');
@@ -116,7 +125,7 @@ export default function GuestPostPropertyPage() {
         contactPhone: agencyPhone.trim() || undefined,
         address:      agencyAddress.trim() || undefined,
       });
-      router.replace('/post-property');
+      setStep('success');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to register agency. Please try again.');
     } finally { setLoading(false); }
@@ -177,7 +186,27 @@ export default function GuestPostPropertyPage() {
             {/* Right: Form Card */}
             <div className="bg-white rounded-2xl shadow-2xl p-7 text-gray-900">
 
-              {step === 'agency' ? (
+              {step === 'success' ? (
+                /* ── Success Step ── */
+                <div className="flex flex-col items-center justify-center py-6 text-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                    <CheckCircle className="w-9 h-9 text-green-500" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">You're all set!</h2>
+                    <p className="text-gray-500 text-sm">Account verified. Taking you to the property form…</p>
+                  </div>
+                  <div className="flex gap-1.5 mt-2">
+                    {[0, 1, 2].map(i => (
+                      <span
+                        key={i}
+                        className="w-2 h-2 rounded-full bg-primary-500 animate-bounce"
+                        style={{ animationDelay: `${i * 150}ms` }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : step === 'agency' ? (
                 /* ── Agency Details Step ── */
                 <form onSubmit={handleAgencySubmit} className="space-y-4">
                   <div>
