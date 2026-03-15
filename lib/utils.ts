@@ -83,7 +83,7 @@ export function getPrimaryImage(images: any[]): string {
   const primary = images.find((img) => img.isPrimary);
   const img = primary || images[0];
   if (img.url.startsWith('http')) return img.url;
-  return `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:3001'}${img.url}`;
+  return `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'}${img.url}`;
 }
 
 export function timeAgo(dateStr: string): string {

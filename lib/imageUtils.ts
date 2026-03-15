@@ -27,7 +27,7 @@ export function resolveImageUrl(url: string | undefined | null): string {
   if (url.startsWith('http')) return url;
   // Strip "/api/v1" suffix to get just the origin (e.g. https://reales-api.vtechxhub.com)
   const apiOrigin =
-    (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/api\/v1\/?$/, '');
+    process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
   return `${apiOrigin}${url.startsWith('/') ? url : `/${url}`}`;
 }
 
