@@ -242,6 +242,7 @@ export default function AdminPropertiesPage() {
       slug: p.slug || '',
       metaTitle: p.metaTitle || '',
       metaDescription: p.metaDescription || '',
+      allowIndexing: p.allowIndexing ?? false,
     });
     // Load states
     try {
@@ -786,6 +787,19 @@ export default function AdminPropertiesPage() {
                       className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 resize-none"
                     />
                     <p className="text-right text-xs text-gray-400 mt-0.5">{(editForm.metaDescription || '').length}/500</p>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800">Allow Search Engine Indexing</p>
+                      <p className="text-xs text-amber-600 mt-0.5">Off by default. Enable only for high-quality, complete listings.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditForm((f: any) => ({ ...f, allowIndexing: !f.allowIndexing }))}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${editForm.allowIndexing ? 'bg-green-500' : 'bg-gray-300'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${editForm.allowIndexing ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
                   </div>
                 </div>
               </div>

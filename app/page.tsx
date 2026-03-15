@@ -170,7 +170,28 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ─── Category Grid ────────────────────────────────────────────────── */}
+       {/* ─── Latest Listings / Top Categories ───────────────────────────── */}
+      <TopCategories />
+
+      {/* ─── Featured Properties ──────────────────────────────────────────── */}
+      <FeaturedProperties />
+
+      {/* ─── State Explorer / Top Cities ─────────────────────────────────── */}
+      <StateExplorer />
+
+      {/* ─── Dynamic Location Selector (state selected → cities) ─────────── */}
+      <HomeLocationSelector />
+
+      {/* ─── Popular Projects ─────────────────────────────────────────────── */}
+      <TopNewProjects />
+
+      {/* ─── Verified Agents ──────────────────────────────────────────────── */}
+      <TopAgents />
+
+      {/* ─── Explore Cities (dynamic, reacts to location Redux state) ─────── */}
+      {/* <CityExplorer /> */}
+
+      {/* ─── What Are You Looking For? — Category Grid (last, per conversion best practice) */}
       <section className="py-4 sm:py-12 bg-gray-50">
         <div className="container-max">
           <div className="text-center mb-3 sm:mb-8">
@@ -197,27 +218,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* ─── State Explorer (country selected, no state yet) ─────────────── */}
-      <StateExplorer />
-
-      {/* ─── Dynamic Location Selector (state selected → cities) ─────────── */}
-      <HomeLocationSelector />
-
-      {/* ─── Top Categories (analytics-powered, location-aware) ─────────── */}
-      <TopCategories />
-
-      {/* ─── Featured Properties (reacts to location Redux state) ─────────── */}
-      <FeaturedProperties />
-
-      {/* ─── Top Agents ───────────────────────────────────────────────────── */}
-      <TopAgents />
-
-      {/* ─── Top New Projects ─────────────────────────────────────────────── */}
-      <TopNewProjects />
-
-      {/* ─── Explore Cities (dynamic, reacts to location Redux state) ─────── */}
-      {/* <CityExplorer /> */}
 
       {/* ─── Why Choose Us ────────────────────────────────────────────────── */}
       <section className="py-5 sm:py-16 bg-white">

@@ -30,6 +30,8 @@ import {
   BookOpen,
   Navigation,
   LayoutGrid,
+  Zap,
+  Gem,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
@@ -54,6 +56,8 @@ const NAV_GROUPS = [
     items: [
       { href: '/admin/agencies', label: 'Agencies', icon: Building2 },
       { href: '/admin/agents', label: 'Agents', icon: UserCheck },
+      { href: '/admin/premium-slots',   label: 'Premium Slots',    icon: Zap },
+      { href: '/admin/agent-coverage',  label: 'Diamond Coverage', icon: Gem },
     ],
   },
   {

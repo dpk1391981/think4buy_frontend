@@ -996,4 +996,16 @@ export function getStateData(stateSlug: string): StateData | null {
   return stateDatabase[key] || null;
 }
 
-export type ContentVariant = "buy" | "flats-for-sale" | "flats-for-rent" | "new-projects" | "rent";
+export type ContentVariant =
+  | "buy"
+  | "flats-for-sale"
+  | "flats-for-rent"
+  | "new-projects"
+  | "rent"
+  | "property-for-sale"
+  | "property-for-rent"
+  | "commercial"
+  | "office-rent"
+  | "villa-sale"
+  | "plot-sale"
+  | "pg";

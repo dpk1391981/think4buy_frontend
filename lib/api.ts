@@ -136,8 +136,8 @@ export const menusApi = {
 export const locationsApi = {
   search: (q: string) => api.get('/locations/search', { params: { q } }),
   getCities: () => api.get('/locations/cities'),
-  getLocalities: (city: string) =>
-    api.get('/locations/localities', { params: { city } }),
+  getLocalities: (city: string, state?: string) =>
+    api.get('/locations/localities', { params: { city, state } }),
   getStates: () => api.get('/locations/states'),
   getCitiesByState: (stateId: string) => api.get(`/locations/states/${stateId}/cities`),
   getSeoContent: (params: { city?: string; state?: string }) =>
@@ -227,6 +227,15 @@ export const adminLocationsApi = {
     api.post('/admin/cities', data),
   updateCity: (id: string, data: any) => api.patch(`/admin/cities/${id}`, data),
   deleteCity: (id: string) => api.delete(`/admin/cities/${id}`),
+  // Localities
+  getLocalities: (params?: { page?: number; limit?: number; state?: string; city?: string; search?: string }) =>
+    api.get('/admin/localities', { params }),
+  createLocality: (data: { city: string; state: string; locality?: string; pincode?: string; latitude?: number; longitude?: number }) =>
+    api.post('/admin/localities', data),
+  updateLocality: (id: string, data: any) => api.patch(`/admin/localities/${id}`, data),
+  deleteLocality: (id: string) => api.delete(`/admin/localities/${id}`),
+  bulkImportLocalities: (rows: { city: string; state: string; locality?: string; pincode?: string }[]) =>
+    api.post('/admin/localities/bulk-import', { rows }),
 };
 
 // Admin Subscription/Boost Plans
@@ -401,6 +410,27 @@ export const agencyApi = {
     api.post(`/agency/admin/agent-profiles/${agentProfileId}/locations`, data),
   adminRemoveAgentLocation: (locationMapId: string) =>
     api.delete(`/agency/admin/agent-locations/${locationMapId}`),
+
+  // Premium Slots (public + admin)
+  getPremiumAgents: (city: string) =>
+    api.get('/agency/premium-agents', { params: { city } }),
+  getTopAgents: (city?: string, limit = 12) =>
+    api.get('/agency/top-agents', { params: { city, limit } }),
+  adminListPremiumSlots: (params?: { city?: string; page?: number; limit?: number }) =>
+    api.get('/agency/admin/premium-slots', { params }),
+  adminCreatePremiumSlot: (data: any) => api.post('/agency/admin/premium-slots', data),
+  adminDeactivatePremiumSlot: (id: string) => api.delete(`/agency/admin/premium-slots/${id}`),
+
+  // Diamond coverage
+  getDiamondAgents: (params: { locality?: string; city?: string; state?: string; limit?: number }) =>
+    api.get('/agency/diamond-agents', { params }),
+  adminListCoverage: (params?: { agentProfileId?: string; tick?: string; city?: string; page?: number; limit?: number }) =>
+    api.get('/agency/admin/coverage', { params }),
+  adminAddCoverage: (data: { agentProfileId: string; coverageType: string; cityName?: string; localityName?: string; stateName?: string; cityId?: string; stateId?: string; localityId?: string }) =>
+    api.post('/agency/admin/coverage', data),
+  adminApproveCoverage: (id: string) => api.patch(`/agency/admin/coverage/${id}/approve`),
+  adminDeactivateCoverage: (id: string) => api.patch(`/agency/admin/coverage/${id}/deactivate`),
+  adminRemoveCoverage: (id: string) => api.delete(`/agency/admin/coverage/${id}`),
 };
 
 // Subscription (Agent)

@@ -10,39 +10,31 @@ import AgentContactForm from '@/components/agent/AgentContactForm';
 import AgentListings from '@/components/agent/AgentListings';
 import AgentAnalyticsTracker from '@/components/agent/AgentAnalyticsTracker';
 import AgentFeedbackSection from '@/components/agent/AgentFeedbackSection';
+import AgentCallCTA from '@/components/agent/AgentCallCTA';
 
-type Params = { slug: string };
-
-// Slug format: rahul-verma-in-delhi-{uuidNoHyphens}
-// or legacy: rahul-verma-delhi-{last4}
-function parseSlug(slug: string): string {
-  // New format: last segment is 32-char hex UUID without hyphens
-  const parts = slug.split('-');
-  const last = parts[parts.length - 1];
-
-  if (last.length === 32 && /^[a-f0-9]+$/i.test(last)) {
-    // Reformat to UUID: 8-4-4-4-12
-    return `${last.slice(0, 8)}-${last.slice(8, 12)}-${last.slice(12, 16)}-${last.slice(16, 20)}-${last.slice(20)}`;
-  }
-
-  // Legacy: try last 5 parts as UUID segments
-  if (parts.length >= 5) {
-    const candidate = parts.slice(-5).join('-');
-    if (/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(candidate)) {
-      return candidate;
-    }
-  }
-
-  return last;
-}
+type Params = { name: string; city: string };
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
-async function fetchAgent(id: string) {
+/** Lookup agent by name slug + optional city slug, returns first match */
+async function fetchAgentBySlug(nameSlug: string, citySlug: string) {
   try {
-    const res = await fetch(`${BASE}/users/${id}`, { next: { revalidate: 3600 } });
+    const search = nameSlug.replace(/-/g, ' ');
+    const city   = citySlug ? citySlug.replace(/-/g, ' ') : '';
+
+    const params = new URLSearchParams({ search, limit: '5' });
+    if (city) params.set('city', city);
+
+    const res = await fetch(`${BASE}/users/agents?${params}`, { next: { revalidate: 3600 } });
     if (!res.ok) return null;
-    return res.json();
+    const json = await res.json();
+    const agents: any[] = json?.agents ?? json?.data?.agents ?? json?.data ?? [];
+    if (!Array.isArray(agents) || agents.length === 0) return null;
+
+    const normalize = (s: string) =>
+      (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+    return agents.find(a => normalize(a.name) === nameSlug) ?? agents[0];
   } catch { return null; }
 }
 
@@ -56,19 +48,18 @@ async function fetchListingCount(agentId: string): Promise<number> {
   } catch { return 0; }
 }
 
-
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const id = parseSlug(params.slug);
-  const agent = await fetchAgent(id);
+  const agent = await fetchAgentBySlug(params.name, params.city);
   if (!agent) return { title: 'Agent Not Found | Think4BuySale' };
 
-  const city = agent.city || 'India';
+  const city = agent.city || params.city;
   const name = agent.name || 'Agent';
+  const slug = `${params.name}-in-${params.city}`;
   return {
     title: `${name} – Real Estate Agent in ${city} | Think4BuySale`,
     description: `${agent.agentBio || `${name} is a verified real estate agent in ${city} with ${agent.agentExperience || 0}+ years of experience and ${agent.totalDeals || 0} successful deals.`}`,
     keywords: `${name} real estate agent ${city}, property agent ${city}, buy sell rent property ${city}`,
-    alternates: { canonical: `https://think4buysale.com/agents/${params.slug}` },
+    alternates: { canonical: `https://think4buysale.com/agents/${slug}` },
     openGraph: {
       title: `${name} – Real Estate Agent | Think4BuySale`,
       description: agent.agentBio || `Verified real estate agent in ${city}`,
@@ -82,7 +73,6 @@ const TICK_CONFIG: Record<string, { label: string; badgeCls: string; avatarCls: 
   gold:    { label: 'Gold',      badgeCls: 'bg-amber-100 text-amber-700 border-amber-300',     avatarCls: 'from-amber-400 to-amber-600',   icon: '★' },
   diamond: { label: 'Diamond',   badgeCls: 'bg-violet-100 text-violet-700 border-violet-300',  avatarCls: 'from-violet-500 to-violet-700', icon: '◆' },
 };
-
 
 function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md' }) {
   const sz = size === 'md' ? 'w-5 h-5' : 'w-4 h-4';
@@ -99,19 +89,16 @@ function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md
 }
 
 export default async function AgentProfilePage({ params }: { params: Params }) {
-  const id = parseSlug(params.slug);
-  const [agent, listingCount] = await Promise.all([
-    fetchAgent(id),
-    fetchListingCount(id),
-  ]);
-
+  const agent = await fetchAgentBySlug(params.name, params.city);
   if (!agent) notFound();
 
+  const listingCount = await fetchListingCount(agent.id);
   const tick = agent.agentTick && agent.agentTick !== 'none' ? TICK_CONFIG[agent.agentTick] : null;
   const initials = agent.name?.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase() || 'AG';
   const avatarGradient = tick?.avatarCls ?? 'from-gray-400 to-gray-600';
 
-  const profileUrl = `https://think4buysale.com/agents/${params.slug}`;
+  const slug = `${params.name}-in-${params.city}`;
+  const profileUrl = `https://think4buysale.com/agents/${slug}`;
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -234,51 +221,13 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
               </div>
 
               {/* CTA buttons — visible on desktop in hero */}
-              <div className="hidden md:flex flex-col gap-3 min-w-48">
-                {agent.phone && (
-                  <a
-                    href={`tel:+91${agent.phone}`}
-                    className="flex items-center justify-center gap-2 py-3.5 px-6 bg-white text-primary-700 rounded-2xl font-bold hover:bg-primary-50 transition-colors shadow-lg"
-                  >
-                    <Phone className="w-5 h-5" />
-                    Call Now
-                  </a>
-                )}
-                {agent.email && (
-                  <a
-                    href={`mailto:${agent.email}`}
-                    className="flex items-center justify-center gap-2 py-3.5 px-6 bg-primary-600/40 border border-primary-400/50 text-white rounded-2xl font-bold hover:bg-primary-600/60 transition-colors"
-                  >
-                    <Mail className="w-5 h-5" />
-                    Send Email
-                  </a>
-                )}
-              </div>
+              <AgentCallCTA phone={agent.phone} email={agent.email} variant="desktop-hero" />
             </div>
           </div>
         </div>
 
         {/* ── Mobile CTA bar ──────────────────────────────────────── */}
-        <div className="md:hidden sticky top-16 z-30 bg-white border-b border-gray-100 shadow-sm">
-          <div className="flex gap-3 p-3">
-            {agent.phone && (
-              <a
-                href={`tel:+91${agent.phone}`}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-600 text-white rounded-xl font-bold text-sm"
-              >
-                <Phone className="w-4 h-4" /> Call Agent
-              </a>
-            )}
-            {agent.email && (
-              <a
-                href={`mailto:${agent.email}`}
-                className="flex-1 flex items-center justify-center gap-2 py-3 border border-gray-200 text-gray-700 rounded-xl font-bold text-sm"
-              >
-                <Mail className="w-4 h-4" /> Email
-              </a>
-            )}
-          </div>
-        </div>
+        <AgentCallCTA phone={agent.phone} email={agent.email} variant="mobile-bar" />
 
         {/* ── Main Content ────────────────────────────────────────── */}
         <div className="container-max py-8">
@@ -344,7 +293,7 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
                 </div>
               </section>
 
-              {/* Active Listings — dynamic client component */}
+              {/* Active Listings */}
               <AgentListings agentId={agent.id} agentName={agent.name} initialTotal={listingCount} />
 
               {/* Reviews & Ratings */}
@@ -482,7 +431,7 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
                   </div>
                 </div>
 
-                {/* Contact form — public to view, login required only on submit */}
+                {/* Contact form */}
                 <AgentContactForm
                   agentId={agent.id}
                   agentName={agent.name}

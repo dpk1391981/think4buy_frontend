@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import PropertyCard from '@/components/property/PropertyCard';
 import SearchBar from '@/components/search/SearchBar';
+import AgentsSection from '@/components/property/AgentsSection';
 import { propertiesApi, propertyConfigApi, locationsApi } from '@/lib/api';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { Property, PaginatedProperties } from '@/types/property';
@@ -565,6 +566,11 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
                   Clear Filters
                 </button>
               </div>
+            )}
+
+            {/* ── Agents section (diamond + featured, deduped) ────────── */}
+            {(locality || city || stateParam) && (
+              <AgentsSection locality={locality} city={city} state={stateParam} />
             )}
 
             {/* ── SEO content block ──────────────────────────────────── */}

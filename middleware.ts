@@ -54,10 +54,48 @@ export const config = {
   ],
 };
 
+// ── SEO URL rewrites ──────────────────────────────────────────────────────────
+// URLs like /property-for-rent-in-mumbai → internal /property-for-rent-in/mumbai
+// The external slug stays intact (canonical tags preserve the SEO URL).
+
+const SEO_PREFIXES = [
+  'property-for-sale-in',
+  'property-for-rent-in',
+  'flats-for-sale-in',
+  'flats-for-rent-in',
+  'villas-for-sale-in',
+  'plots-for-sale-in',
+  'commercial-property-in',
+  'office-space-for-rent-in',
+  'new-projects-in',
+  'pg-in',
+  'property-agents-in',
+];
+
 // ── Middleware ────────────────────────────────────────────────────────────────
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // ── SEO URL rewrite: /prefix-in-city → /prefix-in/city ─────────────────
+  for (const prefix of SEO_PREFIXES) {
+    const match = pathname.match(new RegExp(`^\\/(${prefix})-([^/]+)$`));
+    if (match) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/${match[1]}/${match[2]}`;
+      return NextResponse.rewrite(url);
+    }
+  }
+
+  // ── Agent profile rewrite: /agents/name-in-city → /agents/name/city ────
+  // Matches /agents/amit-verma-in-mumbai but NOT /agents (listing page)
+  const agentMatch = pathname.match(/^\/agents\/([a-z0-9-]+)-in-([a-z0-9-]+)$/);
+  if (agentMatch) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/agents/${agentMatch[1]}/${agentMatch[2]}`;
+    return NextResponse.rewrite(url);
+  }
+
 
   // Auth detected by presence cookie (set by AuthContext) OR HTTP-only rt cookie
   const isAuthed =

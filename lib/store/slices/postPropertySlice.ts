@@ -53,6 +53,7 @@ export interface PostPropertyForm {
   city: string;
   cityId: string;
   locality: string;
+  localityId: string;
   pincode: string;
   address: string;
   latitude: number | null;
@@ -100,6 +101,7 @@ const initialFormState: PostPropertyForm = {
   city: 'Delhi',
   cityId: '',
   locality: '',
+  localityId: '',
   pincode: '',
   address: '',
   latitude: null,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { adminLocationsApi, adminApi, api } from '@/lib/api';
+import { adminLocationsApi, adminApi, api, locationsApi } from '@/lib/api';
 import OptimizedImage, { resolveImageSrc } from '@/components/common/OptimizedImage';
 import { Plus, Trash2 } from 'lucide-react';
 
@@ -50,7 +50,19 @@ interface City {
   faqs?: { question: string; answer: string }[];
 }
 
-type Tab = 'states' | 'cities' | 'countries';
+type Tab = 'states' | 'cities' | 'countries' | 'localities';
+
+interface Locality {
+  id: string;
+  city: string;
+  state: string;
+  locality?: string;
+  pincode?: string;
+  latitude?: number;
+  longitude?: number;
+  isActive: boolean;
+  propertyCount: number;
+}
 type ModalTab = 'basic' | 'seo';
 
 const EMPTY_STATE = { name: '', code: '', imageUrl: '', countryId: '', slug: '', h1: '', metaTitle: '', metaDescription: '', metaKeywords: '', seoContent: '' };
@@ -299,8 +311,24 @@ export default function AdminLocationsPage() {
   const [cityImageUrl, setCityImageUrl] = useState('');
   const [imageUploading, setImageUploading] = useState(false);
 
+  // Localities
+  const [localities, setLocalities] = useState<Locality[]>([]);
+  const [localitiesTotal, setLocalitiesTotal] = useState(0);
+  const [localitiesPage, setLocalitiesPage] = useState(1);
+  const [localitiesSearch, setLocalitiesSearch] = useState('');
+  const [localitiesCityFilter, setLocalitiesCityFilter] = useState('');
+  const [localitiesLoading, setLocalitiesLoading] = useState(false);
+  const [localityModal, setLocalityModal] = useState<{ open: boolean; editing: Locality | null }>({ open: false, editing: null });
+  const [localityForm, setLocalityForm] = useState({ stateId: '', state: '', cityId: '', city: '', locality: '', pincode: '', latitude: '', longitude: '', isActive: true });
+  const [localityModalCities, setLocalityModalCities] = useState<{ id: string; name: string }[]>([]);
+  const [localityModalCitiesLoading, setLocalityModalCitiesLoading] = useState(false);
+  const [localitiesStateFilter, setLocalitiesStateFilter] = useState('');
+  const [localitiesFilterCities, setLocalitiesFilterCities] = useState<{ id: string; name: string }[]>([]);
+  const [bulkCsvText, setBulkCsvText] = useState('');
+  const [bulkImporting, setBulkImporting] = useState(false);
+
   const [saving, setSaving] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'state' | 'city' | 'country'; id: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'state' | 'city' | 'country' | 'locality'; id: string } | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
 
@@ -339,8 +367,25 @@ export default function AdminLocationsPage() {
     finally { setCitiesLoading(false); }
   }, [citiesPage, citiesSearch, filterStateId]);
 
+  const loadLocalities = useCallback(async () => {
+    setLocalitiesLoading(true);
+    try {
+      const r = await adminLocationsApi.getLocalities({
+        page: localitiesPage, limit: 20,
+        state: localitiesStateFilter || undefined,
+        city: localitiesCityFilter || undefined,
+        search: localitiesSearch || undefined,
+      });
+      const data = r.data;
+      setLocalities(Array.isArray(data?.items) ? data.items : []);
+      setLocalitiesTotal(data?.total ?? 0);
+    } catch (e) { console.error(e); }
+    finally { setLocalitiesLoading(false); }
+  }, [localitiesPage, localitiesSearch, localitiesCityFilter, localitiesStateFilter]);
+
   useEffect(() => { loadStates(); loadCountries(); }, [loadStates, loadCountries]);
   useEffect(() => { if (tab === 'cities') loadCities(); }, [tab, loadCities]);
+  useEffect(() => { if (tab === 'localities') loadLocalities(); }, [tab, loadLocalities]);
 
   // ── Country actions ──────────────────────────────────────────────────────────
 
@@ -504,7 +549,7 @@ export default function AdminLocationsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Locations</h1>
-          <p className="text-gray-500 text-sm mt-1">Manage countries, states and cities with SEO</p>
+          <p className="text-gray-500 text-sm mt-1">Manage countries, states, cities and localities with SEO</p>
         </div>
         {tab === 'states' && (
           <button onClick={openAddState} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">+ Add State</button>
@@ -515,11 +560,15 @@ export default function AdminLocationsPage() {
         {tab === 'countries' && (
           <button onClick={openAddCountry} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">+ Add Country</button>
         )}
+        {tab === 'localities' && (
+          <button onClick={() => { setLocalityForm({ stateId: '', state: '', cityId: '', city: '', locality: '', pincode: '', latitude: '', longitude: '', isActive: true }); setLocalityModalCities([]); setLocalityModal({ open: true, editing: null }); }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">+ Add Locality</button>
+        )}
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit mb-5">
-        {(['states', 'cities', 'countries'] as Tab[]).map((t) => (
+        {(['states', 'cities', 'localities', 'countries'] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-5 py-2 rounded-md text-sm font-medium transition-colors capitalize ${tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
             {t}
@@ -690,6 +739,280 @@ export default function AdminLocationsPage() {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* ── LOCALITIES TAB ── */}
+      {tab === 'localities' && (
+        <div className="space-y-4">
+          {/* Filters — State → City cascade + text search */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              value={localitiesSearch}
+              onChange={e => { setLocalitiesSearch(e.target.value); setLocalitiesPage(1); }}
+              placeholder="Search locality, pincode..."
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <select
+              value={localitiesStateFilter}
+              onChange={async e => {
+                const stateName = e.target.value;
+                setLocalitiesStateFilter(stateName);
+                setLocalitiesCityFilter('');
+                setLocalitiesFilterCities([]);
+                setLocalitiesPage(1);
+                if (stateName) {
+                  const matched = states.find(s => s.name === stateName);
+                  if (matched) {
+                    try {
+                      const r = await locationsApi.getCitiesByState(matched.id);
+                      setLocalitiesFilterCities(Array.isArray(r.data) ? r.data : r.data?.cities || []);
+                    } catch {}
+                  }
+                }
+              }}
+              className="w-44 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">All States</option>
+              {states.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+            </select>
+            <select
+              value={localitiesCityFilter}
+              onChange={e => { setLocalitiesCityFilter(e.target.value); setLocalitiesPage(1); }}
+              disabled={!localitiesStateFilter || localitiesFilterCities.length === 0}
+              className="w-44 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">All Cities</option>
+              {localitiesFilterCities.map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            {localitiesLoading ? (
+              <div className="p-8 text-center text-gray-400">Loading...</div>
+            ) : localities.length === 0 ? (
+              <div className="p-12 text-center text-gray-400">No localities found.</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Locality</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">City</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">State</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Pincode</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Properties</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {localities.map(loc => (
+                    <tr key={loc.id} className="hover:bg-gray-50/50">
+                      <td className="px-4 py-3 font-medium text-gray-900">{loc.locality || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{loc.city}</td>
+                      <td className="px-4 py-3 text-gray-500">{loc.state}</td>
+                      <td className="px-4 py-3 text-gray-500">{loc.pincode || '—'}</td>
+                      <td className="px-4 py-3 text-gray-500">{loc.propertyCount || 0}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${loc.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {loc.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={async () => {
+                              // pre-load cities for the locality's state
+                              const matchedState = states.find(s => s.name === loc.state);
+                              let preloadedCities: { id: string; name: string }[] = [];
+                              if (matchedState) {
+                                try {
+                                  const r = await locationsApi.getCitiesByState(matchedState.id);
+                                  preloadedCities = Array.isArray(r.data) ? r.data : r.data?.cities || [];
+                                } catch {}
+                              }
+                              setLocalityModalCities(preloadedCities);
+                              const matchedCity = preloadedCities.find((c: any) => c.name === loc.city);
+                              setLocalityForm({ stateId: matchedState?.id || '', state: loc.state, cityId: matchedCity?.id || '', city: loc.city, locality: loc.locality || '', pincode: loc.pincode || '', latitude: String(loc.latitude || ''), longitude: String(loc.longitude || ''), isActive: loc.isActive });
+                              setLocalityModal({ open: true, editing: loc });
+                            }}
+                            className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-medium hover:bg-gray-200">Edit</button>
+                          <button
+                            onClick={() => setDeleteConfirm({ type: 'locality', id: loc.id })}
+                            className="px-3 py-1 bg-red-100 text-red-700 rounded-md text-xs font-medium hover:bg-red-200">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {/* Pagination */}
+            {localitiesTotal > 20 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50 text-xs text-gray-500">
+                <span>Showing {((localitiesPage - 1) * 20) + 1}–{Math.min(localitiesPage * 20, localitiesTotal)} of {localitiesTotal}</span>
+                <div className="flex gap-1">
+                  <button disabled={localitiesPage === 1} onClick={() => setLocalitiesPage(p => p - 1)} className="px-2 py-1 rounded border border-gray-200 hover:bg-gray-100 disabled:opacity-40">Prev</button>
+                  <button disabled={localitiesPage * 20 >= localitiesTotal} onClick={() => setLocalitiesPage(p => p + 1)} className="px-2 py-1 rounded border border-gray-200 hover:bg-gray-100 disabled:opacity-40">Next</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bulk CSV Import */}
+          <div className="bg-white rounded-xl shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Bulk Import via CSV</h3>
+            <p className="text-xs text-gray-400 mb-3">Format (one per line): <code className="bg-gray-100 px-1 rounded">city,state,locality,pincode</code></p>
+            <textarea
+              value={bulkCsvText}
+              onChange={e => setBulkCsvText(e.target.value)}
+              rows={5}
+              placeholder={"Mumbai,Maharashtra,Bandra,400050\nMumbai,Maharashtra,Andheri,400058"}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+            />
+            <button
+              disabled={bulkImporting || !bulkCsvText.trim()}
+              onClick={async () => {
+                setBulkImporting(true);
+                try {
+                  const rows = bulkCsvText.trim().split('\n').map(line => {
+                    const [city, state, locality, pincode] = line.split(',').map(s => s.trim());
+                    return { city, state, locality, pincode };
+                  }).filter(r => r.city && r.state);
+                  await adminLocationsApi.bulkImportLocalities(rows);
+                  setBulkCsvText('');
+                  loadLocalities();
+                } catch (e: any) {
+                  alert(e?.response?.data?.message || 'Import failed');
+                } finally { setBulkImporting(false); }
+              }}
+              className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {bulkImporting ? 'Importing...' : 'Import'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── LOCALITY MODAL ── */}
+      {localityModal.open && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">{localityModal.editing ? 'Edit Locality' : 'Add Locality'}</h3>
+              <button onClick={() => setLocalityModal({ open: false, editing: null })} className="text-gray-400 hover:text-gray-600 text-xl w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100">×</button>
+            </div>
+            {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+            <div className="space-y-3">
+              {/* State dropdown */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">State <span className="text-red-500">*</span></label>
+                <select
+                  value={localityForm.stateId}
+                  onChange={async e => {
+                    const stateId = e.target.value;
+                    const matched = states.find(s => s.id === stateId);
+                    setLocalityForm(f => ({ ...f, stateId, state: matched?.name || '', cityId: '', city: '' }));
+                    setLocalityModalCities([]);
+                    if (stateId) {
+                      setLocalityModalCitiesLoading(true);
+                      try {
+                        const r = await locationsApi.getCitiesByState(stateId);
+                        setLocalityModalCities(Array.isArray(r.data) ? r.data : r.data?.cities || []);
+                      } catch {} finally { setLocalityModalCitiesLoading(false); }
+                    }
+                  }}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="">— Select State —</option>
+                  {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+
+              {/* City dropdown — enabled only after state is chosen */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  City <span className="text-red-500">*</span>
+                  {localityModalCitiesLoading && <span className="ml-2 text-gray-400 text-xs">Loading…</span>}
+                </label>
+                <select
+                  value={localityForm.cityId}
+                  disabled={!localityForm.stateId || localityModalCitiesLoading}
+                  onChange={e => {
+                    const cityId = e.target.value;
+                    const matched = localityModalCities.find((c: any) => c.id === cityId);
+                    setLocalityForm(f => ({ ...f, cityId, city: matched?.name || '' }));
+                  }}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">— Select City —</option>
+                  {localityModalCities.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                {localityForm.stateId && !localityModalCitiesLoading && localityModalCities.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">No cities found for this state. Add cities first.</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Locality Name</label>
+                <input value={localityForm.locality} onChange={e => setLocalityForm(f => ({ ...f, locality: e.target.value }))}
+                  placeholder="Bandra West" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Pincode</label>
+                  <input value={localityForm.pincode} onChange={e => setLocalityForm(f => ({ ...f, pincode: e.target.value }))}
+                    placeholder="400050" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Latitude</label>
+                  <input type="number" step="any" value={localityForm.latitude} onChange={e => setLocalityForm(f => ({ ...f, latitude: e.target.value }))}
+                    placeholder="19.0596" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Longitude</label>
+                  <input type="number" step="any" value={localityForm.longitude} onChange={e => setLocalityForm(f => ({ ...f, longitude: e.target.value }))}
+                    placeholder="72.8295" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="loc-active" checked={localityForm.isActive} onChange={e => setLocalityForm(f => ({ ...f, isActive: e.target.checked }))}
+                  className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500" />
+                <label htmlFor="loc-active" className="text-sm text-gray-700">Active</label>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                disabled={saving || !localityForm.stateId || !localityForm.cityId}
+                onClick={async () => {
+                  setSaving(true); setError('');
+                  try {
+                    const payload: any = {
+                      city: localityForm.city,
+                      state: localityForm.state,
+                      locality: localityForm.locality || undefined,
+                      pincode: localityForm.pincode || undefined,
+                      isActive: localityForm.isActive,
+                    };
+                    if (localityForm.latitude) payload.latitude = parseFloat(localityForm.latitude);
+                    if (localityForm.longitude) payload.longitude = parseFloat(localityForm.longitude);
+                    if (localityModal.editing) {
+                      await adminLocationsApi.updateLocality(localityModal.editing.id, payload);
+                    } else {
+                      await adminLocationsApi.createLocality(payload);
+                    }
+                    setLocalityModal({ open: false, editing: null });
+                    loadLocalities();
+                  } catch (e: any) { setError(e?.response?.data?.message || 'Failed to save'); }
+                  finally { setSaving(false); }
+                }}
+                className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {saving ? 'Saving...' : localityModal.editing ? 'Update' : 'Create'}
+              </button>
+              <button onClick={() => setLocalityModal({ open: false, editing: null })}
+                className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -888,6 +1211,10 @@ export default function AdminLocationsPage() {
                   if (deleteConfirm.type === 'state') deleteState(deleteConfirm.id);
                   else if (deleteConfirm.type === 'city') deleteCity(deleteConfirm.id);
                   else if (deleteConfirm.type === 'country') deleteCountry(deleteConfirm.id);
+                  else if (deleteConfirm.type === 'locality') {
+                    setActionLoading(deleteConfirm.id);
+                    adminLocationsApi.deleteLocality(deleteConfirm.id).then(() => { setDeleteConfirm(null); loadLocalities(); }).catch(e => console.error(e)).finally(() => setActionLoading(null));
+                  }
                 }}
                 disabled={!!actionLoading}
                 className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">

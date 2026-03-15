@@ -52,10 +52,12 @@ function getAmenityIcon(name: string): string {
   return '✓';
 }
 
-/** Build a public agent profile slug: firstname-lastname-in-city-{uuidNoHyphens} */
-function buildAgentSlug(name: string, city: string, id: string): string {
+/** Build a public agent profile slug: firstname-lastname-in-city (city optional) */
+function buildAgentSlug(name: string, city: string, _id: string): string {
   const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return `${slug(name)}-in-${slug(city)}-${id.replace(/-/g, '')}`;
+  const n = slug(name);
+  if (!city) return n;
+  return `${n}-in-${slug(city)}`;
 }
 
 // ── Inquiry type ─────────────────────────────────────────────────────────────
@@ -1179,33 +1181,51 @@ export default function PropertyDetailClient({ property }: Props) {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    {phone ? (
-                      <a
-                        href={`tel:${phone}`}
-                        onClick={() => setShowPhone(true)}
+                    {/* Phone privacy gate: number hidden until logged-in user explicitly reveals */}
+                    {!user ? (
+                      <button
+                        onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
                         className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors"
                       >
+                        <Lock className="w-4 h-4" />
+                        Login to View Phone Number
+                      </button>
+                    ) : phone ? (
+                      <a
+                        href={showPhone ? `tel:${phone}` : undefined}
+                        onClick={() => setShowPhone(true)}
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors cursor-pointer"
+                      >
                         <Phone className="w-4 h-4" />
-                        {showPhone ? phone : 'Show Phone Number'}
+                        {showPhone ? phone : `${phone.slice(0, 5)}XXXXX — Tap to Reveal`}
                       </a>
                     ) : (
                       <button
-                        onClick={() => setShowPhone(v => !v)}
-                        className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors"
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-gray-400 text-white rounded-xl text-sm font-bold cursor-not-allowed"
+                        disabled
                       >
                         <Phone className="w-4 h-4" />
-                        {showPhone ? 'No phone available' : 'Show Phone Number'}
+                        Phone not available
                       </button>
                     )}
                     {waLink && (
-                      <a
-                        href={waLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2 w-full py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors"
-                      >
-                        <MessageSquare className="w-4 h-4" /> WhatsApp
-                      </a>
+                      user ? (
+                        <a
+                          href={waLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-2 w-full py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors"
+                        >
+                          <MessageSquare className="w-4 h-4" /> WhatsApp
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                          className="flex items-center justify-center gap-2 w-full py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-colors"
+                        >
+                          <Lock className="w-4 h-4" /> Login to WhatsApp
+                        </button>
+                      )
                     )}
                     <button
                       onClick={() => openInquiryModal('site_visit')}
@@ -1236,22 +1256,40 @@ export default function PropertyDetailClient({ property }: Props) {
       {!isInactiveListing && <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl safe-bottom">
         <div className="flex items-center gap-2 px-3 py-3">
           {phone ? (
-            <a
-              href={`tel:${phone}`}
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all"
-            >
-              <Phone className="w-4 h-4" /> Call
-            </a>
+            user ? (
+              <a
+                href={`tel:${phone}`}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all"
+              >
+                <Phone className="w-4 h-4" /> Call
+              </a>
+            ) : (
+              <button
+                onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all"
+              >
+                <Lock className="w-4 h-4" /> Login to Call
+              </button>
+            )
           ) : null}
           {waLink && (
-            <a
-              href={waLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 active:scale-95 transition-all"
-            >
-              <MessageSquare className="w-4 h-4" /> WhatsApp
-            </a>
+            user ? (
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 active:scale-95 transition-all"
+              >
+                <MessageSquare className="w-4 h-4" /> WhatsApp
+              </a>
+            ) : (
+              <button
+                onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 active:scale-95 transition-all"
+              >
+                <Lock className="w-4 h-4" /> Login to Chat
+              </button>
+            )
           )}
           <button
             onClick={() => openInquiryModal('general')}

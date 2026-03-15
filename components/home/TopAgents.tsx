@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Star, Phone, MapPin, Building2, ArrowRight, Award, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CallButton } from '@/components/common/PhoneRevealButton';
 import { useQuery } from '@tanstack/react-query';
 import { usersApi } from '@/lib/api';
 import { useAppSelector } from '@/lib/store';
@@ -28,9 +29,9 @@ interface Agent {
 
 function buildAgentSlug(agent: Agent): string {
   const name = agent.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const city = (agent.city || 'india').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const uid  = agent.id.replace(/-/g, '');
-  return `${name}-in-${city}-${uid}`;
+  if (!agent.city) return name;
+  const city = agent.city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  return `${name}-in-${city}`;
 }
 
 const TICK: Record<string, { label: string; cls: string; avatarCls: string }> = {
@@ -125,13 +126,12 @@ function AgentCard({ agent }: { agent: Agent }) {
       {/* Actions */}
       <div className="px-4 pb-4 flex gap-2 flex-shrink-0">
         {agent.phone && (
-          <a
-            href={`tel:+91${agent.phone}`}
-            onClick={e => e.stopPropagation()}
+          <CallButton
+            phone={`+91${agent.phone}`}
             className="flex items-center justify-center gap-1 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-medium px-3 py-2.5 rounded-xl transition-colors flex-shrink-0"
           >
             <Phone className="w-3.5 h-3.5" />
-          </a>
+          </CallButton>
         )}
         <Link
           href={`/agents/${slug}`}

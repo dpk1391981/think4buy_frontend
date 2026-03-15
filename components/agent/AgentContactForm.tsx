@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { MessageCircle, Phone, Mail, Send, CheckCircle, User, LogIn } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { inquiriesApi } from '@/lib/api';
+import { CallButton } from '@/components/common/PhoneRevealButton';
 
 interface Props {
   agentId: string;
@@ -107,13 +108,13 @@ export default function AgentContactForm({
       {/* Direct contact */}
       <div className="flex gap-2 p-4 border-b border-gray-100">
         {agentPhone && (
-          <a
-            href={`tel:+91${agentPhone}`}
+          <CallButton
+            phone={`+91${agentPhone}`}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary-50 hover:bg-primary-100 text-primary-700 rounded-xl text-xs font-semibold transition-colors"
           >
             <Phone className="w-3.5 h-3.5" />
             Call Now
-          </a>
+          </CallButton>
         )}
         {agentEmail && (
           <a

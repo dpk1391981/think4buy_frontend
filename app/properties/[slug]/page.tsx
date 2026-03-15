@@ -41,9 +41,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     property.metaDescription ||
     `${property.bedrooms ? property.bedrooms + ' BHK ' : ''}${property.type} for ${property.category === 'buy' ? 'sale' : 'rent'} in ${property.locality}, ${property.city}. ${property.area ? property.area + ' sqft. ' : ''}Contact now.`;
 
+  // Property detail pages are noindex by default to avoid thin-content SEO penalties.
+  // Admin can enable indexing per-property via the allowIndexing flag.
+  const shouldIndex = property.allowIndexing === true;
+
   return {
     title,
     description,
+    robots: {
+      index: shouldIndex,
+      follow: true,
+      googleBot: { index: shouldIndex, follow: true },
+    },
     openGraph: {
       title,
       description,
@@ -58,7 +67,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
     },
     alternates: {
-      canonical: `/properties/${property.slug}`,
+      canonical: shouldIndex ? `/properties/${property.slug}` : undefined,
     },
   };
 }

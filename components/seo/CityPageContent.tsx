@@ -12,57 +12,89 @@ interface Props {
 
 function variantTitle(v: ContentVariant, city: string): string {
   switch (v) {
+    case 'property-for-sale':
     case 'buy':              return `Property for Sale in ${city} – Complete Buying Guide`;
-    case 'flats-for-sale':  return `Flats & Apartments for Sale in ${city}`;
-    case 'rent':             return `Rental Properties in ${city} – Find the Right Home`;
-    case 'flats-for-rent':  return `Flats for Rent in ${city} – Verified Rental Listings`;
-    case 'new-projects':    return `New Projects in ${city} – Latest Launches & New Developments`;
+    case 'flats-for-sale':   return `Flats & Apartments for Sale in ${city}`;
+    case 'villa-sale':       return `Villas for Sale in ${city} – Luxury & Independent Houses`;
+    case 'plot-sale':        return `Plots for Sale in ${city} – Residential & Commercial Land`;
+    case 'property-for-rent':
+    case 'rent':             return `Property for Rent in ${city} – Find the Right Home`;
+    case 'flats-for-rent':   return `Flats for Rent in ${city} – Verified Rental Listings`;
+    case 'commercial':       return `Commercial Property in ${city} – Offices, Shops & Warehouses`;
+    case 'office-rent':      return `Office Space for Rent in ${city} – Verified Commercial Listings`;
+    case 'pg':               return `PG Accommodation in ${city} – Paying Guest & Co-Living`;
+    case 'new-projects':     return `New Projects in ${city} – Latest Launches & New Developments`;
   }
 }
 
 function variantIntro(v: ContentVariant, d: CityData): string {
   switch (v) {
-    case 'buy':
-    case 'flats-for-sale':  return d.buyOverview;
     case 'rent':
+    case 'property-for-rent':
     case 'flats-for-rent':  return d.rentOverview;
     case 'new-projects':    return d.newProjectsOverview;
+    default:                return d.buyOverview;
   }
 }
 
 function variantLocalities(v: ContentVariant, d: CityData) {
   switch (v) {
     case 'rent':
-    case 'flats-for-rent':  return { title: 'Top Areas to Rent in', list: d.topLocalitiesRent };
-    case 'new-projects':    return { title: 'Top Localities for New Projects in', list: d.topLocalitiesNewProjects };
+    case 'property-for-rent':
+    case 'flats-for-rent':
+    case 'pg':              return { title: 'Top Areas to Rent in', list: d.topLocalitiesRent };
+    case 'new-projects':
+    case 'commercial':
+    case 'office-rent':     return { title: 'Top Localities for New Projects in', list: d.topLocalitiesNewProjects };
     default:                return { title: 'Top Localities to Buy in', list: d.topLocalitiesBuy };
   }
 }
 
 function variantPriceLabel(v: ContentVariant, d: CityData): string {
-  return v === 'rent' || v === 'flats-for-rent' ? d.priceRangeRent : d.priceRangeBuy;
+  switch (v) {
+    case 'rent':
+    case 'property-for-rent':
+    case 'flats-for-rent':
+    case 'office-rent':
+    case 'pg':              return d.priceRangeRent;
+    default:                return d.priceRangeBuy;
+  }
 }
 
 function variantPriceTitle(v: ContentVariant): string {
-  return v === 'rent' || v === 'flats-for-rent' ? 'Typical Rent Range' : 'Price Range';
+  switch (v) {
+    case 'rent':
+    case 'property-for-rent':
+    case 'flats-for-rent':
+    case 'office-rent':
+    case 'pg':              return 'Typical Rent Range';
+    default:                return 'Price Range';
+  }
 }
 
 function variantLocalityCTA(v: ContentVariant, citySlug: string, locality: string): string {
-  const locSlug = locality.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+  const loc = encodeURIComponent(locality);
   switch (v) {
     case 'rent':
-    case 'flats-for-rent':  return `/flats-for-rent/${citySlug}?locality=${encodeURIComponent(locality)}`;
-    case 'new-projects':    return `/new-projects/${citySlug}?locality=${encodeURIComponent(locality)}`;
-    default:                return `/flats-for-sale/${citySlug}?locality=${encodeURIComponent(locality)}`;
+    case 'property-for-rent':
+    case 'flats-for-rent':  return `/property-for-rent-in-${citySlug}?locality=${loc}`;
+    case 'new-projects':    return `/new-projects-in-${citySlug}?locality=${loc}`;
+    case 'commercial':
+    case 'office-rent':     return `/commercial-property-in-${citySlug}?locality=${loc}`;
+    case 'villa-sale':      return `/villas-for-sale-in-${citySlug}?locality=${loc}`;
+    case 'plot-sale':       return `/plots-for-sale-in-${citySlug}?locality=${loc}`;
+    case 'pg':              return `/pg-in-${citySlug}?locality=${loc}`;
+    default:                return `/property-for-sale-in-${citySlug}?locality=${loc}`;
   }
 }
 
 // ── Fallback template for cities not in database ─────────────────────────────
 
 function FallbackContent({ cityName, variant }: { cityName: string; variant: ContentVariant }) {
-  const isBuy = variant === 'buy' || variant === 'flats-for-sale';
-  const isRent = variant === 'rent' || variant === 'flats-for-rent';
+  const isBuy = variant === 'buy' || variant === 'flats-for-sale' || variant === 'property-for-sale' || variant === 'villa-sale' || variant === 'plot-sale';
+  const isRent = variant === 'rent' || variant === 'flats-for-rent' || variant === 'property-for-rent' || variant === 'office-rent' || variant === 'pg';
   const isNew = variant === 'new-projects';
+  const isCommercial = variant === 'commercial' || variant === 'office-rent';
 
   return (
     <section className="bg-white border-t border-gray-100 py-14">
@@ -116,13 +148,29 @@ function FallbackContent({ cityName, variant }: { cityName: string; variant: Con
               </p>
             </>
           )}
+          {isCommercial && (
+            <>
+              <p>
+                Looking for commercial property in {cityName}? Think4BuySale lists verified commercial
+                spaces — offices, shops, showrooms, warehouses, and co-working spaces across all major
+                business districts in {cityName}. Whether you're a startup, SME, or large enterprise,
+                we connect you with the right commercial space.
+              </p>
+              <p>
+                {cityName} offers a thriving commercial real estate market. From Grade-A office buildings
+                in CBD locations to affordable retail shops in neighbourhood markets, our listings cover
+                all types and budgets. All listings include built-up area, floor details, and direct
+                contact with property owners or agents.
+              </p>
+            </>
+          )}
         </div>
 
         {/* Generic bullets */}
         <div className="grid md:grid-cols-2 gap-6">
           <div className="bg-gray-50 rounded-2xl p-6">
             <h3 className="font-semibold text-gray-900 mb-3 text-base">
-              {isBuy ? `Why Buy Property in ${cityName}?` : isRent ? `Why Rent in ${cityName}?` : `Why Invest in New Projects in ${cityName}?`}
+              {isBuy && !isCommercial ? `Why Buy Property in ${cityName}?` : isRent && !isCommercial ? `Why Rent in ${cityName}?` : isCommercial ? `Why Choose Commercial Property in ${cityName}?` : `Why Invest in New Projects in ${cityName}?`}
             </h3>
             <ul className="space-y-2 text-sm text-gray-600">
               {isBuy && [
@@ -147,7 +195,7 @@ function FallbackContent({ cityName, variant }: { cityName: string; variant: Con
                   <span className="text-green-500 mt-0.5 flex-shrink-0">✓</span>{item}
                 </li>
               ))}
-              {isNew && [
+              {isNew && !isCommercial && [
                 'RERA-registered projects only',
                 'Pre-launch and under-construction pricing',
                 'Builder track record and delivery history',
@@ -158,12 +206,23 @@ function FallbackContent({ cityName, variant }: { cityName: string; variant: Con
                   <span className="text-green-500 mt-0.5 flex-shrink-0">✓</span>{item}
                 </li>
               ))}
+              {isCommercial && [
+                'Verified commercial listings with floor plans',
+                'Options from individual owners and agencies',
+                'Lease, rent, and outright purchase options',
+                'Business district and suburban locations',
+                'Co-working and managed office space options',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5 flex-shrink-0">✓</span>{item}
+                </li>
+              ))}
             </ul>
           </div>
           <div className="bg-primary-50 rounded-2xl p-6">
             <h3 className="font-semibold text-gray-900 mb-3 text-base">Quick Tips</h3>
             <ul className="space-y-2 text-sm text-gray-600">
-              {isBuy && [
+              {isBuy && !isCommercial && [
                 'Always verify RERA registration before booking',
                 'Check OC (Occupancy Certificate) for ready properties',
                 'Compare circle rate vs market rate before registering',
@@ -174,7 +233,7 @@ function FallbackContent({ cityName, variant }: { cityName: string; variant: Con
                   <span className="text-primary-500 mt-0.5 flex-shrink-0">→</span>{item}
                 </li>
               ))}
-              {isRent && [
+              {isRent && !isCommercial && [
                 'Always get a registered rental agreement',
                 'Check for maintenance charges before finalising',
                 'Verify landlord ownership documents',
@@ -185,12 +244,23 @@ function FallbackContent({ cityName, variant }: { cityName: string; variant: Con
                   <span className="text-primary-500 mt-0.5 flex-shrink-0">→</span>{item}
                 </li>
               ))}
-              {isNew && [
+              {isNew && !isCommercial && [
                 'Check RERA registration and delivery timeline',
                 'Verify builder\'s past project delivery record',
                 'Understand payment plan structure',
                 'Check for hidden charges (car parking, club, etc.)',
                 'Visit the site before booking',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <span className="text-primary-500 mt-0.5 flex-shrink-0">→</span>{item}
+                </li>
+              ))}
+              {isCommercial && [
+                'Verify the property\'s zoning and usage permissions',
+                'Check fire NOC and other compliance certificates',
+                'Understand CAM (Common Area Maintenance) charges',
+                'Negotiate lease tenure and lock-in period carefully',
+                'Verify power load capacity for your business needs',
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <span className="text-primary-500 mt-0.5 flex-shrink-0">→</span>{item}
@@ -384,42 +454,37 @@ export default function CityPageContent({ citySlug, cityName, variant }: Props) 
         <div className="mt-12 bg-gradient-to-r from-primary-600 to-blue-700 rounded-2xl p-6 text-white">
           <h3 className="font-bold text-lg mb-3">Explore More in {cityName}</h3>
           <div className="flex flex-wrap gap-2">
-            {variant !== 'buy' && variant !== 'flats-for-sale' && (
-              <Link
-                href={`/buy/property-in-${citySlug}`}
-                className="bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium px-3 py-2 rounded-lg"
-              >
+            {variant !== 'buy' && variant !== 'flats-for-sale' && variant !== 'property-for-sale' && (
+              <Link href={`/property-for-sale-in-${citySlug}`} className="bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium px-3 py-2 rounded-lg">
                 🏠 Buy Property in {cityName}
               </Link>
             )}
-            {variant !== 'flats-for-sale' && variant !== 'buy' && (
-              <Link
-                href={`/flats-for-sale/${citySlug}`}
-                className="bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium px-3 py-2 rounded-lg"
-              >
+            {variant !== 'flats-for-sale' && variant !== 'buy' && variant !== 'property-for-sale' && (
+              <Link href={`/flats-for-sale-in-${citySlug}`} className="bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium px-3 py-2 rounded-lg">
                 🏢 Flats for Sale in {cityName}
               </Link>
             )}
-            {variant !== 'flats-for-rent' && variant !== 'rent' && (
-              <Link
-                href={`/flats-for-rent/${citySlug}`}
-                className="bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium px-3 py-2 rounded-lg"
-              >
-                🔑 Flats for Rent in {cityName}
+            {variant !== 'flats-for-rent' && variant !== 'rent' && variant !== 'property-for-rent' && (
+              <Link href={`/property-for-rent-in-${citySlug}`} className="bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium px-3 py-2 rounded-lg">
+                🔑 Rent Property in {cityName}
+              </Link>
+            )}
+            {variant !== 'commercial' && variant !== 'office-rent' && (
+              <Link href={`/commercial-property-in-${citySlug}`} className="bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium px-3 py-2 rounded-lg">
+                🏬 Commercial in {cityName}
               </Link>
             )}
             {variant !== 'new-projects' && (
-              <Link
-                href={`/new-projects/${citySlug}`}
-                className="bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium px-3 py-2 rounded-lg"
-              >
+              <Link href={`/new-projects-in-${citySlug}`} className="bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium px-3 py-2 rounded-lg">
                 🏗️ New Projects in {cityName}
               </Link>
             )}
-            <Link
-              href={`/agents?city=${encodeURIComponent(cityName)}`}
-              className="bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium px-3 py-2 rounded-lg"
-            >
+            {variant !== 'pg' && (
+              <Link href={`/pg-in-${citySlug}`} className="bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium px-3 py-2 rounded-lg">
+                🛏️ PG in {cityName}
+              </Link>
+            )}
+            <Link href={`/agents?city=${encodeURIComponent(cityName)}`} className="bg-white/20 hover:bg-white/30 transition-colors text-xs font-medium px-3 py-2 rounded-lg">
               👤 Property Agents in {cityName}
             </Link>
           </div>

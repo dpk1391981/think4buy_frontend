@@ -66,7 +66,10 @@ export interface Property {
   possessionStatus?: PossessionStatus;
   city: string;
   state?: string;
+  stateId?: string;
+  cityId?: string;
   locality: string;
+  localityId?: string;
   society?: string;
   address?: string;
   pincode?: string;
@@ -86,6 +89,7 @@ export interface Property {
   propertyAge?: number;
   metaTitle?: string;
   metaDescription?: string;
+  allowIndexing?: boolean;
   images: PropertyImage[];
   amenities: Amenity[];
   owner: PropertyOwner;

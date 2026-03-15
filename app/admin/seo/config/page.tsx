@@ -4,17 +4,37 @@ import { Save, Plus, Trash2 } from 'lucide-react';
 import { seoApi } from '@/lib/api';
 
 const DEFAULT_CONFIGS = [
-  { key: 'site_title', label: 'Site Title', description: 'Default title tag for all pages', value: '' },
-  { key: 'site_description', label: 'Site Description', description: 'Default meta description', value: '' },
-  { key: 'site_keywords', label: 'Site Keywords', description: 'Default meta keywords (comma separated)', value: '' },
-  { key: 'og_image', label: 'OG Image URL', description: 'Default Open Graph image for social sharing', value: '' },
-  { key: 'twitter_handle', label: 'Twitter Handle', description: 'e.g. @think4buysale', value: '' },
-  { key: 'google_site_verification', label: 'Google Site Verification', description: 'Google Search Console verification code', value: '' },
-  { key: 'robots_txt_extras', label: 'Robots.txt Extra Rules', description: 'Additional robots.txt directives', value: '' },
-  { key: 'canonical_domain', label: 'Canonical Domain', description: 'e.g. https://think4buysale.com', value: '' },
+  // ── Basic ──────────────────────────────────────────────────────────────────
+  { key: 'site_title', label: 'Site Title', description: 'Default title tag for all pages', value: '', group: 'Basic' },
+  { key: 'site_description', label: 'Site Description', description: 'Default meta description', value: '', group: 'Basic' },
+  { key: 'site_keywords', label: 'Site Keywords', description: 'Default meta keywords (comma separated)', value: '', group: 'Basic' },
+  { key: 'canonical_domain', label: 'Canonical Domain', description: 'e.g. https://think4buysale.com', value: '', group: 'Basic' },
+
+  // ── Robots & Indexing ──────────────────────────────────────────────────────
+  { key: 'robots_txt_extras', label: 'Robots.txt Extra Rules', description: 'Additional robots.txt directives (one per line)', value: '', group: 'Robots' },
+  { key: 'default_robots_meta', label: 'Default Robots Meta', description: 'Default robots meta for all pages: index,follow | noindex,follow | noindex,nofollow', value: 'index,follow', group: 'Robots' },
+  { key: 'property_detail_robots', label: 'Property Detail Robots', description: 'Robots meta for individual property pages (recommended: noindex,follow)', value: 'noindex,follow', group: 'Robots' },
+  { key: 'blog_robots', label: 'Blog/Article Robots', description: 'Robots meta for blog articles', value: 'index,follow', group: 'Robots' },
+  { key: 'agent_profile_robots', label: 'Agent Profile Robots', description: 'Robots meta for agent profile pages', value: 'index,follow', group: 'Robots' },
+
+  // ── Open Graph ────────────────────────────────────────────────────────────
+  { key: 'og_site_name', label: 'OG Site Name', description: 'Site name for Open Graph (og:site_name)', value: 'Think4BuySale', group: 'OpenGraph' },
+  { key: 'og_image', label: 'OG Image URL', description: 'Default Open Graph image for social sharing (1200×630px recommended)', value: '', group: 'OpenGraph' },
+  { key: 'og_type', label: 'OG Type', description: 'Default og:type — website | article | product', value: 'website', group: 'OpenGraph' },
+  { key: 'og_locale', label: 'OG Locale', description: 'Language/region e.g. en_IN', value: 'en_IN', group: 'OpenGraph' },
+
+  // ── Twitter / X Cards ─────────────────────────────────────────────────────
+  { key: 'twitter_handle', label: 'Twitter Handle', description: 'e.g. @think4buysale', value: '', group: 'Twitter' },
+  { key: 'twitter_card', label: 'Twitter Card Type', description: 'summary | summary_large_image | app | player', value: 'summary_large_image', group: 'Twitter' },
+  { key: 'twitter_creator', label: 'Twitter Creator Handle', description: 'Default author handle e.g. @think4buysale', value: '', group: 'Twitter' },
+
+  // ── Verification ──────────────────────────────────────────────────────────
+  { key: 'google_site_verification', label: 'Google Site Verification', description: 'Google Search Console verification code', value: '', group: 'Verification' },
+  { key: 'bing_site_verification', label: 'Bing Site Verification', description: 'Bing Webmaster Tools verification code', value: '', group: 'Verification' },
+  { key: 'facebook_domain_verification', label: 'Facebook Domain Verification', description: 'Facebook domain verification token', value: '', group: 'Verification' },
 ];
 
-interface ConfigItem { id?: string; key: string; label: string; description: string; value: string; }
+interface ConfigItem { id?: string; key: string; label: string; description: string; value: string; group?: string; }
 
 export default function AdminSeoConfigPage() {
   const [configs, setConfigs] = useState<ConfigItem[]>(DEFAULT_CONFIGS);
@@ -93,31 +113,59 @@ export default function AdminSeoConfigPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm divide-y divide-gray-100">
-        {configs.map((config, idx) => (
-          <div key={config.key} className="p-4 flex gap-4 items-start">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <label className="text-sm font-semibold text-gray-800">{config.label}</label>
-                <code className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded font-mono">{config.key}</code>
-              </div>
-              {config.description && <p className="text-xs text-gray-500 mb-2">{config.description}</p>}
-              {config.key === 'site_description' || config.key === 'robots_txt_extras' ? (
-                <textarea value={config.value} onChange={e => handleChange(config.key, e.target.value)} rows={2}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
-              ) : (
-                <input value={config.value} onChange={e => handleChange(config.key, e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-              )}
+      {/* Group configs by their group label */}
+      {(() => {
+        const groups: Record<string, ConfigItem[]> = {};
+        configs.forEach(c => {
+          const g = c.group || 'Custom';
+          if (!groups[g]) groups[g] = [];
+          groups[g].push(c);
+        });
+        const GROUP_COLORS: Record<string, string> = {
+          Basic: 'bg-blue-50 text-blue-700 border-blue-200',
+          Robots: 'bg-amber-50 text-amber-700 border-amber-200',
+          OpenGraph: 'bg-purple-50 text-purple-700 border-purple-200',
+          Twitter: 'bg-sky-50 text-sky-700 border-sky-200',
+          Verification: 'bg-green-50 text-green-700 border-green-200',
+          Custom: 'bg-gray-50 text-gray-600 border-gray-200',
+        };
+        const TEXTAREA_KEYS = new Set(['site_description', 'robots_txt_extras']);
+        return Object.entries(groups).map(([groupName, items]) => (
+          <div key={groupName} className="mb-6">
+            <div className={`inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border mb-3 ${GROUP_COLORS[groupName] || GROUP_COLORS.Custom}`}>
+              {groupName}
             </div>
-            {idx >= DEFAULT_CONFIGS.length && (
-              <button onClick={() => removeConfig(config.key)} className="mt-6 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
+            <div className="bg-white rounded-xl shadow-sm divide-y divide-gray-100">
+              {items.map((config) => {
+                const isCustom = !DEFAULT_CONFIGS.find(d => d.key === config.key);
+                return (
+                  <div key={config.key} className="p-4 flex gap-4 items-start">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <label className="text-sm font-semibold text-gray-800">{config.label}</label>
+                        <code className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded font-mono">{config.key}</code>
+                      </div>
+                      {config.description && <p className="text-xs text-gray-500 mb-2">{config.description}</p>}
+                      {TEXTAREA_KEYS.has(config.key) ? (
+                        <textarea value={config.value} onChange={e => handleChange(config.key, e.target.value)} rows={2}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
+                      ) : (
+                        <input value={config.value} onChange={e => handleChange(config.key, e.target.value)}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+                      )}
+                    </div>
+                    {isCustom && (
+                      <button onClick={() => removeConfig(config.key)} className="mt-6 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        ))}
-      </div>
+        ));
+      })()}
 
       {/* Add Custom Config */}
       <div className="mt-6 bg-white rounded-xl shadow-sm p-5">

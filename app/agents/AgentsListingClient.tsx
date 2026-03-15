@@ -11,6 +11,7 @@ import {
 import { usersApi, locationsApi } from '@/lib/api';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { CallButton } from '@/components/common/PhoneRevealButton';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -80,8 +81,9 @@ const LIMIT = 15;
 
 function buildSlug(a: Agent) {
   const n = (a.name || 'agent').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const c = (a.city || 'india').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  return `${n}-in-${c}-${a.id.replace(/-/g, '')}`;
+  if (!a.city) return n;
+  const c = a.city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  return `${n}-in-${c}`;
 }
 
 function getInitials(name: string) {
@@ -213,10 +215,12 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
           {/* Right CTA — desktop */}
           <div className="hidden sm:flex flex-col gap-2 flex-shrink-0 w-[108px]">
             {agent.phone ? (
-              <a href={`tel:+91${agent.phone}`} onClick={e => e.stopPropagation()}
-                className="flex items-center justify-center gap-1.5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition-colors">
+              <CallButton
+                phone={`+91${agent.phone}`}
+                className="flex items-center justify-center gap-1.5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition-colors"
+              >
                 <Phone className="w-3.5 h-3.5" /> Call Now
-              </a>
+              </CallButton>
             ) : (
               <Link href={`/agents/${buildSlug(agent)}`}
                 className="flex items-center justify-center gap-1.5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition-colors">
@@ -233,10 +237,12 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
         {/* Mobile CTA strip */}
         <div className="sm:hidden flex gap-2 mt-3 pt-3 border-t border-gray-100">
           {agent.phone && (
-            <a href={`tel:+91${agent.phone}`}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold">
+            <CallButton
+              phone={`+91${agent.phone}`}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold"
+            >
               <Phone className="w-3.5 h-3.5" /> Call
-            </a>
+            </CallButton>
           )}
           <Link href={`/agents/${buildSlug(agent)}`}
             className="flex-1 flex items-center justify-center gap-1 py-2 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50">

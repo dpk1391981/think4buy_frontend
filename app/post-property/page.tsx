@@ -29,6 +29,37 @@ import { cn } from '@/lib/utils';
 
 interface MediaFile { file: File; preview: string; type: 'image' | 'video'; }
 
+// ─── Leaflet CDN loader (same pattern as MapPropertySearch) ───────────────────
+function loadLeafletCDN(): Promise<any> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') return reject(new Error('SSR'));
+    if ((window as any).L && (window as any).L.map) return resolve((window as any).L);
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.async = true;
+    script.onload = () => {
+      const L = (window as any).L;
+      if (!L) return reject(new Error('Leaflet failed to load'));
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+      resolve(L);
+    };
+    script.onerror = () => reject(new Error('Failed to load Leaflet CDN'));
+    document.head.appendChild(script);
+  });
+}
+
 const IMPLICIT_LISTING: Record<string, 'rent' | 'buy'> = {
   buy: 'buy', rent: 'rent', pg: 'rent',
 };
@@ -920,11 +951,17 @@ function Step3PropertyType({ form, dispatch, config }: any) {
 function Step4Location({ form, dispatch }: any) {
   const [states, setStates] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [localities, setLocalities] = useState<any[]>([]);
+  const [localitiesLoading, setLocalitiesLoading] = useState(false);
+  // In edit mode, if locality is a free-text value (no localityId), start in custom mode
+  const [customLocality, setCustomLocality] = useState(() => !!(form.locality && !form.localityId));
   const [geoStatus, setGeoStatus] = useState<'idle' | 'detecting' | 'found' | 'denied' | 'error'>('idle');
-  const debounce = useRef<NodeJS.Timeout>();
   const isAgent = form.userType === 'agent';
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
 
+  // ── Load states on mount ──────────────────────────────────────────────────
   useEffect(() => {
     locationsApi.getStates().then(r => {
       const d = r.data;
@@ -932,15 +969,71 @@ function Step4Location({ form, dispatch }: any) {
     }).catch(() => {});
   }, []);
 
+  // ── Load cities when state changes ───────────────────────────────────────
   useEffect(() => {
-    const stateObj = form.stateId ? states.find((s: any) => s.id === form.stateId) : null;
-    if (!stateObj) { setCities([]); return; }
-    locationsApi.getCitiesByState(stateObj.id).then(r => {
+    if (!form.stateId) { setCities([]); setLocalities([]); return; }
+    locationsApi.getCitiesByState(form.stateId).then(r => {
       const d = r.data;
       setCities(Array.isArray(d) ? d : d?.items || []);
     }).catch(() => setCities([]));
-  }, [form.stateId, states]);
+  }, [form.stateId]);
 
+  // ── Load localities when city changes ────────────────────────────────────
+  useEffect(() => {
+    if (!form.city) { setLocalities([]); return; }
+    setLocalitiesLoading(true);
+    locationsApi.getLocalities(form.city, form.state).then(r => {
+      const d = r.data;
+      const locs = Array.isArray(d) ? d : [];
+      setLocalities(locs);
+      // If the current localityId is no longer valid for this city, clear it
+      if (form.localityId && !locs.find((l: any) => l.id === form.localityId)) {
+        dispatch(updateForm({ localityId: '', locality: '', pincode: '', latitude: null, longitude: null }));
+      }
+    }).catch(() => setLocalities([])).finally(() => setLocalitiesLoading(false));
+  }, [form.city, form.state]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Initialize Leaflet map ────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    loadLeafletCDN().then((L) => {
+      if (cancelled || !mapContainerRef.current || mapInstanceRef.current) return;
+      const lat = form.latitude || 20.5937;
+      const lng = form.longitude || 78.9629;
+      const zoom = form.latitude ? 14 : 5;
+      const map = L.map(mapContainerRef.current, { zoomControl: true }).setView([lat, lng], zoom);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors', maxZoom: 19,
+      }).addTo(map);
+      const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      marker.on('dragend', (e: any) => {
+        const { lat: newLat, lng: newLng } = e.target.getLatLng();
+        dispatch(updateForm({ latitude: parseFloat(newLat.toFixed(6)), longitude: parseFloat(newLng.toFixed(6)) }));
+      });
+      map.on('click', (e: any) => {
+        const { lat: cLat, lng: cLng } = e.latlng;
+        marker.setLatLng([cLat, cLng]);
+        dispatch(updateForm({ latitude: parseFloat(cLat.toFixed(6)), longitude: parseFloat(cLng.toFixed(6)) }));
+      });
+      mapInstanceRef.current = map;
+      markerRef.current = marker;
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; markerRef.current = null; }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Sync marker when lat/lng changes ─────────────────────────────────────
+  useEffect(() => {
+    if (!mapInstanceRef.current || !markerRef.current) return;
+    if (form.latitude && form.longitude) {
+      markerRef.current.setLatLng([form.latitude, form.longitude]);
+      mapInstanceRef.current.setView([form.latitude, form.longitude], 14, { animate: true });
+    }
+  }, [form.latitude, form.longitude]);
+
+  // ── Auto-detect GPS ───────────────────────────────────────────────────────
   const handleDetect = async () => {
     setGeoStatus('detecting');
     try {
@@ -949,7 +1042,7 @@ function Step4Location({ form, dispatch }: any) {
       if (loc.state && states.length > 0) {
         const sm = states.find((s: any) => s.name.toLowerCase() === loc.state.toLowerCase());
         if (sm) {
-          dispatch(updateForm({ stateId: sm.id, state: sm.name, city: '', cityId: '' }));
+          dispatch(updateForm({ stateId: sm.id, state: sm.name, city: '', cityId: '', localityId: '', locality: '', pincode: '' }));
           const cr = await locationsApi.getCitiesByState(sm.id).catch(() => null);
           if (cr) {
             const ca: any[] = Array.isArray(cr.data) ? cr.data : [];
@@ -965,6 +1058,31 @@ function Step4Location({ form, dispatch }: any) {
       setGeoStatus(err?.code === 1 ? 'denied' : 'error');
     }
   };
+
+  // ── When a DB locality is selected ───────────────────────────────────────
+  const handleLocalitySelect = (locId: string) => {
+    if (!locId) {
+      dispatch(updateForm({ localityId: '', locality: '', pincode: '', latitude: null, longitude: null }));
+      return;
+    }
+    if (locId === '__custom__') {
+      setCustomLocality(true);
+      dispatch(updateForm({ localityId: '', locality: '', pincode: '' }));
+      return;
+    }
+    const loc = localities.find((l: any) => l.id === locId);
+    if (!loc) return;
+    setCustomLocality(false);
+    dispatch(updateForm({
+      localityId: loc.id,
+      locality: loc.locality || loc.city,
+      pincode: loc.pincode || form.pincode,
+      latitude: loc.latitude ? parseFloat(loc.latitude) : form.latitude,
+      longitude: loc.longitude ? parseFloat(loc.longitude) : form.longitude,
+    }));
+  };
+
+  const showLocalityDropdown = localities.length > 0 && !customLocality;
 
   return (
     <div className="space-y-6">
@@ -982,7 +1100,9 @@ function Step4Location({ form, dispatch }: any) {
           <Select value={form.stateId}
             onChange={(e: any) => {
               const s = states.find((x: any) => x.id === e.target.value);
-              dispatch(updateForm({ stateId: e.target.value, state: s?.name || '', city: '', cityId: '' }));
+              dispatch(updateForm({ stateId: e.target.value, state: s?.name || '', city: '', cityId: '', localityId: '', locality: '', pincode: '', latitude: null, longitude: null }));
+              setLocalities([]);
+              setCustomLocality(false);
             }}>
             <option value="">Select State</option>
             {states.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -996,45 +1116,55 @@ function Step4Location({ form, dispatch }: any) {
             <Select value={form.cityId}
               onChange={(e: any) => {
                 const c = cities.find((x: any) => x.id === e.target.value);
-                dispatch(updateForm({ cityId: e.target.value, city: c?.name || '' }));
+                dispatch(updateForm({ cityId: e.target.value, city: c?.name || '', localityId: '', locality: '', pincode: '', latitude: null, longitude: null }));
+                setCustomLocality(false);
               }}>
               <option value="">Select City</option>
               {cities.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
           ) : (
             <Input value={form.city}
-              onChange={(e: any) => dispatch(updateForm({ city: e.target.value, cityId: '' }))}
+              onChange={(e: any) => dispatch(updateForm({ city: e.target.value, cityId: '', localityId: '', locality: '' }))}
               placeholder={form.stateId ? 'Type city name' : 'Select state first'} />
           )}
         </div>
 
-        {/* Locality */}
-        <div className="relative sm:col-span-2">
-          <FieldLabel required={!isAgent}>Area / Locality</FieldLabel>
-          <Input value={form.locality}
-            onChange={(e: any) => {
-              dispatch(updateForm({ locality: e.target.value }));
-              clearTimeout(debounce.current);
-              debounce.current = setTimeout(async () => {
-                if (e.target.value.length < 2) { setSuggestions([]); return; }
-                try {
-                  const { data } = await locationsApi.search(`${e.target.value} ${form.city}`);
-                  setSuggestions(data.slice(0, 5));
-                } catch { setSuggestions([]); }
-              }, 300);
-            }}
-            placeholder="e.g., Koramangala, Bandra West" />
-          {suggestions.length > 0 && (
-            <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-20 mt-1 overflow-hidden">
-              {suggestions.map((s: any, i: number) => (
-                <button key={i} type="button"
-                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2 border-b border-gray-50 last:border-0"
-                  onClick={() => { dispatch(updateForm({ locality: s.locality || s.city, city: s.city })); setSuggestions([]); }}>
-                  <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                  {s.locality ? `${s.locality}, ${s.city}` : s.city}
-                </button>
+        {/* Locality — dropdown from DB, or free text */}
+        <div className="sm:col-span-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <FieldLabel required={!isAgent}>Area / Locality</FieldLabel>
+            {localities.length > 0 && (
+              <button type="button"
+                onClick={() => { setCustomLocality(!customLocality); dispatch(updateForm({ localityId: '', locality: '', pincode: '' })); }}
+                className="text-xs text-blue-600 hover:underline">
+                {customLocality ? '← Pick from list' : 'Enter manually'}
+              </button>
+            )}
+          </div>
+
+          {showLocalityDropdown ? (
+            <Select value={form.localityId || ''}
+              onChange={(e: any) => handleLocalitySelect(e.target.value)}
+              disabled={!form.city || localitiesLoading}>
+              <option value="">{localitiesLoading ? 'Loading localities…' : 'Select locality'}</option>
+              {localities.map((l: any) => (
+                <option key={l.id} value={l.id}>
+                  {l.locality || l.city}{l.pincode ? ` — ${l.pincode}` : ''}
+                </option>
               ))}
-            </div>
+            </Select>
+          ) : (
+            <Input value={form.locality}
+              onChange={(e: any) => dispatch(updateForm({ locality: e.target.value, localityId: '' }))}
+              placeholder={form.city ? `e.g., area in ${form.city}` : 'e.g., Koramangala, Bandra West'} />
+          )}
+
+          {/* Show what was auto-filled */}
+          {form.localityId && form.pincode && (
+            <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1">
+              <span>✓</span>
+              <span>Auto-filled from location data{form.pincode ? ` — Pincode: ${form.pincode}` : ''}</span>
+            </p>
           )}
         </div>
 
@@ -1053,30 +1183,30 @@ function Step4Location({ form, dispatch }: any) {
         </div>
       </div>
 
-      {/* GPS */}
-      <SectionCard title="GPS Coordinates (Optional)">
-        <button type="button" onClick={handleDetect} disabled={geoStatus === 'detecting'}
-          className={cn('flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all mb-3',
-            geoStatus === 'detecting' ? 'bg-blue-100 text-blue-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
-          )}>
-          {geoStatus === 'detecting' ? <><Loader2 className="w-4 h-4 animate-spin" />Detecting…</> : <><MapPin className="w-4 h-4" />Auto-detect my location</>}
-        </button>
-        {geoStatus === 'found' && <p className="text-xs text-green-600 font-medium mb-3">✓ Location detected and filled above</p>}
-        {geoStatus === 'denied' && <p className="text-xs text-orange-500 mb-3">Permission denied. Enter coordinates manually.</p>}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <FieldLabel>Latitude</FieldLabel>
-            <Input type="number" value={form.latitude ?? ''}
-              onChange={(e: any) => dispatch(updateForm({ latitude: e.target.value ? Number(e.target.value) : null }))}
-              placeholder="19.0760" />
-          </div>
-          <div>
-            <FieldLabel>Longitude</FieldLabel>
-            <Input type="number" value={form.longitude ?? ''}
-              onChange={(e: any) => dispatch(updateForm({ longitude: e.target.value ? Number(e.target.value) : null }))}
-              placeholder="72.8777" />
-          </div>
+      {/* GPS Map Picker */}
+      <SectionCard title="Pin Location on Map">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-gray-500">
+            {form.localityId ? 'Map auto-positioned from selected locality. Click or drag to fine-tune.' : 'Click on the map or drag the pin to set the exact location.'}
+          </p>
+          <button type="button" onClick={handleDetect} disabled={geoStatus === 'detecting'}
+            className={cn('flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all flex-shrink-0',
+              geoStatus === 'detecting' ? 'bg-blue-100 text-blue-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
+            )}>
+            {geoStatus === 'detecting' ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Detecting…</> : <><MapPin className="w-3.5 h-3.5" />Auto-detect</>}
+          </button>
         </div>
+        {geoStatus === 'denied' && <p className="text-xs text-orange-500 mb-2">Location permission denied. Click the map to pin manually.</p>}
+        <div ref={mapContainerRef} className="w-full rounded-xl overflow-hidden border border-gray-200" style={{ height: 320, zIndex: 0 }} />
+        {(form.latitude || form.longitude) && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+            <MapPin className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+            <span>
+              {form.localityId ? '✓ From locality — ' : geoStatus === 'found' ? '✓ Detected — ' : 'Pinned at '}
+              <span className="font-mono text-gray-700">{parseFloat(String(form.latitude)).toFixed(6)}, {parseFloat(String(form.longitude)).toFixed(6)}</span>
+            </span>
+          </div>
+        )}
       </SectionCard>
     </div>
   );
@@ -1745,6 +1875,7 @@ function PostPropertyPageInner() {
       state: formData.state || undefined,
       stateId: formData.stateId || undefined,
       locality: formData.locality || formData.city || 'Delhi',
+      localityId: formData.localityId || undefined,
       address: formData.address || undefined,
       pincode: formData.pincode || undefined,
       latitude: formData.latitude ?? undefined,
@@ -1873,6 +2004,7 @@ function PostPropertyPageInner() {
           state: property.state || '',
           stateId: property.stateId || '',
           locality: property.locality || '',
+          localityId: property.localityId || '',
           address: property.address || '',
           pincode: property.pincode || '',
           latitude: property.latitude ?? null,
@@ -1977,6 +2109,7 @@ function PostPropertyPageInner() {
         city: form.city, cityId: form.cityId || undefined,
         state: form.state, stateId: form.stateId || undefined,
         locality: form.locality || form.city,
+        localityId: form.localityId || undefined,
         address: form.address || undefined,
         pincode: form.pincode || undefined,
         latitude: form.latitude ?? undefined,
