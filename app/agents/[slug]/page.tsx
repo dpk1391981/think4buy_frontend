@@ -46,6 +46,16 @@ async function fetchAgent(id: string) {
   } catch { return null; }
 }
 
+async function fetchListingCount(agentId: string): Promise<number> {
+  try {
+    const url = `${BASE}/properties?agentId=${agentId}&approvalStatus=approved&status=active&limit=1&page=1`;
+    const res = await fetch(url, { next: { revalidate: 300 } });
+    if (!res.ok) return 0;
+    const json = await res.json();
+    return json?.total ?? json?.meta?.total ?? 0;
+  } catch { return 0; }
+}
+
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const id = parseSlug(params.slug);
@@ -90,7 +100,10 @@ function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md
 
 export default async function AgentProfilePage({ params }: { params: Params }) {
   const id = parseSlug(params.slug);
-  const agent = await fetchAgent(id);
+  const [agent, listingCount] = await Promise.all([
+    fetchAgent(id),
+    fetchListingCount(id),
+  ]);
 
   if (!agent) notFound();
 
@@ -143,9 +156,17 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
             <div className="flex flex-col md:flex-row gap-8 items-start">
               {/* Avatar */}
               <div className="flex-shrink-0">
-                <div className={`w-28 h-28 md:w-36 md:h-36 rounded-3xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-4xl md:text-5xl font-black shadow-2xl ring-4 ring-white/20`}>
-                  {initials}
-                </div>
+                {agent.avatar ? (
+                  <img
+                    src={agent.avatar}
+                    alt={agent.name}
+                    className="w-28 h-28 md:w-36 md:h-36 rounded-3xl object-cover shadow-2xl ring-4 ring-white/20"
+                  />
+                ) : (
+                  <div className={`w-28 h-28 md:w-36 md:h-36 rounded-3xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-4xl md:text-5xl font-black shadow-2xl ring-4 ring-white/20`}>
+                    {initials}
+                  </div>
+                )}
               </div>
 
               {/* Info */}
@@ -206,7 +227,7 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
                   </div>
                   <div className="w-px bg-primary-600" />
                   <div className="text-center">
-                    <div className="text-2xl font-black text-white">{agent.agentUsedQuota ?? 0}</div>
+                    <div className="text-2xl font-black text-white">{listingCount}</div>
                     <div className="text-xs text-primary-300 uppercase tracking-wider">Active Listings</div>
                   </div>
                 </div>
@@ -324,7 +345,7 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
               </section>
 
               {/* Active Listings — dynamic client component */}
-              <AgentListings agentId={agent.id} agentName={agent.name} />
+              <AgentListings agentId={agent.id} agentName={agent.name} initialTotal={listingCount} />
 
               {/* Reviews & Ratings */}
               <AgentFeedbackSection agentId={agent.id} />
@@ -372,9 +393,17 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
                 {/* Mini profile card */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-xl font-black shadow-md flex-shrink-0`}>
-                      {initials}
-                    </div>
+                    {agent.avatar ? (
+                      <img
+                        src={agent.avatar}
+                        alt={agent.name}
+                        className="w-16 h-16 rounded-2xl object-cover shadow-md flex-shrink-0"
+                      />
+                    ) : (
+                      <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-xl font-black shadow-md flex-shrink-0`}>
+                        {initials}
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <h3 className="font-bold text-gray-900 truncate">{agent.name}</h3>
                       {tick && (
@@ -403,7 +432,7 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
                       <div className="text-[10px] text-gray-400">Yrs Exp</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-base font-black text-gray-900">{agent.agentUsedQuota ?? 0}</div>
+                      <div className="text-base font-black text-gray-900">{listingCount}</div>
                       <div className="text-[10px] text-gray-400">Listings</div>
                     </div>
                   </div>
@@ -432,20 +461,24 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
 
                   {/* Trust indicators */}
                   <div className="mt-4 pt-3 border-t border-gray-100 space-y-1.5">
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                      Verified by Think4BuySale
-                    </div>
+                    {agent.isVerified && (
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                        Verified by Think4BuySale
+                      </div>
+                    )}
                     {agent.agentLicense && (
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
                         RERA registered agent
                       </div>
                     )}
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                      {agent.agentExperience ?? 0}+ years experience
-                    </div>
+                    {(agent.agentExperience ?? 0) > 0 && (
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                        {agent.agentExperience}+ years experience
+                      </div>
+                    )}
                   </div>
                 </div>
 

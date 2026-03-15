@@ -51,9 +51,9 @@ function SkeletonCard() {
   );
 }
 
-export default function AgentListings({ agentId, agentName }: { agentId: string; agentName: string }) {
+export default function AgentListings({ agentId, agentName, initialTotal = 0 }: { agentId: string; agentName: string; initialTotal?: number }) {
   const [properties, setProperties] = useState<Property[]>([]);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal] = useState(initialTotal);
   const [page, setPage] = useState(1);
   const [category, setCategory] = useState('');
   const [loading, setLoading] = useState(true);
@@ -64,6 +64,7 @@ export default function AgentListings({ agentId, agentName }: { agentId: string;
       const params: Record<string, any> = {
         agentId,
         approvalStatus: 'approved',
+        status: 'active',
         page,
         limit: LIMIT,
       };
