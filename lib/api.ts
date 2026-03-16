@@ -138,6 +138,9 @@ export const locationsApi = {
   getCities: () => api.get('/locations/cities'),
   getLocalities: (city: string, state?: string) =>
     api.get('/locations/localities', { params: { city, state } }),
+  /** Alias used by FindPropertyClient */
+  getLocalitiesByCity: (city: string, state?: string) =>
+    api.get('/locations/localities', { params: { city, state } }),
   getStates: () => api.get('/locations/states'),
   getCitiesByState: (stateId: string) => api.get(`/locations/states/${stateId}/cities`),
   getSeoContent: (params: { city?: string; state?: string }) =>

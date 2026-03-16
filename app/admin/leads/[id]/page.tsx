@@ -159,7 +159,7 @@ export default function LeadDetailPage() {
             <div className="space-y-2 text-xs text-gray-600">
               <div className="flex items-center gap-2">
                 <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                <span>{lead.contactPhone}</span>
+                <span className="font-medium">{lead.contactPhone}</span>
               </div>
               {lead.contactEmail && (
                 <div className="flex items-center gap-2">
@@ -173,26 +173,86 @@ export default function LeadDetailPage() {
                   <span>{lead.city}{lead.state ? `, ${lead.state}` : ''}</span>
                 </div>
               )}
+              {lead.locality && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+                  <span className="text-indigo-700 font-medium">{lead.locality}</span>
+                </div>
+              )}
             </div>
+
+            {/* Property Requirement */}
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Property Requirement</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+                {lead.propertyFor && (
+                  <div>
+                    <div className="text-gray-400 mb-0.5">Looking To</div>
+                    <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold uppercase bg-primary-100 text-primary-700">
+                      {lead.propertyFor}
+                    </span>
+                  </div>
+                )}
+                {lead.propertyType && (
+                  <div>
+                    <div className="text-gray-400 mb-0.5">Type</div>
+                    <div className="font-semibold capitalize text-gray-800">{lead.propertyType}</div>
+                  </div>
+                )}
+                {(lead.budgetMin || lead.budgetMax) && (
+                  <div className="col-span-2">
+                    <div className="text-gray-400 mb-0.5">Budget</div>
+                    <div className="font-semibold text-gray-800">
+                      {lead.budgetMin ? `₹${Number(lead.budgetMin).toLocaleString('en-IN')}` : 'Any'}
+                      {lead.budgetMax ? ` – ₹${Number(lead.budgetMax).toLocaleString('en-IN')}` : '+'}
+                    </div>
+                  </div>
+                )}
+                {(lead.areaMin || lead.areaMax) && (
+                  <div className="col-span-2">
+                    <div className="text-gray-400 mb-0.5">Built-up Area</div>
+                    <div className="font-semibold text-gray-800">
+                      {lead.areaMin || '?'} – {lead.areaMax || '?'} {lead.areaUnit || 'sqft'}
+                    </div>
+                  </div>
+                )}
+                {lead.userType && (
+                  <div>
+                    <div className="text-gray-400 mb-0.5">User Type</div>
+                    <div className="font-semibold capitalize text-gray-800">{lead.userType}</div>
+                  </div>
+                )}
+                <div>
+                  <div className="text-gray-400 mb-0.5">Lead Score</div>
+                  <div className="font-bold text-gray-900">{lead.leadScore} / 100</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Preferred Localities */}
+            {lead.preferredLocalities && (() => {
+              try {
+                const locs: string[] = JSON.parse(lead.preferredLocalities);
+                if (locs.length > 0) return (
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Preferred Localities</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {locs.map((loc, i) => (
+                        <span key={i} className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full font-medium">
+                          {loc}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
 
             <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-3 text-xs">
               <div>
                 <div className="text-gray-400 mb-0.5">Source</div>
                 <div className="font-medium capitalize text-gray-700">{lead.source?.replace(/_/g, ' ')}</div>
               </div>
-              <div>
-                <div className="text-gray-400 mb-0.5">Score</div>
-                <div className="font-bold text-gray-900">{lead.leadScore}</div>
-              </div>
-              {lead.budgetMin && (
-                <div>
-                  <div className="text-gray-400 mb-0.5">Budget</div>
-                  <div className="font-medium text-gray-700">
-                    ₹{Number(lead.budgetMin).toLocaleString('en-IN')}
-                    {lead.budgetMax ? ` – ₹${Number(lead.budgetMax).toLocaleString('en-IN')}` : '+'}
-                  </div>
-                </div>
-              )}
               <div>
                 <div className="text-gray-400 mb-0.5">Created</div>
                 <div className="font-medium text-gray-700">
@@ -203,8 +263,21 @@ export default function LeadDetailPage() {
 
             {lead.requirement && (
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="text-xs text-gray-400 mb-1">Requirement</div>
+                <div className="text-xs text-gray-400 mb-1">Requirement Note</div>
                 <p className="text-xs text-gray-700 leading-relaxed">{lead.requirement}</p>
+              </div>
+            )}
+
+            {/* UTM / Tracking */}
+            {(lead.utmSource || lead.utmMedium || lead.utmCampaign || lead.deviceType) && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tracking</div>
+                <div className="space-y-1 text-xs text-gray-600">
+                  {lead.utmSource   && <div><span className="text-gray-400">Source:</span> {lead.utmSource}</div>}
+                  {lead.utmMedium   && <div><span className="text-gray-400">Medium:</span> {lead.utmMedium}</div>}
+                  {lead.utmCampaign && <div><span className="text-gray-400">Campaign:</span> {lead.utmCampaign}</div>}
+                  {lead.deviceType  && <div><span className="text-gray-400">Device:</span> {lead.deviceType}</div>}
+                </div>
               </div>
             )}
 
