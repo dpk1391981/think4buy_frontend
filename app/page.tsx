@@ -171,17 +171,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ─── Top Cities ───────────────────────────────────────────────────── */}
-      <TopCitiesSection />
-
        {/* ─── Latest Listings / Top Categories ───────────────────────────── */}
       <TopCategories />
 
       {/* ─── Featured Properties ──────────────────────────────────────────── */}
       <FeaturedProperties />
 
-      {/* ─── State Explorer / Top Cities ─────────────────────────────────── */}
+      {/* ─── State Explorer / Top States ─────────────────────────────────── */}
       <StateExplorer />
+
+      {/* ─── Top Residential Cities in India (horizontal scroll) ─────────── */}
+      <TopCitiesSection />
 
       {/* ─── Dynamic Location Selector (state selected → cities) ─────────── */}
       <HomeLocationSelector />
@@ -267,32 +267,107 @@ export default function HomePage() {
       {/* ─── Services ─────────────────────────────────────────────────────── */}
       <ServicesBanner />
 
-      {/* ─── CTA Banner ───────────────────────────────────────────────────── */}
-      <section className="py-6 sm:py-16 bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
-        <div className="container-max text-center relative z-10 px-4">
-          <CTAStatsText />
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2 sm:mb-3">
-            List Your Property for <span className="text-yellow-400">FREE</span>
-          </h2>
-          <p className="text-blue-100/70 mb-6 sm:mb-8 max-w-lg mx-auto text-sm sm:text-lg">
-            Reach millions of buyers and renters. Post your property listing in just 2 minutes.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-            <Link
-              href="/post-property"
-              className="w-full sm:w-auto bg-white text-primary-700 hover:bg-yellow-50 font-bold px-6 sm:px-8 py-3 sm:py-3.5 rounded-2xl transition-all hover:shadow-xl inline-flex items-center justify-center gap-2"
-            >
-              Post Property Now <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
-            </Link>
-            <Link
-              href="/properties"
-              className="w-full sm:w-auto text-white border border-white/30 hover:border-white/60 hover:bg-white/10 font-medium px-6 sm:px-8 py-3 sm:py-3.5 rounded-2xl transition-all inline-flex items-center justify-center gap-2"
-            >
-              Browse Properties
-            </Link>
+      {/* ─── List Your Property for FREE — SEO + CTA ─────────────────────── */}
+      <section className="py-10 sm:py-16 bg-gradient-to-br from-primary-700 via-primary-800 to-primary-900 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-60 h-60 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+
+        <div className="container-max relative z-10 px-4">
+
+          {/* ── SEO heading block ── */}
+          <div className="max-w-3xl mx-auto text-center mb-8 sm:mb-10">
+            <CTAStatsText />
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white leading-tight mb-3">
+              List Your Property for{' '}
+              <span className="text-yellow-400">FREE</span> on India&apos;s Trusted Real Estate Platform
+            </h2>
+            <p className="text-blue-100/75 text-sm sm:text-base leading-relaxed">
+              Think4BuySale connects property owners, real estate agents, and home buyers across 500+ cities in India.
+              Whether you want to <strong className="text-white font-semibold">sell a flat</strong>,{' '}
+              <strong className="text-white font-semibold">rent an apartment</strong>, or{' '}
+              <strong className="text-white font-semibold">buy residential plots</strong> — post your listing in under
+              2 minutes with zero charges, no brokerage, and no hidden fees.
+            </p>
           </div>
+
+          {/* ── Why Choose Us — plain text grid (SEO content) ── */}
+          <div className="max-w-4xl mx-auto mb-10">
+            <p className="text-center text-xs font-semibold text-yellow-400 uppercase tracking-widest mb-6">
+              Why Property Owners &amp; Buyers Choose Think4BuySale
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
+              {[
+                {
+                  icon: <Building2 className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />,
+                  title: 'Genuine, Verified Property Listings',
+                  desc: 'Every listing on Think4BuySale is reviewed for accuracy. Browse verified flats, residential plots, independent houses, villas, and commercial spaces — zero fake listings, real photos, real prices.',
+                },
+                {
+                  icon: <TrendingUp className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />,
+                  title: 'Instant Visibility Across 500+ Indian Cities',
+                  desc: 'Your property listing gets indexed on Google within hours. Buyers searching for "flats for sale in [your city]" or "plots near [your locality]" discover your listing organically — no paid ads needed.',
+                },
+                {
+                  icon: <Shield className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />,
+                  title: 'Privacy-First — Your Number Stays Safe',
+                  desc: 'We mask your phone number until you choose to connect. Only genuine, verified buyers reach you — no spam calls, no broker harassment, no unwanted solicitations.',
+                },
+                {
+                  icon: <Star className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />,
+                  title: 'Completely Free — No Subscription, No Commission',
+                  desc: 'Post unlimited residential and commercial properties at absolutely zero cost. No monthly fees, no pay-to-rank upgrades required. Individual owners and registered agents list for free, forever.',
+                },
+                {
+                  icon: <HeadphonesIcon className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />,
+                  title: 'Dedicated Support for Every User',
+                  desc: "New to online property listing? Our real estate advisors help you write compelling descriptions, set the right asking price, and attract more buyer inquiries — faster than traditional classifieds.",
+                },
+                {
+                  icon: <CheckCircle2 className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />,
+                  title: 'One Platform for Buyers, Sellers & Agents',
+                  desc: 'Think4BuySale is purpose-built for all real estate needs in India — buy a home, rent a flat, sell a plot, discover new residential projects, or build your real estate agency profile.',
+                },
+              ].map(({ icon, title, desc }) => (
+                <div key={title} className="flex gap-3">
+                  {icon}
+                  <div>
+                    <h3 className="text-white font-semibold text-sm mb-1">{title}</h3>
+                    <p className="text-blue-100/65 text-xs leading-relaxed">{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── CTA Card ── */}
+          <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl px-6 py-7 sm:px-10 sm:py-9 text-center">
+            <p className="text-xs font-semibold text-primary-600 uppercase tracking-widest mb-2">Get Started Today — It&apos;s Free</p>
+            <h3 className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-2">
+              Ready to Sell or Rent Your Property?
+            </h3>
+            <p className="text-gray-500 text-sm mb-6 leading-relaxed">
+              Join <strong className="text-gray-700">thousands of verified owners &amp; agents</strong> listing properties
+              on Think4BuySale. Post your property now and start receiving genuine buyer inquiries today.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                href="/post-property"
+                className="inline-flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold px-7 py-3 rounded-xl transition-all hover:shadow-lg text-sm"
+              >
+                Post Property for Free <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/properties"
+                className="inline-flex items-center justify-center gap-2 border border-gray-200 hover:border-primary-300 text-gray-700 hover:text-primary-700 font-medium px-7 py-3 rounded-xl transition-all text-sm"
+              >
+                Browse Listings
+              </Link>
+            </div>
+            <p className="mt-4 text-[11px] text-gray-400">
+              No credit card required &nbsp;·&nbsp; No brokerage &nbsp;·&nbsp; Cancel anytime
+            </p>
+          </div>
+
         </div>
       </section>
 
