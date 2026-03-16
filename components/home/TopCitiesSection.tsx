@@ -90,6 +90,7 @@ function CityCard({ city, idx }: { city: CityData; idx: number }) {
             />
           </div>
         )}
+        
 
         {/* Bottom gradient overlay for text readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
