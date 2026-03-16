@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ArrowRight, X } from 'lucide-react';
 import Link from 'next/link';
+import { ArrowRight, X } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { setSelectedCity } from '@/lib/store/slices/uiSlice';
 import { fetchCitiesByState } from '@/lib/store/slices/locationsSlice';
@@ -23,7 +23,10 @@ const CITY_GRADIENTS = [
   'from-lime-500 to-lime-700',
 ];
 
-/** Uses the count already in the city record — zero extra API calls. */
+function cityToSlug(c: { slug?: string; name: string }): string {
+  return c.slug || c.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
 function CityPropertyCount({ count }: { count?: number }) {
   if (!count) return null;
   return (
@@ -36,10 +39,10 @@ function CityPropertyCount({ count }: { count?: number }) {
 export default function HomeLocationSelector() {
   const dispatch = useAppDispatch();
 
-  const citiesByState = useAppSelector((s) => s.locations.citiesByState);
-  const selectedState = useAppSelector((s) => s.ui.selectedState);
+  const citiesByState   = useAppSelector((s) => s.locations.citiesByState);
+  const selectedState   = useAppSelector((s) => s.ui.selectedState);
   const selectedStateId = useAppSelector((s) => s.ui.selectedStateId);
-  const selectedCity = useAppSelector((s) => s.ui.selectedCity);
+  const selectedCity    = useAppSelector((s) => s.ui.selectedCity);
 
   useEffect(() => {
     if (selectedStateId && !citiesByState[selectedStateId]) {
@@ -48,14 +51,6 @@ export default function HomeLocationSelector() {
   }, [dispatch, selectedStateId, citiesByState]);
 
   const citiesForState = selectedStateId ? (citiesByState[selectedStateId] || []) : [];
-
-  const handleCitySelect = (id: string, name: string) => {
-    if (selectedCity === name) {
-      dispatch(setSelectedCity({ city: '', cityId: '' }));
-    } else {
-      dispatch(setSelectedCity({ city: name, cityId: id }));
-    }
-  };
 
   if (!selectedState || citiesForState.length === 0) return null;
 
@@ -66,12 +61,10 @@ export default function HomeLocationSelector() {
         <div className="flex items-center justify-between mb-3 sm:mb-8">
           <div>
             <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">
-              {selectedCity ? `Properties in ${selectedCity}` : `Top Cities in ${selectedState}`}
+              Top Cities in {selectedState}
             </h2>
             <p className="text-gray-500 text-sm mt-1">
-              {selectedCity
-                ? `Showing listings in ${selectedCity}, ${selectedState}`
-                : `Select a city to filter properties`}
+              Click a city to view its property listings
             </p>
           </div>
 
@@ -89,25 +82,22 @@ export default function HomeLocationSelector() {
         <div className="-mx-4 sm:mx-0">
           <div className="flex gap-4 sm:gap-6 overflow-x-auto no-scrollbar px-4 sm:px-0 snap-x snap-mandatory pb-3">
             {citiesForState.map((city: any, i: number) => {
-              const isSelected = selectedCity === city.name;
+              const slug = cityToSlug(city);
               const gradient = CITY_GRADIENTS[i % CITY_GRADIENTS.length];
               const hasImg = !!city.imageUrl;
 
               return (
-                <button
+                <Link
                   key={city.id}
-                  onClick={() => handleCitySelect(city.id, city.name)}
+                  href={`/property-in/${slug}`}
                   className="group flex-shrink-0 snap-start flex flex-col items-center gap-2 w-[76px] sm:w-[88px] focus:outline-none"
-                  aria-label={`Select ${city.name}`}
+                  aria-label={`Properties in ${city.name}`}
                 >
                   {/* Circle */}
                   <div
-                    className={`relative w-[68px] h-[68px] sm:w-[80px] sm:h-[80px] rounded-full overflow-hidden
-                      transition-all duration-300 shadow-md group-hover:shadow-lg group-hover:scale-105
-                      ${isSelected
-                        ? 'ring-3 ring-primary-500 ring-offset-2 scale-105'
-                        : 'ring-2 ring-gray-100 group-hover:ring-primary-400'
-                      }`}
+                    className="relative w-[68px] h-[68px] sm:w-[80px] sm:h-[80px] rounded-full overflow-hidden
+                      ring-2 ring-gray-100 group-hover:ring-primary-400
+                      transition-all duration-300 shadow-md group-hover:shadow-lg group-hover:scale-105"
                   >
                     {hasImg ? (
                       <OptimizedImage
@@ -131,22 +121,15 @@ export default function HomeLocationSelector() {
                     {hasImg && (
                       <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                     )}
-                    {isSelected && (
-                      <div className="absolute inset-0 bg-primary-600/20" />
-                    )}
                   </div>
 
                   {/* City name */}
-                  <span
-                    className={`text-xs sm:text-[13px] font-semibold text-center leading-tight line-clamp-1 w-full transition-colors
-                      ${isSelected ? 'text-primary-700' : 'text-gray-800'}`}
-                  >
+                  <span className="text-xs sm:text-[13px] font-semibold text-gray-800 text-center leading-tight line-clamp-1 w-full group-hover:text-primary-700 transition-colors">
                     {city.name}
                   </span>
 
-                  {/* Property count — uses data already in city record, no extra API call */}
                   <CityPropertyCount count={city.propertyCount ?? city._count?.properties} />
-                </button>
+                </Link>
               );
             })}
           </div>
@@ -155,10 +138,10 @@ export default function HomeLocationSelector() {
         {/* Browse all */}
         <div className="mt-6">
           <Link
-            href={`/properties?state=${encodeURIComponent(selectedState)}${selectedCity ? `&city=${encodeURIComponent(selectedCity)}` : ''}`}
+            href={`/properties-in/${selectedState.toLowerCase().replace(/\s+/g, '-')}`}
             className="inline-flex items-center gap-2 text-sm text-primary-600 font-medium hover:underline"
           >
-            Browse all properties in {selectedCity || selectedState}
+            Browse all properties in {selectedState}
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

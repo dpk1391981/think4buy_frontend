@@ -2,51 +2,98 @@
 
 import Link from 'next/link';
 import { Home, Users, MapPin, Search, ArrowRight } from 'lucide-react';
+import { useAppSelector } from '@/lib/store';
 
-const CARDS = [
+function toSlug(name: string) {
+  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
+const STATIC_CARDS = [
   {
-    id:      'post',
-    href:    '/post-property',
-    tag:     'FREE LISTING',
-    color:   '#1a56db',
-    icon:    <Home className="w-5 h-5 text-white" />,
-    title:   'Post Property Free',
-    stat:    '50K+ Active Listings',
-    cta:     'Post Now',
-  },
-  {
-    id:      'agents',
-    href:    '/agents',
-    tag:     'TOP AGENTS',
-    color:   '#6d28d9',
-    icon:    <Users className="w-5 h-5 text-white" />,
-    title:   'Find Top Agents',
-    stat:    '10K+ Verified Agents',
-    cta:     'Explore',
-  },
-  {
-    id:      'cities',
-    href:    '/properties',
-    tag:     'EXPLORE',
-    color:   '#065f46',
-    icon:    <MapPin className="w-5 h-5 text-white" />,
-    title:   'Top Cities',
-    stat:    '50+ Cities Covered',
-    cta:     'Browse',
-  },
-  {
-    id:      'find',
-    href:    '/find-property',
-    tag:     'FREE HELP',
-    color:   '#b45309',
-    icon:    <Search className="w-5 h-5 text-white" />,
-    title:   'Find Your Property',
-    stat:    'No Brokerage',
-    cta:     'Get Help',
+    id:    'post',
+    href:  '/post-property',
+    tag:   'FREE LISTING',
+    color: '#1a56db',
+    icon:  <Home className="w-5 h-5 text-white" />,
+    title: 'Post Property Free',
+    stat:  '50K+ Active Listings',
+    cta:   'Post Now',
   },
 ] as const;
 
 export default function PlatformStatsCards() {
+  const selectedCountry = useAppSelector(s => s.ui.selectedCountry);
+  const selectedState   = useAppSelector(s => s.ui.selectedState);
+  const selectedCity    = useAppSelector(s => s.ui.selectedCity);
+
+  // ── Cities card — href changes based on selected location ─────────────────
+  const citiesHref = selectedCity
+    ? `/property-in/${toSlug(selectedCity)}`
+    : selectedState
+    ? `/properties-in/${toSlug(selectedState)}`
+    : selectedCountry
+    ? `/property-for-sale-rent-in-${toSlug(selectedCountry)}`
+    : '/property-for-sale-rent-in-india';
+
+  const citiesStat = selectedCity
+    ? `Properties in ${selectedCity}`
+    : selectedState
+    ? `Cities in ${selectedState}`
+    : selectedCountry
+    ? `States in ${selectedCountry}`
+    : '50+ Cities Covered';
+
+  const citiesTag = selectedCity || selectedState ? 'IN YOUR AREA' : 'EXPLORE';
+
+  // ── Agents card — href changes based on selected location ─────────────────
+  const agentsHref = selectedCity
+    ? `/property-agents-in/${toSlug(selectedCity)}`
+    : selectedState
+    ? `/property-agents-in/${toSlug(selectedState)}`
+    : '/agents';
+
+  const agentsStat = selectedCity
+    ? `Agents in ${selectedCity}`
+    : selectedState
+    ? `Agents in ${selectedState}`
+    : '10K+ Verified Agents';
+
+  const agentsTag = selectedCity || selectedState ? 'LOCAL AGENTS' : 'TOP AGENTS';
+
+  const CARDS = [
+    ...STATIC_CARDS,
+    {
+      id:    'agents',
+      href:  agentsHref,
+      tag:   agentsTag,
+      color: '#6d28d9',
+      icon:  <Users className="w-5 h-5 text-white" />,
+      title: 'Find Top Agents',
+      stat:  agentsStat,
+      cta:   'Explore',
+    },
+    {
+      id:    'cities',
+      href:  citiesHref,
+      tag:   citiesTag,
+      color: '#065f46',
+      icon:  <MapPin className="w-5 h-5 text-white" />,
+      title: selectedCity ? `Properties in ${selectedCity}` : selectedState ? `Properties in ${selectedState}` : 'Top Cities',
+      stat:  citiesStat,
+      cta:   'Browse',
+    },
+    {
+      id:    'find',
+      href:  '/find-property',
+      tag:   'FREE HELP',
+      color: '#b45309',
+      icon:  <Search className="w-5 h-5 text-white" />,
+      title: 'Find Your Property',
+      stat:  'No Brokerage',
+      cta:   'Get Help',
+    },
+  ];
+
   return (
     <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
       {CARDS.map(card => (
@@ -73,12 +120,12 @@ export default function PlatformStatsCards() {
           </div>
 
           {/* Title */}
-          <p className="text-sm font-bold text-gray-900 leading-tight">
+          <p className="text-sm font-bold text-gray-900 leading-tight line-clamp-1">
             {card.title}
           </p>
 
           {/* Stat */}
-          <p className="text-[11px] text-gray-500 font-medium">{card.stat}</p>
+          <p className="text-[11px] text-gray-500 font-medium line-clamp-1">{card.stat}</p>
 
           {/* CTA */}
           <div

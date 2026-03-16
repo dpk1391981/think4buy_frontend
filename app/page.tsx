@@ -20,6 +20,7 @@ import StateExplorer from '@/components/home/StateExplorer';
 import HomeLocationSelector from '@/components/home/HomeLocationSelector';
 import PlatformStatsCards from '@/components/home/PlatformStatsCards';
 import CTAStatsText from '@/components/home/CTAStatsText';
+import TopCitiesSection from '@/components/home/TopCitiesSection';
 
 // ─── Below-the-fold: lazy-load with next/dynamic ─────────────────────────────
 // These components are large, data-heavy, or not needed for LCP.
@@ -169,6 +170,9 @@ export default function HomePage() {
           <PlatformStatsCards />
         </div>
       </section>
+
+      {/* ─── Top Cities ───────────────────────────────────────────────────── */}
+      <TopCitiesSection />
 
        {/* ─── Latest Listings / Top Categories ───────────────────────────── */}
       <TopCategories />

@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect } from 'react';
+import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { fetchStates } from '@/lib/store/slices/locationsSlice';
-import { setSelectedLocation } from '@/lib/store/slices/uiSlice';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import { useAnalytics } from '@/hooks/useAnalytics';
 
@@ -23,7 +23,10 @@ const STATE_GRADIENTS = [
   'from-amber-500 to-orange-600',
 ];
 
-/** Shows the property count already included in the state record — zero extra API calls. */
+function stateToSlug(s: { slug?: string; name: string }): string {
+  return s.slug || s.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
 function StatePropertyCount({ count }: { count?: number }) {
   if (!count) return null;
   return (
@@ -39,7 +42,6 @@ export default function StateExplorer() {
 
   const selectedCountry   = useAppSelector((s) => s.ui.selectedCountry);
   const selectedCountryId = useAppSelector((s) => s.ui.selectedCountryId);
-  const selectedState     = useAppSelector((s) => s.ui.selectedState);
   const allStates         = useAppSelector((s) => s.locations.states);
   const statesLoaded      = useAppSelector((s) => s.locations.statesLoaded);
 
@@ -49,10 +51,6 @@ export default function StateExplorer() {
     }
   }, [dispatch, statesLoaded]);
 
-  // Hide once a state has been picked
-  if (selectedState) return null;
-
-  // Filter by country if one is selected; otherwise show all
   const statesToShow = (
     selectedCountryId
       ? allStates.filter((s) => !s.countryId || s.countryId === selectedCountryId)
@@ -65,12 +63,6 @@ export default function StateExplorer() {
 
   const countryLabel = selectedCountry || 'India';
 
-  const handleStateClick = (id: string, name: string) => {
-    dispatch(setSelectedLocation({ state: name, stateId: id }));
-    trackStateView(name, countryLabel);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   return (
     <section className="py-5 sm:py-14 bg-white border-b border-gray-100">
       <div className="container-max">
@@ -81,15 +73,15 @@ export default function StateExplorer() {
               Top States in {countryLabel}
             </h2>
             <p className="text-gray-500 text-sm mt-1">
-              Tap a state to explore properties in your region
+              Tap a state to explore properties in its cities
             </p>
           </div>
-          <a
-            href={`/properties${selectedCountry ? `?country=${encodeURIComponent(selectedCountry)}` : ''}`}
+          <Link
+            href="/property-for-sale-rent-in-india"
             className="hidden sm:flex items-center gap-1.5 text-sm text-primary-600 font-medium hover:underline flex-shrink-0"
           >
-            View all <ArrowRight className="w-4 h-4" />
-          </a>
+            View all states <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
 
         {/* ── Circle scroll row ── */}
@@ -100,7 +92,7 @@ export default function StateExplorer() {
                 key={state.id}
                 state={state}
                 index={i}
-                onClick={handleStateClick}
+                onTrack={() => trackStateView(state.name, countryLabel)}
               />
             ))}
           </div>
@@ -108,12 +100,12 @@ export default function StateExplorer() {
 
         {/* Mobile view-all */}
         <div className="text-center mt-5 sm:hidden">
-          <a
-            href={`/properties${selectedCountry ? `?country=${encodeURIComponent(selectedCountry)}` : ''}`}
+          <Link
+            href="/property-for-sale-rent-in-india"
             className="inline-flex items-center gap-2 border border-primary-200 text-primary-700 text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-primary-50 transition-colors"
           >
-            All properties in {countryLabel} <ArrowRight className="w-4 h-4" />
-          </a>
+            All states in {countryLabel} <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </div>
     </section>
@@ -126,22 +118,25 @@ interface StateCircleProps {
   state: {
     id: string;
     name: string;
+    slug?: string;
     code: string;
     imageUrl?: string;
     propertyCount?: number;
     _count?: { properties?: number };
   };
   index: number;
-  onClick: (id: string, name: string) => void;
+  onTrack: () => void;
 }
 
-function StateCircle({ state, index, onClick }: StateCircleProps) {
+function StateCircle({ state, index, onTrack }: StateCircleProps) {
   const gradient = STATE_GRADIENTS[index % STATE_GRADIENTS.length];
   const hasImg = !!state.imageUrl;
+  const slug = stateToSlug(state);
 
   return (
-    <button
-      onClick={() => onClick(state.id, state.name)}
+    <Link
+      href={`/properties-in/${slug}`}
+      onClick={onTrack}
       className="group flex-shrink-0 snap-start flex flex-col items-center gap-2 w-[76px] sm:w-[88px] focus:outline-none"
       aria-label={`Explore ${state.name}`}
     >
@@ -170,7 +165,6 @@ function StateCircle({ state, index, onClick }: StateCircleProps) {
           </div>
         )}
 
-        {/* Subtle dark vignette for image readability */}
         {hasImg && (
           <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         )}
@@ -181,8 +175,7 @@ function StateCircle({ state, index, onClick }: StateCircleProps) {
         {state.name}
       </span>
 
-      {/* Property count — uses data already in the state record, no extra API call */}
       <StatePropertyCount count={state.propertyCount ?? state._count?.properties} />
-    </button>
+    </Link>
   );
 }

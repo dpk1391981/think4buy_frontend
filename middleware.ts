@@ -70,6 +70,11 @@ const SEO_PREFIXES = [
   'new-projects-in',
   'pg-in',
   'property-agents-in',
+  // State & city landing pages
+  // /properties-in-delhi     → /properties-in/delhi
+  // /property-in-mumbai      → /property-in/mumbai
+  'properties-in',
+  'property-in',
 ];
 
 // ── Middleware ────────────────────────────────────────────────────────────────

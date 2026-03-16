@@ -145,6 +145,9 @@ export const locationsApi = {
   getCitiesByState: (stateId: string) => api.get(`/locations/states/${stateId}/cities`),
   getSeoContent: (params: { city?: string; state?: string }) =>
     api.get('/locations/seo', { params }),
+  getTopCities: () => api.get('/locations/top-cities'),
+  getStateBySlug: (slug: string) => api.get(`/locations/states/by-slug/${slug}`),
+  getStatesWithStats: () => api.get('/locations/states-with-stats'),
 };
 
 // Inquiries
