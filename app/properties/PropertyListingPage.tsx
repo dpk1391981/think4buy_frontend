@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
-  SlidersHorizontal, Grid3X3, List, ChevronDown, X,
+  SlidersHorizontal, ChevronDown, X,
   MapPin, Home, Map, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import PropertyCard from '@/components/property/PropertyCard';
@@ -86,7 +86,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
 
   const [data, setData]                   = useState<PaginatedProperties | null>(null);
   const [loading, setLoading]             = useState(true);
-  const [viewMode, setViewMode]           = useState<'grid' | 'list' | 'map'>('list');
+  const [viewMode, setViewMode]           = useState<'list' | 'map'>('list');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [sortValue, setSortValue]         = useState('relevance');
   const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
@@ -227,8 +227,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
     seen.add(key);
   }
 
-  const isListView = viewMode === 'list';
-  const totalStr   = loading ? '…' : (data?.meta.total.toLocaleString('en-IN') ?? '0');
+  const totalStr = loading ? '…' : (data?.meta.total.toLocaleString('en-IN') ?? '0');
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -364,7 +363,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
         <div className={cn('flex gap-0 lg:gap-6', viewMode === 'map' && 'h-[calc(100vh-200px)]')}>
 
           {/* Desktop sidebar ─────────────────────────────────────────────── */}
-          {viewMode !== 'map' && (
+          {viewMode === 'list' && (
             <div className="hidden lg:block w-[260px] flex-shrink-0 sticky top-[125px] self-start h-[calc(100vh-133px)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent pb-4">
               <FilterPanel />
             </div>
@@ -388,7 +387,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
               </div>
 
               {/* Desktop controls */}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
                 {viewMode !== 'map' && (
                   <div className="relative">
                     <select
@@ -403,20 +402,19 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
                     <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>
                 )}
-                <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden">
-                  {(['grid', 'list', 'map'] as const).map(mode => (
-                    <button
-                      key={mode}
-                      onClick={() => setViewMode(mode)}
-                      className={cn('p-2.5 transition-colors', viewMode === mode ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}
-                      aria-label={`${mode} view`}
-                    >
-                      {mode === 'grid' && <Grid3X3 className="w-4 h-4" />}
-                      {mode === 'list' && <List className="w-4 h-4" />}
-                      {mode === 'map'  && <Map className="w-4 h-4" />}
-                    </button>
-                  ))}
-                </div>
+                {/* Map toggle only */}
+                <button
+                  onClick={() => setViewMode(v => v === 'map' ? 'list' : 'map')}
+                  className={cn(
+                    'p-2.5 border rounded-xl transition-colors',
+                    viewMode === 'map'
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50',
+                  )}
+                  aria-label="Map view"
+                >
+                  <Map className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
@@ -460,31 +458,35 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
 
             ) : loading ? (
               /* ── Skeleton ───────────────────────────────────────────── */
-              <div className={cn(isListView && 'sm:space-y-3')}>
-                <PropertyGridSkeleton count={6} listView={isListView} />
-              </div>
+              <>
+                <div className="hidden sm:block space-y-3">
+                  <PropertyGridSkeleton count={6} listView={true} />
+                </div>
+                <div className="sm:hidden flex flex-col gap-3 px-3">
+                  <PropertyGridSkeleton count={6} listView={false} />
+                </div>
+              </>
 
             ) : data?.data.length ? (
               <>
-                {/* ── Property list ──────────────────────────────────── */}
-                {isListView ? (
-                  <div className="divide-y divide-gray-100 sm:divide-y-0 sm:space-y-3">
-                    {data.data.map((property: Property) => (
-                      <PropertyCard
-                        key={property.id}
-                        property={property}
-                        listView
-                        className="sm:rounded-xl rounded-none shadow-none sm:shadow-sm border-x-0 sm:border-x border-t-0 sm:border-t"
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 px-4 sm:px-0">
-                    {data.data.map((property: Property) => (
-                      <PropertyCard key={property.id} property={property} />
-                    ))}
-                  </div>
-                )}
+                {/* Desktop: list view */}
+                <div className="hidden sm:block space-y-3">
+                  {data.data.map((property: Property) => (
+                    <PropertyCard
+                      key={property.id}
+                      property={property}
+                      listView
+                      className="rounded-xl shadow-sm"
+                    />
+                  ))}
+                </div>
+
+                {/* Mobile: single column like 99acres */}
+                <div className="sm:hidden flex flex-col gap-3 px-3 pb-3">
+                  {data.data.map((property: Property) => (
+                    <PropertyCard key={property.id} property={property} />
+                  ))}
+                </div>
 
                 {/* ── Pagination ─────────────────────────────────────── */}
                 {data.meta.totalPages > 1 && (

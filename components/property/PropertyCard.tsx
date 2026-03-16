@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import {
   BedDouble, Bath, Maximize2, MapPin, CheckCircle, Heart, Zap,
-  Camera, Phone, MessageCircle, Mail, Eye, Calendar, Building2,
-  Star, TrendingDown, Shield, Car, Layers, Compass, Home, Clock,
-  Award, ChevronRight,
+  Camera, Phone, MessageCircle, Mail, Eye, Building2,
+  Star, TrendingDown, Shield, Car, Award, Clock,
+  ChevronLeft, ChevronRight, Layers,
 } from 'lucide-react';
 import { Property } from '@/types/property';
 import {
@@ -40,138 +40,240 @@ const PLAN_BADGE: Record<string, { label: string; cls: string }> = {
   premium:  { label: 'Premium',  cls: 'bg-violet-600 text-white' },
 };
 
-function getHighlights(property: Property): { label: string; icon: React.ElementType; color: string }[] {
+function getImageUrls(images: any[], fallback: string): string[] {
+  if (!images?.length) return fallback ? [fallback] : [];
+  const urls = images
+    .map((img: any) =>
+      typeof img === 'string' ? img : (img?.url || img?.src || img?.path || img?.imageUrl || ''),
+    )
+    .filter(Boolean);
+  return urls.length ? urls : (fallback ? [fallback] : []);
+}
+
+function getHighlights(property: Property) {
   const chips: { label: string; icon: React.ElementType; color: string }[] = [];
-  if (property.possessionStatus === 'ready_to_move') {
+  if (property.possessionStatus === 'ready_to_move')
     chips.push({ label: 'Ready to Move', icon: CheckCircle, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' });
-  } else if (property.possessionStatus === 'under_construction') {
+  else if (property.possessionStatus === 'under_construction')
     chips.push({ label: 'Under Construction', icon: Building2, color: 'text-orange-600 bg-orange-50 border-orange-200' });
-  }
-  if (property.reraNumber) {
-    chips.push({ label: 'RERA Certified', icon: Shield, color: 'text-blue-600 bg-blue-50 border-blue-200' });
-  }
-  if (property.parkingSpots && property.parkingSpots > 0) {
+  if (property.reraNumber)
+    chips.push({ label: 'RERA', icon: Shield, color: 'text-blue-600 bg-blue-50 border-blue-200' });
+  if (property.parkingSpots && property.parkingSpots > 0)
     chips.push({ label: `${property.parkingSpots} Parking`, icon: Car, color: 'text-gray-600 bg-gray-50 border-gray-200' });
-  }
-  if (property.isNewProject) {
+  if (property.isNewProject)
     chips.push({ label: 'New Project', icon: Star, color: 'text-purple-600 bg-purple-50 border-purple-200' });
-  }
-  if (property.society) {
+  if (property.society)
     chips.push({ label: 'Gated Society', icon: Award, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' });
-  }
   return chips.slice(0, 4);
 }
 
+// ── Auto-cycling Image Carousel ────────────────────────────────────────────────
+
+interface CarouselProps {
+  urls: string[];
+  title: string;
+  sizes: string;
+}
+
+function ImageCarousel({ urls, title, sizes }: CarouselProps) {
+  const [idx, setIdx] = useState(0);
+  const [hovered, setHovered] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (urls.length <= 1 || hovered) return;
+    timerRef.current = setInterval(
+      () => setIdx(i => (i + 1) % urls.length),
+      3500,
+    );
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [urls.length, hovered]);
+
+  const go = (e: React.MouseEvent, dir: 1 | -1) => {
+    e.preventDefault(); e.stopPropagation();
+    setIdx(i => (i + dir + urls.length) % urls.length);
+  };
+  const gotoDot = (e: React.MouseEvent, i: number) => {
+    e.preventDefault(); e.stopPropagation(); setIdx(i);
+  };
+
+  if (!urls.length) return null;
+
+  return (
+    <div
+      className="relative w-full h-full overflow-hidden bg-gray-200"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Slides */}
+      {urls.map((url, i) => (
+        <div
+          key={i}
+          className={cn(
+            'absolute inset-0 transition-opacity duration-500',
+            i === idx ? 'opacity-100 z-[1]' : 'opacity-0 z-0',
+          )}
+        >
+          <OptimizedImage
+            src={url}
+            alt={i === 0 ? title : `${title} photo ${i + 1}`}
+            fill
+            className="object-cover"
+            sizes={sizes}
+          />
+        </div>
+      ))}
+
+      {/* Prev / Next arrows — on hover, desktop */}
+      {urls.length > 1 && hovered && (
+        <>
+          <button
+            onClick={e => go(e, -1)}
+            className="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center shadow transition-all"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={e => go(e, 1)}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center shadow transition-all"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </>
+      )}
+
+      {/* Dot indicators */}
+      {urls.length > 1 && (
+        <div className="absolute bottom-2 left-0 right-0 z-10 flex items-center justify-center gap-1">
+          {urls.slice(0, 6).map((_, i) => (
+            <button
+              key={i}
+              onClick={e => gotoDot(e, i)}
+              className={cn(
+                'rounded-full transition-all duration-300',
+                i === idx ? 'w-4 h-1.5 bg-white' : 'w-1.5 h-1.5 bg-white/55 hover:bg-white/80',
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── PropertyCard ──────────────────────────────────────────────────────────────
+
 export default function PropertyCard({ property, className, listView }: PropertyCardProps) {
   const { isSaved, toggle } = useWishlist();
-  const { user } = useAuth();
-  const dispatch = useAppDispatch();
+  const { user }            = useAuth();
+  const dispatch            = useAppDispatch();
   const { trackPropertyClick, trackPropertySave } = useAnalytics();
   const [showPhone, setShowPhone] = useState(false);
 
   const primaryImage = getPrimaryImage(property.images);
-  const saved = isSaved(property.id);
-  const plan = property.listingPlan && PLAN_BADGE[property.listingPlan];
+  const imageUrls    = getImageUrls(property.images, primaryImage);
+  const saved        = isSaved(property.id);
+  const plan         = property.listingPlan && PLAN_BADGE[property.listingPlan];
   const pricePerSqft =
     property.area && property.price && property.priceUnit !== 'per month'
-      ? Math.round(property.price / property.area)
-      : null;
-  const isAgent = property.owner?.role === 'agent';
+      ? Math.round(property.price / property.area) : null;
+  const isAgent   = property.owner?.role === 'agent';
   const ownerName = isAgent
     ? property.owner?.company || property.owner?.name
     : property.owner?.name;
   const highlights = getHighlights(property);
+  const phone      = property.owner?.phone;
+  const whatsappMsg = encodeURIComponent(
+    `Hi, I'm interested in "${property.title}" in ${property.locality || ''}, ${property.city || ''}. Please share more details.`,
+  );
+  const whatsappUrl = phone
+    ? `https://wa.me/91${phone.replace(/\D/g, '')}?text=${whatsappMsg}`
+    : `/properties/${property.slug}`;
 
-  const handleCardClick = () => {
+  const handleCardClick = () =>
     trackPropertyClick(property.id, {
-      city:  property.city  || undefined,
-      state: property.state || undefined,
+      city: property.city || undefined, state: property.state || undefined,
       metadata: { propertyType: property.type },
     });
-  };
 
   const handleWishlist = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!user) {
-      dispatch(openAuthModal({ mode: 'login', reason: 'wishlist' }));
-      return;
-    }
+    e.preventDefault(); e.stopPropagation();
+    if (!user) { dispatch(openAuthModal({ mode: 'login', reason: 'wishlist' })); return; }
     toggle(property.id);
-    if (!saved) {
-      trackPropertySave(property.id, {
-        city:  property.city  || undefined,
-        state: property.state || undefined,
-      });
-    }
+    if (!saved)
+      trackPropertySave(property.id, { city: property.city || undefined, state: property.state || undefined });
   };
 
-  // ── Rich List View ──────────────────────────────────────────────────────────────
-  if (listView) {
-    const phone = property.owner?.phone;
-    const whatsappMsg = encodeURIComponent(`Hi, I'm interested in ${property.title} in ${property.locality}, ${property.city}. Please share more details.`);
-    const whatsappUrl = phone ? `https://wa.me/91${phone.replace(/\D/g, '')}?text=${whatsappMsg}` : `/properties/${property.slug}`;
+  const handleRevealPhone = (e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    if (!user) { dispatch(openAuthModal({ mode: 'login', reason: 'contact' })); return; }
+    setShowPhone(true);
+  };
 
+  const handleWAClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user && phone) { e.preventDefault(); dispatch(openAuthModal({ mode: 'login', reason: 'contact' })); }
+  };
+
+  // ── LIST VIEW (desktop) ───────────────────────────────────────────────────
+
+  if (listView) {
     return (
-      <article
-        className={cn(
-          'bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-primary-200 transition-all duration-200 overflow-hidden group',
-          property.isBoosted && 'ring-1 ring-purple-200 border-purple-100',
-          plan?.label === 'Featured' && !property.isBoosted && 'ring-1 ring-amber-200 border-amber-100',
-          className,
-        )}
-      >
-        <div className="flex">
+      <article className={cn(
+        'bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-primary-200 transition-all duration-200 group',
+        property.isBoosted && 'ring-1 ring-purple-200',
+        plan?.label === 'Featured' && !property.isBoosted && 'ring-1 ring-amber-200',
+        className,
+      )}>
+        <div className="flex" style={{ minHeight: '176px' }}>
 
           {/* ── IMAGE ─────────────────────────────────── */}
-          <div className="relative sm:w-44 lg:w-52 w-32 flex-shrink-0">
-            <Link href={`/properties/${property.slug}`} onClick={handleCardClick} className="block relative h-full overflow-hidden" style={{ minHeight: '130px' }}>
-              <OptimizedImage
-                src={primaryImage}
-                alt={property.title}
-                fill
-                className="object-cover group-hover:scale-105 transition-transform duration-500"
-                sizes="(max-width:640px) 128px, (max-width:1024px) 176px, 208px"
+          <div className="relative w-[190px] sm:w-[230px] lg:w-[270px] flex-shrink-0">
+            <Link href={`/properties/${property.slug}`} onClick={handleCardClick} className="block absolute inset-0">
+              <ImageCarousel
+                urls={imageUrls}
+                title={property.title}
+                sizes="(max-width:640px) 190px, (max-width:1024px) 230px, 270px"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
 
-              {/* Badges */}
-              <div className="absolute top-2 left-2 flex flex-col gap-1">
-                <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide', CATEGORY_BADGE[property.category] || CATEGORY_BADGE.buy)}>
+              {/* Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none z-[2]" />
+
+              {/* Top: category + plan badges */}
+              <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-[3]">
+                <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide shadow-sm', CATEGORY_BADGE[property.category] || CATEGORY_BADGE.buy)}>
                   {getCategoryLabel(property.category)}
                 </span>
                 {property.isBoosted ? (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 bg-purple-600 text-white">
-                    <Zap className="w-2.5 h-2.5" />Boosted
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 bg-purple-600 text-white shadow-sm">
+                    <Zap className="w-2.5 h-2.5" /> Boosted
                   </span>
                 ) : plan && (
-                  <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full', plan.cls)}>
+                  <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm', plan.cls)}>
                     {plan.label}
                   </span>
                 )}
               </div>
 
               {/* Wishlist */}
-              <button
-                onClick={handleWishlist}
-                className={cn(
-                  'absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center shadow transition-all',
-                  saved ? 'bg-red-500' : 'bg-white/90 hover:bg-white',
-                )}
-              >
-                <Heart className={cn('w-3 h-3', saved ? 'fill-white text-white' : 'text-gray-600')} />
+              <button onClick={handleWishlist} className={cn(
+                'absolute top-2.5 right-2.5 w-7 h-7 rounded-full flex items-center justify-center shadow z-[3] transition-all',
+                saved ? 'bg-red-500' : 'bg-white/90 hover:bg-white',
+              )}>
+                <Heart className={cn('w-3.5 h-3.5', saved ? 'fill-white text-white' : 'text-gray-500')} />
               </button>
 
-              {/* Bottom row */}
-              <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+              {/* Bottom: verified + photo count */}
+              <div className="absolute bottom-8 left-2.5 right-2.5 flex items-center justify-between z-[3]">
                 {property.isVerified && (
-                  <span className="flex items-center gap-0.5 bg-emerald-500/90 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
+                  <span className="flex items-center gap-0.5 bg-emerald-500/90 backdrop-blur-sm text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
                     <CheckCircle className="w-2.5 h-2.5" /> Verified
                   </span>
                 )}
-                {property.images?.length > 1 && (
-                  <span className="ml-auto flex items-center gap-0.5 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                    <Camera className="w-2.5 h-2.5" />{property.images.length}
+                {imageUrls.length > 1 && (
+                  <span className="ml-auto flex items-center gap-0.5 bg-black/60 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                    <Camera className="w-2.5 h-2.5" /> {imageUrls.length}
                   </span>
                 )}
               </div>
@@ -182,328 +284,383 @@ export default function PropertyCard({ property, className, listView }: Property
           <Link
             href={`/properties/${property.slug}`}
             onClick={handleCardClick}
-            className="flex-1 px-3 py-2.5 flex flex-col justify-between min-w-0 overflow-hidden"
+            className="flex-1 px-4 py-3.5 flex flex-col justify-between min-w-0 overflow-hidden"
           >
-            {/* Top: price + title */}
-            <div>
-              {/* Price row */}
-              <div className="flex items-start justify-between gap-1 mb-0.5">
-                <p className="text-base font-black text-gray-900 leading-tight">
-                  {formatPrice(property.price, property.priceUnit)}
-                </p>
-                <span className="text-[10px] text-gray-400 flex items-center gap-0.5 flex-shrink-0 mt-0.5">
-                  <Clock className="w-2.5 h-2.5" />
-                  {timeAgo(property.createdAt)}
+            <div className="space-y-1.5">
+
+              {/* Price + time ago */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="text-lg sm:text-xl font-black text-gray-900 leading-tight">
+                    {formatPrice(property.price, property.priceUnit)}
+                  </span>
+                  {pricePerSqft && (
+                    <span className="text-xs text-gray-400 font-medium">
+                      ₹{pricePerSqft.toLocaleString('en-IN')}/sqft
+                    </span>
+                  )}
+                  {property.brokerage === '0' && (
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full">
+                      <TrendingDown className="w-2.5 h-2.5" /> Zero Brokerage
+                    </span>
+                  )}
+                </div>
+                <span className="flex items-center gap-1 text-[11px] text-gray-400 flex-shrink-0 mt-0.5">
+                  <Clock className="w-3 h-3" />{timeAgo(property.createdAt)}
                 </span>
               </div>
-              {pricePerSqft && (
-                <p className="text-[10px] text-gray-400 -mt-0.5 mb-1">₹{pricePerSqft.toLocaleString('en-IN')}/sqft</p>
-              )}
 
               {/* Title */}
-              <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-1 group-hover:text-primary-600 transition-colors mb-1">
+              <h2 className="text-sm font-bold text-gray-900 line-clamp-1 group-hover:text-primary-600 transition-colors">
                 {property.title}
-              </h3>
+              </h2>
 
               {/* Location */}
-              <div className="flex items-center gap-1 text-gray-500 text-xs mb-1.5">
-                <MapPin className="w-3 h-3 flex-shrink-0 text-primary-400" />
+              <p className="flex items-center gap-1 text-xs text-gray-500">
+                <MapPin className="w-3 h-3 text-primary-400 flex-shrink-0" />
                 <span className="line-clamp-1">
-                  {[property.society, property.locality, property.city].filter(Boolean).join(', ')}
+                  {[property.society, property.locality, property.city, property.state].filter(Boolean).join(', ')}
                 </span>
-              </div>
+              </p>
 
-              {/* Specs: BHK · Bath · Area · Floor */}
-              <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-xs text-gray-600 mb-1.5">
+              {/* Specs */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-600">
                 {property.bedrooms && (
-                  <span className="flex items-center gap-1">
-                    <BedDouble className="w-3 h-3 text-gray-400" />
-                    <span className="font-semibold">{property.bedrooms} BHK</span>
+                  <span className="flex items-center gap-1 font-semibold">
+                    <BedDouble className="w-3.5 h-3.5 text-gray-400" />{property.bedrooms} BHK
                   </span>
                 )}
                 {property.bathrooms && (
-                  <span className="flex items-center gap-1 text-gray-400">·
-                    <Bath className="w-3 h-3 text-gray-400" />
-                    {property.bathrooms}
+                  <span className="flex items-center gap-1 text-gray-500">
+                    <Bath className="w-3.5 h-3.5 text-gray-400" />{property.bathrooms} Bath
                   </span>
                 )}
                 {property.area && (
-                  <span className="flex items-center gap-1 text-gray-400">·
-                    <Maximize2 className="w-3 h-3 text-gray-400" />
-                    {formatArea(property.area, property.areaUnit)}
+                  <span className="flex items-center gap-1 text-gray-500">
+                    <Maximize2 className="w-3.5 h-3.5 text-gray-400" />{formatArea(property.area, property.areaUnit)}
                   </span>
                 )}
                 {property.floorNumber != null && (
-                  <span className="flex items-center gap-1 text-gray-400">·
-                    <Layers className="w-3 h-3 text-gray-400" />
-                    Fl {property.floorNumber}{property.totalFloors ? `/${property.totalFloors}` : ''}
+                  <span className="flex items-center gap-1 text-gray-400">
+                    <Layers className="w-3.5 h-3.5" />Floor {property.floorNumber}
+                    {property.totalFloors ? `/${property.totalFloors}` : ''}
                   </span>
                 )}
                 {property.furnishingStatus && (
-                  <span className="flex items-center gap-1 text-gray-400">·
-                    <span className="text-gray-500">{getFurnishingLabel(property.furnishingStatus)}</span>
-                  </span>
+                  <span className="text-gray-400">{getFurnishingLabel(property.furnishingStatus)}</span>
                 )}
               </div>
 
-              {/* Tags row: type + highlights (max 2) */}
-              <div className="flex flex-wrap items-center gap-1">
+              {/* Highlight tags */}
+              <div className="flex flex-wrap gap-1">
                 <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md font-medium">
                   {getPropertyTypeLabel(property.type)}
                 </span>
-                {property.reraNumber && (
-                  <span className="text-[11px] flex items-center gap-0.5 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md font-semibold">
-                    <Shield className="w-2.5 h-2.5" />RERA
-                  </span>
-                )}
-                {highlights.slice(0, 2).map((h, i) => {
+                {highlights.map((h, i) => {
                   const Icon = h.icon;
                   return (
-                    <span key={i} className={cn('hidden sm:flex text-[11px] items-center gap-0.5 px-2 py-0.5 rounded-md border font-medium', h.color)}>
+                    <span key={i} className={cn('text-[11px] flex items-center gap-0.5 px-2 py-0.5 rounded-md border font-medium', h.color)}>
                       <Icon className="w-2.5 h-2.5" />{h.label}
                     </span>
                   );
                 })}
               </div>
+
+              {/* Description snippet */}
+              {property.description && (
+                <p className="hidden sm:block text-xs text-gray-400 line-clamp-1 leading-relaxed">
+                  {property.description}
+                </p>
+              )}
             </div>
 
-            {/* Bottom: agent row */}
-            <div className="flex items-center justify-between pt-2 mt-1.5 border-t border-gray-50">
-              <div className="flex items-center gap-1.5 min-w-0">
+            {/* Owner row */}
+            <div className="flex items-center justify-between pt-2 mt-1.5 border-t border-gray-100">
+              <div className="flex items-center gap-2 min-w-0">
                 <div className={cn(
-                  'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0',
-                  isAgent ? 'bg-blue-500' : 'bg-gray-400',
+                  'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0',
+                  isAgent ? 'bg-blue-500' : 'bg-primary-500',
                 )}>
                   {ownerName?.[0]?.toUpperCase() || 'U'}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-gray-700 truncate max-w-[100px]">{ownerName}</p>
-                  <p className="text-[10px] text-gray-400">{isAgent ? 'Agent' : 'Owner'}</p>
+                  <p className="text-xs font-semibold text-gray-800 truncate max-w-[130px] flex items-center gap-1">
+                    {ownerName}
+                    {property.owner?.isVerified && (
+                      <CheckCircle className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                    )}
+                  </p>
+                  <p className="text-[10px] text-gray-400">{isAgent ? 'Real Estate Agent' : 'Owner'}</p>
                 </div>
-                {property.owner?.isVerified && (
-                  <CheckCircle className="w-3 h-3 text-emerald-500 flex-shrink-0" />
-                )}
               </div>
               {property.viewCount > 0 && (
-                <span className="hidden sm:flex items-center gap-0.5 text-[10px] text-gray-400">
+                <span className="hidden sm:flex items-center gap-1 text-[11px] text-gray-400">
                   <Eye className="w-3 h-3" />
-                  {property.viewCount >= 1000 ? `${(property.viewCount/1000).toFixed(1)}k` : property.viewCount}
+                  {property.viewCount >= 1000
+                    ? `${(property.viewCount / 1000).toFixed(1)}k` : property.viewCount} views
                 </span>
               )}
             </div>
+
           </Link>
 
-          {/* ── RIGHT CTA — desktop only ─────────────── */}
-          <div className="hidden sm:flex flex-col items-center justify-center gap-2 px-3 py-3 border-l border-gray-100 w-32 flex-shrink-0">
-            {property.brokerage === '0' && (
-              <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full flex items-center gap-0.5 w-full justify-center">
-                <TrendingDown className="w-2.5 h-2.5" />Zero Brokerage
-              </span>
-            )}
-            <Link
-              href={`/properties/${property.slug}`}
-              onClick={handleCardClick}
-              className="flex items-center justify-center gap-1 w-full py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-lg transition-all active:scale-[0.97] shadow-sm"
-            >
-              <Mail className="w-3 h-3" /> Contact
-            </Link>
-            {showPhone && phone ? (
-              <a
-                href={`tel:${phone}`}
-                className="flex items-center justify-center gap-1 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-all active:scale-[0.97]"
-                onClick={e => e.stopPropagation()}
-              >
-                <Phone className="w-3 h-3" />{phone.slice(-10)}
-              </a>
-            ) : (
-              <button
-                onClick={e => {
-                  e.preventDefault();
-                  if (!user) { dispatch(openAuthModal({ mode: 'login', reason: 'contact' })); return; }
-                  setShowPhone(true);
-                }}
-                className="flex items-center justify-center gap-1 w-full py-2 border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold rounded-lg transition-all active:scale-[0.97]"
-              >
-                <Phone className="w-3 h-3" /> Call
-              </button>
-            )}
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={e => {
-                e.stopPropagation();
-                if (!user && phone) { e.preventDefault(); dispatch(openAuthModal({ mode: 'login', reason: 'contact' })); }
-              }}
-              className="flex items-center justify-center gap-1 w-full py-2 border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 text-xs font-bold rounded-lg transition-all active:scale-[0.97]"
-            >
-              <MessageCircle className="w-3 h-3" /> WhatsApp
-            </a>
-          </div>
-        </div>
+          {/* ── RIGHT CONTACT PANEL — desktop only ──── */}
+          <div className="hidden sm:flex flex-col w-[176px] flex-shrink-0 border-l border-gray-100">
 
-        {/* ── MOBILE BOTTOM ─────────────────────────── */}
-        <div className="sm:hidden flex items-center gap-2 px-3 pb-3 pt-0">
-          <div className="flex-1">
-            <span className="text-sm font-black text-gray-900">{formatPrice(property.price, property.priceUnit)}</span>
-            {pricePerSqft && <span className="text-[10px] text-gray-400 ml-1">₹{pricePerSqft.toLocaleString('en-IN')}/sqft</span>}
-          </div>
-          <div className="flex items-center gap-1.5">
-            {showPhone && phone ? (
-              <a href={`tel:${phone}`} onClick={e => e.stopPropagation()} className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg">
-                <Phone className="w-3 h-3" />Call
-              </a>
-            ) : (
-              <button
-                onClick={e => { e.preventDefault(); if (!user) { dispatch(openAuthModal({ mode: 'login', reason: 'contact' })); return; } setShowPhone(true); }}
-                className="flex items-center gap-1 px-3 py-1.5 border border-emerald-300 text-emerald-700 text-xs font-bold rounded-lg"
+            {/* Posted by header */}
+            <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Posted by</p>
+              <div className="flex items-center gap-2.5">
+                <div className={cn(
+                  'w-9 h-9 rounded-full flex items-center justify-center text-sm font-black text-white flex-shrink-0 shadow-sm',
+                  isAgent
+                    ? 'bg-gradient-to-br from-blue-400 to-blue-600'
+                    : 'bg-gradient-to-br from-primary-400 to-primary-600',
+                )}>
+                  {ownerName?.[0]?.toUpperCase() || 'U'}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-gray-900 truncate flex items-center gap-1 leading-tight">
+                    <span className="truncate">{ownerName}</span>
+                    {property.owner?.isVerified && (
+                      <CheckCircle className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                    )}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    {isAgent ? 'Registered Agent' : 'Property Owner'}
+                  </p>
+                  {property.brokerage === '0' && (
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full mt-1">
+                      <TrendingDown className="w-2 h-2" /> Zero Brokerage
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* CTA buttons */}
+            <div className="px-4 py-3 flex flex-col gap-2">
+              <Link
+                href={`/properties/${property.slug}`}
+                onClick={handleCardClick}
+                className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95"
               >
-                <Phone className="w-3 h-3" />Call
-              </button>
-            )}
-            <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" onClick={e => { e.stopPropagation(); if (!user && phone) { e.preventDefault(); dispatch(openAuthModal({ mode: 'login', reason: 'contact' })); } }} className="flex items-center gap-1 px-3 py-1.5 border border-green-300 text-green-700 text-xs font-bold rounded-lg">
-              <MessageCircle className="w-3 h-3" />WA
-            </a>
-            <Link href={`/properties/${property.slug}`} onClick={handleCardClick} className="flex items-center gap-1 px-3 py-1.5 bg-primary-600 text-white text-xs font-bold rounded-lg">
-              <Mail className="w-3 h-3" />Contact
-            </Link>
+                <Mail className="w-3.5 h-3.5" /> Contact Owner
+              </Link>
+
+              {showPhone && phone ? (
+                <a
+                  href={`tel:${phone}`}
+                  onClick={e => e.stopPropagation()}
+                  className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-all active:scale-95"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  {phone.replace(/(\d{5})(\d{5})/, '$1 $2')}
+                </a>
+              ) : (
+                <button
+                  onClick={handleRevealPhone}
+                  className="flex items-center justify-center gap-1.5 w-full py-2.5 border border-emerald-400 text-emerald-700 hover:bg-emerald-50 bg-emerald-50/50 text-xs font-bold rounded-xl transition-all active:scale-95"
+                >
+                  <Phone className="w-3.5 h-3.5" /> View Phone No.
+                </button>
+              )}
+
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleWAClick}
+                className="flex items-center justify-center gap-1.5 w-full py-2.5 border border-green-400 text-green-700 hover:bg-green-50 bg-green-50/50 text-xs font-bold rounded-xl transition-all active:scale-95"
+              >
+                <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+              </a>
+            </div>
+
           </div>
+
         </div>
       </article>
     );
   }
 
-  // ── Grid view ─────────────────────────────────────────────────────────────────
+  // ── GRID VIEW — full width single column (99acres mobile style) ─────────
+
   return (
-    <article className={cn('bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden group cursor-pointer', className)}>
-      <Link href={`/properties/${property.slug}`} className="block" onClick={handleCardClick}>
-        {/* Image */}
-        <div className="relative overflow-hidden" style={{ aspectRatio: '16/10' }}>
-          <OptimizedImage
-            src={primaryImage}
-            alt={property.title}
-            fill
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          />
+    <article className={cn(
+      'bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden group',
+      property.isBoosted && 'ring-1 ring-purple-200',
+      plan?.label === 'Featured' && !property.isBoosted && 'ring-1 ring-amber-200',
+      className,
+    )}>
 
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+      {/* ── Image ── */}
+      <div className="relative overflow-hidden" style={{ aspectRatio: '16/9' }}>
+        <Link href={`/properties/${property.slug}`} onClick={handleCardClick} className="block absolute inset-0">
+          <ImageCarousel urls={imageUrls} title={property.title} sizes="100vw" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent pointer-events-none z-[2]" />
 
-          {/* Top badges */}
-          <div className="absolute top-3 left-3 flex gap-1.5">
-            <span className={cn('text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide', CATEGORY_BADGE[property.category] || CATEGORY_BADGE.buy)}>
+          {/* Top row: category + plan + wishlist */}
+          <div className="absolute top-3 left-3 flex gap-1.5 z-[3]">
+            <span className={cn('text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide shadow', CATEGORY_BADGE[property.category] || CATEGORY_BADGE.buy)}>
               {getCategoryLabel(property.category)}
             </span>
             {property.isBoosted ? (
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 bg-purple-600 text-white">
-                <Zap className="w-2.5 h-2.5" />Boosted
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 bg-purple-600 text-white shadow">
+                <Zap className="w-3 h-3" /> Boosted
               </span>
             ) : plan && (
-              <span className={cn('text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1', plan.cls)}>
-                <Zap className="w-2.5 h-2.5" />{plan.label}
+              <span className={cn('text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow', plan.cls)}>
+                {plan.label}
               </span>
             )}
           </div>
-
-          {/* Wishlist */}
-          <button
-            className={cn(
-              'absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all',
-              saved ? 'bg-red-500 scale-110' : 'bg-white/90 hover:bg-white hover:scale-110',
-            )}
-            aria-label={saved ? 'Remove from wishlist' : 'Save'}
-            onClick={handleWishlist}
-          >
+          <button onClick={handleWishlist}
+            className={cn('absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center shadow z-[3]', saved ? 'bg-red-500' : 'bg-white/90')}>
             <Heart className={cn('w-4 h-4', saved ? 'fill-white text-white' : 'text-gray-500')} />
           </button>
 
           {/* Bottom row: verified + photo count */}
-          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-            {property.isVerified ? (
-              <span className="flex items-center gap-1 bg-emerald-500/90 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between z-[3]">
+            {property.isVerified && (
+              <span className="flex items-center gap-1 bg-emerald-500/90 backdrop-blur-sm text-white text-xs font-semibold px-2 py-0.5 rounded-full">
                 <CheckCircle className="w-3 h-3" /> Verified
               </span>
-            ) : <span />}
-            {property.images?.length > 1 && (
-              <span className="flex items-center gap-1 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
-                <Camera className="w-3 h-3" />{property.images.length}
+            )}
+            {imageUrls.length > 1 && (
+              <span className="ml-auto flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-0.5 rounded-full">
+                <Camera className="w-3 h-3" /> {imageUrls.length} Photos
               </span>
             )}
           </div>
+        </Link>
+      </div>
+
+      {/* ── Content ── */}
+      <Link href={`/properties/${property.slug}`} onClick={handleCardClick} className="block px-4 pt-3 pb-2">
+
+        {/* Price row */}
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <div>
+            <span className="text-xl font-black text-gray-900 leading-tight">
+              {formatPrice(property.price, property.priceUnit)}
+            </span>
+            {pricePerSqft && (
+              <span className="ml-2 text-xs text-gray-400 font-medium">
+                ₹{pricePerSqft.toLocaleString('en-IN')}/sqft
+              </span>
+            )}
+          </div>
+          <span className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0 mt-1">
+            <Clock className="w-3 h-3" />{timeAgo(property.createdAt)}
+          </span>
         </div>
 
-        {/* Content */}
-        <div className="p-4">
-          {/* Price */}
-          <div className="flex items-start justify-between mb-1.5">
-            <div>
-              <p className="text-xl font-bold text-gray-900 leading-tight">
-                {formatPrice(property.price, property.priceUnit)}
-              </p>
-              {pricePerSqft && (
-                <p className="text-xs text-gray-400 mt-0.5">₹{pricePerSqft.toLocaleString('en-IN')}/sqft</p>
-              )}
-            </div>
-            {property.isFeatured && !plan && (
-              <Zap className="w-4 h-4 text-amber-400 fill-amber-300 flex-shrink-0 mt-1" />
-            )}
-          </div>
+        {/* Zero brokerage */}
+        {property.brokerage === '0' && (
+          <span className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full mb-1.5">
+            <TrendingDown className="w-3 h-3" /> Zero Brokerage
+          </span>
+        )}
 
-          {/* Title */}
-          <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mb-1.5 group-hover:text-primary-600 transition-colors">
-            {property.title}
-          </h3>
+        {/* Title */}
+        <h2 className="text-sm font-bold text-gray-900 line-clamp-2 leading-snug group-hover:text-primary-600 transition-colors mb-1.5">
+          {property.title}
+        </h2>
 
-          {/* Location */}
-          <div className="flex items-center gap-1 text-gray-500 text-xs mb-3">
-            <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" />
-            <span className="line-clamp-1">{property.locality}, {property.city}</span>
-          </div>
+        {/* Location */}
+        <p className="flex items-center gap-1 text-sm text-gray-500 mb-2">
+          <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-primary-400" />
+          <span className="line-clamp-1">{[property.society, property.locality, property.city].filter(Boolean).join(', ')}</span>
+        </p>
 
-          {/* Specs divider row */}
-          {(property.bedrooms || property.bathrooms || property.area) && (
-            <div className="flex items-center py-2.5 border-y border-gray-100 mb-3">
-              {property.bedrooms && (
-                <div className="flex-1 flex items-center justify-center gap-1 text-xs text-gray-600 border-r border-gray-100">
-                  <BedDouble className="w-3.5 h-3.5 text-gray-400" />
-                  <span>{property.bedrooms} BHK</span>
-                </div>
-              )}
-              {property.bathrooms && (
-                <div className="flex-1 flex items-center justify-center gap-1 text-xs text-gray-600 border-r border-gray-100 last:border-r-0">
-                  <Bath className="w-3.5 h-3.5 text-gray-400" />
-                  <span>{property.bathrooms}</span>
-                </div>
-              )}
-              {property.area && (
-                <div className="flex-1 flex items-center justify-center gap-1 text-xs text-gray-600">
-                  <Maximize2 className="w-3.5 h-3.5 text-gray-400" />
-                  <span>{formatArea(property.area, property.areaUnit)}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Footer */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0', isAgent ? 'bg-blue-500' : 'bg-gray-400')}>
-                {ownerName?.[0]?.toUpperCase() || 'U'}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-gray-700 line-clamp-1">{ownerName}</p>
-                <p className="text-[10px] text-gray-400">{isAgent ? 'Agent' : 'Owner'} · {timeAgo(property.createdAt)}</p>
-              </div>
-            </div>
-            {property.furnishingStatus && (
-              <span className="bg-gray-100 text-gray-500 text-[11px] px-2 py-0.5 rounded-full flex-shrink-0">
-                {getFurnishingLabel(property.furnishingStatus)}
+        {/* Specs */}
+        {(property.bedrooms || property.bathrooms || property.area) && (
+          <div className="flex items-center gap-3 py-2.5 border-y border-gray-100 mb-2 text-sm text-gray-600">
+            {property.bedrooms && (
+              <span className="flex items-center gap-1.5 font-semibold">
+                <BedDouble className="w-4 h-4 text-gray-400" />{property.bedrooms} BHK
               </span>
             )}
+            {property.bathrooms && (
+              <span className="flex items-center gap-1.5 text-gray-500">
+                <Bath className="w-4 h-4 text-gray-400" />{property.bathrooms} Bath
+              </span>
+            )}
+            {property.area && (
+              <span className="flex items-center gap-1.5 text-gray-500">
+                <Maximize2 className="w-4 h-4 text-gray-400" />{formatArea(property.area, property.areaUnit)}
+              </span>
+            )}
+            {property.furnishingStatus && (
+              <span className="text-gray-400 text-xs">{getFurnishingLabel(property.furnishingStatus)}</span>
+            )}
           </div>
+        )}
+
+        {/* Highlight tags */}
+        {highlights.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {highlights.map((h, i) => {
+              const Icon = h.icon;
+              return (
+                <span key={i} className={cn('text-xs flex items-center gap-1 px-2 py-0.5 rounded-md border font-medium', h.color)}>
+                  <Icon className="w-3 h-3" />{h.label}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Owner row */}
+        <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+          <div className={cn('w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0', isAgent ? 'bg-blue-500' : 'bg-primary-500')}>
+            {ownerName?.[0]?.toUpperCase() || 'U'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-gray-800 truncate flex items-center gap-1">
+              {ownerName}
+              {property.owner?.isVerified && <CheckCircle className="w-3 h-3 text-emerald-500 flex-shrink-0" />}
+            </p>
+            <p className="text-[11px] text-gray-400">{isAgent ? 'Real Estate Agent' : 'Property Owner'}</p>
+          </div>
+          {property.viewCount > 0 && (
+            <span className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
+              <Eye className="w-3.5 h-3.5" />
+              {property.viewCount >= 1000 ? `${(property.viewCount / 1000).toFixed(1)}k` : property.viewCount}
+            </span>
+          )}
         </div>
       </Link>
+
+      {/* ── CTA Buttons ── */}
+      <div className="grid grid-cols-3 gap-2 px-4 py-3 border-t border-gray-100">
+        <Link
+          href={`/properties/${property.slug}`}
+          onClick={handleCardClick}
+          className="flex items-center justify-center gap-1.5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition-all active:scale-95"
+        >
+          <Mail className="w-3.5 h-3.5" /> Contact
+        </Link>
+
+        {showPhone && phone ? (
+          <a href={`tel:${phone}`} onClick={e => e.stopPropagation()}
+            className="flex items-center justify-center gap-1.5 py-2.5 bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all active:scale-95">
+            <Phone className="w-3.5 h-3.5" /> {phone.slice(-5)}
+          </a>
+        ) : (
+          <button onClick={handleRevealPhone}
+            className="flex items-center justify-center gap-1.5 py-2.5 border-2 border-emerald-400 text-emerald-700 text-xs font-bold rounded-xl bg-white active:scale-95 transition-all">
+            <Phone className="w-3.5 h-3.5" /> Call
+          </button>
+        )}
+
+        <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" onClick={handleWAClick}
+          className="flex items-center justify-center gap-1.5 py-2.5 border-2 border-green-400 text-green-700 text-xs font-bold rounded-xl bg-white active:scale-95 transition-all">
+          <MessageCircle className="w-3.5 h-3.5" /> WA
+        </a>
+      </div>
+
     </article>
   );
 }

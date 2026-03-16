@@ -124,86 +124,132 @@ function Avatar({ agent, size = 'lg' }: { agent: Agent; size?: 'sm' | 'md' | 'lg
   );
 }
 
-// ── Agent Card ────────────────────────────────────────────────────────────────
+// ── Agent Card — JustDial style ───────────────────────────────────────────────
 
 function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
-  const tick = agent.agentTick && agent.agentTick !== 'none' ? TICK[agent.agentTick] : null;
+  const tick  = agent.agentTick && agent.agentTick !== 'none' ? TICK[agent.agentTick] : null;
+  const slug  = buildSlug(agent);
+  const wa    = agent.phone
+    ? `https://wa.me/91${agent.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hi ${agent.name}, I found your profile on Think4BuySale and I'm interested in your real estate services.`)}`
+    : null;
+
   return (
-    <article className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:border-primary-100 transition-all duration-200 overflow-hidden">
-      <div className={`h-0.5 ${tick ? `bg-gradient-to-r ${tick.grad}` : 'bg-gray-100'}`} />
-      <div className="p-4 sm:p-5">
-        <div className="flex gap-3 sm:gap-4">
+    <article className={cn(
+      'group bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg hover:border-primary-200 transition-all duration-200',
+      tick?.label === 'Diamond' && 'ring-1 ring-violet-200',
+      tick?.label === 'Gold'    && 'ring-1 ring-amber-200',
+    )}>
+
+      {/* Top accent bar */}
+      <div className={`h-1 ${tick ? `bg-gradient-to-r ${tick.grad}` : 'bg-gradient-to-r from-gray-100 to-gray-200'}`} />
+
+      <div className="flex">
+
+        {/* ── LEFT: rank + avatar ─────────────────── */}
+        <div className="flex flex-col items-center gap-2 px-4 py-4 border-r border-gray-100 bg-gray-50/50 w-[88px] sm:w-[100px] flex-shrink-0">
+          {rank && (
+            <span className={cn(
+              'text-xs font-black w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm',
+              rank === 1 ? 'bg-amber-400' : rank === 2 ? 'bg-slate-400' : rank === 3 ? 'bg-amber-700' : 'bg-gray-300',
+            )}>
+              {rank}
+            </span>
+          )}
 
           {/* Avatar */}
-          <div className="relative flex-shrink-0">
-            <Avatar agent={agent} />
-            {rank && rank <= 3 && (
-              <div className={`absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-white shadow ${rank === 1 ? 'bg-amber-400' : rank === 2 ? 'bg-gray-400' : 'bg-amber-700'}`}>
-                #{rank}
+          <div className="relative">
+            {agent.avatar ? (
+              <img src={agent.avatar} alt={agent.name}
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover shadow-sm border border-gray-200" />
+            ) : (
+              <div className={cn(
+                'w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center text-white text-lg font-black shadow-sm',
+                `bg-gradient-to-br ${tick?.grad ?? 'from-slate-400 to-slate-600'}`,
+              )}>
+                {getInitials(agent.name)}
               </div>
+            )}
+            {/* Verified dot */}
+            {agent.isVerified && (
+              <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center">
+                <CheckCircle className="w-3 h-3 text-white fill-white" />
+              </span>
             )}
           </div>
 
-          {/* Info */}
-          <div className="flex-1 min-w-0">
+          {/* Rating under avatar */}
+          {(agent.agentRating ?? 0) > 0 && (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-sm font-black text-amber-500">{Number(agent.agentRating).toFixed(1)}</span>
+              <Stars rating={Number(agent.agentRating)} size="xs" />
+            </div>
+          )}
+        </div>
+
+        {/* ── MIDDLE: info ────────────────────────── */}
+        <Link href={`/agents/${slug}`} className="flex-1 min-w-0 px-4 py-4 flex flex-col justify-between">
+
+          <div>
             {/* Name + badges */}
-            <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-              <h2 className="font-bold text-gray-900 text-[15px] leading-snug group-hover:text-primary-600 transition-colors">
-                <Link href={`/agents/${buildSlug(agent)}`} className="hover:underline underline-offset-2">
-                  {agent.name}
-                </Link>
+            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+              <h2 className="text-base font-extrabold text-gray-900 group-hover:text-primary-600 transition-colors leading-tight">
+                {agent.name}
               </h2>
               {agent.isVerified && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                  <CheckCircle className="w-2.5 h-2.5" />Verified
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                  <CheckCircle className="w-2.5 h-2.5" /> Verified
                 </span>
               )}
               {tick && (
-                <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full border whitespace-nowrap ${tick.cls}`}>
+                <span className={cn('inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full border', tick.cls)}>
                   {tick.icon} {tick.label}
                 </span>
               )}
             </div>
 
-            {/* Company + Location */}
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mb-2 text-xs text-gray-400">
-              {agent.company && <span className="text-gray-600 font-medium">{agent.company}</span>}
+            {/* Company + location */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mb-2.5 text-xs text-gray-500">
+              {agent.company && (
+                <span className="flex items-center gap-1 font-semibold text-gray-700">
+                  <Building2 className="w-3 h-3 text-gray-400" />{agent.company}
+                </span>
+              )}
               {(agent.city || agent.state) && (
-                <span className="flex items-center gap-0.5">
-                  <MapPin className="w-3 h-3 flex-shrink-0" />
+                <span className="flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-primary-400 flex-shrink-0" />
                   {[agent.city, agent.state].filter(Boolean).join(', ')}
                 </span>
               )}
             </div>
 
-            {/* Stat pills */}
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              <span className="inline-flex items-center gap-1 bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-1 text-xs">
-                <TrendingUp className="w-3 h-3 text-primary-500 flex-shrink-0" />
-                <b className="text-gray-800">{agent.totalDeals ?? 0}</b><span className="text-gray-400">deals</span>
-              </span>
-              <span className="inline-flex items-center gap-1 bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-1 text-xs">
-                <Briefcase className="w-3 h-3 text-blue-500 flex-shrink-0" />
-                <b className="text-gray-800">{agent.agentExperience ?? 0}+</b><span className="text-gray-400">yrs</span>
-              </span>
-              <span className="inline-flex items-center gap-1 bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-1 text-xs">
-                <Building2 className="w-3 h-3 text-amber-500 flex-shrink-0" />
-                <b className="text-gray-800">{agent.agentUsedQuota ?? 0}</b><span className="text-gray-400">listings</span>
-              </span>
-              {(agent.agentRating ?? 0) > 0 && (
-                <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1 text-xs">
-                  <Stars rating={Number(agent.agentRating)} size="xs" />
-                  <b className="text-amber-700">{Number(agent.agentRating).toFixed(1)}</b>
+            {/* Stats row — JustDial style horizontal pills */}
+            <div className="flex flex-wrap gap-2 mb-2.5">
+              <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                <span className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
+                  <Briefcase className="w-3.5 h-3.5 text-blue-500" />
                 </span>
-              )}
+                <span><b className="text-gray-900">{agent.agentExperience ?? 0}+</b> yrs experience</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                <span className="w-6 h-6 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                </span>
+                <span><b className="text-gray-900">{agent.totalDeals ?? 0}</b> deals closed</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                <span className="w-6 h-6 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
+                  <Building2 className="w-3.5 h-3.5 text-amber-500" />
+                </span>
+                <span><b className="text-gray-900">{agent.agentUsedQuota ?? 0}</b> active listings</span>
+              </div>
             </div>
 
             {/* RERA */}
             {agent.agentLicense && (
-              <p className="flex items-center gap-1 text-xs text-emerald-700 font-medium mb-1.5">
+              <div className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg mb-2">
                 <Shield className="w-3 h-3 flex-shrink-0" />
-                RERA: <span className="font-mono">{agent.agentLicense}</span>
-              </p>
+                RERA Reg: <span className="font-mono font-bold">{agent.agentLicense}</span>
+              </div>
             )}
 
             {/* Bio */}
@@ -212,43 +258,79 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
             )}
           </div>
 
-          {/* Right CTA — desktop */}
-          <div className="hidden sm:flex flex-col gap-2 flex-shrink-0 w-[108px]">
+          {/* Mobile CTA */}
+          <div className="sm:hidden flex gap-2 mt-3 pt-3 border-t border-gray-100">
+            {agent.phone && (
+              <CallButton
+                phone={`+91${agent.phone}`}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                <Phone className="w-3.5 h-3.5" /> Call Agent
+              </CallButton>
+            )}
+            {wa && (
+              <a href={wa} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 border-2 border-green-400 text-green-700 rounded-xl text-xs font-bold hover:bg-green-50 transition-colors">
+                <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+              </a>
+            )}
+            <Link href={`/agents/${slug}`} onClick={e => e.stopPropagation()}
+              className="flex-1 flex items-center justify-center gap-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-colors">
+              Profile <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+        </Link>
+
+        {/* ── RIGHT: contact panel — desktop ──────── */}
+        <div className="hidden sm:flex flex-col border-l border-gray-100 w-[160px] flex-shrink-0">
+
+          {/* Header */}
+          <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Contact Agent</p>
+            {agent.phone ? (
+              <p className="text-xs font-bold text-gray-800 flex items-center gap-1">
+                <Phone className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                {agent.phone.replace(/(\d{5})(\d{5})/, '$1 $2')}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-400 italic">Phone hidden</p>
+            )}
+            {agent.email && (
+              <p className="text-[10px] text-gray-400 mt-0.5 truncate">{agent.email}</p>
+            )}
+          </div>
+
+          {/* Buttons */}
+          <div className="px-4 py-3 flex flex-col gap-2">
             {agent.phone ? (
               <CallButton
                 phone={`+91${agent.phone}`}
-                className="flex items-center justify-center gap-1.5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition-colors"
+                className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-all active:scale-95 shadow-sm"
               >
                 <Phone className="w-3.5 h-3.5" /> Call Now
               </CallButton>
             ) : (
-              <Link href={`/agents/${buildSlug(agent)}`}
-                className="flex items-center justify-center gap-1.5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition-colors">
-                <MessageCircle className="w-3.5 h-3.5" /> Contact
+              <Link href={`/agents/${slug}`}
+                className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition-all active:scale-95">
+                <MessageCircle className="w-3.5 h-3.5" /> Send Enquiry
               </Link>
             )}
-            <Link href={`/agents/${buildSlug(agent)}`}
-              className="flex items-center justify-center gap-1 py-2.5 border border-gray-200 hover:border-primary-300 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-xl text-xs font-semibold transition-colors">
-              Profile <ChevronRight className="w-3 h-3" />
+
+            {wa && (
+              <a href={wa} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 w-full py-2.5 border border-green-400 text-green-700 hover:bg-green-50 bg-green-50/40 text-xs font-bold rounded-xl transition-all active:scale-95">
+                <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+              </a>
+            )}
+
+            <Link href={`/agents/${slug}`}
+              className="flex items-center justify-center gap-1 w-full py-2.5 border border-gray-200 hover:border-primary-300 text-gray-600 hover:text-primary-600 hover:bg-primary-50 text-xs font-semibold rounded-xl transition-all">
+              View Profile <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
+
         </div>
 
-        {/* Mobile CTA strip */}
-        <div className="sm:hidden flex gap-2 mt-3 pt-3 border-t border-gray-100">
-          {agent.phone && (
-            <CallButton
-              phone={`+91${agent.phone}`}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold"
-            >
-              <Phone className="w-3.5 h-3.5" /> Call
-            </CallButton>
-          )}
-          <Link href={`/agents/${buildSlug(agent)}`}
-            className="flex-1 flex items-center justify-center gap-1 py-2 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50">
-            View Profile <ChevronRight className="w-3 h-3" />
-          </Link>
-        </div>
       </div>
     </article>
   );
@@ -258,22 +340,35 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
 
 function CardSkeleton() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 animate-pulse">
-      <div className="flex gap-4">
-        <div className="w-[72px] h-[72px] bg-gray-200 rounded-2xl flex-shrink-0" />
-        <div className="flex-1 space-y-2.5">
-          <div className="flex gap-2"><div className="h-4 bg-gray-200 rounded w-36" /><div className="h-4 bg-gray-200 rounded w-14" /></div>
-          <div className="h-3 bg-gray-200 rounded w-44" />
-          <div className="flex gap-1.5">
-            <div className="h-6 bg-gray-200 rounded-lg w-20" />
-            <div className="h-6 bg-gray-200 rounded-lg w-20" />
-            <div className="h-6 bg-gray-200 rounded-lg w-20" />
-          </div>
-          <div className="h-3 bg-gray-200 rounded w-full max-w-xs" />
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-pulse">
+      <div className="h-1 bg-gray-100" />
+      <div className="flex">
+        {/* Left rank+avatar */}
+        <div className="w-[100px] flex-shrink-0 bg-gray-50 flex flex-col items-center gap-3 px-4 py-4 border-r border-gray-100">
+          <div className="w-6 h-6 bg-gray-200 rounded-full" />
+          <div className="w-16 h-16 bg-gray-200 rounded-xl" />
+          <div className="w-12 h-3 bg-gray-200 rounded" />
         </div>
-        <div className="hidden sm:flex flex-col gap-2 w-[108px]">
-          <div className="h-9 bg-gray-200 rounded-xl" />
-          <div className="h-9 bg-gray-200 rounded-xl" />
+        {/* Middle */}
+        <div className="flex-1 px-4 py-4 space-y-3">
+          <div className="flex gap-2">
+            <div className="h-5 bg-gray-200 rounded w-40" />
+            <div className="h-5 bg-gray-200 rounded w-16" />
+          </div>
+          <div className="h-3.5 bg-gray-200 rounded w-52" />
+          <div className="flex gap-2">
+            <div className="h-7 bg-gray-100 rounded-lg w-28" />
+            <div className="h-7 bg-gray-100 rounded-lg w-28" />
+            <div className="h-7 bg-gray-100 rounded-lg w-28" />
+          </div>
+          <div className="h-3 bg-gray-100 rounded w-full max-w-sm" />
+          <div className="h-3 bg-gray-100 rounded w-2/3" />
+        </div>
+        {/* Right CTA */}
+        <div className="hidden sm:flex flex-col gap-2 w-[160px] flex-shrink-0 border-l border-gray-100 px-4 py-4">
+          <div className="h-10 bg-gray-200 rounded-xl" />
+          <div className="h-10 bg-gray-100 rounded-xl" />
+          <div className="h-10 bg-gray-100 rounded-xl" />
         </div>
       </div>
     </div>
@@ -475,13 +570,24 @@ export default function AgentsListingClient({
 
   // Client-side filter + sort — instant, no API call
   const filteredAgents = useMemo(() => {
+    const search = activeSearch.toLowerCase().trim();
     const result = allAgents.filter(a => {
+      // Badge / tick filter
+      if (activeBadge && a.agentTick !== activeBadge) return false;
+      // City filter (client-side fallback in case API ignores it)
+      if (activeCity && !(a.city ?? '').toLowerCase().includes(activeCity.toLowerCase())) return false;
+      // Search filter — name, company, city
+      if (search) {
+        const hay = `${a.name} ${a.company ?? ''} ${a.city ?? ''}`.toLowerCase();
+        if (!hay.includes(search)) return false;
+      }
+      // Numeric filters
       if (activeMinExp   && (a.agentExperience ?? 0) < parseInt(activeMinExp))  return false;
       if (activeMinDeals && (a.totalDeals ?? 0)      < parseInt(activeMinDeals)) return false;
       return true;
     });
     return clientSort(result, activeSort);
-  }, [allAgents, activeMinExp, activeMinDeals, activeSort]);
+  }, [allAgents, activeBadge, activeCity, activeSearch, activeMinExp, activeMinDeals, activeSort]);
 
   // Client-side pagination
   const total      = filteredAgents.length;
