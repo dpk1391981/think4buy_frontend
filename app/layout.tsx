@@ -5,6 +5,7 @@ import ConditionalFooter from '@/components/layout/ConditionalFooter';
 import MobileBottomNav from '@/components/layout/MobileBottomNav';
 import QueryProvider from '@/components/providers/QueryProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { WishlistProvider } from '@/contexts/WishlistContext';
 import { ReduxProvider } from '@/providers/ReduxProvider';
 import AuthModal from '@/components/auth/AuthModal';
 import MobileGuestLoginPrompt from '@/components/auth/MobileGuestLoginPrompt';
@@ -91,12 +92,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ReduxProvider>
           <QueryProvider>
             <AuthProvider>
+              <WishlistProvider>
               <Header />
               <main className="min-h-screen pb-safe-nav lg:pb-0">{children}</main>
               <ConditionalFooter />
               <MobileBottomNav />
               <MobileGuestLoginPrompt />
               <AuthModal />
+              </WishlistProvider>
             </AuthProvider>
           </QueryProvider>
         </ReduxProvider>

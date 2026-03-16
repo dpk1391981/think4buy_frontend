@@ -6,11 +6,12 @@ import {
   Target, Search, Copy, Check, UserCheck, ExternalLink,
   Flame, Thermometer, Snowflake, TrendingUp, Users,
   MapPin, IndianRupee, RefreshCw, Filter, ChevronDown,
-  Calendar, Home,
+  Calendar, Home, Download, BarChart2, CheckSquare,
+  Square, Trash2, X, AlertCircle, Merge,
 } from 'lucide-react';
 import { leadsApi, adminApi } from '@/lib/api';
 
-// ─── Badges ───────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_BADGE: Record<string, string> = {
   new:                    'bg-blue-100 text-blue-700',
@@ -22,6 +23,8 @@ const STATUS_BADGE: Record<string, string> = {
   deal_in_progress:       'bg-pink-100 text-pink-700',
   deal_won:               'bg-green-100 text-green-700',
   deal_lost:              'bg-red-100 text-red-600',
+  duplicate:              'bg-gray-100 text-gray-500',
+  junk:                   'bg-gray-100 text-gray-400',
 };
 
 const TEMP_BADGE: Record<string, { cls: string; icon: React.ReactNode }> = {
@@ -31,7 +34,7 @@ const TEMP_BADGE: Record<string, { cls: string; icon: React.ReactNode }> = {
 };
 
 const SOURCE_LABEL: Record<string, string> = {
-  find_property:   'Find Property Form',
+  find_property:   'Find Property',
   seo_form:        'SEO Form',
   property_page:   'Property Page',
   view_phone:      'View Phone',
@@ -42,11 +45,16 @@ const SOURCE_LABEL: Record<string, string> = {
   call:            'Call',
   manual:          'Manual',
   campaign:        'Campaign',
+  chatbot:         'Chatbot',
+  property_alert:  'Property Alert',
+  portal_import:   'Portal Import',
+  walkin:          'Walk-in',
+  download_brochure: 'Brochure',
 };
 
 function fmt(v: number) {
-  if (v >= 10_000_000) return `₹${(v / 10_000_000).toFixed(v % 10_000_000 === 0 ? 0 : 1)} Cr`;
-  if (v >= 100_000)    return `₹${(v / 100_000).toFixed(v % 100_000 === 0 ? 0 : 1)} L`;
+  if (v >= 10_000_000) return `₹${(v / 10_000_000).toFixed(v % 10_000_000 === 0 ? 0 : 1)}Cr`;
+  if (v >= 100_000)    return `₹${(v / 100_000).toFixed(v % 100_000 === 0 ? 0 : 1)}L`;
   return `₹${v.toLocaleString('en-IN')}`;
 }
 
@@ -67,10 +75,20 @@ export default function AdminLeadsPage() {
   const [filterFor,      setFilterFor]      = useState('');
   const [filterSource,   setFilterSource]   = useState('');
   const [filterCity,     setFilterCity]     = useState('');
+  const [filterLocality, setFilterLocality] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo,   setFilterDateTo]   = useState('');
+  const [filterUnassigned, setFilterUnassigned] = useState(false);
   const [search,         setSearch]         = useState('');
   const [showFilters,    setShowFilters]    = useState(false);
+
+  // ── Selection (bulk actions) ──
+  const [selected,       setSelected]       = useState<Set<string>>(new Set());
+  const [bulkAction,     setBulkAction]     = useState('');
+  const [bulkAgentId,    setBulkAgentId]    = useState('');
+  const [bulkStatus,     setBulkStatus]     = useState('');
+  const [bulkLoading,    setBulkLoading]    = useState(false);
+  const [showBulkModal,  setShowBulkModal]  = useState(false);
 
   // ── Assign modal ──
   const [assignModal,  setAssignModal]  = useState<any>(null);
@@ -80,22 +98,28 @@ export default function AdminLeadsPage() {
   const [agentSearch,  setAgentSearch]  = useState('');
   const [copiedId,     setCopiedId]     = useState<string | null>(null);
 
-  // ── Load leads ──
+  // ── Export ──
+  const [exporting, setExporting] = useState(false);
+
+  // ── Load ──
+  const buildFilterParams = () => ({
+    status:      filterStatus    || undefined,
+    temperature: filterTemp      || undefined,
+    propertyType: filterType     || undefined,
+    propertyFor:  filterFor      || undefined,
+    source:       filterSource   || undefined,
+    city:         filterCity     || undefined,
+    locality:     filterLocality || undefined,
+    dateFrom:     filterDateFrom || undefined,
+    dateTo:       filterDateTo   || undefined,
+    unassigned:   filterUnassigned ? 'true' : undefined,
+    search:       search         || undefined,
+  });
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await leadsApi.getAll({
-        page, limit: 20,
-        status:      filterStatus   || undefined,
-        temperature: filterTemp     || undefined,
-        propertyType: filterType    || undefined,
-        propertyFor:  filterFor     || undefined,
-        source:       filterSource  || undefined,
-        city:         filterCity    || undefined,
-        dateFrom:     filterDateFrom || undefined,
-        dateTo:       filterDateTo   || undefined,
-        search:       search        || undefined,
-      });
+      const res = await leadsApi.getAll({ page, limit: 20, ...buildFilterParams() });
       setLeads(res.data.items || []);
       setTotal(res.data.total || 0);
     } catch (e) {
@@ -103,16 +127,17 @@ export default function AdminLeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, filterStatus, filterTemp, filterType, filterFor, filterSource, filterCity, filterDateFrom, filterDateTo, search]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, filterStatus, filterTemp, filterType, filterFor, filterSource, filterCity,
+      filterLocality, filterDateFrom, filterDateTo, filterUnassigned, search]);
 
-  // ── Load stats once ──
   useEffect(() => {
     leadsApi.getStats().then(r => setStats(r.data)).catch(() => {});
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  // ── Copy helper ──
+  // ── Helpers ──
   const copyUuid = (id: string) => {
     navigator.clipboard.writeText(id).then(() => {
       setCopiedId(id);
@@ -120,10 +145,56 @@ export default function AdminLeadsPage() {
     });
   };
 
-  // ── Open assign modal ──
-  const openAssign = async (lead: any) => {
-    setAssignModal(lead);
-    setAgentId(lead.assignedAgentId || '');
+  const resetFilters = () => {
+    setFilterStatus(''); setFilterTemp(''); setFilterType('');
+    setFilterFor(''); setFilterSource(''); setFilterCity('');
+    setFilterLocality(''); setFilterDateFrom(''); setFilterDateTo('');
+    setFilterUnassigned(false); setSearch(''); setPage(1);
+  };
+
+  const hasActiveFilters = !!(filterStatus || filterTemp || filterType || filterFor ||
+    filterSource || filterCity || filterLocality || filterDateFrom || filterDateTo ||
+    filterUnassigned || search);
+
+  // ── Selection ──
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === leads.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(leads.map(l => l.id)));
+    }
+  };
+
+  // ── Export ──
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await leadsApi.exportCsv(buildFilterParams());
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Export failed', e);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // ── Bulk actions ──
+  const openAssign = async (lead?: any) => {
+    if (lead) setAssignModal(lead);
+    setAgentId(lead?.assignedAgentId || '');
     setAgentSearch('');
     if (agents.length === 0) {
       try {
@@ -132,11 +203,6 @@ export default function AdminLeadsPage() {
       } catch {}
     }
   };
-
-  const filteredAgents = agents.filter(a => {
-    const q = agentSearch.toLowerCase();
-    return !q || a.name?.toLowerCase().includes(q) || a.email?.toLowerCase().includes(q) || a.phone?.includes(q);
-  });
 
   const doAssign = async () => {
     if (!assignModal || !agentId.trim()) return;
@@ -152,14 +218,33 @@ export default function AdminLeadsPage() {
     }
   };
 
-  const resetFilters = () => {
-    setFilterStatus(''); setFilterTemp(''); setFilterType('');
-    setFilterFor(''); setFilterSource(''); setFilterCity('');
-    setFilterDateFrom(''); setFilterDateTo(''); setSearch('');
-    setPage(1);
+  const doBulkAction = async () => {
+    if (selected.size === 0) return;
+    setBulkLoading(true);
+    try {
+      if (bulkAction === 'assign' && bulkAgentId) {
+        await leadsApi.bulkAssign({ leadIds: Array.from(selected), agentId: bulkAgentId });
+      } else if (bulkAction === 'status' && bulkStatus) {
+        await leadsApi.bulkStatus({ leadIds: Array.from(selected), status: bulkStatus });
+      }
+      setSelected(new Set());
+      setShowBulkModal(false);
+      setBulkAgentId(''); setBulkStatus('');
+      load();
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Bulk action failed');
+    } finally {
+      setBulkLoading(false);
+    }
   };
 
-  const hasActiveFilters = !!(filterStatus || filterTemp || filterType || filterFor || filterSource || filterCity || filterDateFrom || filterDateTo || search);
+  const filteredAgents = agents.filter(a => {
+    const q = agentSearch.toLowerCase();
+    return !q || a.name?.toLowerCase().includes(q) || a.email?.toLowerCase().includes(q) || a.phone?.includes(q);
+  });
+
+  const filterCount = [filterStatus, filterTemp, filterType, filterFor, filterSource,
+    filterCity, filterLocality, filterDateFrom, filterDateTo, filterUnassigned ? 'x' : ''].filter(Boolean).length;
 
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -167,71 +252,51 @@ export default function AdminLeadsPage() {
     <div className="p-6 max-w-full">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Lead Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{total} leads · track, assign & convert</p>
+          <p className="text-sm text-gray-500 mt-0.5">{total.toLocaleString()} leads · track, assign &amp; convert</p>
         </div>
-        <button
-          onClick={load}
-          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/leads/analytics"
+            className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 transition-colors"
+          >
+            <BarChart2 className="w-3.5 h-3.5" />Analytics
+          </Link>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            <Download className={`w-3.5 h-3.5 ${exporting ? 'animate-bounce' : ''}`} />
+            {exporting ? 'Exporting…' : 'Export CSV'}
+          </button>
+          <button
+            onClick={load}
+            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* ── Stats Cards ── */}
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
           {[
-            {
-              label: 'Total Leads',
-              value: stats.total,
-              icon:  <Target className="w-4 h-4" />,
-              color: 'bg-blue-50 border-blue-100 text-blue-700',
-              val_color: 'text-blue-900',
-            },
-            {
-              label: 'Hot',
-              value: stats.byTemperature?.hot || 0,
-              icon:  <Flame className="w-4 h-4" />,
-              color: 'bg-red-50 border-red-100 text-red-600',
-              val_color: 'text-red-700',
-            },
-            {
-              label: 'Warm',
-              value: stats.byTemperature?.warm || 0,
-              icon:  <Thermometer className="w-4 h-4" />,
-              color: 'bg-orange-50 border-orange-100 text-orange-600',
-              val_color: 'text-orange-700',
-            },
-            {
-              label: 'Cold',
-              value: stats.byTemperature?.cold || 0,
-              icon:  <Snowflake className="w-4 h-4" />,
-              color: 'bg-sky-50 border-sky-100 text-sky-600',
-              val_color: 'text-sky-700',
-            },
-            {
-              label: 'New',
-              value: stats.byStatus?.new || 0,
-              icon:  <TrendingUp className="w-4 h-4" />,
-              color: 'bg-emerald-50 border-emerald-100 text-emerald-600',
-              val_color: 'text-emerald-700',
-            },
-            {
-              label: 'Won',
-              value: stats.byStatus?.deal_won || 0,
-              icon:  <Users className="w-4 h-4" />,
-              color: 'bg-violet-50 border-violet-100 text-violet-600',
-              val_color: 'text-violet-700',
-            },
+            { label: 'Total',    value: stats.total,                    icon: <Target className="w-4 h-4" />,      color: 'bg-blue-50 border-blue-100 text-blue-700',    val: 'text-blue-900' },
+            { label: 'Hot',      value: stats.byTemperature?.hot || 0,  icon: <Flame className="w-4 h-4" />,       color: 'bg-red-50 border-red-100 text-red-600',       val: 'text-red-700' },
+            { label: 'Warm',     value: stats.byTemperature?.warm || 0, icon: <Thermometer className="w-4 h-4" />, color: 'bg-orange-50 border-orange-100 text-orange-600', val: 'text-orange-700' },
+            { label: 'Cold',     value: stats.byTemperature?.cold || 0, icon: <Snowflake className="w-4 h-4" />,   color: 'bg-sky-50 border-sky-100 text-sky-600',       val: 'text-sky-700' },
+            { label: 'New',      value: stats.byStatus?.new || 0,       icon: <TrendingUp className="w-4 h-4" />,  color: 'bg-emerald-50 border-emerald-100 text-emerald-600', val: 'text-emerald-700' },
+            { label: 'Won',      value: stats.byStatus?.deal_won || 0,  icon: <Users className="w-4 h-4" />,       color: 'bg-violet-50 border-violet-100 text-violet-600', val: 'text-violet-700' },
           ].map((s, i) => (
             <div key={i} className={`border rounded-xl px-4 py-3 flex items-center gap-3 ${s.color}`}>
               <span className="flex-shrink-0">{s.icon}</span>
               <div>
-                <div className={`text-xl font-bold ${s.val_color}`}>{s.value}</div>
+                <div className={`text-xl font-bold ${s.val}`}>{s.value?.toLocaleString()}</div>
                 <div className="text-xs font-medium opacity-80">{s.label}</div>
               </div>
             </div>
@@ -239,10 +304,36 @@ export default function AdminLeadsPage() {
         </div>
       )}
 
+      {/* ── Bulk Action Bar ── */}
+      {selected.size > 0 && (
+        <div className="bg-blue-600 text-white rounded-xl px-4 py-3 mb-4 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold">{selected.size} lead{selected.size > 1 ? 's' : ''} selected</span>
+          <div className="flex gap-2 ml-auto">
+            <button
+              onClick={() => { setBulkAction('assign'); setShowBulkModal(true); openAssign(); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-50 transition-colors"
+            >
+              <UserCheck className="w-3.5 h-3.5" />Assign
+            </button>
+            <button
+              onClick={() => { setBulkAction('status'); setShowBulkModal(true); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-50 transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />Update Status
+            </button>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-400 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Search + Filter bar ── */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
         <div className="flex flex-wrap gap-3 items-center">
-
           {/* Search */}
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -257,11 +348,8 @@ export default function AdminLeadsPage() {
 
           {/* Status */}
           <div className="relative">
-            <select
-              value={filterStatus}
-              onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
-              className="border border-gray-200 rounded-xl pl-3 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 appearance-none text-gray-700"
-            >
+            <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
+              className="border border-gray-200 rounded-xl pl-3 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 appearance-none text-gray-700">
               <option value="">All Statuses</option>
               <option value="new">New</option>
               <option value="contacted">Contacted</option>
@@ -278,11 +366,8 @@ export default function AdminLeadsPage() {
 
           {/* Temperature */}
           <div className="relative">
-            <select
-              value={filterTemp}
-              onChange={e => { setFilterTemp(e.target.value); setPage(1); }}
-              className="border border-gray-200 rounded-xl pl-3 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 appearance-none text-gray-700"
-            >
+            <select value={filterTemp} onChange={e => { setFilterTemp(e.target.value); setPage(1); }}
+              className="border border-gray-200 rounded-xl pl-3 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 appearance-none text-gray-700">
               <option value="">All Temps</option>
               <option value="hot">🔥 Hot</option>
               <option value="warm">🌡 Warm</option>
@@ -291,7 +376,7 @@ export default function AdminLeadsPage() {
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
 
-          {/* Toggle advanced filters */}
+          {/* Advanced filters toggle */}
           <button
             onClick={() => setShowFilters(v => !v)}
             className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-sm font-medium transition-colors ${
@@ -300,16 +385,14 @@ export default function AdminLeadsPage() {
           >
             <Filter className="w-3.5 h-3.5" />
             Filters
-            {hasActiveFilters && (
-              <span className="w-4 h-4 bg-blue-600 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
-                {[filterStatus, filterTemp, filterType, filterFor, filterSource, filterCity, filterDateFrom, filterDateTo].filter(Boolean).length}
-              </span>
+            {filterCount > 0 && (
+              <span className="w-4 h-4 bg-blue-600 text-white rounded-full text-[10px] flex items-center justify-center font-bold">{filterCount}</span>
             )}
           </button>
 
           {hasActiveFilters && (
-            <button onClick={resetFilters} className="text-xs text-red-500 hover:text-red-700 font-medium">
-              Clear all
+            <button onClick={resetFilters} className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1">
+              <X className="w-3 h-3" />Clear all
             </button>
           )}
         </div>
@@ -317,15 +400,11 @@ export default function AdminLeadsPage() {
         {/* Advanced filter row */}
         {showFilters && (
           <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-100">
-
             {/* Property Type */}
             <div className="relative">
               <Home className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-              <select
-                value={filterType}
-                onChange={e => { setFilterType(e.target.value); setPage(1); }}
-                className="border border-gray-200 rounded-xl pl-8 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 appearance-none text-gray-700"
-              >
+              <select value={filterType} onChange={e => { setFilterType(e.target.value); setPage(1); }}
+                className="border border-gray-200 rounded-xl pl-8 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 appearance-none text-gray-700">
                 <option value="">All Types</option>
                 <option value="residential">Residential</option>
                 <option value="commercial">Commercial</option>
@@ -337,11 +416,8 @@ export default function AdminLeadsPage() {
 
             {/* Property For */}
             <div className="relative">
-              <select
-                value={filterFor}
-                onChange={e => { setFilterFor(e.target.value); setPage(1); }}
-                className="border border-gray-200 rounded-xl pl-3 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 appearance-none text-gray-700"
-              >
+              <select value={filterFor} onChange={e => { setFilterFor(e.target.value); setPage(1); }}
+                className="border border-gray-200 rounded-xl pl-3 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 appearance-none text-gray-700">
                 <option value="">Buy / Rent / PG</option>
                 <option value="buy">Buy</option>
                 <option value="rent">Rent</option>
@@ -352,11 +428,8 @@ export default function AdminLeadsPage() {
 
             {/* Source */}
             <div className="relative">
-              <select
-                value={filterSource}
-                onChange={e => { setFilterSource(e.target.value); setPage(1); }}
-                className="border border-gray-200 rounded-xl pl-3 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 appearance-none text-gray-700"
-              >
+              <select value={filterSource} onChange={e => { setFilterSource(e.target.value); setPage(1); }}
+                className="border border-gray-200 rounded-xl pl-3 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 appearance-none text-gray-700">
                 <option value="">All Sources</option>
                 <option value="find_property">Find Property Form</option>
                 <option value="seo_form">SEO Form</option>
@@ -368,40 +441,47 @@ export default function AdminLeadsPage() {
                 <option value="call">Call</option>
                 <option value="manual">Manual</option>
                 <option value="campaign">Campaign</option>
+                <option value="chatbot">Chatbot</option>
+                <option value="walkin">Walk-in</option>
               </select>
               <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
             </div>
 
-            {/* City search */}
+            {/* City */}
             <div className="relative">
               <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="City…"
-                value={filterCity}
+              <input type="text" placeholder="City…" value={filterCity}
                 onChange={e => { setFilterCity(e.target.value); setPage(1); }}
-                className="border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 w-36 text-gray-700"
-              />
+                className="border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 w-32 text-gray-700" />
+            </div>
+
+            {/* Locality */}
+            <div className="relative">
+              <input type="text" placeholder="Locality…" value={filterLocality}
+                onChange={e => { setFilterLocality(e.target.value); setPage(1); }}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 w-32 text-gray-700" />
             </div>
 
             {/* Date From */}
             <div className="relative">
               <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-              <input
-                type="date"
-                value={filterDateFrom}
+              <input type="date" value={filterDateFrom}
                 onChange={e => { setFilterDateFrom(e.target.value); setPage(1); }}
-                className="border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 text-gray-700"
-              />
+                className="border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 text-gray-700" />
             </div>
 
             {/* Date To */}
-            <input
-              type="date"
-              value={filterDateTo}
+            <input type="date" value={filterDateTo}
               onChange={e => { setFilterDateTo(e.target.value); setPage(1); }}
-              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 text-gray-700"
-            />
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 text-gray-700" />
+
+            {/* Unassigned toggle */}
+            <label className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors">
+              <input type="checkbox" checked={filterUnassigned}
+                onChange={e => { setFilterUnassigned(e.target.checked); setPage(1); }}
+                className="w-3.5 h-3.5 rounded accent-blue-600" />
+              Unassigned only
+            </label>
           </div>
         )}
       </div>
@@ -425,19 +505,35 @@ export default function AdminLeadsPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {['Contact', 'Property Need', 'Budget', 'Location', 'Source', 'Status', 'Temp', 'Agent', 'Date', ''].map(h => (
+                  <th className="px-3 py-3 w-10">
+                    <button onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
+                      {selected.size === leads.length && leads.length > 0
+                        ? <CheckSquare className="w-4 h-4 text-blue-600" />
+                        : <Square className="w-4 h-4" />}
+                    </button>
+                  </th>
+                  {['Contact', 'Property Need', 'Budget + Area', 'Location', 'Source', 'Status', 'Temp', 'Score', 'Agent', 'Date', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {leads.map(l => (
-                  <tr key={l.id} className="hover:bg-gray-50/70 transition-colors">
+                  <tr key={l.id} className={`hover:bg-gray-50/70 transition-colors ${selected.has(l.id) ? 'bg-blue-50/50' : ''}`}>
+                    {/* Checkbox */}
+                    <td className="px-3 py-3">
+                      <button onClick={() => toggleSelect(l.id)} className="text-gray-400 hover:text-blue-600 transition-colors">
+                        {selected.has(l.id)
+                          ? <CheckSquare className="w-4 h-4 text-blue-600" />
+                          : <Square className="w-4 h-4" />}
+                      </button>
+                    </td>
 
                     {/* Contact */}
                     <td className="px-4 py-3 min-w-[140px]">
                       <div className="font-semibold text-gray-900 text-xs">{l.contactName}</div>
                       <div className="text-gray-500 text-xs mt-0.5">{l.contactPhone}</div>
+                      {l.contactEmail && <div className="text-gray-400 text-[10px] truncate max-w-[130px]">{l.contactEmail}</div>}
                       {l.userType && (
                         <span className="text-[10px] font-semibold capitalize text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
                           {l.userType}
@@ -458,15 +554,13 @@ export default function AdminLeadsPage() {
                       {!l.propertyType && !l.propertyFor && <span className="text-gray-300 text-xs">—</span>}
                     </td>
 
-                    {/* Budget */}
+                    {/* Budget + Area */}
                     <td className="px-4 py-3 min-w-[120px]">
-                      {l.budgetMin || l.budgetMax ? (
+                      {(l.budgetMin || l.budgetMax) ? (
                         <div className="flex items-center gap-1 text-xs text-gray-700 font-semibold">
                           <IndianRupee className="w-3 h-3 text-emerald-500 flex-shrink-0" />
-                          <span>
-                            {l.budgetMin ? fmt(Number(l.budgetMin)) : '—'}
-                            {l.budgetMax ? ` – ${fmt(Number(l.budgetMax))}` : '+'}
-                          </span>
+                          {l.budgetMin ? fmt(Number(l.budgetMin)) : '—'}
+                          {l.budgetMax ? ` – ${fmt(Number(l.budgetMax))}` : '+'}
                         </div>
                       ) : (
                         <span className="text-gray-300 text-xs">—</span>
@@ -488,9 +582,7 @@ export default function AdminLeadsPage() {
                             {l.locality && <div className="text-[10px] text-gray-500">{l.locality}</div>}
                           </div>
                         </div>
-                      ) : (
-                        <span className="text-gray-300 text-xs">—</span>
-                      )}
+                      ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
 
                     {/* Source */}
@@ -509,10 +601,22 @@ export default function AdminLeadsPage() {
                     <td className="px-4 py-3">
                       {TEMP_BADGE[l.temperature] ? (
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TEMP_BADGE[l.temperature].cls}`}>
-                          {TEMP_BADGE[l.temperature].icon}
-                          {l.temperature}
+                          {TEMP_BADGE[l.temperature].icon}{l.temperature}
                         </span>
                       ) : '—'}
+                    </td>
+
+                    {/* Score */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${l.leadScore >= 75 ? 'bg-red-500' : l.leadScore >= 45 ? 'bg-orange-400' : 'bg-blue-400'}`}
+                            style={{ width: `${l.leadScore}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-500 font-mono">{l.leadScore}</span>
+                      </div>
                     </td>
 
                     {/* Agent */}
@@ -568,7 +672,7 @@ export default function AdminLeadsPage() {
         {total > 20 && (
           <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
             <span className="text-sm text-gray-500">
-              Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}
+              Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total.toLocaleString()}
             </span>
             <div className="flex gap-2">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
@@ -599,7 +703,6 @@ export default function AdminLeadsPage() {
                 </div>
               )}
             </div>
-
             <div className="p-5 flex flex-col gap-4 overflow-hidden">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Agent UUID</label>
@@ -619,17 +722,12 @@ export default function AdminLeadsPage() {
                   )}
                 </div>
               </div>
-
               <div className="flex flex-col gap-2 min-h-0">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search agents by name, email, phone…"
-                    value={agentSearch}
+                  <input type="text" placeholder="Search agents…" value={agentSearch}
                     onChange={e => setAgentSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400 text-gray-800"
-                  />
+                    className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400 text-gray-800" />
                 </div>
                 <div className="overflow-y-auto max-h-56 rounded-xl border border-gray-100 divide-y divide-gray-50">
                   {filteredAgents.length === 0 ? (
@@ -637,42 +735,98 @@ export default function AdminLeadsPage() {
                       <UserCheck className="w-6 h-6 mx-auto mb-1 text-gray-300" />No agents found
                     </div>
                   ) : filteredAgents.map(a => (
-                    <div
-                      key={a.id}
-                      onClick={() => setAgentId(a.id)}
-                      className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${agentId === a.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-                    >
+                    <div key={a.id} onClick={() => setAgentId(a.id)}
+                      className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${agentId === a.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                         {a.name?.charAt(0)?.toUpperCase() || '?'}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-800 truncate">{a.name}</div>
                         <div className="text-xs text-gray-400 truncate">{a.email || a.phone}</div>
-                        <div className="text-[10px] text-gray-300 font-mono mt-0.5 truncate">{a.id}</div>
                       </div>
-                      <button type="button" onClick={e => { e.stopPropagation(); copyUuid(a.id); }}
-                        className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 flex-shrink-0 transition-colors">
-                        {copiedId === a.id ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
                       {agentId === a.id && <Check className="w-4 h-4 text-blue-500 flex-shrink-0" />}
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-
             <div className="flex gap-3 p-5 border-t border-gray-100">
-              <button
-                onClick={doAssign}
-                disabled={assigning || !agentId.trim()}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
+              <button onClick={doAssign} disabled={assigning || !agentId.trim()}
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
                 {assigning ? 'Assigning…' : 'Assign Lead'}
               </button>
+              <button onClick={() => { setAssignModal(null); setAgentId(''); setAgentSearch(''); }}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Action Modal ── */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="p-5 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">
+                {bulkAction === 'assign' ? 'Bulk Assign Leads' : 'Bulk Update Status'}
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">{selected.size} lead{selected.size > 1 ? 's' : ''} selected</p>
+            </div>
+            <div className="p-5">
+              {bulkAction === 'assign' ? (
+                <div className="flex flex-col gap-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                    <input type="text" placeholder="Search agents…" value={agentSearch}
+                      onChange={e => setAgentSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400" />
+                  </div>
+                  <div className="overflow-y-auto max-h-48 rounded-xl border border-gray-100 divide-y divide-gray-50">
+                    {filteredAgents.map(a => (
+                      <div key={a.id} onClick={() => setBulkAgentId(a.id)}
+                        className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer ${bulkAgentId === a.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                        <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                          {a.name?.charAt(0) || '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{a.name}</div>
+                          <div className="text-xs text-gray-400 truncate">{a.email}</div>
+                        </div>
+                        {bulkAgentId === a.id && <Check className="w-4 h-4 text-blue-500" />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400 appearance-none">
+                    <option value="">Select status…</option>
+                    <option value="new">New</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="follow_up">Follow Up</option>
+                    <option value="site_visit_scheduled">Visit Scheduled</option>
+                    <option value="negotiation">Negotiation</option>
+                    <option value="deal_won">Deal Won</option>
+                    <option value="deal_lost">Deal Lost</option>
+                    <option value="junk">Junk / Spam</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 p-5 border-t border-gray-100">
               <button
-                onClick={() => { setAssignModal(null); setAgentId(''); setAgentSearch(''); }}
-                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                onClick={doBulkAction}
+                disabled={bulkLoading || (bulkAction === 'assign' ? !bulkAgentId : !bulkStatus)}
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
+                {bulkLoading ? 'Processing…' : `Apply to ${selected.size} Leads`}
+              </button>
+              <button onClick={() => { setShowBulkModal(false); setBulkAgentId(''); setBulkStatus(''); }}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
                 Cancel
               </button>
             </div>

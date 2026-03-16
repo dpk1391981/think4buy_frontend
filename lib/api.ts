@@ -485,13 +485,22 @@ export const leadsApi = {
   getAll: (params?: Record<string, any>) => api.get('/leads', { params }),
   getMy: (params?: Record<string, any>) => api.get('/leads/my', { params }),
   getStats: (agentId?: string) => api.get('/leads/stats', { params: agentId ? { agentId } : {} }),
+  getAnalytics: (params?: Record<string, any>) => api.get('/leads/analytics', { params }),
+  exportCsv: (params?: Record<string, any>) =>
+    api.get('/leads/export', { params, responseType: 'blob' }),
   getOne: (id: string) => api.get(`/leads/${id}`),
   updateStatus: (id: string, data: { status: string; notes?: string; lostReason?: string }) =>
     api.patch(`/leads/${id}/status`, data),
   assign: (id: string, data: { agentId: string; reason?: string }) =>
     api.patch(`/leads/${id}/assign`, data),
+  bulkAssign: (data: { leadIds: string[]; agentId: string; reason?: string }) =>
+    api.patch('/leads/bulk/assign', data),
+  bulkStatus: (data: { leadIds: string[]; status: string; notes?: string }) =>
+    api.patch('/leads/bulk/status', data),
   addNote: (id: string, notes: string) => api.post(`/leads/${id}/notes`, { notes }),
   getActivities: (id: string) => api.get(`/leads/${id}/activities`),
+  getAssignments: (id: string) => api.get(`/leads/${id}/assignments`),
+  mergeLead: (keepId: string, mergeId: string) => api.post(`/leads/${keepId}/merge/${mergeId}`),
 };
 
 // ─── Site Visits API ──────────────────────────────────────────────────────────
