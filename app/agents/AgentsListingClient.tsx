@@ -258,27 +258,6 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
             )}
           </div>
 
-          {/* Mobile CTA */}
-          <div className="sm:hidden flex gap-2 mt-3 pt-3 border-t border-gray-100">
-            {agent.phone && (
-              <CallButton
-                phone={`+91${agent.phone}`}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-colors"
-              >
-                <Phone className="w-3.5 h-3.5" /> Call Agent
-              </CallButton>
-            )}
-            {wa && (
-              <a href={wa} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 border-2 border-green-400 text-green-700 rounded-xl text-xs font-bold hover:bg-green-50 transition-colors">
-                <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
-              </a>
-            )}
-            <Link href={`/agents/${slug}`} onClick={e => e.stopPropagation()}
-              className="flex-1 flex items-center justify-center gap-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-colors">
-              Profile <ChevronRight className="w-3 h-3" />
-            </Link>
-          </div>
         </Link>
 
         {/* ── RIGHT: contact panel — desktop ──────── */}
@@ -332,6 +311,29 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
         </div>
 
       </div>
+
+      {/* ── Mobile CTA ───────────────────────────────────────────────────── */}
+      <div className="sm:hidden px-3 pb-3 pt-2.5 border-t border-gray-100 bg-white flex items-center gap-2">
+        {agent.phone ? (
+          <CallButton
+            phone={`+91${agent.phone}`}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm"
+          >
+            <Phone className="w-3.5 h-3.5 flex-shrink-0" /> Call Agent
+          </CallButton>
+        ) : null}
+        {wa ? (
+          <a href={wa} target="_blank" rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm">
+            <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" /> WhatsApp
+          </a>
+        ) : null}
+        <Link href={`/agents/${slug}`}
+          className="flex items-center justify-center gap-1 py-2.5 px-3.5 border border-gray-200 bg-gray-50 hover:bg-primary-50 hover:border-primary-300 text-gray-700 hover:text-primary-600 rounded-xl text-xs font-semibold transition-colors">
+          <Users className="w-3.5 h-3.5 flex-shrink-0" /> Profile
+        </Link>
+      </div>
+
     </article>
   );
 }
