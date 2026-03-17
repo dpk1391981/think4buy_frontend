@@ -314,7 +314,7 @@ export default function PropertyCard({ property, className, listView }: Property
                       ₹{pricePerSqft.toLocaleString('en-IN')}/sqft
                     </span>
                   )}
-                  {property.brokerage === '0' && (
+                  {isAgent && property.brokerage === '0' && (
                     <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full">
                       <TrendingDown className="w-2.5 h-2.5" /> Zero Brokerage
                     </span>
@@ -444,7 +444,7 @@ export default function PropertyCard({ property, className, listView }: Property
                   <p className="text-[10px] text-gray-400 mt-0.5">
                     {isAgent ? 'Registered Agent' : 'Property Owner'}
                   </p>
-                  {property.brokerage === '0' && (
+                  {isAgent && property.brokerage === '0' && (
                     <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full mt-1">
                       <TrendingDown className="w-2 h-2" /> Zero Brokerage
                     </span>
@@ -578,8 +578,8 @@ export default function PropertyCard({ property, className, listView }: Property
           </span>
         </div>
 
-        {/* Zero brokerage */}
-        {property.brokerage === '0' && (
+        {/* Zero brokerage — only shown for agent listings */}
+        {isAgent && property.brokerage === '0' && (
           <span className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full mb-1.5">
             <TrendingDown className="w-3 h-3" /> Zero Brokerage
           </span>

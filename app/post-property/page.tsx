@@ -548,7 +548,7 @@ function SidebarProgress({ currentStep, form }: { currentStep: number; form: any
                       {(form.listingType === 'rent' || form.mainCategory === 'rent' || form.mainCategory === 'pg') ? '/mo' : ''}
                     </span>
                   </p>
-                  {form.brokerage && form.brokerage !== 'none' && (
+                  {form.userType === 'agent' && form.brokerage && form.brokerage !== 'none' && (
                     <p className="text-[10px] text-gray-400 mt-0.5">Brokerage: {form.brokerage}</p>
                   )}
                 </div>
@@ -1643,26 +1643,28 @@ function Step9Price({ form, dispatch }: any) {
         </div>
       )}
 
-      <SectionCard title={isAgent ? 'Brokerage Terms (Required)' : 'Brokerage (Optional)'}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {brokerageOpts.map(opt => (
-            <button key={opt.value} type="button"
-              onClick={() => dispatch(updateForm({ brokerage: opt.value }))}
-              className={cn('py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all text-center',
-                form.brokerage === opt.value
-                  ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:bg-blue-50',
-              )}>{opt.label}</button>
-          ))}
-        </div>
-        {form.brokerage === 'custom' && (
-          <div className="mt-3">
-            <Input value={form.brokerageCustom}
-              onChange={(e: any) => dispatch(updateForm({ brokerageCustom: e.target.value }))}
-              placeholder="e.g., 45 days rent" />
+      {isAgent && (
+        <SectionCard title="Brokerage Terms (Required)">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {brokerageOpts.map(opt => (
+              <button key={opt.value} type="button"
+                onClick={() => dispatch(updateForm({ brokerage: opt.value }))}
+                className={cn('py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all text-center',
+                  form.brokerage === opt.value
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:bg-blue-50',
+                )}>{opt.label}</button>
+            ))}
           </div>
-        )}
-      </SectionCard>
+          {form.brokerage === 'custom' && (
+            <div className="mt-3">
+              <Input value={form.brokerageCustom}
+                onChange={(e: any) => dispatch(updateForm({ brokerageCustom: e.target.value }))}
+                placeholder="e.g., 45 days rent" />
+            </div>
+          )}
+        </SectionCard>
+      )}
     </div>
   );
 }

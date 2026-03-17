@@ -670,7 +670,7 @@ export default function PropertyDetailClient({ property }: Props) {
                   {pricePerSqft && (
                     <p className="text-sm text-gray-500 mt-0.5">₹{pricePerSqft.toLocaleString('en-IN')}/sqft</p>
                   )}
-                  {property.brokerage && (
+                  {isAgent && property.brokerage && (
                     <p className="text-xs text-orange-600 font-medium mt-0.5">Brokerage: {property.brokerage}</p>
                   )}
                 </div>
