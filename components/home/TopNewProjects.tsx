@@ -13,6 +13,8 @@ import OptimizedImage from '@/components/common/OptimizedImage';
 import { formatPrice, formatArea, getPropertyTypeLabel, getPrimaryImage } from '@/lib/utils';
 import { Property } from '@/types/property';
 
+
+
 // ─── Project Card ─────────────────────────────────────────────────────────────
 
 function ProjectCard({ property }: { property: Property }) {
