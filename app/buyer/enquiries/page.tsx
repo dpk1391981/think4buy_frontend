@@ -23,7 +23,7 @@ export default function BuyerEnquiries() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/inquiries/my-inquiries')
+    api.get('/inquiries/buyer-enquiries')
       .then(({ data }) => setItems(Array.isArray(data) ? data : data.items ?? data.data ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));

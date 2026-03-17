@@ -6,9 +6,9 @@ import {
   Search, MapPin, Phone, Star, Shield, CheckCircle, Building2,
   Briefcase, TrendingUp, ChevronRight, ChevronDown, ChevronLeft,
   X, Users, MessageCircle, SlidersHorizontal, BadgeCheck,
-  Home, Handshake, Quote, Sparkles,
+  Home, Handshake, Quote, Sparkles, Zap, Flame, Trophy,
 } from 'lucide-react';
-import { usersApi, locationsApi } from '@/lib/api';
+import { usersApi, locationsApi, agencyApi } from '@/lib/api';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { CallButton, WhatsAppButton } from '@/components/common/PhoneRevealButton';
@@ -197,6 +197,18 @@ const DEALS_OPTIONS = [
 
 const TOP_CITIES = ['Mumbai', 'Delhi', 'Bangalore', 'Pune', 'Hyderabad', 'Chennai', 'Gurgaon', 'Noida', 'Kolkata', 'Ahmedabad'];
 
+const QUICK_FILTERS = [
+  { label: 'All Agents',      sort: 'rating',     badge: null,       icon: '🏠' },
+  { label: 'Top Rated',       sort: 'rating',     badge: null,       icon: '⭐' },
+  { label: 'Most Deals',      sort: 'deals',      badge: null,       icon: '🔥' },
+  { label: 'Experienced',     sort: 'experience', badge: null,       icon: '🕐' },
+  { label: 'Most Listings',   sort: 'listings',   badge: null,       icon: '📋' },
+  { label: '✓ Verified',      sort: 'rating',     badge: 'verified', icon: '✓'  },
+  { label: '◉ Bronze',        sort: 'rating',     badge: 'bronze',   icon: '◉'  },
+  { label: '◈ Silver',        sort: 'rating',     badge: 'silver',   icon: '◈'  },
+  { label: '♛ Gold',          sort: 'rating',     badge: 'gold',     icon: '♛'  },
+];
+
 const LIMIT = 15;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -221,6 +233,14 @@ function clientSort(agents: Agent[], by: string) {
     if (by === 'newest')     return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
     return 0;
   });
+}
+
+function WhatsAppIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+    </svg>
+  );
 }
 
 function Stars({ rating, size = 'sm' }: { rating: number; size?: 'xs' | 'sm' }) {
@@ -320,9 +340,13 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
           )}
 
           {theme.crownIcon && (
-            <span className="text-base leading-none" style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))' }}>
-              {theme.crownIcon}
-            </span>
+            tickKey === 'gold' ? (
+              <span className="gold-crown-3d text-xl">♛</span>
+            ) : (
+              <span className="text-base leading-none" style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))' }}>
+                {theme.crownIcon}
+              </span>
+            )
           )}
 
           {/* Avatar */}
@@ -353,15 +377,6 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
             )}
           </div>
 
-          {/* Rating */}
-          {(agent.agentRating ?? 0) > 0 && (
-            <div className="flex flex-col items-center gap-0.5">
-              <span className={cn('text-sm font-black', isPremium ? theme.statIconColor : 'text-amber-500')}>
-                {Number(agent.agentRating).toFixed(1)}
-              </span>
-              <Stars rating={Number(agent.agentRating)} size="xs" />
-            </div>
-          )}
         </div>
 
         {/* ── MIDDLE: info ────────────────────────── */}
@@ -378,6 +393,14 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
                 </span>
               )}
             </div>
+
+            {/* Rating stars below name */}
+            {(agent.agentRating ?? 0) > 0 && (
+              <div className="flex items-center gap-1.5 mb-1">
+                <Stars rating={Number(agent.agentRating)} size="sm" />
+                <span className="text-xs font-semibold text-amber-600">{Number(agent.agentRating).toFixed(1)}</span>
+              </div>
+            )}
 
             {/* Premium tagline */}
             {isPremium && (
@@ -469,9 +492,10 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
               <WhatsAppButton
                 phone={waPhone}
                 message={`Hi ${agent.name}, I found your profile on Think4BuySale and I'm interested in your real estate services.`}
-                className={cn('flex items-center justify-center gap-1.5 w-full py-2.5 border text-xs font-bold rounded-xl transition-all active:scale-95', theme.waCls)}
+                className="flex items-center justify-center gap-1.5 w-full py-2.5 text-xs font-bold rounded-xl transition-all active:scale-95 text-white shadow-sm"
+                style={{ background: '#25D366' }}
               >
-                <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                <WhatsAppIcon className="w-3.5 h-3.5" /> WhatsApp
               </WhatsAppButton>
             )}
 
@@ -499,9 +523,10 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
           <WhatsAppButton
             phone={waPhone}
             message={`Hi ${agent.name}, I found your profile on Think4BuySale and I'm interested in your real estate services.`}
-            className={cn('flex-1 flex items-center justify-center gap-1.5 py-2.5 border rounded-xl text-xs font-bold transition-colors', theme.waCls)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 text-white"
+            style={{ background: '#25D366' }}
           >
-            <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" /> WhatsApp
+            <WhatsAppIcon className="w-3.5 h-3.5 flex-shrink-0" /> WhatsApp
           </WhatsAppButton>
         )}
         <Link
@@ -669,12 +694,15 @@ export default function AgentsListingClient({
   const [loading, setLoading] = useState(true);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [bannerAgents, setBannerAgents] = useState<Agent[]>([]);
 
   // City search autocomplete (purely local — not a filter until applied)
   const [cityQuery, setCityQuery]     = useState(activeCity);
   const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
   const [showSug, setShowSug] = useState(false);
-  const searchWrap = useRef<HTMLDivElement>(null);
+  const searchWrap     = useRef<HTMLDivElement>(null);
+  const bannerTrackRef = useRef<HTMLDivElement>(null);
+  const bannerPaused   = useRef(false);
 
   // Sync city input if URL changes externally
   useEffect(() => { setCityQuery(activeCity); }, [activeCity]);
@@ -687,6 +715,62 @@ export default function AgentsListingClient({
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
+
+  // Fetch banner agents from correct APIs (premium slots + top agents)
+  useEffect(() => {
+    Promise.allSettled([
+      agencyApi.getPremiumAgents(activeCity || ''),
+      agencyApi.getTopAgents(activeCity || undefined, 12),
+    ]).then(([premRes, topRes]) => {
+      // premAgents are already fully enriched (backend JOINs users table)
+      const premRaw: Agent[] =
+        premRes.status === 'fulfilled' && Array.isArray(premRes.value.data)
+          ? premRes.value.data : [];
+
+      // Deduplicate premium agents by user id (same agent may hold multiple slots)
+      const seenIds = new Set<string>();
+      const premAgents = premRaw.filter(a => {
+        if (!a.id || seenIds.has(a.id)) return false;
+        seenIds.add(a.id);
+        return true;
+      });
+
+      const topRaw = topRes.status === 'fulfilled' ? topRes.value.data : null;
+      const topList: Agent[] = Array.isArray(topRaw) ? topRaw
+        : Array.isArray(topRaw?.agents) ? topRaw.agents
+        : Array.isArray(topRaw?.items) ? topRaw.items : [];
+
+      // Add top ticked agents not already in premium slots
+      const premIds = new Set(premAgents.map(a => a.id));
+      const extras = topList.filter(a => a.agentTick && a.agentTick !== 'none' && !premIds.has(a.id));
+      const combined = [...premAgents, ...extras];
+
+      if (combined.length === 0) { setBannerAgents([]); return; }
+      // Duplicate for seamless loop (need at least 10 items)
+      const times = Math.max(2, Math.ceil(10 / combined.length));
+      setBannerAgents(Array.from({ length: times }, () => combined).flat());
+    }).catch(() => setBannerAgents([]));
+  }, [activeCity]);
+
+  // Banner auto-scroll via requestAnimationFrame
+  useEffect(() => {
+    const track = bannerTrackRef.current;
+    if (!track || bannerAgents.length === 0) return;
+    let raf: number;
+    let pos = 0;
+    const speed = 0.6;
+    function step() {
+      if (!bannerPaused.current) {
+        pos += speed;
+        const half = track!.scrollWidth / 2;
+        if (pos >= half) pos = 0;
+        track!.style.transform = `translateX(-${pos}px)`;
+      }
+      raf = requestAnimationFrame(step);
+    }
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [bannerAgents]);
 
   // City autocomplete
   const searchCity = useCallback(async (q: string) => {
@@ -903,8 +987,27 @@ export default function AgentsListingClient({
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes goldCrown3d {
+          0%,100% { transform:translateY(0) scale(1) rotateZ(0deg);
+            filter:drop-shadow(0 2px 6px rgba(234,179,8,.7)) drop-shadow(0 0 8px rgba(251,191,36,.4)); }
+          20%  { transform:translateY(-4px) scale(1.25) rotateZ(-8deg);
+            filter:drop-shadow(0 6px 14px rgba(234,179,8,.9)) drop-shadow(0 0 18px rgba(251,191,36,.7)) brightness(1.5); }
+          40%  { transform:translateY(-6px) scale(1.3) rotateZ(0deg);
+            filter:drop-shadow(0 8px 20px rgba(234,179,8,1)) drop-shadow(0 0 28px rgba(253,224,71,.8)) brightness(1.7); }
+          60%  { transform:translateY(-4px) scale(1.25) rotateZ(8deg);
+            filter:drop-shadow(0 6px 14px rgba(234,179,8,.9)) drop-shadow(0 0 18px rgba(251,191,36,.7)) brightness(1.5); }
+          80%  { transform:translateY(-1px) scale(1.1) rotateZ(0deg);
+            filter:drop-shadow(0 3px 8px rgba(234,179,8,.6)); }
+        }
+        .gold-crown-3d { animation: goldCrown3d 2.8s ease-in-out infinite; display:inline-block; line-height:1; }
+        .banner-track  { will-change: transform; }
+        .spn-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .spn-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.14); }
+      ` }} />
 
       {/* ── Sticky search bar (same as property listing) ─────────────────── */}
       <div className="bg-white border-b border-gray-100 shadow-sm sticky top-16 z-30">
@@ -948,6 +1051,26 @@ export default function AgentsListingClient({
               {hasActiveFilters && <span className="w-2 h-2 bg-primary-600 rounded-full" />}
             </button>
           </div>
+          {/* Horizontal quick filters */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 pt-2 scrollbar-hide -mx-2 px-2" style={{ scrollbarWidth: 'none' }}>
+            {QUICK_FILTERS.map((qf) => {
+              const isActive = activeSort === qf.sort && activeBadge === (qf.badge ?? '');
+              return (
+                <button
+                  key={qf.label}
+                  onClick={() => pushFilter({ sort: qf.sort, badge: qf.badge })}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 border ${
+                    isActive
+                      ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:text-primary-600'
+                  }`}
+                >
+                  <span>{qf.icon}</span>
+                  {qf.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -962,6 +1085,128 @@ export default function AgentsListingClient({
             <Link href="/agents" className="hover:text-primary-600 transition-colors">Agents</Link>
             <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
             <span className="text-gray-800 font-semibold">{activeCity}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Featured Agents Banner ────────────────────────────────────────── */}
+      {bannerAgents.length > 0 && (
+        <div className="container-max py-3">
+          {/* Header row */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1 bg-amber-500 text-white px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide">
+                <Zap className="w-2.5 h-2.5 fill-white" /> FEATURED
+              </span>
+              <span className="text-sm font-bold text-gray-800">
+                Top Agents{activeCity ? ` in ${activeCity}` : ''}
+              </span>
+            </div>
+            <Link href="/agents" className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-0.5">
+              View all <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {/* Auto-scroll track */}
+          <div
+            className="overflow-hidden cursor-default rounded-xl"
+            onMouseEnter={() => { bannerPaused.current = true; }}
+            onMouseLeave={() => { bannerPaused.current = false; }}
+          >
+            <div ref={bannerTrackRef} className="banner-track flex gap-2.5 w-max">
+              {bannerAgents.map((a, idx) => {
+                const tickKey = (a.agentTick && a.agentTick !== 'none') ? a.agentTick : 'verified';
+                const theme   = CARD_THEME[tickKey] ?? CARD_THEME.none;
+                const tick    = TICK[tickKey];
+                const slug    = buildSlug(a);
+                const isGold  = tickKey === 'gold';
+                const waNum = a.phone ? `91${a.phone.replace(/\D/g, '')}` : null;
+                return (
+                  <div
+                    key={`${a.id}-${idx}`}
+                    className="spn-card relative flex-shrink-0 w-[220px] bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden"
+                  >
+                    {/* Left accent bar */}
+                    <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${theme.headerGrad}`} />
+
+                    {/* Profile link area */}
+                    <Link href={`/agents/${slug}`} className="flex items-center gap-2.5 px-3 py-2.5 pl-4 pr-2">
+                      {/* Avatar */}
+                      <div className="relative flex-shrink-0">
+                        {a.avatar ? (
+                          <img src={a.avatar} alt={a.name}
+                            className={`w-10 h-10 rounded-lg object-cover border border-white ${theme.avatarRing}`}
+                            style={{ boxShadow: theme.avatarShadow || '0 2px 8px rgba(0,0,0,0.12)' }}
+                          />
+                        ) : (
+                          <div
+                            className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-black bg-gradient-to-br ${theme.avatarGrad} ${theme.avatarRing}`}
+                            style={{ boxShadow: theme.avatarShadow || '0 2px 8px rgba(0,0,0,0.12)' }}
+                          >
+                            {getInitials(a.name)}
+                          </div>
+                        )}
+                        {a.isVerified && (
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border border-white flex items-center justify-center">
+                            <CheckCircle className="w-2 h-2 text-white fill-white" />
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <p className="text-xs font-extrabold text-gray-900 truncate leading-tight">{a.name}</p>
+                          {isGold && <span className="gold-crown-3d text-[11px] flex-shrink-0">♛</span>}
+                        </div>
+                        <div className="flex items-center gap-1 mb-0.5">
+                          {(a.agentRating ?? 0) > 0 && (
+                            <>
+                              {[1,2,3,4,5].map(i => (
+                                <Star key={i} className={`w-2 h-2 ${i <= Math.round(a.agentRating ?? 0) ? 'text-amber-400 fill-amber-400' : 'text-gray-200 fill-gray-200'}`} />
+                              ))}
+                              <span className="text-[10px] font-bold text-amber-600 ml-0.5">{Number(a.agentRating).toFixed(1)}</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {a.city && (
+                            <span className="text-[10px] text-gray-400 truncate flex items-center gap-0.5">
+                              <MapPin className="w-2 h-2 text-primary-400 flex-shrink-0" />{a.city}
+                            </span>
+                          )}
+                          <span
+                            className="ml-auto text-[8px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: theme.badgeGrad || '#f3f4f6', color: theme.badgeColor || '#374151', boxShadow: theme.badgeShadow }}
+                          >
+                            {tick?.icon} {tick?.label.toUpperCase()}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+
+                    {/* WhatsApp button — full width bottom strip */}
+                    {waNum ? (
+                      <WhatsAppButton
+                        phone={waNum}
+                        message={`Hi ${a.name}, I found your profile on Think4BuySale and I'm interested in your real estate services.`}
+                        className="flex items-center justify-center gap-1.5 w-full py-1.5 text-white text-[10px] font-bold border-t border-green-100 transition-all"
+                        style={{ background: '#25D366' }}
+                      >
+                        <WhatsAppIcon className="w-3 h-3" /> Chat on WhatsApp
+                      </WhatsAppButton>
+                    ) : (
+                      <Link
+                        href={`/agents/${slug}`}
+                        className="flex items-center justify-center gap-1.5 w-full py-1.5 text-primary-600 text-[10px] font-semibold border-t border-gray-100 hover:bg-primary-50 transition-colors"
+                      >
+                        View Profile <ChevronRight className="w-2.5 h-2.5" />
+                      </Link>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

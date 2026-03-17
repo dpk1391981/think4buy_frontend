@@ -32,6 +32,7 @@ import {
   LayoutGrid,
   Zap,
   Gem,
+  MessageSquare,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
@@ -102,6 +103,12 @@ const NAV_GROUPS = [
       { href: '/admin/wallets', label: 'Wallets', icon: Wallet },
       { href: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
       { href: '/admin/payments', label: 'Payments', icon: Receipt },
+    ],
+  },
+  {
+    label: 'Messaging',
+    items: [
+      { href: '/admin/messaging', label: 'Messaging Centre', icon: MessageSquare },
     ],
   },
 ];

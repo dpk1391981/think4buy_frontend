@@ -383,13 +383,13 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
               </div>
 
               {/* CTA buttons — visible on desktop in hero */}
-              <AgentCallCTA phone={agent.phone} email={agent.email} variant="desktop-hero" />
+              <AgentCallCTA phone={agent.phone} email={agent.email} agentId={agent.id} variant="desktop-hero" />
             </div>
           </div>
         </div>
 
         {/* ── Mobile CTA bar ──────────────────────────────────────── */}
-        <AgentCallCTA phone={agent.phone} email={agent.email} variant="mobile-bar" />
+        <AgentCallCTA phone={agent.phone} email={agent.email} agentId={agent.id} variant="mobile-bar" />
 
         {/* ── Main Content ────────────────────────────────────────── */}
         <div className="container-max py-8">

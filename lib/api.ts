@@ -290,7 +290,7 @@ export const agentApi = {
   getMyListings: (params?: { page?: number; limit?: number; status?: string }) =>
     api.get('/properties/my-listings', { params }),
   getMyInquiries: (params?: { page?: number; limit?: number }) =>
-    api.get('/inquiries/my', { params }),
+    api.get('/inquiries/agent-inbox', { params }),
   getDashboardStats: () => api.get('/agent/dashboard'),
 };
 

@@ -10,6 +10,7 @@ export type LeadSource =
   | 'download_brochure'
   | 'chatbot'
   | 'seo_form'
+  | 'find_property'
   | 'property_alert'
   | 'search'
   | 'contact_form'
@@ -23,6 +24,8 @@ export type LeadSource =
 export interface LeadCapturePayload {
   source: LeadSource;
   propertyId?: string;
+  /** Direct agent assignment — pass when capturing from an agent's profile page */
+  assignedAgentId?: string;
   contactName: string;
   contactPhone: string;
   contactEmail?: string;

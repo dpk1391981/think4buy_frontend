@@ -10,8 +10,16 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppDispatch } from '@/lib/store';
 import { openAuthModal } from '@/lib/store/slices/uiSlice';
+import { leadsApi } from '@/lib/api';
 import { Phone, MessageCircle, Lock } from 'lucide-react';
 import { useState } from 'react';
+
+function normalizePhone(raw: string): string {
+  const digits = (raw || '').replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith('0'))  return digits.slice(1);
+  return digits.slice(-10);
+}
 
 // ── Call button ────────────────────────────────────────────────────────────────
 
@@ -19,9 +27,11 @@ interface CallButtonProps {
   phone: string;
   className?: string;
   children?: React.ReactNode;
+  agentId?: string;
+  propertyId?: string;
 }
 
-export function CallButton({ phone, className, children }: CallButtonProps) {
+export function CallButton({ phone, className, children, agentId, propertyId }: CallButtonProps) {
   const { user } = useAuth();
   const dispatch  = useAppDispatch();
 
@@ -38,8 +48,23 @@ export function CallButton({ phone, className, children }: CallButtonProps) {
     );
   }
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const cleanPhone = normalizePhone(user.phone || '');
+    if (cleanPhone.length === 10) {
+      leadsApi.capturePublic({
+        source: 'call',
+        contactName: user.name || '',
+        contactPhone: cleanPhone,
+        contactEmail: user.email ?? '',
+        propertyId: propertyId ?? undefined,
+        assignedAgentId: agentId ?? undefined,
+      }).catch(() => {});
+    }
+  };
+
   return (
-    <a href={`tel:${phone}`} className={className} onClick={e => e.stopPropagation()}>
+    <a href={`tel:${phone}`} className={className} onClick={handleClick}>
       {children ?? (
         <>
           <Phone className="w-3.5 h-3.5 flex-shrink-0" />
@@ -56,10 +81,13 @@ interface WhatsAppButtonProps {
   phone: string;
   message?: string;
   className?: string;
+  style?: React.CSSProperties;
   children?: React.ReactNode;
+  agentId?: string;
+  propertyId?: string;
 }
 
-export function WhatsAppButton({ phone, message = '', className, children }: WhatsAppButtonProps) {
+export function WhatsAppButton({ phone, message = '', className, style, children, agentId, propertyId }: WhatsAppButtonProps) {
   const { user } = useAuth();
   const dispatch  = useAppDispatch();
 
@@ -71,6 +99,7 @@ export function WhatsAppButton({ phone, message = '', className, children }: Wha
       <button
         onClick={e => { e.preventDefault(); e.stopPropagation(); dispatch(openAuthModal({ mode: 'login', reason: 'general' })); }}
         className={className}
+        style={style}
         title="Login to WhatsApp"
       >
         <Lock className="w-3.5 h-3.5 flex-shrink-0" />
@@ -79,8 +108,23 @@ export function WhatsAppButton({ phone, message = '', className, children }: Wha
     );
   }
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const cleanPhone = normalizePhone(user.phone || '');
+    if (cleanPhone.length === 10) {
+      leadsApi.capturePublic({
+        source: 'whatsapp',
+        contactName: user.name || '',
+        contactPhone: cleanPhone,
+        contactEmail: user.email ?? '',
+        propertyId: propertyId ?? undefined,
+        assignedAgentId: agentId ?? undefined,
+      }).catch(() => {});
+    }
+  };
+
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={className} onClick={e => e.stopPropagation()}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className={className} style={style} onClick={handleClick}>
       {children ?? (
         <>
           <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" />
@@ -97,9 +141,11 @@ interface RevealPhoneProps {
   phone: string;
   className?: string;
   revealedClassName?: string;
+  agentId?: string;
+  propertyId?: string;
 }
 
-export function RevealPhoneButton({ phone, className, revealedClassName }: RevealPhoneProps) {
+export function RevealPhoneButton({ phone, className, revealedClassName, agentId, propertyId }: RevealPhoneProps) {
   const { user } = useAuth();
   const dispatch  = useAppDispatch();
   const [shown, setShown] = useState(false);
@@ -116,10 +162,27 @@ export function RevealPhoneButton({ phone, className, revealedClassName }: Revea
     );
   }
 
+  const handleReveal = () => {
+    if (!shown) {
+      const cleanPhone = normalizePhone(user.phone || '');
+      if (cleanPhone.length === 10) {
+        leadsApi.capturePublic({
+          source: 'view_phone',
+          contactName: user.name || '',
+          contactPhone: cleanPhone,
+          contactEmail: user.email ?? '',
+          propertyId: propertyId ?? undefined,
+          assignedAgentId: agentId ?? undefined,
+        }).catch(() => {});
+      }
+    }
+    setShown(true);
+  };
+
   return (
     <a
       href={shown ? `tel:${phone}` : undefined}
-      onClick={() => setShown(true)}
+      onClick={handleReveal}
       className={shown ? (revealedClassName ?? className) : className}
     >
       <Phone className="w-4 h-4 flex-shrink-0" />

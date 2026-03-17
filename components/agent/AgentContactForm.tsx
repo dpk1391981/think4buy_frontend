@@ -1,12 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { MessageCircle, Phone, Mail, Send, CheckCircle, User, LogIn } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { inquiriesApi } from '@/lib/api';
+import { inquiriesApi, leadsApi } from '@/lib/api';
 import { CallButton } from '@/components/common/PhoneRevealButton';
+
+/** Strip +91/0 prefix so phone matches backend 10-digit validation */
+function normalizePhone(raw: string): string {
+  const digits = (raw || '').replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith('0'))  return digits.slice(1);
+  return digits.slice(-10);
+}
 
 interface Props {
   agentId: string;
@@ -27,6 +35,19 @@ export default function AgentContactForm({
   const pathname = usePathname();
 
   const [form, setForm] = useState({ name: '', phone: '', message: '' });
+
+  const captureEmailLead = useCallback(() => {
+    if (!user?.phone) return;
+    leadsApi.capturePublic({
+      source: 'contact_form',
+      contactName: user.name || '',
+      contactPhone: normalizePhone(user.phone),
+      contactEmail: user.email ?? '',
+      propertyId: propertyId ?? undefined,
+      assignedAgentId: agentId,
+      contactUserId: user.id,
+    }).catch(() => {});
+  }, [user, agentId, propertyId]);
   const [submitting, setSubmitting]     = useState(false);
   const [submitted, setSubmitted]       = useState(false);
   const [error, setError]               = useState('');
@@ -66,6 +87,19 @@ export default function AgentContactForm({
       } else {
         await inquiriesApi.contactAgent(agentId, payload);
       }
+
+      // Also capture as a lead so it appears in agent/admin lead dashboards
+      leadsApi.capturePublic({
+        source: 'contact_form',
+        contactName: name.trim(),
+        contactPhone: normalizePhone(phone.trim()),
+        contactEmail: user?.email ?? '',
+        requirement: message.trim() || undefined,
+        propertyId: propertyId ?? undefined,
+        assignedAgentId: agentId,
+        contactUserId: user?.id,
+      }).catch(() => { /* silent — inquiry was already saved */ });
+
       setSubmitted(true);
     } catch {
       setError('Could not send message. Please try calling directly.');
@@ -110,6 +144,8 @@ export default function AgentContactForm({
         {agentPhone && (
           <CallButton
             phone={`+91${agentPhone}`}
+            agentId={agentId}
+            propertyId={propertyId}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary-50 hover:bg-primary-100 text-primary-700 rounded-xl text-xs font-semibold transition-colors"
           >
             <Phone className="w-3.5 h-3.5" />
@@ -119,6 +155,7 @@ export default function AgentContactForm({
         {agentEmail && (
           <a
             href={`mailto:${agentEmail}`}
+            onClick={captureEmailLead}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-semibold transition-colors"
           >
             <Mail className="w-3.5 h-3.5" />
