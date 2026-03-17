@@ -39,13 +39,11 @@ function buildCategoryHref(
   city?: string,
   state?: string,
 ): string {
-  const commercialTypes = ['commercial_office', 'commercial_shop', 'commercial_warehouse', 'showroom', 'factory', 'industrial_shed'];
-  const rentTypes       = ['pg', 'co_living'];
-  const category        = commercialTypes.includes(propertyType) ? 'commercial'
-    : rentTypes.includes(propertyType) ? 'pg'
-    : 'buy';
-
-  const params = new URLSearchParams({ category, type: propertyType });
+  // Pass only `type` — do NOT add a `category` filter.
+  // Properties of the same type can be posted under different categories
+  // (e.g. a warehouse listed as "buy"). Adding category here causes the
+  // listing page to show 0 results when the DB data doesn't match.
+  const params = new URLSearchParams({ type: propertyType });
   if (city)  params.set('city',  city);
   if (state) params.set('state', state);
   return `/properties?${params.toString()}`;

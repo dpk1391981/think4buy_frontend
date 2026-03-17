@@ -97,6 +97,9 @@ export const propertiesApi = {
     api.delete(`/properties/${propertyId}/images/${imageId}`),
   trackView: (id: string, body: { sessionId?: string; source?: string; referrer?: string; deviceType?: string }) =>
     api.post(`/properties/${id}/view`, body).catch(() => {}), // fire-and-forget, never throws
+  updateStatus: (id: string, status: string, note?: string) =>
+    api.patch(`/properties/${id}/status`, { status, note }),
+  getStatusHistory: (id: string) => api.get(`/properties/${id}/status-history`),
 };
 
 // Auth

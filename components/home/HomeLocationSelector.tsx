@@ -89,7 +89,7 @@ export default function HomeLocationSelector() {
               return (
                 <Link
                   key={city.id}
-                  href={`/property-in/${slug}`}
+                  href={`/property-in-${slug}`}
                   className="group flex-shrink-0 snap-start flex flex-col items-center gap-2 w-[76px] sm:w-[88px] focus:outline-none"
                   aria-label={`Properties in ${city.name}`}
                 >
@@ -138,7 +138,7 @@ export default function HomeLocationSelector() {
         {/* Browse all */}
         <div className="mt-6">
           <Link
-            href={`/properties-in/${selectedState.toLowerCase().replace(/\s+/g, '-')}`}
+            href={`/properties-in-${selectedState.toLowerCase().replace(/\s+/g, '-')}`}
             className="inline-flex items-center gap-2 text-sm text-primary-600 font-medium hover:underline"
           >
             Browse all properties in {selectedState}

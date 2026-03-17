@@ -13,7 +13,7 @@ export type PropertyType =
 
 export type PropertyCategory = 'buy' | 'rent' | 'pg' | 'commercial';
 
-export type PropertyStatus = 'active' | 'sold' | 'rented' | 'inactive' | 'pending';
+export type PropertyStatus = 'active' | 'under_deal' | 'sold' | 'rented' | 'inactive' | 'pending';
 
 export type FurnishingStatus = 'furnished' | 'semi_furnished' | 'unfurnished';
 

@@ -50,7 +50,7 @@ function fmt(n: number): string {
 function CityCard({ city, idx }: { city: CityData; idx: number }) {
   const gradient = GRADIENTS[idx % GRADIENTS.length];
   const slug = city.slug || city.cityName.toLowerCase().replace(/\s+/g, '-');
-  const href = `/property-in/${slug}`;
+  const href = `/property-in-${slug}`;
 
   const typeRows = [
     { icon: <Layers className="w-3 h-3" />,   label: 'Plots',   count: city.counts.plots },

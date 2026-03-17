@@ -40,6 +40,13 @@ const PLAN_BADGE: Record<string, { label: string; cls: string }> = {
   premium:  { label: 'Premium',  cls: 'bg-violet-600 text-white' },
 };
 
+const STATUS_OVERLAY: Record<string, { label: string; cls: string } | undefined> = {
+  under_deal: { label: '🤝 Under Deal', cls: 'bg-orange-500 text-white' },
+  sold:       { label: '✅ Sold',        cls: 'bg-red-600 text-white' },
+  rented:     { label: '🔑 Rented',     cls: 'bg-blue-600 text-white' },
+  inactive:   { label: '⏸ Inactive',   cls: 'bg-gray-600 text-white' },
+};
+
 function getImageUrls(images: any[], fallback: string): string[] {
   if (!images?.length) return fallback ? [fallback] : [];
   const urls = images
@@ -171,10 +178,11 @@ export default function PropertyCard({ property, className, listView }: Property
   const { trackPropertyClick, trackPropertySave } = useAnalytics();
   const [showPhone, setShowPhone] = useState(false);
 
-  const primaryImage = getPrimaryImage(property.images);
-  const imageUrls    = getImageUrls(property.images, primaryImage);
-  const saved        = isSaved(property.id);
-  const plan         = property.listingPlan && PLAN_BADGE[property.listingPlan];
+  const primaryImage   = getPrimaryImage(property.images);
+  const imageUrls      = getImageUrls(property.images, primaryImage);
+  const saved          = isSaved(property.id);
+  const plan           = property.listingPlan && PLAN_BADGE[property.listingPlan];
+  const statusOverlay  = STATUS_OVERLAY[property.status];
   const pricePerSqft =
     property.area && property.price && property.priceUnit !== 'per month'
       ? Math.round(property.price / property.area) : null;
@@ -263,6 +271,13 @@ export default function PropertyCard({ property, className, listView }: Property
               )}>
                 <Heart className={cn('w-3.5 h-3.5', saved ? 'fill-white text-white' : 'text-gray-500')} />
               </button>
+
+              {/* Status overlay (under_deal / sold / rented / inactive) */}
+              {statusOverlay && (
+                <div className={cn('absolute inset-x-0 bottom-0 z-[4] text-center text-[11px] font-black py-1 tracking-wide', statusOverlay.cls)}>
+                  {statusOverlay.label}
+                </div>
+              )}
 
               {/* Bottom: verified + photo count */}
               <div className="absolute bottom-8 left-2.5 right-2.5 flex items-center justify-between z-[3]">
@@ -519,6 +534,13 @@ export default function PropertyCard({ property, className, listView }: Property
             className={cn('absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center shadow z-[3]', saved ? 'bg-red-500' : 'bg-white/90')}>
             <Heart className={cn('w-4 h-4', saved ? 'fill-white text-white' : 'text-gray-500')} />
           </button>
+
+          {/* Status overlay */}
+          {statusOverlay && (
+            <div className={cn('absolute inset-x-0 bottom-0 z-[4] text-center text-xs font-black py-1.5 tracking-wide', statusOverlay.cls)}>
+              {statusOverlay.label}
+            </div>
+          )}
 
           {/* Bottom row: verified + photo count */}
           <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between z-[3]">

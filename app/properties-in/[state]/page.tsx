@@ -82,7 +82,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     `Property in ${stateName} | Buy, Rent & Invest | Think4BuySale`;
   const description = data?.metaDescription ||
     `Find properties for sale and rent in ${stateName}. Browse verified flats, houses, plots and commercial spaces across all cities in ${stateName}. Connect with top agents.`;
-  const canonical = `${SITE}/properties-in/${params.state}`;
+  const canonical = `${SITE}/properties-in-${params.state}`;
 
   return {
     title,
@@ -102,7 +102,7 @@ function CityCard({ city, idx, stateName }: { city: CityEntry; idx: number; stat
 
   return (
     <Link
-      href={`/property-in/${slug}`}
+      href={`/property-in-${slug}`}
       className="group relative bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col"
     >
       <div className="relative aspect-[16/9] overflow-hidden flex-shrink-0">
@@ -173,7 +173,7 @@ export default async function PropertiesInStatePage({ params }: { params: Params
   const breadcrumb = buildBreadcrumbSchema([
     { name: 'Home',                                          url: SITE },
     { name: 'Property in India',                             url: `${SITE}/property-for-sale-rent-in-india` },
-    { name: `Property in ${data.name}`,                      url: `${SITE}/properties-in/${params.state}` },
+    { name: `Property in ${data.name}`,                      url: `${SITE}/properties-in-${params.state}` },
   ]);
 
   return (

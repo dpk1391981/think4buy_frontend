@@ -11,7 +11,7 @@ import {
 import { usersApi, locationsApi } from '@/lib/api';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { CallButton } from '@/components/common/PhoneRevealButton';
+import { CallButton, WhatsAppButton } from '@/components/common/PhoneRevealButton';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -39,8 +39,64 @@ interface Agent {
 
 const TICK: Record<string, { label: string; cls: string; icon: string; grad: string; dot: string }> = {
   blue:    { label: 'Verified',  cls: 'bg-blue-50 text-blue-700 border-blue-200',      icon: '✓', grad: 'from-blue-500 to-blue-700',    dot: 'bg-blue-500'   },
-  gold:    { label: 'Gold',      cls: 'bg-amber-50 text-amber-700 border-amber-200',    icon: '★', grad: 'from-amber-400 to-amber-600',   dot: 'bg-amber-400'  },
-  diamond: { label: 'Diamond',   cls: 'bg-violet-50 text-violet-700 border-violet-200', icon: '◆', grad: 'from-violet-500 to-violet-700', dot: 'bg-violet-500' },
+  gold:    { label: 'Gold',      cls: 'bg-amber-50 text-amber-700 border-amber-300',    icon: '★', grad: 'from-amber-400 to-yellow-500',  dot: 'bg-amber-400'  },
+  diamond: { label: 'Diamond',   cls: 'bg-violet-50 text-violet-700 border-violet-300', icon: '◆', grad: 'from-violet-500 to-purple-600', dot: 'bg-violet-500' },
+};
+
+// Per-badge card theme
+const CARD_THEME: Record<string, {
+  card: string; bar: string; barH: string;
+  leftBg: string; leftBorder: string;
+  avatarGrad: string; avatarRing: string;
+  rightBg: string; rightBorder: string;
+  callCls: string; waCls: string;
+  nameCls: string; crownIcon: string | null;
+  statIconBg: string; statIconColor: string;
+}> = {
+  none: {
+    card:        'border-gray-200 bg-white hover:shadow-md hover:border-primary-200',
+    bar:         'from-gray-200 to-gray-300', barH: 'h-1',
+    leftBg:      'bg-gray-50/50', leftBorder: 'border-gray-100',
+    avatarGrad:  'from-slate-400 to-slate-600', avatarRing: '',
+    rightBg:     'bg-white', rightBorder: 'border-gray-100',
+    callCls:     'bg-emerald-500 hover:bg-emerald-600 text-white',
+    waCls:       'border-green-400 text-green-700 bg-green-50/40 hover:bg-green-50',
+    nameCls:     'group-hover:text-primary-600',
+    crownIcon:   null, statIconBg: 'bg-blue-50 border-blue-100', statIconColor: 'text-blue-500',
+  },
+  blue: {
+    card:        'border-blue-200 bg-white hover:shadow-md hover:shadow-blue-100/50 hover:border-blue-300',
+    bar:         'from-blue-500 to-blue-700', barH: 'h-1',
+    leftBg:      'bg-blue-50/40', leftBorder: 'border-blue-100',
+    avatarGrad:  'from-blue-500 to-blue-700', avatarRing: 'ring-2 ring-blue-300/60',
+    rightBg:     'bg-blue-50/20', rightBorder: 'border-blue-100',
+    callCls:     'bg-blue-600 hover:bg-blue-700 text-white',
+    waCls:       'border-green-400 text-green-700 bg-green-50/40 hover:bg-green-50',
+    nameCls:     'group-hover:text-blue-600',
+    crownIcon:   null, statIconBg: 'bg-blue-50 border-blue-100', statIconColor: 'text-blue-500',
+  },
+  gold: {
+    card:        'border-amber-300 bg-gradient-to-br from-white via-amber-50/30 to-white hover:shadow-xl hover:shadow-amber-200/60 hover:border-amber-400',
+    bar:         'from-yellow-400 via-amber-400 to-amber-500', barH: 'h-2',
+    leftBg:      'bg-gradient-to-b from-amber-50 to-yellow-50/40', leftBorder: 'border-amber-200',
+    avatarGrad:  'from-amber-400 to-yellow-500', avatarRing: 'ring-2 ring-amber-400/70',
+    rightBg:     'bg-gradient-to-b from-amber-50/80 to-yellow-50/40', rightBorder: 'border-amber-200',
+    callCls:     'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-sm shadow-amber-300/50',
+    waCls:       'border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100',
+    nameCls:     'group-hover:text-amber-700',
+    crownIcon:   '👑', statIconBg: 'bg-amber-50 border-amber-100', statIconColor: 'text-amber-500',
+  },
+  diamond: {
+    card:        'border-violet-300 bg-gradient-to-br from-white via-violet-50/30 to-white hover:shadow-xl hover:shadow-violet-200/60 hover:border-violet-400',
+    bar:         'from-violet-500 via-purple-400 to-violet-600', barH: 'h-2',
+    leftBg:      'bg-gradient-to-b from-violet-50 to-purple-50/40', leftBorder: 'border-violet-200',
+    avatarGrad:  'from-violet-500 to-purple-600', avatarRing: 'ring-2 ring-violet-400/70',
+    rightBg:     'bg-gradient-to-b from-violet-50/80 to-purple-50/40', rightBorder: 'border-violet-200',
+    callCls:     'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-sm shadow-violet-300/50',
+    waCls:       'border-violet-300 text-violet-800 bg-violet-50 hover:bg-violet-100',
+    nameCls:     'group-hover:text-violet-700',
+    crownIcon:   '💎', statIconBg: 'bg-violet-50 border-violet-100', statIconColor: 'text-violet-500',
+  },
 };
 
 const SORT_OPTIONS = [
@@ -124,29 +180,45 @@ function Avatar({ agent, size = 'lg' }: { agent: Agent; size?: 'sm' | 'md' | 'lg
   );
 }
 
-// ── Agent Card — JustDial style ───────────────────────────────────────────────
+// ── Agent Card — premium badge-themed ────────────────────────────────────────
 
 function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
-  const tick  = agent.agentTick && agent.agentTick !== 'none' ? TICK[agent.agentTick] : null;
-  const slug  = buildSlug(agent);
-  const wa    = agent.phone
-    ? `https://wa.me/91${agent.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hi ${agent.name}, I found your profile on Think4BuySale and I'm interested in your real estate services.`)}`
-    : null;
+  const tickKey = agent.agentTick && agent.agentTick !== 'none' ? agent.agentTick : 'none';
+  const tick    = tickKey !== 'none' ? TICK[tickKey] : null;
+  const theme   = CARD_THEME[tickKey] ?? CARD_THEME.none;
+  const slug    = buildSlug(agent);
+  const waMsg   = encodeURIComponent(`Hi ${agent.name}, I found your profile on Think4BuySale and I'm interested in your real estate services.`);
+  const waPhone = agent.phone ? `91${agent.phone.replace(/\D/g, '')}` : null;
+
+  const isGold    = tickKey === 'gold';
+  const isDiamond = tickKey === 'diamond';
+  const isPremium = isGold || isDiamond;
 
   return (
     <article className={cn(
-      'group bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg hover:border-primary-200 transition-all duration-200',
-      tick?.label === 'Diamond' && 'ring-1 ring-violet-200',
-      tick?.label === 'Gold'    && 'ring-1 ring-amber-200',
+      'group border rounded-2xl overflow-hidden transition-all duration-200 relative',
+      theme.card,
     )}>
 
-      {/* Top accent bar */}
-      <div className={`h-1 ${tick ? `bg-gradient-to-r ${tick.grad}` : 'bg-gradient-to-r from-gray-100 to-gray-200'}`} />
+      {/* Premium shimmer border for gold/diamond */}
+      {isPremium && (
+        <div className={cn(
+          'absolute inset-0 rounded-2xl pointer-events-none',
+          isGold    && 'ring-1 ring-amber-300/80',
+          isDiamond && 'ring-1 ring-violet-300/80',
+        )} />
+      )}
+
+      {/* Top accent bar — thicker for premium */}
+      <div className={cn(`bg-gradient-to-r ${theme.bar}`, theme.barH)} />
 
       <div className="flex">
 
         {/* ── LEFT: rank + avatar ─────────────────── */}
-        <div className="flex flex-col items-center gap-2 px-4 py-4 border-r border-gray-100 bg-gray-50/50 w-[88px] sm:w-[100px] flex-shrink-0">
+        <div className={cn(
+          'flex flex-col items-center gap-2 px-4 py-4 border-r w-[88px] sm:w-[100px] flex-shrink-0',
+          theme.leftBg, theme.leftBorder,
+        )}>
           {rank && (
             <span className={cn(
               'text-xs font-black w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm',
@@ -156,20 +228,34 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
             </span>
           )}
 
+          {/* Crown / Diamond icon for premium */}
+          {theme.crownIcon && (
+            <span className={cn(
+              'text-base leading-none',
+              isGold    && 'drop-shadow-[0_1px_3px_rgba(251,191,36,0.8)]',
+              isDiamond && 'drop-shadow-[0_1px_3px_rgba(167,139,250,0.8)]',
+            )}>
+              {theme.crownIcon}
+            </span>
+          )}
+
           {/* Avatar */}
           <div className="relative">
             {agent.avatar ? (
               <img src={agent.avatar} alt={agent.name}
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover shadow-sm border border-gray-200" />
+                className={cn(
+                  'w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover shadow-sm border border-gray-200',
+                  theme.avatarRing,
+                )} />
             ) : (
               <div className={cn(
                 'w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center text-white text-lg font-black shadow-sm',
-                `bg-gradient-to-br ${tick?.grad ?? 'from-slate-400 to-slate-600'}`,
+                `bg-gradient-to-br ${theme.avatarGrad}`,
+                theme.avatarRing,
               )}>
                 {getInitials(agent.name)}
               </div>
             )}
-            {/* Verified dot */}
             {agent.isVerified && (
               <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center">
                 <CheckCircle className="w-3 h-3 text-white fill-white" />
@@ -180,7 +266,12 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
           {/* Rating under avatar */}
           {(agent.agentRating ?? 0) > 0 && (
             <div className="flex flex-col items-center gap-0.5">
-              <span className="text-sm font-black text-amber-500">{Number(agent.agentRating).toFixed(1)}</span>
+              <span className={cn(
+                'text-sm font-black',
+                isGold ? 'text-amber-600' : isDiamond ? 'text-violet-600' : 'text-amber-500',
+              )}>
+                {Number(agent.agentRating).toFixed(1)}
+              </span>
               <Stars rating={Number(agent.agentRating)} size="xs" />
             </div>
           )}
@@ -190,9 +281,12 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
         <Link href={`/agents/${slug}`} className="flex-1 min-w-0 px-4 py-4 flex flex-col justify-between">
 
           <div>
-            {/* Name + badges */}
+            {/* Name + badges row */}
             <div className="flex flex-wrap items-center gap-1.5 mb-1">
-              <h2 className="text-base font-extrabold text-gray-900 group-hover:text-primary-600 transition-colors leading-tight">
+              <h2 className={cn(
+                'text-base font-extrabold text-gray-900 transition-colors leading-tight',
+                theme.nameCls,
+              )}>
                 {agent.name}
               </h2>
               {agent.isVerified && (
@@ -201,16 +295,35 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
                 </span>
               )}
               {tick && (
-                <span className={cn('inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full border', tick.cls)}>
+                <span className={cn(
+                  'inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full border',
+                  tick.cls,
+                  isPremium && 'font-extrabold tracking-wide',
+                )}>
                   {tick.icon} {tick.label}
                 </span>
               )}
             </div>
 
+            {/* Premium tagline for gold / diamond */}
+            {isGold && (
+              <p className="text-[10px] font-semibold text-amber-600/80 mb-1.5 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> Trusted Gold-Tier Agent
+              </p>
+            )}
+            {isDiamond && (
+              <p className="text-[10px] font-semibold text-violet-600/80 mb-1.5 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> Elite Diamond-Tier Agent
+              </p>
+            )}
+
             {/* Company + location */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mb-2.5 text-xs text-gray-500">
               {agent.company && (
-                <span className="flex items-center gap-1 font-semibold text-gray-700">
+                <span className={cn(
+                  'flex items-center gap-1 font-semibold',
+                  isGold ? 'text-amber-800' : isDiamond ? 'text-violet-800' : 'text-gray-700',
+                )}>
                   <Building2 className="w-3 h-3 text-gray-400" />{agent.company}
                 </span>
               )}
@@ -222,35 +335,27 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
               )}
             </div>
 
-            {/* Stats row — JustDial style horizontal pills */}
+            {/* Stats row */}
             <div className="flex flex-wrap gap-2 mb-2.5">
               <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                <span className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
-                  <Briefcase className="w-3.5 h-3.5 text-blue-500" />
+                <span className={cn('w-6 h-6 rounded-lg border flex items-center justify-center flex-shrink-0', theme.statIconBg)}>
+                  <Briefcase className={cn('w-3.5 h-3.5', theme.statIconColor)} />
                 </span>
-                <span><b className="text-gray-900">{agent.agentExperience ?? 0}+</b> yrs experience</span>
+                <span><b className="text-gray-900">{agent.agentExperience ?? 0}+</b> yrs exp</span>
               </div>
               <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                <span className="w-6 h-6 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0">
-                  <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                <span className={cn('w-6 h-6 rounded-lg border flex items-center justify-center flex-shrink-0', theme.statIconBg)}>
+                  <TrendingUp className={cn('w-3.5 h-3.5', theme.statIconColor)} />
                 </span>
-                <span><b className="text-gray-900">{agent.totalDeals ?? 0}</b> deals closed</span>
+                <span><b className="text-gray-900">{agent.totalDeals ?? 0}</b> deals</span>
               </div>
               <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                <span className="w-6 h-6 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
-                  <Building2 className="w-3.5 h-3.5 text-amber-500" />
+                <span className={cn('w-6 h-6 rounded-lg border flex items-center justify-center flex-shrink-0', theme.statIconBg)}>
+                  <Building2 className={cn('w-3.5 h-3.5', theme.statIconColor)} />
                 </span>
-                <span><b className="text-gray-900">{agent.agentUsedQuota ?? 0}</b> active listings</span>
+                <span><b className="text-gray-900">{agent.agentUsedQuota ?? 0}</b> listings</span>
               </div>
             </div>
-
-            {/* RERA */}
-            {agent.agentLicense && (
-              <div className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg mb-2">
-                <Shield className="w-3 h-3 flex-shrink-0" />
-                RERA Reg: <span className="font-mono font-bold">{agent.agentLicense}</span>
-              </div>
-            )}
 
             {/* Bio */}
             {agent.agentBio && (
@@ -261,21 +366,26 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
         </Link>
 
         {/* ── RIGHT: contact panel — desktop ──────── */}
-        <div className="hidden sm:flex flex-col border-l border-gray-100 w-[160px] flex-shrink-0">
+        <div className={cn(
+          'hidden sm:flex flex-col border-l w-[160px] flex-shrink-0',
+          theme.rightBg, theme.rightBorder,
+        )}>
 
           {/* Header */}
-          <div className="px-4 pt-4 pb-3 border-b border-gray-100">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Contact Agent</p>
+          <div className={cn('px-4 pt-4 pb-3 border-b', theme.rightBorder)}>
+            <p className={cn(
+              'text-[10px] font-semibold uppercase tracking-wider mb-1.5',
+              isGold ? 'text-amber-600' : isDiamond ? 'text-violet-600' : 'text-gray-400',
+            )}>
+              Contact {isGold ? '★ Agent' : isDiamond ? '◆ Agent' : 'Agent'}
+            </p>
             {agent.phone ? (
               <p className="text-xs font-bold text-gray-800 flex items-center gap-1">
-                <Phone className="w-3 h-3 text-emerald-500 flex-shrink-0" />
-                {agent.phone.replace(/(\d{5})(\d{5})/, '$1 $2')}
+                <Phone className={cn('w-3 h-3 flex-shrink-0', isGold ? 'text-amber-500' : isDiamond ? 'text-violet-500' : 'text-emerald-500')} />
+                ••••• {agent.phone.slice(-5)}
               </p>
             ) : (
-              <p className="text-xs text-gray-400 italic">Phone hidden</p>
-            )}
-            {agent.email && (
-              <p className="text-[10px] text-gray-400 mt-0.5 truncate">{agent.email}</p>
+              <p className="text-xs text-gray-400 italic">Login to view</p>
             )}
           </div>
 
@@ -284,26 +394,34 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
             {agent.phone ? (
               <CallButton
                 phone={`+91${agent.phone}`}
-                className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-all active:scale-95 shadow-sm"
+                className={cn('flex items-center justify-center gap-1.5 w-full py-2.5 text-xs font-bold rounded-xl transition-all active:scale-95', theme.callCls)}
               >
                 <Phone className="w-3.5 h-3.5" /> Call Now
               </CallButton>
             ) : (
               <Link href={`/agents/${slug}`}
-                className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition-all active:scale-95">
+                className={cn('flex items-center justify-center gap-1.5 w-full py-2.5 text-xs font-bold rounded-xl transition-all active:scale-95', theme.callCls)}>
                 <MessageCircle className="w-3.5 h-3.5" /> Send Enquiry
               </Link>
             )}
 
-            {wa && (
-              <a href={wa} target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center gap-1.5 w-full py-2.5 border border-green-400 text-green-700 hover:bg-green-50 bg-green-50/40 text-xs font-bold rounded-xl transition-all active:scale-95">
+            {waPhone && (
+              <WhatsAppButton
+                phone={waPhone}
+                message={`Hi ${agent.name}, I found your profile on Think4BuySale and I'm interested in your real estate services.`}
+                className={cn('flex items-center justify-center gap-1.5 w-full py-2.5 border text-xs font-bold rounded-xl transition-all active:scale-95', theme.waCls)}
+              >
                 <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
-              </a>
+              </WhatsAppButton>
             )}
 
             <Link href={`/agents/${slug}`}
-              className="flex items-center justify-center gap-1 w-full py-2.5 border border-gray-200 hover:border-primary-300 text-gray-600 hover:text-primary-600 hover:bg-primary-50 text-xs font-semibold rounded-xl transition-all">
+              className={cn(
+                'flex items-center justify-center gap-1 w-full py-2.5 text-xs font-semibold rounded-xl transition-all border',
+                isGold    ? 'border-amber-200 text-amber-700 hover:bg-amber-50' :
+                isDiamond ? 'border-violet-200 text-violet-700 hover:bg-violet-50' :
+                            'border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50',
+              )}>
               View Profile <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
@@ -313,23 +431,36 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
       </div>
 
       {/* ── Mobile CTA ───────────────────────────────────────────────────── */}
-      <div className="sm:hidden px-3 pb-3 pt-2.5 border-t border-gray-100 bg-white flex items-center gap-2">
-        {agent.phone ? (
+      <div className={cn(
+        'sm:hidden px-3 pb-3 pt-2.5 border-t flex items-center gap-2',
+        isGold    ? 'border-amber-200 bg-amber-50/40' :
+        isDiamond ? 'border-violet-200 bg-violet-50/40' :
+                    'border-gray-100 bg-white',
+      )}>
+        {agent.phone && (
           <CallButton
             phone={`+91${agent.phone}`}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm"
+            className={cn('flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-colors', theme.callCls)}
           >
-            <Phone className="w-3.5 h-3.5 flex-shrink-0" /> Call Agent
+            <Phone className="w-3.5 h-3.5 flex-shrink-0" /> Call
           </CallButton>
-        ) : null}
-        {wa ? (
-          <a href={wa} target="_blank" rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm">
+        )}
+        {waPhone && (
+          <WhatsAppButton
+            phone={waPhone}
+            message={`Hi ${agent.name}, I found your profile on Think4BuySale and I'm interested in your real estate services.`}
+            className={cn('flex-1 flex items-center justify-center gap-1.5 py-2.5 border rounded-xl text-xs font-bold transition-colors', theme.waCls)}
+          >
             <MessageCircle className="w-3.5 h-3.5 flex-shrink-0" /> WhatsApp
-          </a>
-        ) : null}
+          </WhatsAppButton>
+        )}
         <Link href={`/agents/${slug}`}
-          className="flex items-center justify-center gap-1 py-2.5 px-3.5 border border-gray-200 bg-gray-50 hover:bg-primary-50 hover:border-primary-300 text-gray-700 hover:text-primary-600 rounded-xl text-xs font-semibold transition-colors">
+          className={cn(
+            'flex items-center justify-center gap-1 py-2.5 px-3.5 border rounded-xl text-xs font-semibold transition-colors',
+            isGold    ? 'border-amber-200 bg-amber-50/60 text-amber-700 hover:bg-amber-100' :
+            isDiamond ? 'border-violet-200 bg-violet-50/60 text-violet-700 hover:bg-violet-100' :
+                        'border-gray-200 bg-gray-50 text-gray-700 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-600',
+          )}>
           <Users className="w-3.5 h-3.5 flex-shrink-0" /> Profile
         </Link>
       </div>

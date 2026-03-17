@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     ? `Explore flats, plots and independent houses for sale in ${city}. ${data.famousFor}. Compare prices, view listings and connect with agents. RERA verified properties.`
     : `Explore flats, plots and independent houses for sale in ${city}. Compare prices, view listings and connect with agents directly. Browse 1000+ verified properties in ${city}.`;
 
-  const canonical = `${SITE}/property-in/${params.city}`;
+  const canonical = `${SITE}/property-in-${params.city}`;
 
   return {
     title,
@@ -56,7 +56,7 @@ export default function PropertyInCityPage({ params }: { params: Params }) {
   const schema = buildBreadcrumbSchema([
     { name: 'Home',              url: SITE },
     { name: 'Properties',        url: `${SITE}/properties` },
-    { name: `Property in ${city}`, url: `${SITE}/property-in/${params.city}` },
+    { name: `Property in ${city}`, url: `${SITE}/property-in-${params.city}` },
   ]);
 
   return (

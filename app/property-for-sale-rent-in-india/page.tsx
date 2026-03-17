@@ -120,7 +120,7 @@ function StateCard({ state, idx }: { state: StateStats; idx: number }) {
 
   return (
     <Link
-      href={`/properties-in/${state.slug}`}
+      href={`/properties-in-${state.slug}`}
       className="group relative bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col"
     >
       {/* ── Banner ── */}

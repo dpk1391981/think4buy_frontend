@@ -177,13 +177,28 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSearchParams.toString()]);
 
+  const typeParam = getMerged('type');
+
+  // Type → human label map (mirrors TopCategories CAT_STYLE keys)
+  const TYPE_LABELS: Record<string, string> = {
+    apartment: 'Apartments', villa: 'Villas', plot: 'Plots / Land',
+    house: 'Houses', penthouse: 'Penthouses', studio: 'Studio Flats',
+    commercial_office: 'Office Spaces', commercial_shop: 'Retail Shops',
+    commercial_warehouse: 'Warehouses', pg: 'PG / Hostel',
+    co_living: 'Co-Living', builder_floor: 'Builder Floors',
+    farm_house: 'Farm Houses', land: 'Land', showroom: 'Showrooms',
+    industrial_shed: 'Industrial Sheds', factory: 'Factories',
+  };
+
   const effectiveSlug = isNewProject ? 'new_projects' : category;
   const style = SLUG_STYLE[effectiveSlug] ?? DEFAULT_STYLE;
   const catLabel = isNewProject
     ? 'New Projects'
     : (categoryNames[category]
         ? `${categoryNames[category]} Properties`
-        : category ? `${category} Properties` : 'All Properties');
+        : category ? `${category} Properties`
+        : typeParam ? (TYPE_LABELS[typeParam] ?? `${typeParam} Properties`)
+        : 'All Properties');
 
   const headingParts = [catLabel];
   if (locality) headingParts.push(`in ${locality}`);

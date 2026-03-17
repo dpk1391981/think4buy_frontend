@@ -135,7 +135,7 @@ function StateCircle({ state, index, onTrack }: StateCircleProps) {
 
   return (
     <Link
-      href={`/properties-in/${slug}`}
+      href={`/properties-in-${slug}`}
       onClick={onTrack}
       className="group flex-shrink-0 snap-start flex flex-col items-center gap-2 w-[76px] sm:w-[88px] focus:outline-none"
       aria-label={`Explore ${state.name}`}

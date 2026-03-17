@@ -136,7 +136,8 @@ export default function PropertyDetailClient({ property }: Props) {
   const [mapRef, mapVisible]             = useLazyComponent<HTMLDivElement>({ rootMargin: '300px' });
   const [ownerPropsRef, ownerPropsVisible] = useLazyComponent<HTMLDivElement>({ rootMargin: '500px' });
 
-  const isInactiveListing = property.status !== 'active';
+  // under_deal: deal in progress but still accepts inquiries; other non-active statuses hide contact
+  const isInactiveListing = property.status !== 'active' && property.status !== 'under_deal';
 
   const { data: similar, isLoading: similarLoading } = useQuery({
     queryKey: ['similar', property.id],
@@ -489,7 +490,7 @@ export default function PropertyDetailClient({ property }: Props) {
           <span className="text-gray-800 line-clamp-1">{property.title}</span>
         </nav>
 
-        {/* ── Status Banner (SOLD / RENTED / INACTIVE) ─────────────────────── */}
+        {/* ── Status Banner (UNDER_DEAL / SOLD / RENTED / INACTIVE) ────────── */}
         {property.status !== 'active' && (
           <div className={cn(
             'mb-4 rounded-2xl p-4 border flex flex-col sm:flex-row sm:items-center gap-3',
@@ -497,23 +498,28 @@ export default function PropertyDetailClient({ property }: Props) {
               ? 'bg-red-50 border-red-200 text-red-800'
               : property.status === 'rented'
               ? 'bg-orange-50 border-orange-200 text-orange-800'
+              : property.status === 'under_deal'
+              ? 'bg-amber-50 border-amber-200 text-amber-800'
               : 'bg-gray-50 border-gray-200 text-gray-700',
           )}>
             <div className="flex items-center gap-2.5 flex-1">
               <AlertTriangle className={cn(
                 'w-5 h-5 flex-shrink-0',
-                property.status === 'sold' ? 'text-red-500' :
-                property.status === 'rented' ? 'text-orange-500' : 'text-gray-400',
+                property.status === 'sold'       ? 'text-red-500'    :
+                property.status === 'rented'     ? 'text-orange-500' :
+                property.status === 'under_deal' ? 'text-amber-500'  : 'text-gray-400',
               )} />
               <div>
                 <p className="font-bold text-base leading-tight">
-                  {property.status === 'sold' && 'This property has been SOLD'}
-                  {property.status === 'rented' && 'This property has been RENTED'}
+                  {property.status === 'sold'       && 'This property has been SOLD'}
+                  {property.status === 'rented'     && 'This property has been RENTED'}
+                  {property.status === 'under_deal' && '🤝 Deal in Progress'}
                   {(property.status === 'inactive' || property.status === 'pending') && 'This listing is currently inactive'}
                 </p>
                 <p className="text-sm mt-0.5 opacity-80">
-                  {property.status === 'sold' && 'The listing is no longer available. Browse similar properties below.'}
-                  {property.status === 'rented' && 'This rental is no longer available. Browse similar rentals below.'}
+                  {property.status === 'sold'       && 'The listing is no longer available. Browse similar properties below.'}
+                  {property.status === 'rented'     && 'This rental is no longer available. Browse similar rentals below.'}
+                  {property.status === 'under_deal' && 'A deal is currently in progress for this property. You may still enquire.'}
                   {(property.status === 'inactive' || property.status === 'pending') && 'This listing has been taken off the market temporarily.'}
                 </p>
               </div>
@@ -526,6 +532,8 @@ export default function PropertyDetailClient({ property }: Props) {
                   ? 'bg-red-100 hover:bg-red-200 text-red-800'
                   : property.status === 'rented'
                   ? 'bg-orange-100 hover:bg-orange-200 text-orange-800'
+                  : property.status === 'under_deal'
+                  ? 'bg-amber-100 hover:bg-amber-200 text-amber-800'
                   : 'bg-gray-200 hover:bg-gray-300 text-gray-800',
               )}
             >
@@ -744,14 +752,23 @@ export default function PropertyDetailClient({ property }: Props) {
               <div className="md:hidden bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100">
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Contact {isAgent ? 'Agent' : 'Owner'}</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <a
-                    href={phone ? `tel:${phone}` : '#'}
-                    onClick={() => trackPropertyInquiry(property.id, { city: property.city || undefined })}
-                    className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all"
-                  >
-                    <Phone className="w-4 h-4" /> Call Now
-                  </a>
-                  {waLink ? (
+                  {user ? (
+                    <a
+                      href={phone ? `tel:${phone}` : '#'}
+                      onClick={() => trackPropertyInquiry(property.id, { city: property.city || undefined })}
+                      className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all"
+                    >
+                      <Phone className="w-4 h-4" /> Call Now
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                      className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 active:scale-95 transition-all"
+                    >
+                      <Lock className="w-4 h-4" /> Call Now
+                    </button>
+                  )}
+                  {waLink && user ? (
                     <a
                       href={waLink}
                       target="_blank"
@@ -760,6 +777,13 @@ export default function PropertyDetailClient({ property }: Props) {
                     >
                       <MessageSquare className="w-4 h-4" /> WhatsApp
                     </a>
+                  ) : waLink ? (
+                    <button
+                      onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                      className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 active:scale-95 transition-all"
+                    >
+                      <Lock className="w-4 h-4" /> WhatsApp
+                    </button>
                   ) : (
                     <button
                       onClick={() => openInquiryModal('general')}
@@ -878,22 +902,40 @@ export default function PropertyDetailClient({ property }: Props) {
                   )}
                   <div className="flex flex-wrap gap-2 mt-3">
                     {phone && (
-                      <a
-                        href={`tel:${phone}`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors"
-                      >
-                        <Phone className="w-3.5 h-3.5" /> Call
-                      </a>
+                      user ? (
+                        <a
+                          href={`tel:${phone}`}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors"
+                        >
+                          <Phone className="w-3.5 h-3.5" /> Call
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors"
+                        >
+                          <Lock className="w-3.5 h-3.5" /> Call
+                        </button>
+                      )
                     )}
                     {waLink && (
-                      <a
-                        href={waLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-colors"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
-                      </a>
+                      user ? (
+                        <a
+                          href={waLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-colors"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-colors"
+                        >
+                          <Lock className="w-3.5 h-3.5" /> WhatsApp
+                        </button>
+                      )
                     )}
                     {isAgent && owner?.id && (
                       <Link

@@ -82,6 +82,22 @@ const SEO_PREFIXES = [
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // ── 301: /properties-in/state → /properties-in-state (canonical hyphen form) ──
+  if (/^\/properties-in\/[^/]+$/.test(pathname)) {
+    const slug = pathname.replace('/properties-in/', '');
+    const url  = request.nextUrl.clone();
+    url.pathname = `/properties-in-${slug}`;
+    return NextResponse.redirect(url, 301);
+  }
+
+  // ── 301: /property-in/city → /property-in-city (canonical hyphen form) ────────
+  if (/^\/property-in\/[^/]+$/.test(pathname)) {
+    const slug = pathname.replace('/property-in/', '');
+    const url  = request.nextUrl.clone();
+    url.pathname = `/property-in-${slug}`;
+    return NextResponse.redirect(url, 301);
+  }
+
   // ── SEO URL rewrite: /prefix-in-city → /prefix-in/city ─────────────────
   for (const prefix of SEO_PREFIXES) {
     const match = pathname.match(new RegExp(`^\\/(${prefix})-([^/]+)$`));

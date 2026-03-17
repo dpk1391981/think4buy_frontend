@@ -6,7 +6,8 @@ import {
   Plus, CheckCircle, Clock, XCircle, Building2, LayoutGrid,
   MapPin, Eye, Pencil, Star, Search, X, Home, List,
   ChevronLeft, ChevronRight, BedDouble, Maximize2, RefreshCw,
-  TrendingUp, LogOut, User, Settings, Heart, Target,
+  TrendingUp, LogOut, User, Settings, Heart, ChevronDown,
+  Handshake, KeyRound, CircleSlash,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { propertiesApi } from '@/lib/api';
@@ -24,11 +25,24 @@ import AuthGuard from '@/components/auth/AuthGuard';
 const PER_PAGE = 9;
 
 const STATUS_CONFIG = {
-  active:   { label: 'Active',   dot: 'bg-emerald-500', pill: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200', icon: CheckCircle, color: 'text-emerald-600' },
-  pending:  { label: 'Pending',  dot: 'bg-amber-400',   pill: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',       icon: Clock,        color: 'text-amber-600' },
-  rejected: { label: 'Rejected', dot: 'bg-red-500',     pill: 'bg-red-50 text-red-600 ring-1 ring-red-200',            icon: XCircle,      color: 'text-red-500' },
-  draft:    { label: 'Draft',    dot: 'bg-gray-400',    pill: 'bg-gray-50 text-gray-600 ring-1 ring-gray-200',          icon: Clock,        color: 'text-gray-500' },
+  active:     { label: 'Active',     dot: 'bg-emerald-500', pill: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',  icon: CheckCircle,   color: 'text-emerald-600' },
+  under_deal: { label: 'Under Deal', dot: 'bg-orange-400',  pill: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200',    icon: Handshake,     color: 'text-orange-600' },
+  sold:       { label: 'Sold',       dot: 'bg-red-500',     pill: 'bg-red-50 text-red-700 ring-1 ring-red-200',             icon: CheckCircle,   color: 'text-red-600' },
+  rented:     { label: 'Rented',     dot: 'bg-blue-500',    pill: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',          icon: KeyRound,      color: 'text-blue-600' },
+  inactive:   { label: 'Inactive',   dot: 'bg-gray-400',    pill: 'bg-gray-50 text-gray-600 ring-1 ring-gray-200',          icon: CircleSlash,   color: 'text-gray-500' },
+  pending:    { label: 'Pending',    dot: 'bg-amber-400',   pill: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',       icon: Clock,         color: 'text-amber-600' },
+  rejected:   { label: 'Rejected',   dot: 'bg-red-500',     pill: 'bg-red-50 text-red-600 ring-1 ring-red-200',             icon: XCircle,       color: 'text-red-500' },
+  draft:      { label: 'Draft',      dot: 'bg-gray-400',    pill: 'bg-gray-50 text-gray-600 ring-1 ring-gray-200',          icon: Clock,         color: 'text-gray-500' },
 } as const;
+
+// Allowed next statuses owners/agents can set
+const NEXT_STATUSES: Record<string, string[]> = {
+  active:     ['under_deal', 'sold', 'rented', 'inactive'],
+  under_deal: ['active', 'sold', 'rented', 'inactive'],
+  sold:       ['active'],
+  rented:     ['active'],
+  inactive:   ['active'],
+};
 
 type StatusKey = keyof typeof STATUS_CONFIG;
 type ViewMode = 'grid' | 'list';
@@ -87,10 +101,14 @@ function MyListingsContent() {
 
   const counts = useMemo(() => ({
     '': all.length,
-    active:   all.filter(p => p.status === 'active' && !p.isDraft).length,
-    pending:  all.filter(p => p.status === 'pending' && !p.isDraft).length,
-    rejected: all.filter(p => p.status === 'rejected' && !p.isDraft).length,
-    draft:    all.filter(p => p.isDraft).length,
+    active:     all.filter(p => p.status === 'active'     && !p.isDraft).length,
+    under_deal: all.filter(p => p.status === 'under_deal' && !p.isDraft).length,
+    sold:       all.filter(p => p.status === 'sold'       && !p.isDraft).length,
+    rented:     all.filter(p => p.status === 'rented'     && !p.isDraft).length,
+    inactive:   all.filter(p => p.status === 'inactive'   && !p.isDraft).length,
+    pending:    all.filter(p => p.status === 'pending'    && !p.isDraft).length,
+    rejected:   all.filter(p => p.status === 'rejected'   && !p.isDraft).length,
+    draft:      all.filter(p => p.isDraft).length,
   }), [all]);
 
   const filtered = useMemo(() => {
@@ -123,6 +141,15 @@ function MyListingsContent() {
       await load(true);
     } catch (err: any) {
       alert(err?.response?.data?.message || 'Failed to publish draft');
+    }
+  };
+
+  const handleStatusChange = async (id: string, status: string, note?: string) => {
+    try {
+      await propertiesApi.updateStatus(id, status, note);
+      await load(true);
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Failed to update status');
     }
   };
 
@@ -163,7 +190,7 @@ function MyListingsContent() {
           {/* Stat row */}
           {!loading && (
             <div className="grid grid-cols-3 gap-2">
-              {(['active', 'pending', 'rejected'] as StatusKey[]).map(s => {
+              {(['active', 'under_deal', 'sold', 'rented', 'pending', 'inactive'] as StatusKey[]).filter(s => (counts as any)[s] > 0 || s === 'active').slice(0, 3).map(s => {
                 const cfg = STATUS_CONFIG[s];
                 return (
                   <button
@@ -175,7 +202,7 @@ function MyListingsContent() {
                     )}
                   >
                     <p className={cn('text-lg font-black leading-none', tab === s ? 'text-white' : cfg.color)}>
-                      {counts[s]}
+                      {(counts as any)[s] ?? 0}
                     </p>
                     <p className={cn('text-[9px] font-semibold mt-0.5', tab === s ? 'text-blue-100' : 'text-gray-400')}>
                       {cfg.label}
@@ -386,8 +413,8 @@ function MyListingsContent() {
             )}>
               {paginated.map(p => (
                 view === 'list'
-                  ? <ListingRow key={p.id} p={p} onPublish={handlePublish} />
-                  : <ListingCard key={p.id} p={p} onPublish={handlePublish} />
+                  ? <ListingRow key={p.id} p={p} onPublish={handlePublish} onStatusChange={handleStatusChange} />
+                  : <ListingCard key={p.id} p={p} onPublish={handlePublish} onStatusChange={handleStatusChange} />
               ))}
             </div>
           )}
@@ -434,9 +461,67 @@ function MyListingsContent() {
   );
 }
 
+// ─── Status Dropdown ──────────────────────────────────────────────────────────
+
+function StatusDropdown({ currentStatus, propertyId, onStatusChange }: {
+  currentStatus: string;
+  propertyId: string;
+  onStatusChange: (id: string, status: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const nextStatuses = NEXT_STATUSES[currentStatus] ?? [];
+  if (!nextStatuses.length) return null;
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
+    active:     { label: '✅ Mark Active',     cls: 'text-emerald-700 hover:bg-emerald-50' },
+    under_deal: { label: '🤝 Under Deal',      cls: 'text-orange-700 hover:bg-orange-50' },
+    sold:       { label: '✅ Mark as Sold',    cls: 'text-red-700 hover:bg-red-50' },
+    rented:     { label: '🔑 Mark as Rented', cls: 'text-blue-700 hover:bg-blue-50' },
+    inactive:   { label: '⏸ Deactivate',      cls: 'text-gray-600 hover:bg-gray-100' },
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-all"
+      >
+        Status <ChevronDown className={cn('w-3 h-3 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="absolute bottom-full mb-1.5 left-0 z-50 bg-white rounded-xl shadow-xl border border-gray-100 py-1 min-w-[170px]">
+          {nextStatuses.map(s => {
+            const item = STATUS_LABELS[s];
+            if (!item) return null;
+            return (
+              <button
+                key={s}
+                onClick={() => { onStatusChange(propertyId, s); setOpen(false); }}
+                className={cn('w-full text-left px-4 py-2 text-xs font-semibold transition-colors', item.cls)}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Grid card ────────────────────────────────────────────────────────────────
 
-function ListingCard({ p, onPublish }: { p: any; onPublish?: (id: string) => void }) {
+function ListingCard({ p, onPublish, onStatusChange }: { p: any; onPublish?: (id: string) => void; onStatusChange?: (id: string, status: string) => void }) {
   const status = p.isDraft ? STATUS_CONFIG.draft : (STATUS_CONFIG[p.status as StatusKey] ?? STATUS_CONFIG.pending);
   const thumb  = p.images?.[0]?.url || getPrimaryImage([]);
 
@@ -501,13 +586,16 @@ function ListingCard({ p, onPublish }: { p: any; onPublish?: (id: string) => voi
           ) : (
             <>
               <Link href={`/properties/${p.slug}`}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 active:scale-95 transition-all">
+                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 active:scale-95 transition-all">
                 <Eye className="w-3.5 h-3.5" /> View
               </Link>
               <Link href={`/post-property?edit=${p.id}`}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all shadow-sm shadow-blue-600/20">
+                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all shadow-sm shadow-blue-600/20">
                 <Pencil className="w-3.5 h-3.5" /> Edit
               </Link>
+              {onStatusChange && (
+                <StatusDropdown currentStatus={p.status} propertyId={p.id} onStatusChange={onStatusChange} />
+              )}
             </>
           )}
         </div>
@@ -518,7 +606,7 @@ function ListingCard({ p, onPublish }: { p: any; onPublish?: (id: string) => voi
 
 // ─── List row ─────────────────────────────────────────────────────────────────
 
-function ListingRow({ p, onPublish }: { p: any; onPublish?: (id: string) => void }) {
+function ListingRow({ p, onPublish, onStatusChange }: { p: any; onPublish?: (id: string) => void; onStatusChange?: (id: string, status: string) => void }) {
   const status = p.isDraft ? STATUS_CONFIG.draft : (STATUS_CONFIG[p.status as StatusKey] ?? STATUS_CONFIG.pending);
   const thumb  = p.images?.[0]?.url || getPrimaryImage([]);
 
@@ -550,7 +638,7 @@ function ListingRow({ p, onPublish }: { p: any; onPublish?: (id: string) => void
           <p className="text-sm font-black text-blue-600">{formatPrice(p.price, p.priceUnit)}</p>
         </div>
 
-        <div className="flex items-center gap-2 mt-2">
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
           {p.isDraft ? (
             <>
               <Link href={`/post-property?edit=${p.id}`}
@@ -574,6 +662,9 @@ function ListingRow({ p, onPublish }: { p: any; onPublish?: (id: string) => void
                 className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all">
                 <Pencil className="w-3 h-3" /> Edit
               </Link>
+              {onStatusChange && (
+                <StatusDropdown currentStatus={p.status} propertyId={p.id} onStatusChange={onStatusChange} />
+              )}
             </>
           )}
           <span className="ml-auto text-[10px] text-gray-300">{timeAgo(p.createdAt)}</span>

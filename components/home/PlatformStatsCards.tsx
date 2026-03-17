@@ -28,9 +28,9 @@ export default function PlatformStatsCards() {
 
   // ── Cities card — href changes based on selected location ─────────────────
   const citiesHref = selectedCity
-    ? `/property-in/${toSlug(selectedCity)}`
+    ? `/property-in-${toSlug(selectedCity)}`
     : selectedState
-    ? `/properties-in/${toSlug(selectedState)}`
+    ? `/properties-in-${toSlug(selectedState)}`
     : selectedCountry
     ? `/property-for-sale-rent-in-${toSlug(selectedCountry)}`
     : '/property-for-sale-rent-in-india';
