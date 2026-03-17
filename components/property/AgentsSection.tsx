@@ -34,7 +34,7 @@ interface Agent {
   company?: string;
   city?: string;
   state?: string;
-  tick?: 'none' | 'blue' | 'gold' | 'diamond';
+  tick?: 'none' | 'verified' | 'bronze' | 'silver' | 'gold';
   rating: number;
   deals: number;
   experience: number;
@@ -42,7 +42,7 @@ interface Agent {
   bio?: string;
   coverageAreas?: string[];
   authorityScore: number;
-  /** true = this agent came from diamond coverage */
+  /** true = this agent came from coverage (gold/silver/bronze/verified) */
   isDiamond: boolean;
   /** true = occupies a paid premium slot */
   isSponsored: boolean;
@@ -62,10 +62,11 @@ function initials(name: string) {
 }
 
 const TICK = {
-  diamond: { label: 'Diamond',  bg: 'bg-violet-100 text-violet-700 border-violet-200',  dot: 'bg-violet-500'  },
-  gold:    { label: 'Gold',     bg: 'bg-amber-100 text-amber-700 border-amber-200',     dot: 'bg-amber-400'   },
-  blue:    { label: 'Verified', bg: 'bg-blue-100 text-blue-700 border-blue-200',        dot: 'bg-blue-500'    },
-  none:    { label: '',         bg: '',                                                  dot: 'bg-gray-300'    },
+  gold:     { label: 'Gold',     bg: 'bg-amber-100 text-amber-700 border-amber-200',     dot: 'bg-amber-400'   },
+  silver:   { label: 'Silver',   bg: 'bg-slate-100 text-slate-600 border-slate-200',     dot: 'bg-slate-400'   },
+  bronze:   { label: 'Bronze',   bg: 'bg-orange-100 text-orange-700 border-orange-200',  dot: 'bg-orange-400'  },
+  verified: { label: 'Verified', bg: 'bg-blue-100 text-blue-700 border-blue-200',        dot: 'bg-blue-500'    },
+  none:     { label: '',         bg: '',                                                  dot: 'bg-gray-300'    },
 };
 
 function Stars({ rating }: { rating: number }) {
@@ -80,15 +81,41 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-// ── Diamond card ───────────────────────────────────────────────────────────────
+// ── Gold/coverage card (formerly DiamondCard) ──────────────────────────────────
 
 function DiamondCard({ agent, city }: { agent: Agent; city: string }) {
   const agentSlug = slug(agent.name, agent.city || city);
   const phone     = agent.phone?.replace(/[^0-9]/g, '') ?? '';
   const waMsg     = `Hi ${agent.name.split(' ')[0]}, I found your profile on Think4BuySale. Looking for property in ${city}.`;
+  const tick      = agent.tick && agent.tick !== 'none' ? agent.tick : 'gold';
+  const ribbonCls = tick === 'gold'
+    ? 'from-amber-500 via-yellow-500 to-amber-600'
+    : tick === 'silver' ? 'from-slate-500 via-slate-400 to-slate-600'
+    : tick === 'bronze' ? 'from-orange-500 via-orange-400 to-orange-600'
+    : 'from-blue-500 via-blue-400 to-blue-600';
+  const ringCls   = tick === 'gold' ? 'ring-amber-200 group-hover:ring-amber-400'
+    : tick === 'silver' ? 'ring-slate-200 group-hover:ring-slate-400'
+    : tick === 'bronze' ? 'ring-orange-200 group-hover:ring-orange-400'
+    : 'ring-blue-200 group-hover:ring-blue-400';
+  const avatarBg  = tick === 'gold' ? 'from-amber-400 to-yellow-600'
+    : tick === 'silver' ? 'from-slate-400 to-slate-600'
+    : tick === 'bronze' ? 'from-orange-400 to-orange-600'
+    : 'from-blue-400 to-blue-600';
+  const badgeBg   = tick === 'gold' ? 'bg-amber-500' : tick === 'silver' ? 'bg-slate-400' : tick === 'bronze' ? 'bg-orange-500' : 'bg-blue-500';
+  const tickLabel = tick === 'gold' ? 'Gold Agent' : tick === 'silver' ? 'Silver Agent' : tick === 'bronze' ? 'Bronze Agent' : 'Verified Agent';
+  const scoreColor = tick === 'gold' ? 'text-amber-200' : tick === 'silver' ? 'text-slate-200' : tick === 'bronze' ? 'text-orange-200' : 'text-blue-200';
+  const hoverCls  = tick === 'gold' ? 'border-amber-200 hover:shadow-amber-100 hover:border-amber-400'
+    : tick === 'silver' ? 'border-slate-200 hover:shadow-slate-100 hover:border-slate-400'
+    : tick === 'bronze' ? 'border-orange-200 hover:shadow-orange-100 hover:border-orange-400'
+    : 'border-blue-200 hover:shadow-blue-100 hover:border-blue-400';
+  const coverageTagCls = tick === 'gold' ? 'bg-amber-50 text-amber-700 border-amber-100'
+    : tick === 'silver' ? 'bg-slate-50 text-slate-600 border-slate-100'
+    : tick === 'bronze' ? 'bg-orange-50 text-orange-700 border-orange-100'
+    : 'bg-blue-50 text-blue-700 border-blue-100';
+  const profileHoverCls = tick === 'gold' ? 'group-hover:text-amber-700' : tick === 'silver' ? 'group-hover:text-slate-700' : tick === 'bronze' ? 'group-hover:text-orange-700' : 'group-hover:text-blue-700';
 
   return (
-    <div className="group relative bg-white rounded-2xl border border-violet-200 shadow-sm hover:shadow-xl hover:shadow-violet-100 hover:border-violet-400 transition-all duration-300 overflow-hidden flex flex-col">
+    <div className={`group relative bg-white rounded-2xl border shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col ${hoverCls}`}>
 
       {/* Sponsored overlay badge */}
       {agent.isSponsored && (
@@ -98,13 +125,13 @@ function DiamondCard({ agent, city }: { agent: Agent; city: string }) {
       )}
 
       {/* Top ribbon */}
-      <div className="bg-gradient-to-r from-violet-600 via-purple-600 to-violet-700 px-4 py-2.5 flex items-center justify-between">
+      <div className={`bg-gradient-to-r ${ribbonCls} px-4 py-2.5 flex items-center justify-between`}>
         <div className="flex items-center gap-2">
-          <Gem className="w-3.5 h-3.5 text-violet-200" />
-          <span className="text-[11px] font-bold text-white tracking-wide uppercase">Diamond Agent</span>
+          <Crown className="w-3.5 h-3.5 text-white/70" />
+          <span className="text-[11px] font-bold text-white tracking-wide uppercase">{tickLabel}</span>
         </div>
         {agent.authorityScore > 0 && (
-          <span className="flex items-center gap-1 text-[10px] font-semibold text-violet-300">
+          <span className={`flex items-center gap-1 text-[10px] font-semibold ${scoreColor}`}>
             <Crown className="w-3 h-3" />Score {agent.authorityScore}
           </span>
         )}
@@ -113,25 +140,25 @@ function DiamondCard({ agent, city }: { agent: Agent; city: string }) {
       {/* Profile */}
       <div className="p-4 flex gap-3 items-start">
         <Link href={`/agents/${agentSlug}`} className="flex-shrink-0">
-          <div className="relative w-[68px] h-[68px] rounded-2xl overflow-hidden ring-2 ring-violet-200 group-hover:ring-violet-500 transition-all duration-300">
+          <div className={`relative w-[68px] h-[68px] rounded-2xl overflow-hidden ring-2 ${ringCls} transition-all duration-300`}>
             {agent.avatar
               ? <img src={resolveImageUrl(agent.avatar)} alt={agent.name} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              : <div className="w-full h-full bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center text-white font-bold text-xl">{initials(agent.name)}</div>
+              : <div className={`w-full h-full bg-gradient-to-br ${avatarBg} flex items-center justify-center text-white font-bold text-xl`}>{initials(agent.name)}</div>
             }
-            <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white bg-violet-500 flex items-center justify-center">
+            <span className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white ${badgeBg} flex items-center justify-center`}>
               <BadgeCheck className="w-3 h-3 text-white" />
             </span>
           </div>
         </Link>
 
         <div className="flex-1 min-w-0 pt-0.5" style={{ paddingRight: agent.isSponsored ? '72px' : '0' }}>
-          <Link href={`/agents/${agentSlug}`} className="block text-sm font-bold text-gray-900 group-hover:text-violet-700 transition-colors leading-snug">
+          <Link href={`/agents/${agentSlug}`} className={`block text-sm font-bold text-gray-900 ${profileHoverCls} transition-colors leading-snug`}>
             {agent.name}
           </Link>
           {agent.company && <p className="text-xs text-gray-500 mt-0.5 truncate">{agent.company}</p>}
           {(agent.city || agent.state) && (
             <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1">
-              <MapPin className="w-3 h-3 text-violet-400 flex-shrink-0" />
+              <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
               {[agent.city, agent.state].filter(Boolean).join(', ')}
             </p>
           )}
@@ -141,17 +168,17 @@ function DiamondCard({ agent, city }: { agent: Agent; city: string }) {
 
       {/* Stats */}
       {(agent.experience > 0 || agent.deals > 0 || agent.license) && (
-        <div className="flex items-stretch divide-x divide-violet-100 border-y border-violet-100 mx-4 mb-3 bg-violet-50/60 rounded-xl overflow-hidden">
+        <div className="flex items-stretch divide-x divide-gray-100 border-y border-gray-100 mx-4 mb-3 bg-gray-50/60 rounded-xl overflow-hidden">
           {agent.experience > 0 && (
             <div className="flex-1 flex flex-col items-center py-2.5">
-              <Briefcase className="w-3.5 h-3.5 text-violet-400 mb-0.5" />
+              <Briefcase className="w-3.5 h-3.5 text-gray-400 mb-0.5" />
               <span className="text-sm font-bold text-gray-800">{agent.experience}+</span>
               <span className="text-[10px] text-gray-500">Yrs Exp</span>
             </div>
           )}
           {agent.deals > 0 && (
             <div className="flex-1 flex flex-col items-center py-2.5">
-              <TrendingUp className="w-3.5 h-3.5 text-violet-400 mb-0.5" />
+              <TrendingUp className="w-3.5 h-3.5 text-gray-400 mb-0.5" />
               <span className="text-sm font-bold text-gray-800">{agent.deals}</span>
               <span className="text-[10px] text-gray-500">Deals</span>
             </div>
@@ -169,12 +196,12 @@ function DiamondCard({ agent, city }: { agent: Agent; city: string }) {
       {/* Coverage areas */}
       {(agent.coverageAreas?.length ?? 0) > 0 && (
         <div className="px-4 mb-3">
-          <p className="text-[10px] font-semibold text-violet-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
             <MapPin className="w-3 h-3" />Coverage
           </p>
           <div className="flex flex-wrap gap-1">
             {agent.coverageAreas!.slice(0, 4).map((a, i) => (
-              <span key={i} className="text-[11px] bg-violet-50 text-violet-700 border border-violet-100 px-2 py-0.5 rounded-full font-medium">{a}</span>
+              <span key={i} className={`text-[11px] border px-2 py-0.5 rounded-full font-medium ${coverageTagCls}`}>{a}</span>
             ))}
             {agent.coverageAreas!.length > 4 && (
               <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">+{agent.coverageAreas!.length - 4}</span>
@@ -189,7 +216,7 @@ function DiamondCard({ agent, city }: { agent: Agent; city: string }) {
       <div className="px-4 pb-4 flex gap-2">
         {agent.phone && (
           <>
-            <CallButton phone={agent.phone} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-xl transition-colors">
+            <CallButton phone={agent.phone} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-xl transition-colors">
               <Phone className="w-3.5 h-3.5" />Call
             </CallButton>
             <WhatsAppButton phone={phone} message={waMsg} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-xl transition-colors">
@@ -197,7 +224,7 @@ function DiamondCard({ agent, city }: { agent: Agent; city: string }) {
             </WhatsAppButton>
           </>
         )}
-        <Link href={`/agents/${agentSlug}`} className={`${agent.phone ? '' : 'flex-1 '}flex items-center justify-center gap-1 py-2.5 px-3 border border-violet-200 text-violet-700 hover:bg-violet-50 text-xs font-semibold rounded-xl transition-colors`}>
+        <Link href={`/agents/${agentSlug}`} className={`${agent.phone ? '' : 'flex-1 '}flex items-center justify-center gap-1 py-2.5 px-3 border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-semibold rounded-xl transition-colors`}>
           <Users className="w-3.5 h-3.5" />{agent.phone ? <ChevronRight className="w-3.5 h-3.5" /> : 'View Profile'}
         </Link>
       </div>
@@ -214,9 +241,10 @@ function FeaturedCard({ agent, city }: { agent: Agent; city: string }) {
   const tick      = agent.tick && agent.tick !== 'none' ? agent.tick : null;
   const tCfg      = tick ? TICK[tick] : null;
 
-  const accentCls = tick === 'diamond' ? 'from-violet-500 to-purple-600'
-    : tick === 'gold'  ? 'from-amber-400 to-yellow-500'
-    : tick === 'blue'  ? 'from-blue-500 to-primary-600'
+  const accentCls = tick === 'gold'     ? 'from-amber-400 to-yellow-500'
+    : tick === 'silver'  ? 'from-slate-400 to-slate-500'
+    : tick === 'bronze'  ? 'from-orange-400 to-orange-500'
+    : tick === 'verified' ? 'from-blue-500 to-primary-600'
     : 'from-primary-400 to-primary-600';
 
   return (
@@ -235,15 +263,18 @@ function FeaturedCard({ agent, city }: { agent: Agent; city: string }) {
       <div className="p-4 flex gap-3 items-start">
         <Link href={`/agents/${agentSlug}`} className="flex-shrink-0">
           <div className={`relative w-[68px] h-[68px] rounded-2xl overflow-hidden ring-2 transition-all duration-200 ${
-            tick === 'diamond' ? 'ring-violet-200 group-hover:ring-violet-400'
-            : tick === 'gold'  ? 'ring-amber-200 group-hover:ring-amber-400'
+            tick === 'gold'    ? 'ring-amber-200 group-hover:ring-amber-400'
+            : tick === 'silver'  ? 'ring-slate-200 group-hover:ring-slate-400'
+            : tick === 'bronze'  ? 'ring-orange-200 group-hover:ring-orange-400'
+            : tick === 'verified' ? 'ring-blue-200 group-hover:ring-blue-400'
             : 'ring-primary-100 group-hover:ring-primary-300'
           }`}>
             {agent.avatar
               ? <img src={resolveImageUrl(agent.avatar)} alt={agent.name} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               : <div className={`w-full h-full flex items-center justify-center text-white font-bold text-xl bg-gradient-to-br ${
-                  tick === 'diamond' ? 'from-violet-500 to-purple-700'
-                  : tick === 'gold'  ? 'from-amber-400 to-yellow-600'
+                  tick === 'gold'   ? 'from-amber-400 to-yellow-600'
+                  : tick === 'silver' ? 'from-slate-400 to-slate-600'
+                  : tick === 'bronze' ? 'from-orange-400 to-orange-600'
                   : 'from-primary-500 to-primary-700'
                 }`}>{initials(agent.name)}</div>
             }
@@ -332,8 +363,8 @@ function FeaturedCard({ agent, city }: { agent: Agent; city: string }) {
 
 function SkeletonCard({ diamond = false }: { diamond?: boolean }) {
   return (
-    <div className={`rounded-2xl border overflow-hidden animate-pulse flex flex-col bg-white ${diamond ? 'border-violet-100' : 'border-gray-100'}`}>
-      <div className={`h-9 ${diamond ? 'bg-violet-100' : 'h-1 bg-gray-100'}`} />
+    <div className={`rounded-2xl border overflow-hidden animate-pulse flex flex-col bg-white ${diamond ? 'border-amber-100' : 'border-gray-100'}`}>
+      <div className={`h-9 ${diamond ? 'bg-amber-100' : 'h-1 bg-gray-100'}`} />
       <div className="p-4 flex gap-3">
         <div className="w-[68px] h-[68px] rounded-2xl bg-gray-100 flex-shrink-0" />
         <div className="flex-1 space-y-2 pt-1">
@@ -392,7 +423,7 @@ export default function AgentsSection({ locality, city, state }: Props) {
         company:        a.company,
         city:           a.city,
         state:          a.state,
-        tick:           a.agentTick ?? 'diamond',
+        tick:           a.agentTick ?? 'gold',
         rating:         Number(a.agentRating ?? 0),
         deals:          a.totalDeals ?? 0,
         experience:     a.agentExperience ?? 0,
@@ -493,11 +524,11 @@ export default function AgentsSection({ locality, city, state }: Props) {
         return b.authorityScore - a.authorityScore;
       });
 
-      // Featured: sponsored first, then diamond tick, then rating
+      // Featured: sponsored first, then badge tier, then rating
       const featured = Array.from(featuredMap.values()).sort((a, b) => {
         if (a.isSponsored !== b.isSponsored) return a.isSponsored ? -1 : 1;
-        const tickOrder = { diamond: 3, gold: 2, blue: 1, none: 0 };
-        const ta = tickOrder[a.tick ?? 'none'], tb = tickOrder[b.tick ?? 'none'];
+        const tickOrder: Record<string, number> = { gold: 4, silver: 3, bronze: 2, verified: 1, none: 0 };
+        const ta = tickOrder[a.tick ?? 'none'] ?? 0, tb = tickOrder[b.tick ?? 'none'] ?? 0;
         if (ta !== tb) return tb - ta;
         return b.rating - a.rating;
       });
@@ -514,30 +545,30 @@ export default function AgentsSection({ locality, city, state }: Props) {
   const areaLabel  = locality || city || state || '';
   const cityDisp   = city ? city.charAt(0).toUpperCase() + city.slice(1) : '';
   const citySlug   = (city || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const diamondUrl = `/agents?tick=diamond${city ? `&city=${encodeURIComponent(city)}` : ''}`;
+  const diamondUrl = `/agents?tick=gold${city ? `&city=${encodeURIComponent(city)}` : ''}`;
   const allUrl     = `/property-agents-in-${citySlug}`;
 
   return (
     <div className="mt-6 space-y-8 px-4 sm:px-0">
 
-      {/* ── Diamond section ────────────────────────────────────────── */}
+      {/* ── Coverage agents section ─────────────────────────────────── */}
       {hasDiamond && (
         <section>
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center shadow-md shadow-violet-200 flex-shrink-0">
-                <Gem className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center shadow-md shadow-amber-200 flex-shrink-0">
+                <Crown className="w-5 h-5 text-white" />
               </div>
               <div>
                 <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  Top Diamond Agents
-                  {areaLabel && <span className="text-violet-600 font-semibold">in {areaLabel}</span>}
+                  Top Agents
+                  {areaLabel && <span className="text-amber-600 font-semibold">in {areaLabel}</span>}
                 </h2>
-                <p className="text-xs text-gray-400 mt-0.5">Premium coverage · Highest priority · Verified experts</p>
+                <p className="text-xs text-gray-400 mt-0.5">Gold · Silver · Bronze · Verified — Area coverage experts</p>
               </div>
             </div>
-            <Link href={diamondUrl} className="hidden sm:flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors whitespace-nowrap">
+            <Link href={diamondUrl} className="hidden sm:flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-800 transition-colors whitespace-nowrap">
               View all <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -561,8 +592,8 @@ export default function AgentsSection({ locality, city, state }: Props) {
                 </span>
               ))}
             </div>
-            <Link href={diamondUrl} className="sm:hidden flex items-center gap-1 text-xs font-semibold text-violet-600 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-50 transition-colors whitespace-nowrap">
-              View all Diamond Agents <ChevronRight className="w-3.5 h-3.5" />
+            <Link href={diamondUrl} className="sm:hidden flex items-center gap-1 text-xs font-semibold text-amber-600 border border-amber-200 px-4 py-2 rounded-xl hover:bg-amber-50 transition-colors whitespace-nowrap">
+              View all Top Agents <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </section>

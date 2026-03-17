@@ -40,19 +40,25 @@ interface LocalityOption { id: string; locality?: string; name?: string; slug?: 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function TickBadge({ tick }: { tick: string }) {
-  if (tick === 'diamond')
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200">
-        <Gem className="w-2.5 h-2.5" />Diamond
-      </span>
-    );
   if (tick === 'gold')
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
         ★ Gold
       </span>
     );
-  if (tick === 'blue')
+  if (tick === 'silver')
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+        ◈ Silver
+      </span>
+    );
+  if (tick === 'bronze')
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+        ◉ Bronze
+      </span>
+    );
+  if (tick === 'verified')
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
         <BadgeCheck className="w-2.5 h-2.5" />Verified
@@ -249,7 +255,7 @@ function AddCoverageModal({
 
           {/* Agent picker */}
           <SelectField
-            label="Diamond Agent"
+            label="Agent"
             value={agentProfileId}
             onChange={setAgentProfileId}
             placeholder="— Select an agent —"
@@ -258,7 +264,7 @@ function AddCoverageModal({
             {agents.map(a => (
               <option key={a.id} value={a.id}>
                 {a.user.name}
-                {a.tick === 'diamond' ? '  💎 Diamond' : a.tick === 'gold' ? '  ★ Gold' : a.tick === 'blue' ? '  ✓ Verified' : ''}
+                {a.tick === 'gold' ? '  ★ Gold' : a.tick === 'silver' ? '  ◈ Silver' : a.tick === 'bronze' ? '  ◉ Bronze' : a.tick === 'verified' ? '  ✓ Verified' : ''}
               </option>
             ))}
           </SelectField>
@@ -537,8 +543,8 @@ export default function AgentCoveragePage() {
             <Gem className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Diamond Coverage Areas</h1>
-            <p className="text-sm text-gray-400">Manage locality coverage for premium badge agents</p>
+            <h1 className="text-xl font-bold text-gray-900">Agent Coverage Areas</h1>
+            <p className="text-sm text-gray-400">Manage locality coverage for Gold, Silver, Bronze & Verified agents</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -562,12 +568,12 @@ export default function AgentCoveragePage() {
       {/* Info banner */}
       <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-2xl p-4">
         <p className="text-xs font-bold text-violet-700 flex items-center gap-1.5 mb-1">
-          <Gem className="w-3.5 h-3.5" /> How Diamond Coverage Works
+          <Gem className="w-3.5 h-3.5" /> How Agent Coverage Works
         </p>
         <p className="text-[12px] text-violet-600 leading-relaxed">
-          Diamond agents with mapped localities appear at the <b>top of search results</b> when users search
-          within those areas. Coverage can be at <b>locality</b>, <b>city</b>, or <b>state</b> level — broader
-          coverage includes all nested sub-areas.
+          Agents with mapped localities appear at the <b>top of search results</b> when users search
+          within those areas. Gold &gt; Silver &gt; Bronze &gt; Verified — higher badge = higher priority.
+          Coverage can be at <b>locality</b>, <b>city</b>, or <b>state</b> level.
         </p>
       </div>
 
@@ -613,9 +619,10 @@ export default function AgentCoveragePage() {
               className="pl-3 pr-8 py-2 border border-gray-200 rounded-xl text-sm appearance-none bg-white focus:ring-2 focus:ring-violet-200 focus:outline-none min-w-[120px]"
             >
               <option value="">All Tiers</option>
-              <option value="diamond">💎 Diamond</option>
               <option value="gold">★ Gold</option>
-              <option value="blue">✓ Verified</option>
+              <option value="silver">◈ Silver</option>
+              <option value="bronze">◉ Bronze</option>
+              <option value="verified">✓ Verified</option>
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>

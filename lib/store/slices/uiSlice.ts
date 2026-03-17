@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-const LS_KEY = 't4bs_location';
+const LS_KEY      = 't4bs_location';
+const LS_CITY_KEY = 't4bs_city';
 
 export function loadLocationFromLS(): { state: string; stateId: string } {
   if (typeof window === 'undefined') return { state: '', stateId: '' };
@@ -18,6 +19,26 @@ export function saveLocationToLS(state: string, stateId: string) {
       localStorage.setItem(LS_KEY, JSON.stringify({ state, stateId }));
     } else {
       localStorage.removeItem(LS_KEY);
+    }
+  } catch {}
+}
+
+export function loadCityFromLS(): { city: string; cityId: string } {
+  if (typeof window === 'undefined') return { city: '', cityId: '' };
+  try {
+    const raw = localStorage.getItem(LS_CITY_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { city: '', cityId: '' };
+}
+
+export function saveCityToLS(city: string, cityId: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (city) {
+      localStorage.setItem(LS_CITY_KEY, JSON.stringify({ city, cityId }));
+    } else {
+      localStorage.removeItem(LS_CITY_KEY);
     }
   } catch {}
 }
@@ -145,4 +166,7 @@ export const {
   setSelectedState, setSelectedLocation,
   setSelectedCountry, setSelectedCity, clearLocationFilter,
 } = uiSlice.actions;
+
+// Convenience: select city directly (city-first UI)
+export { setSelectedCity as selectCity };
 export default uiSlice.reducer;

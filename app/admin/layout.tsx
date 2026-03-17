@@ -57,7 +57,7 @@ const NAV_GROUPS = [
       { href: '/admin/agencies', label: 'Agencies', icon: Building2 },
       { href: '/admin/agents', label: 'Agents', icon: UserCheck },
       { href: '/admin/premium-slots',   label: 'Premium Slots',    icon: Zap },
-      { href: '/admin/agent-coverage',  label: 'Diamond Coverage', icon: Gem },
+      { href: '/admin/agent-coverage',  label: 'Agent Coverage', icon: Gem },
     ],
   },
   {

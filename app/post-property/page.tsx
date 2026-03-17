@@ -949,52 +949,55 @@ function Step3PropertyType({ form, dispatch, config }: any) {
 // ─── Step: Location ──────────────────────────────────────────────────────────
 
 function Step4Location({ form, dispatch }: any) {
-  const [states, setStates] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [localities, setLocalities] = useState<any[]>([]);
   const [localitiesLoading, setLocalitiesLoading] = useState(false);
+  const [citySearch, setCitySearch] = useState(form.city || '');
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
   // In edit mode, if locality is a free-text value (no localityId), start in custom mode
   const [customLocality, setCustomLocality] = useState(() => !!(form.locality && !form.localityId));
   const [geoStatus, setGeoStatus] = useState<'idle' | 'detecting' | 'found' | 'denied' | 'error'>('idle');
   const isAgent = form.userType === 'agent';
+  const isOwner = !isAgent; // owner / seller
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
+  const cityRef = useRef<HTMLDivElement>(null);
 
-  // ── Load states on mount ──────────────────────────────────────────────────
+  // ── Load all cities on mount ──────────────────────────────────────────────
   useEffect(() => {
-    locationsApi.getStates().then(r => {
+    locationsApi.getCities().then(r => {
       const d = r.data;
-      setStates(Array.isArray(d) ? d : d?.items || []);
+      setCities(Array.isArray(d) ? d : d?.items || []);
     }).catch(() => {});
   }, []);
 
-  // ── Load cities when state changes ───────────────────────────────────────
-  useEffect(() => {
-    if (!form.stateId) { setCities([]); setLocalities([]); return; }
-    locationsApi.getCitiesByState(form.stateId).then(r => {
-      const d = r.data;
-      setCities(Array.isArray(d) ? d : d?.items || []);
-    }).catch(() => setCities([]));
-  }, [form.stateId]);
-
-  // ── Load localities when city changes ────────────────────────────────────
+  // ── Load localities when city changes ─────────────────────────────────────
   useEffect(() => {
     if (!form.city) { setLocalities([]); return; }
     setLocalitiesLoading(true);
-    locationsApi.getLocalities(form.city, form.state).then(r => {
+    locationsApi.getLocalities(form.city).then(r => {
       const d = r.data;
       const locs = Array.isArray(d) ? d : [];
       setLocalities(locs);
-      // If the current localityId is no longer valid for this city, clear it
       if (form.localityId && !locs.find((l: any) => l.id === form.localityId)) {
         dispatch(updateForm({ localityId: '', locality: '', pincode: '', latitude: null, longitude: null }));
       }
     }).catch(() => setLocalities([])).finally(() => setLocalitiesLoading(false));
-  }, [form.city, form.state]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [form.city]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Initialize Leaflet map ────────────────────────────────────────────────
+  // ── Close city dropdown on outside click ─────────────────────────────────
   useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (cityRef.current && !cityRef.current.contains(e.target as Node)) setShowCityDropdown(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // ── Initialize Leaflet map (owner only) ────────────────────────────────────
+  useEffect(() => {
+    if (!isOwner) return; // agents don't see map
     let cancelled = false;
     loadLeafletCDN().then((L) => {
       if (cancelled || !mapContainerRef.current || mapInstanceRef.current) return;
@@ -1022,9 +1025,9 @@ function Step4Location({ form, dispatch }: any) {
       cancelled = true;
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; markerRef.current = null; }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOwner]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Sync marker when lat/lng changes ─────────────────────────────────────
+  // ── Sync marker when lat/lng changes ──────────────────────────────────────
   useEffect(() => {
     if (!mapInstanceRef.current || !markerRef.current) return;
     if (form.latitude && form.longitude) {
@@ -1033,23 +1036,22 @@ function Step4Location({ form, dispatch }: any) {
     }
   }, [form.latitude, form.longitude]);
 
-  // ── Auto-detect GPS ───────────────────────────────────────────────────────
+  // ── Auto-detect GPS (fills city + locality) ───────────────────────────────
   const handleDetect = async () => {
     setGeoStatus('detecting');
     try {
       const loc = await detectLocation();
-      dispatch(updateForm({ latitude: loc.lat, longitude: loc.lng }));
-      if (loc.state && states.length > 0) {
-        const sm = states.find((s: any) => s.name.toLowerCase() === loc.state.toLowerCase());
-        if (sm) {
-          dispatch(updateForm({ stateId: sm.id, state: sm.name, city: '', cityId: '', localityId: '', locality: '', pincode: '' }));
-          const cr = await locationsApi.getCitiesByState(sm.id).catch(() => null);
-          if (cr) {
-            const ca: any[] = Array.isArray(cr.data) ? cr.data : [];
-            const cm = ca.find((c: any) => c.name.toLowerCase() === (loc.city || '').toLowerCase());
-            if (cm) dispatch(updateForm({ cityId: cm.id, city: cm.name }));
-            else if (loc.city) dispatch(updateForm({ city: loc.city, cityId: '' }));
-          }
+      if (isOwner) dispatch(updateForm({ latitude: loc.lat, longitude: loc.lng }));
+      if (loc.city && cities.length > 0) {
+        const normalize = (s: string) => (s || '').toLowerCase().trim();
+        let cm = cities.find((c: any) => c.name && normalize(c.name) === normalize(loc.city));
+        if (!cm) cm = cities.find((c: any) => c.name && (normalize(loc.city).includes(normalize(c.name)) || normalize(c.name).includes(normalize(loc.city))));
+        if (cm) {
+          setCitySearch(cm.name);
+          dispatch(updateForm({ cityId: cm.id, city: cm.name, stateId: cm.stateId || '', state: cm.state?.name || '', localityId: '', locality: '', pincode: '' }));
+        } else if (loc.city) {
+          setCitySearch(loc.city);
+          dispatch(updateForm({ city: loc.city, cityId: '', localityId: '', locality: '' }));
         }
       }
       if (loc.locality && !form.locality) dispatch(updateForm({ locality: loc.locality }));
@@ -1057,6 +1059,24 @@ function Step4Location({ form, dispatch }: any) {
     } catch (err: any) {
       setGeoStatus(err?.code === 1 ? 'denied' : 'error');
     }
+  };
+
+  // ── City search filtering ─────────────────────────────────────────────────
+  const filteredCities = citySearch
+    ? cities.filter(c => c.name?.toLowerCase().includes(citySearch.toLowerCase()))
+    : cities.filter(c => c.name);
+
+  const handleCityInputChange = (val: string) => {
+    setCitySearch(val);
+    setShowCityDropdown(true);
+    if (!val) dispatch(updateForm({ city: '', cityId: '', localityId: '', locality: '', pincode: '' }));
+  };
+
+  const handleCityPick = (c: any) => {
+    setCitySearch(c.name);
+    setShowCityDropdown(false);
+    setCustomLocality(false);
+    dispatch(updateForm({ cityId: c.id, city: c.name, stateId: c.stateId || '', state: c.state?.name || '', localityId: '', locality: '', pincode: '', latitude: null, longitude: null }));
   };
 
   // ── When a DB locality is selected ───────────────────────────────────────
@@ -1089,50 +1109,64 @@ function Step4Location({ form, dispatch }: any) {
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Property Location</h2>
         <p className="text-gray-500 text-sm mt-1">
-          {isAgent ? 'City is required — exact address is optional.' : 'Help buyers find your property.'}
+          {isAgent
+            ? 'Select city and locality — exact address is not required for agents.'
+            : 'Help buyers find your property with city, locality and address.'}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* State */}
-        <div>
-          <FieldLabel required>State</FieldLabel>
-          <Select value={form.stateId}
-            onChange={(e: any) => {
-              const s = states.find((x: any) => x.id === e.target.value);
-              dispatch(updateForm({ stateId: e.target.value, state: s?.name || '', city: '', cityId: '', localityId: '', locality: '', pincode: '', latitude: null, longitude: null }));
-              setLocalities([]);
-              setCustomLocality(false);
-            }}>
-            <option value="">Select State</option>
-            {states.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </Select>
-        </div>
+      {/* Auto-detect button */}
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={handleDetect} disabled={geoStatus === 'detecting'}
+          className={cn('flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all',
+            geoStatus === 'detecting' ? 'bg-blue-100 text-blue-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
+          )}>
+          {geoStatus === 'detecting' ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Detecting…</> : <><MapPin className="w-3.5 h-3.5" />Auto-detect location</>}
+        </button>
+        {geoStatus === 'found' && <span className="text-xs text-green-600 font-medium">✓ Location detected</span>}
+        {geoStatus === 'denied' && <span className="text-xs text-orange-500">Location permission denied — select manually.</span>}
+      </div>
 
-        {/* City */}
-        <div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* City — searchable autocomplete */}
+        <div ref={cityRef} className="relative sm:col-span-2 sm:max-w-sm">
           <FieldLabel required>City</FieldLabel>
-          {form.stateId && cities.length > 0 ? (
-            <Select value={form.cityId}
-              onChange={(e: any) => {
-                const c = cities.find((x: any) => x.id === e.target.value);
-                dispatch(updateForm({ cityId: e.target.value, city: c?.name || '', localityId: '', locality: '', pincode: '', latitude: null, longitude: null }));
-                setCustomLocality(false);
-              }}>
-              <option value="">Select City</option>
-              {cities.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          ) : (
-            <Input value={form.city}
-              onChange={(e: any) => dispatch(updateForm({ city: e.target.value, cityId: '', localityId: '', locality: '' }))}
-              placeholder={form.stateId ? 'Type city name' : 'Select state first'} />
+          <div className="relative">
+            <input
+              type="text"
+              value={citySearch}
+              onChange={(e) => handleCityInputChange(e.target.value)}
+              onFocus={() => setShowCityDropdown(true)}
+              placeholder="Search city (e.g., Delhi, Mumbai…)"
+              className={cn(
+                'w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white',
+                'focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400',
+                'placeholder:text-gray-400 transition-colors'
+              )}
+            />
+            {form.cityId && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-xs font-semibold">✓</span>
+            )}
+          </div>
+          {showCityDropdown && filteredCities.length > 0 && (
+            <div className="absolute z-20 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+              {filteredCities.slice(0, 20).map((c: any) => (
+                <button key={c.id} type="button"
+                  onClick={() => handleCityPick(c)}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-primary-50 text-left transition-colors">
+                  <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                  {c.name}
+                  {c.state?.name && <span className="text-xs text-gray-400 ml-auto">{c.state.name}</span>}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
         {/* Locality — dropdown from DB, or free text */}
         <div className="sm:col-span-2">
           <div className="flex items-center justify-between mb-1.5">
-            <FieldLabel required={!isAgent}>Area / Locality</FieldLabel>
+            <FieldLabel required>Area / Locality</FieldLabel>
             {localities.length > 0 && (
               <button type="button"
                 onClick={() => { setCustomLocality(!customLocality); dispatch(updateForm({ localityId: '', locality: '', pincode: '' })); }}
@@ -1146,7 +1180,7 @@ function Step4Location({ form, dispatch }: any) {
             <Select value={form.localityId || ''}
               onChange={(e: any) => handleLocalitySelect(e.target.value)}
               disabled={!form.city || localitiesLoading}>
-              <option value="">{localitiesLoading ? 'Loading localities…' : 'Select locality'}</option>
+              <option value="">{localitiesLoading ? 'Loading localities…' : form.city ? 'Select locality' : 'Select city first'}</option>
               {localities.map((l: any) => (
                 <option key={l.id} value={l.id}>
                   {l.locality || l.city}{l.pincode ? ` — ${l.pincode}` : ''}
@@ -1156,10 +1190,9 @@ function Step4Location({ form, dispatch }: any) {
           ) : (
             <Input value={form.locality}
               onChange={(e: any) => dispatch(updateForm({ locality: e.target.value, localityId: '' }))}
-              placeholder={form.city ? `e.g., area in ${form.city}` : 'e.g., Koramangala, Bandra West'} />
+              placeholder={form.city ? `e.g., area in ${form.city}` : 'Select city first'} />
           )}
 
-          {/* Show what was auto-filled */}
           {form.localityId && form.pincode && (
             <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1">
               <span>✓</span>
@@ -1168,46 +1201,62 @@ function Step4Location({ form, dispatch }: any) {
           )}
         </div>
 
-        {/* Pincode + Society */}
+        {/* Pincode */}
         <div>
           <FieldLabel>Pincode</FieldLabel>
           <Input value={form.pincode}
             onChange={(e: any) => dispatch(updateForm({ pincode: e.target.value.replace(/\D/g, '') }))}
             placeholder="110001" maxLength={6} />
         </div>
+
+        {/* Society — always visible */}
         <div>
           <FieldLabel>{isAgent ? 'Society / Complex (optional)' : 'Society / Building'}</FieldLabel>
-          <Input value={form.address}
-            onChange={(e: any) => dispatch(updateForm({ address: e.target.value }))}
-            placeholder="Prestige Shantiniketan" />
+          <Input value={form.society || ''}
+            onChange={(e: any) => dispatch(updateForm({ society: e.target.value }))}
+            placeholder="e.g., Prestige Shantiniketan" />
         </div>
-      </div>
 
-      {/* GPS Map Picker */}
-      <SectionCard title="Pin Location on Map">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs text-gray-500">
-            {form.localityId ? 'Map auto-positioned from selected locality. Click or drag to fine-tune.' : 'Click on the map or drag the pin to set the exact location.'}
-          </p>
-          <button type="button" onClick={handleDetect} disabled={geoStatus === 'detecting'}
-            className={cn('flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all flex-shrink-0',
-              geoStatus === 'detecting' ? 'bg-blue-100 text-blue-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
-            )}>
-            {geoStatus === 'detecting' ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Detecting…</> : <><MapPin className="w-3.5 h-3.5" />Auto-detect</>}
-          </button>
-        </div>
-        {geoStatus === 'denied' && <p className="text-xs text-orange-500 mb-2">Location permission denied. Click the map to pin manually.</p>}
-        <div ref={mapContainerRef} className="w-full rounded-xl overflow-hidden border border-gray-200" style={{ height: 320, zIndex: 0 }} />
-        {(form.latitude || form.longitude) && (
-          <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-            <MapPin className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-            <span>
-              {form.localityId ? '✓ From locality — ' : geoStatus === 'found' ? '✓ Detected — ' : 'Pinned at '}
-              <span className="font-mono text-gray-700">{parseFloat(String(form.latitude)).toFixed(6)}, {parseFloat(String(form.longitude)).toFixed(6)}</span>
-            </span>
+        {/* Full Address — Owner only */}
+        {isOwner && (
+          <div className="sm:col-span-2">
+            <FieldLabel required>Full Address</FieldLabel>
+            <Input value={form.address || ''}
+              onChange={(e: any) => dispatch(updateForm({ address: e.target.value }))}
+              placeholder="House / Flat no., Street, Area, City" />
+            <p className="text-xs text-gray-400 mt-1">Exact address is shown to serious buyers after inquiry.</p>
           </div>
         )}
-      </SectionCard>
+      </div>
+
+      {/* GPS Map Picker — Owner only */}
+      {isOwner && (
+        <SectionCard title="Pin Location on Map">
+          <p className="text-xs text-gray-500 mb-3">
+            {form.localityId
+              ? 'Map auto-positioned from selected locality. Click or drag to fine-tune.'
+              : 'Click on the map or drag the pin to set the exact property location.'}
+          </p>
+          <div ref={mapContainerRef} className="w-full rounded-xl overflow-hidden border border-gray-200" style={{ height: 320, zIndex: 0 }} />
+          {(form.latitude || form.longitude) && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+              <MapPin className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+              <span>
+                {form.localityId ? '✓ From locality — ' : geoStatus === 'found' ? '✓ Detected — ' : 'Pinned at '}
+                <span className="font-mono text-gray-700">{parseFloat(String(form.latitude)).toFixed(6)}, {parseFloat(String(form.longitude)).toFixed(6)}</span>
+              </span>
+            </div>
+          )}
+        </SectionCard>
+      )}
+
+      {/* Agent note */}
+      {isAgent && (
+        <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
+          <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <span>As an agent, only city and locality are required. Exact address and map pin are not needed — buyers will contact you directly.</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -2055,7 +2104,7 @@ function PostPropertyPageInner() {
       case 0: return !!form.categoryId;
       case 1: return !!form.listingType;
       case 2: return !!form.typeId;
-      case 3: return !!form.city && (isAgent || !!form.locality);
+      case 3: return !!form.city && !!form.locality && (isAgent || !!form.address);
       case 4: return true;
       case 5: return !!form.area;
       case 6: return true;

@@ -34,7 +34,7 @@ export interface AgentProfile {
   totalDeals: number;
   totalListings: number;
   bio?: string;
-  tick: 'none' | 'blue' | 'gold' | 'diamond';
+  tick: 'none' | 'verified' | 'bronze' | 'silver' | 'gold';
   isActive: boolean;
   locationMaps?: AgentLocationMap[];
   createdAt: string;

@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
-import { openAuthModal, setSelectedLocation, loadLocationFromLS, saveLocationToLS } from '@/lib/store/slices/uiSlice';
+import { openAuthModal, setSelectedCity, loadCityFromLS, saveCityToLS } from '@/lib/store/slices/uiSlice';
 import { locationsApi } from '@/lib/api';
 import { detectLocation } from '@/lib/geolocation';
 
@@ -77,36 +77,52 @@ const MEGA_SECTIONS: MegaSection[] = [
   },
 ];
 
-// ─── State Selector ───────────────────────────────────────────────────────────
+// ─── City Selector ────────────────────────────────────────────────────────────
 
-function StateSelector({ compact = false }: { compact?: boolean }) {
+const POPULAR_CITIES = [
+  { name: 'Delhi' },
+  { name: 'Mumbai' },
+  { name: 'Bangalore' },
+  { name: 'Pune' },
+  { name: 'Hyderabad' },
+  { name: 'Chennai' },
+  { name: 'Noida' },
+  { name: 'Gurgaon' },
+  { name: 'Kolkata' },
+  { name: 'Ahmedabad' },
+];
+
+function CitySelector({ compact = false }: { compact?: boolean }) {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const pathname = usePathname();
-  const selectedState = useAppSelector((s) => s.ui.selectedState);
-  const selectedStateId = useAppSelector((s) => s.ui.selectedStateId);
+  const selectedCity = useAppSelector((s) => s.ui.selectedCity);
+  const selectedCityId = useAppSelector((s) => s.ui.selectedCityId);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [dbStates, setDbStates] = useState<{ id: string; name: string }[]>([]);
+  const [dbCities, setDbCities] = useState<{ id: string; name: string }[]>([]);
   const [detecting, setDetecting] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Load cities from DB once
   useEffect(() => {
-    locationsApi.getStates().then(r => {
+    locationsApi.getCities().then(r => {
       const data = r.data;
       const arr = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-      setDbStates(arr);
+      setDbCities(arr);
     }).catch(() => {});
   }, []);
 
+  // Restore from localStorage on mount
   useEffect(() => {
-    const saved = loadLocationFromLS();
-    if (saved.state && !selectedState) {
-      dispatch(setSelectedLocation({ state: saved.state, stateId: saved.stateId }));
+    const saved = loadCityFromLS();
+    if (saved.city && !selectedCity) {
+      dispatch(setSelectedCity({ city: saved.city, cityId: saved.cityId }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -119,20 +135,20 @@ function StateSelector({ compact = false }: { compact?: boolean }) {
   }, []);
 
   const filtered = query
-    ? dbStates.filter((s) => s.name.toLowerCase().includes(query.toLowerCase()))
-    : dbStates;
+    ? dbCities.filter((c) => c.name?.toLowerCase().includes(query.toLowerCase()))
+    : dbCities;
 
-  const handleSelect = (stateObj: { id: string; name: string }) => {
-    dispatch(setSelectedLocation({ state: stateObj.name, stateId: stateObj.id }));
-    saveLocationToLS(stateObj.name, stateObj.id);
+  const handleSelect = (cityObj: { id: string; name: string }) => {
+    dispatch(setSelectedCity({ city: cityObj.name, cityId: cityObj.id }));
+    saveCityToLS(cityObj.name, cityObj.id);
     setOpen(false);
     setQuery('');
     if (pathname !== '/') router.push('/');
   };
 
-  const handleAllIndia = () => {
-    dispatch(setSelectedLocation({ state: '', stateId: '' }));
-    saveLocationToLS('', '');
+  const handleAllCities = () => {
+    dispatch(setSelectedCity({ city: '', cityId: '' }));
+    saveCityToLS('', '');
     setOpen(false);
     setQuery('');
     if (pathname !== '/') router.push('/');
@@ -143,37 +159,32 @@ function StateSelector({ compact = false }: { compact?: boolean }) {
     setOpen(false);
     detectLocation()
       .then((loc) => {
-        if (!loc.state) return;
-        // Normalize: strip common Indian administrative prefixes before matching
-        const normalize = (s: string) =>
-          s.toLowerCase()
-            .replace(/national capital territory of\s+/i, '')
-            .replace(/union territory of\s+/i, '')
-            .replace(/state of\s+/i, '')
-            .trim();
-        const det = normalize(loc.state);
-        // 1. Exact match
-        let match = dbStates.find(s => normalize(s.name) === det);
-        // 2. Substring match (either direction)
-        if (!match) match = dbStates.find(s => {
-          const n = normalize(s.name);
+        if (!loc.city) return;
+        const normalize = (s: string) => (s || '').toLowerCase().trim();
+        const det = normalize(loc.city);
+        let match = dbCities.find(c => normalize(c.name) === det);
+        if (!match) match = dbCities.find(c => {
+          const n = normalize(c.name);
           return det.includes(n) || n.includes(det);
         });
-        // 3. First-word match (e.g. "Uttarakhand" vs "Uttaranchal")
-        if (!match) {
-          const firstWord = det.split(' ')[0];
-          if (firstWord.length > 3) {
-            match = dbStates.find(s => normalize(s.name).startsWith(firstWord));
-          }
-        }
         if (match) {
-          dispatch(setSelectedLocation({ state: match.name, stateId: match.id }));
-          saveLocationToLS(match.name, match.id);
+          dispatch(setSelectedCity({ city: match.name, cityId: match.id }));
+          saveCityToLS(match.name, match.id);
+        } else if (loc.city) {
+          // city not in DB but detected — store name without id
+          dispatch(setSelectedCity({ city: loc.city, cityId: '' }));
+          saveCityToLS(loc.city, '');
         }
       })
       .catch(() => {})
       .finally(() => setDetecting(false));
   };
+
+  // Popular cities to show when no query
+  const popularToShow = POPULAR_CITIES.map(p => {
+    const found = dbCities.find(c => c.name?.toLowerCase() === p.name.toLowerCase());
+    return found ?? { id: '', name: p.name };
+  });
 
   return (
     <div className="relative" ref={ref}>
@@ -185,59 +196,105 @@ function StateSelector({ compact = false }: { compact?: boolean }) {
             ? 'px-2 py-1.5 text-xs border-gray-200 bg-gray-50 hover:bg-gray-100'
             : 'px-3 py-1.5 text-sm border-gray-200 hover:bg-gray-100 text-gray-600'
         )}
-        title="Select State"
+        title="Select City"
       >
-        <MapPin className={cn('flex-shrink-0', detecting ? 'text-orange-500 animate-pulse' : 'text-primary-600', compact ? 'w-3 h-3' : 'w-3.5 h-3.5')} />
-        <span className={cn('font-medium truncate', compact ? 'max-w-[70px]' : 'max-w-[100px]')}>
-          {detecting ? '…' : selectedState || (compact ? '🇮🇳 India' : '🇮🇳 All India')}
+        <MapPin className={cn(
+          'flex-shrink-0',
+          detecting ? 'text-orange-500 animate-pulse' : 'text-primary-600',
+          compact ? 'w-3 h-3' : 'w-3.5 h-3.5'
+        )} />
+        <span className={cn('font-medium truncate', compact ? 'max-w-[70px]' : 'max-w-[110px]')}>
+          {detecting ? '…' : selectedCity || (compact ? 'City' : 'All Cities')}
         </span>
-        <ChevronDown className={cn('text-gray-400 transition-transform flex-shrink-0', open && 'rotate-180', compact ? 'w-2.5 h-2.5' : 'w-3 h-3')} />
+        <ChevronDown className={cn(
+          'text-gray-400 transition-transform flex-shrink-0',
+          open && 'rotate-180',
+          compact ? 'w-2.5 h-2.5' : 'w-3 h-3'
+        )} />
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 z-[200] overflow-hidden">
+        <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-gray-100 z-[200] overflow-hidden">
+          {/* Search */}
           <div className="p-2 border-b border-gray-100">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search state..."
+              placeholder="Search city..."
               autoFocus
               className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary-400"
             />
           </div>
-          <div className="max-h-64 overflow-y-auto py-1">
+
+          <div className="max-h-72 overflow-y-auto py-1">
+            {/* Auto-detect */}
             <button
               onClick={handleDetectClick}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-blue-50 text-blue-600 transition-colors text-left border-b border-gray-100"
             >
               <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-              Detect my location
+              {detecting ? 'Detecting…' : 'Auto-detect my city'}
             </button>
+
+            {/* All Cities */}
             <button
-              onClick={handleAllIndia}
+              onClick={handleAllCities}
               className={cn(
-                'w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left',
-                !selectedState && 'bg-primary-50 text-primary-700 font-semibold'
+                'w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left border-b border-gray-100',
+                !selectedCity && 'bg-primary-50 text-primary-700 font-semibold'
               )}
             >
-              🇮🇳 All India
+              🏙️ All Cities
             </button>
-            {filtered.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => handleSelect(s)}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left',
-                  (selectedStateId === s.id || selectedState === s.name) && 'bg-primary-50 text-primary-700 font-semibold'
+
+            {/* Popular cities (shown when no search query) */}
+            {!query && (
+              <>
+                <div className="px-3 pt-2 pb-1">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Popular Cities</span>
+                </div>
+                {popularToShow.map((c) => (
+                  <button
+                    key={c.name}
+                    onClick={() => handleSelect(c)}
+                    className={cn(
+                      'w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left',
+                      (selectedCityId === c.id && c.id) || selectedCity === c.name
+                        ? 'bg-primary-50 text-primary-700 font-semibold' : ''
+                    )}
+                  >
+                    <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                    {c.name}
+                  </button>
+                ))}
+                {dbCities.length > POPULAR_CITIES.length && (
+                  <div className="px-3 pt-2 pb-1 border-t border-gray-100 mt-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">All Cities</span>
+                  </div>
                 )}
-              >
-                <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                {s.name}
-              </button>
-            ))}
+              </>
+            )}
+
+            {/* Filtered results */}
+            {filtered
+              .filter(c => c.name && (query || !POPULAR_CITIES.find(p => p.name.toLowerCase() === c.name.toLowerCase())))
+              .map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => handleSelect(c)}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left',
+                    (selectedCityId === c.id || selectedCity === c.name) && 'bg-primary-50 text-primary-700 font-semibold'
+                  )}
+                >
+                  <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                  {c.name}
+                </button>
+              ))}
+
             {filtered.length === 0 && query && (
-              <div className="px-3 py-4 text-sm text-gray-400 text-center">No states found</div>
+              <div className="px-3 py-4 text-sm text-gray-400 text-center">No cities found</div>
             )}
           </div>
         </div>
@@ -442,18 +499,18 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
   const { user, logout } = useAuth();
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const selectedState = useAppSelector((s) => s.ui.selectedState);
-  const selectedStateId = useAppSelector((s) => s.ui.selectedStateId);
+  const selectedCity = useAppSelector((s) => s.ui.selectedCity);
+  const selectedCityId = useAppSelector((s) => s.ui.selectedCityId);
   const [query, setQuery] = useState('');
-  const [dbStates, setDbStates] = useState<{ id: string; name: string }[]>([]);
+  const [dbCities, setDbCities] = useState<{ id: string; name: string }[]>([]);
   const [detecting, setDetecting] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
-    locationsApi.getStates().then(r => {
+    locationsApi.getCities().then(r => {
       const data = r.data;
       const arr = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-      setDbStates(arr);
+      setDbCities(arr);
     }).catch(() => {});
   }, []);
 
@@ -467,19 +524,19 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
-  const filtered = query ? dbStates.filter(s => s.name.toLowerCase().includes(query.toLowerCase())) : dbStates;
+  const filtered = query ? dbCities.filter(c => c.name?.toLowerCase().includes(query.toLowerCase())) : dbCities;
 
-  const handleSelect = (stateObj: { id: string; name: string }) => {
-    dispatch(setSelectedLocation({ state: stateObj.name, stateId: stateObj.id }));
-    saveLocationToLS(stateObj.name, stateObj.id);
+  const handleSelect = (cityObj: { id: string; name: string }) => {
+    dispatch(setSelectedCity({ city: cityObj.name, cityId: cityObj.id }));
+    saveCityToLS(cityObj.name, cityObj.id);
     setQuery('');
     onClose();
     if (pathname !== '/') router.push('/');
   };
 
-  const handleAllIndia = () => {
-    dispatch(setSelectedLocation({ state: '', stateId: '' }));
-    saveLocationToLS('', '');
+  const handleAllCities = () => {
+    dispatch(setSelectedCity({ city: '', cityId: '' }));
+    saveCityToLS('', '');
     setQuery('');
     onClose();
     if (pathname !== '/') router.push('/');
@@ -489,11 +546,16 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
     setDetecting(true);
     detectLocation()
       .then((loc) => {
-        if (!loc.state) return;
-        const match = dbStates.find(s => s.name.toLowerCase() === loc.state.toLowerCase());
+        if (!loc.city) return;
+        const normalize = (s: string) => (s || '').toLowerCase().trim();
+        let match = dbCities.find(c => normalize(c.name) === normalize(loc.city));
+        if (!match) match = dbCities.find(c => normalize(c.name).includes(normalize(loc.city)) || normalize(loc.city).includes(normalize(c.name)));
         if (match) {
-          dispatch(setSelectedLocation({ state: match.name, stateId: match.id }));
-          saveLocationToLS(match.name, match.id);
+          dispatch(setSelectedCity({ city: match.name, cityId: match.id }));
+          saveCityToLS(match.name, match.id);
+        } else if (loc.city) {
+          dispatch(setSelectedCity({ city: loc.city, cityId: '' }));
+          saveCityToLS(loc.city, '');
         }
       })
       .catch(() => {})
@@ -555,18 +617,18 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
           </button>
         </div>
 
-        {/* Location selector */}
+        {/* City selector */}
         <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
           <div className="flex items-center gap-2 mb-2">
             <MapPin className={cn('w-4 h-4 flex-shrink-0', detecting ? 'text-orange-500 animate-pulse' : 'text-primary-600')} />
-            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Location</span>
-            <span className="ml-auto text-xs font-medium text-primary-600">{selectedState || 'All India'}</span>
+            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">City</span>
+            <span className="ml-auto text-xs font-medium text-primary-600">{selectedCity || 'All Cities'}</span>
           </div>
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search state..."
+            placeholder="Search city..."
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary-400 bg-white"
           />
           <div className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-gray-100 bg-white">
@@ -575,22 +637,22 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
               className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-blue-50 text-blue-600 transition-colors text-left border-b border-gray-100"
             >
               <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-              {detecting ? 'Detecting…' : 'Detect my location'}
+              {detecting ? 'Detecting…' : 'Auto-detect my city'}
             </button>
             <button
-              onClick={handleAllIndia}
-              className={cn('w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left', !selectedState && 'bg-primary-50 text-primary-700 font-semibold')}
+              onClick={handleAllCities}
+              className={cn('w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left border-b border-gray-100', !selectedCity && 'bg-primary-50 text-primary-700 font-semibold')}
             >
-              🇮🇳 All India
+              🏙️ All Cities
             </button>
-            {filtered.map((s) => (
+            {filtered.map((c) => (
               <button
-                key={s.id}
-                onClick={() => handleSelect(s)}
-                className={cn('w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left', (selectedStateId === s.id || selectedState === s.name) && 'bg-primary-50 text-primary-700 font-semibold')}
+                key={c.id}
+                onClick={() => handleSelect(c)}
+                className={cn('w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left', (selectedCityId === c.id || selectedCity === c.name) && 'bg-primary-50 text-primary-700 font-semibold')}
               >
                 <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                {s.name}
+                {c.name}
               </button>
             ))}
           </div>
@@ -778,7 +840,7 @@ export default function Header() {
               </>
             ) : (
               <>
-                <StateSelector compact />
+                <CitySelector compact />
                 <button
                   onClick={() => dispatch(openAuthModal({ mode: 'login', reason: 'post-property', redirectTo: '/post-property' }))}
                   className="flex items-center gap-1.5 bg-primary-600 active:bg-primary-700 text-white text-[11px] font-bold px-2.5 py-2 rounded-lg transition-colors whitespace-nowrap"
@@ -849,7 +911,7 @@ export default function Header() {
 
             {/* Right actions */}
             <div className="flex items-center gap-1.5 flex-shrink-0">
-              <StateSelector />
+              <CitySelector />
 
               {!loading && (
                 user ? (

@@ -26,7 +26,7 @@ interface FeaturedAgent {
   email?: string;
   company?: string;
   agentRating?: number;
-  agentTick?: 'none' | 'blue' | 'gold' | 'diamond';
+  agentTick?: 'none' | 'verified' | 'bronze' | 'silver' | 'gold';
   totalDeals?: number;
   agentExperience?: number;
   agentLicense?: string;
@@ -44,20 +44,6 @@ interface FeaturedAgent {
 // ─── Tier config ──────────────────────────────────────────────────────────────
 
 const TICK = {
-  diamond: {
-    label:     'Diamond Agent',
-    short:     'Diamond',
-    panelFrom: '#6d28d9',
-    panelTo:   '#4c1d95',
-    avatarGrd: 'from-violet-400 via-purple-500 to-violet-700',
-    ring:      'ring-violet-300/60',
-    badge:     'bg-violet-100 text-violet-800 border-violet-200',
-    dotBg:     'bg-violet-500',
-    statIcon:  'text-violet-500',
-    areaChip:  'bg-violet-50 text-violet-700 border-violet-200',
-    score:     'bg-violet-800/40 text-violet-100',
-    icon:      <Gem className="w-3 h-3" />,
-  },
   gold: {
     label:     'Gold Agent',
     short:     'Gold',
@@ -72,7 +58,35 @@ const TICK = {
     score:     'bg-amber-800/40 text-amber-100',
     icon:      <Star className="w-3 h-3 fill-amber-400" />,
   },
-  blue: {
+  silver: {
+    label:     'Silver Agent',
+    short:     'Silver',
+    panelFrom: '#64748b',
+    panelTo:   '#334155',
+    avatarGrd: 'from-slate-300 via-slate-400 to-slate-600',
+    ring:      'ring-slate-300/60',
+    badge:     'bg-slate-100 text-slate-700 border-slate-200',
+    dotBg:     'bg-slate-400',
+    statIcon:  'text-slate-500',
+    areaChip:  'bg-slate-50 text-slate-600 border-slate-200',
+    score:     'bg-slate-700/40 text-slate-100',
+    icon:      <BadgeCheck className="w-3 h-3" />,
+  },
+  bronze: {
+    label:     'Bronze Agent',
+    short:     'Bronze',
+    panelFrom: '#c2410c',
+    panelTo:   '#7c2d12',
+    avatarGrd: 'from-orange-300 via-orange-400 to-orange-600',
+    ring:      'ring-orange-300/60',
+    badge:     'bg-orange-100 text-orange-800 border-orange-200',
+    dotBg:     'bg-orange-400',
+    statIcon:  'text-orange-500',
+    areaChip:  'bg-orange-50 text-orange-700 border-orange-200',
+    score:     'bg-orange-800/40 text-orange-100',
+    icon:      <BadgeCheck className="w-3 h-3" />,
+  },
+  verified: {
     label:     'Verified Agent',
     short:     'Verified',
     panelFrom: '#1d4ed8',

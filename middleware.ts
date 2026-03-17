@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { KNOWN_CITY_SLUGS } from '@/lib/city-slugs';
 
 /**
  * Route protection middleware.
@@ -81,6 +82,54 @@ const SEO_PREFIXES = [
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // ── /property-in-{slug}: city-only OR city+locality (all-hyphen SEO URLs) ──
+  // e.g. /property-in-delhi        → city page  (delhi is a known city)
+  // e.g. /property-in-delhi-dwarka → locality page (delhi known, dwarka is locality)
+  // e.g. /property-in-navi-mumbai  → city page  (navi-mumbai is a known compound city)
+  const propInSlugMatch = pathname.match(/^\/property-in-([a-z0-9][a-z0-9-]*)$/);
+  if (propInSlugMatch) {
+    const slug = propInSlugMatch[1];
+
+    // 301: legacy ?locality= query → clean all-hyphen URL
+    const localityParam = request.nextUrl.searchParams.get('locality');
+    if (localityParam) {
+      const localitySlug = localityParam.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const url = request.nextUrl.clone();
+      url.pathname = `/property-in-${slug}-${localitySlug}`;
+      url.search = '';
+      return NextResponse.redirect(url, 301);
+    }
+
+    // If slug is a known city → standard city-page rewrite (handled by SEO loop below)
+    if (KNOWN_CITY_SLUGS.has(slug)) {
+      // fall through to the SEO prefix loop
+    } else {
+      // Unknown slug: try to split as {city}-{locality} — longest matching city prefix wins
+      const parts = slug.split('-');
+      for (let i = parts.length - 1; i >= 1; i--) {
+        const citySlug     = parts.slice(0, i).join('-');
+        const localitySlug = parts.slice(i).join('-');
+        if (KNOWN_CITY_SLUGS.has(citySlug)) {
+          // Rewrite internally to /property-in/[city]/[locality] route
+          const url = request.nextUrl.clone();
+          url.pathname = `/property-in/${citySlug}/${localitySlug}`;
+          return NextResponse.rewrite(url);
+        }
+      }
+      // No match found — fall through and treat as a city page as-is
+    }
+  }
+
+  // ── 301: /property-in-{city}/{locality} (slash form) → canonical all-hyphen ──
+  // Backward compat: redirects any slash-separated locality URLs to the clean form.
+  const localitySlashMatch = pathname.match(/^\/property-in-([a-z0-9-]+)\/([a-z0-9-]+)$/);
+  if (localitySlashMatch) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/property-in-${localitySlashMatch[1]}-${localitySlashMatch[2]}`;
+    url.search = '';
+    return NextResponse.redirect(url, 301);
+  }
 
   // ── 301: /properties-in/state → /properties-in-state (canonical hyphen form) ──
   if (/^\/properties-in\/[^/]+$/.test(pathname)) {

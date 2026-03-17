@@ -11,7 +11,7 @@ export interface Agent {
   locality?: string;
   company?: string;
   avatar?: string;
-  agentTick?: 'none' | 'blue' | 'gold' | 'diamond';
+  agentTick?: 'none' | 'verified' | 'bronze' | 'silver' | 'gold';
   agentRating?: number;
   agentExperience?: number;
   agentBio?: string;

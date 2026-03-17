@@ -6,9 +6,10 @@ import { adminApi } from '@/lib/api';
 import { MapPin, ExternalLink, Pencil, UserCheck, UserX, Building2 } from 'lucide-react';
 
 const TICK_BADGE: Record<string, { label: string; cls: string }> = {
-  blue:    { label: '✓ Verified', cls: 'bg-blue-100 text-blue-700'     },
-  gold:    { label: '★ Gold',     cls: 'bg-amber-100 text-amber-700'   },
-  diamond: { label: '◆ Diamond',  cls: 'bg-violet-100 text-violet-700' },
+  verified: { label: '✓ Verified', cls: 'bg-blue-100 text-blue-700'     },
+  bronze:   { label: '◉ Bronze',   cls: 'bg-orange-100 text-orange-700' },
+  silver:   { label: '◈ Silver',   cls: 'bg-slate-100 text-slate-600'   },
+  gold:     { label: '★ Gold',     cls: 'bg-amber-100 text-amber-700'   },
 };
 
 function agentSlug(agent: any): string {

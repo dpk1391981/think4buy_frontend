@@ -24,7 +24,7 @@ interface Agent {
   agentExperience?: number;
   agentRating?: number;
   totalDeals?: number;
-  agentTick?: 'none' | 'blue' | 'gold' | 'diamond';
+  agentTick?: 'none' | 'verified' | 'bronze' | 'silver' | 'gold';
 }
 
 function buildAgentSlug(agent: Agent): string {
@@ -35,9 +35,10 @@ function buildAgentSlug(agent: Agent): string {
 }
 
 const TICK: Record<string, { label: string; cls: string; avatarCls: string }> = {
-  blue:    { label: '✓ Verified', cls: 'bg-blue-100 text-blue-700 border-blue-200',       avatarCls: 'from-blue-500 to-blue-700'     },
-  gold:    { label: '★ Gold',     cls: 'bg-amber-100 text-amber-700 border-amber-200',     avatarCls: 'from-amber-400 to-amber-600'   },
-  diamond: { label: '◆ Diamond',  cls: 'bg-violet-100 text-violet-700 border-violet-200',  avatarCls: 'from-violet-500 to-violet-700' },
+  verified: { label: '✓ Verified', cls: 'bg-blue-100 text-blue-700 border-blue-200',       avatarCls: 'from-blue-500 to-blue-700'     },
+  bronze:   { label: '◉ Bronze',   cls: 'bg-orange-100 text-orange-700 border-orange-200', avatarCls: 'from-orange-400 to-orange-600' },
+  silver:   { label: '◈ Silver',   cls: 'bg-slate-100 text-slate-600 border-slate-200',    avatarCls: 'from-slate-400 to-slate-600'   },
+  gold:     { label: '★ Gold',     cls: 'bg-amber-100 text-amber-700 border-amber-200',    avatarCls: 'from-amber-400 to-amber-600'   },
 };
 
 function AgentCard({ agent }: { agent: Agent }) {

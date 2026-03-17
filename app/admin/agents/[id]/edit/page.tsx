@@ -60,7 +60,7 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
     agentBio:        '',
     agentExperience: '',
     agentFreeQuota:  '100',
-    agentTick:       'none' as 'none' | 'blue' | 'gold' | 'diamond',
+    agentTick:       'none' as 'none' | 'verified' | 'bronze' | 'silver' | 'gold',
   });
 
   // Load agent data + states on mount
@@ -187,9 +187,10 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="none">None</option>
-                <option value="blue">✓ Verified (Blue)</option>
+                <option value="verified">✓ Verified</option>
+                <option value="bronze">◉ Bronze</option>
+                <option value="silver">◈ Silver</option>
                 <option value="gold">★ Gold</option>
-                <option value="diamond">◆ Diamond</option>
               </select>
             </div>
           </div>

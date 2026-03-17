@@ -113,18 +113,20 @@ export const BROKERAGE_SALE_OPTIONS = [
 
 // ─── Agent Tick Types ─────────────────────────────────────────────────────────
 export const AGENT_TICK_TYPES = {
-  none: { label: 'Standard', color: '', icon: '' },
-  blue: { label: 'Blue Tick', color: 'text-blue-500', icon: '✓', bg: 'bg-blue-100', extraCredits: 20, description: 'Verified Agent Badge + 20 Extra Daily Credits' },
-  gold: { label: 'Gold Tick', color: 'text-yellow-500', icon: '★', bg: 'bg-yellow-100', extraCredits: 50, description: 'Top Search Priority + 50 Extra Daily Credits + Featured Tag' },
-  diamond: { label: 'Diamond Tick', color: 'text-purple-500', icon: '💎', bg: 'bg-purple-100', extraCredits: 999, description: 'Unlimited Posts + Top 3 Position + Direct Call Highlight' },
+  none:     { label: 'Standard',     color: '',                 icon: '',  bg: '',                extraCredits: 0,   description: 'Standard agent account' },
+  verified: { label: 'Verified',     color: 'text-blue-500',   icon: '✓', bg: 'bg-blue-100',     extraCredits: 20,  description: 'Verified Agent Badge + 20 Extra Daily Credits' },
+  bronze:   { label: 'Bronze Badge', color: 'text-orange-600', icon: '◉', bg: 'bg-orange-100',   extraCredits: 50,  description: 'Bronze Badge + Priority Listing + 50 Extra Daily Credits' },
+  silver:   { label: 'Silver Badge', color: 'text-slate-500',  icon: '◈', bg: 'bg-slate-100',    extraCredits: 100, description: 'Silver Badge + Top Search Priority + 100 Extra Daily Credits' },
+  gold:     { label: 'Gold Badge',   color: 'text-amber-500',  icon: '★', bg: 'bg-amber-100',    extraCredits: 999, description: 'Gold Badge + Top 3 Position + Direct Call Highlight + Unlimited Credits' },
 } as const;
 
 // Daily credit limits per tick type
 export const AGENT_DAILY_CREDITS = {
-  none: 100,
-  blue: 120,  // 100 + 20 extra
-  gold: 150,  // 100 + 50 extra
-  diamond: 99999, // unlimited
+  none:     100,
+  verified: 120,   // 100 + 20 extra
+  bronze:   150,   // 100 + 50 extra
+  silver:   200,   // 100 + 100 extra
+  gold:     99999, // unlimited
 } as const;
 
 // ─── India States (Primary) ───────────────────────────────────────────────────

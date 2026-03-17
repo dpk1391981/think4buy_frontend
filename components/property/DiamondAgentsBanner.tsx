@@ -257,7 +257,7 @@ export default function DiamondAgentsBanner({ locality, city, state }: Props) {
 
   const areaLabel   = locality || city || state || '';
   const citySlug    = (city || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const viewAllHref = `/agents?tick=diamond${city ? `&city=${encodeURIComponent(city)}` : ''}`;
+  const viewAllHref = `/agents?tick=gold${city ? `&city=${encodeURIComponent(city)}` : ''}`;
 
   return (
     <section className="mt-6 mb-2 px-4 sm:px-0">

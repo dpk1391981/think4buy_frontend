@@ -16,7 +16,8 @@ import JsonLd, { buildWebSiteSchema, buildOrganizationSchema } from '@/component
 
 // ─── Above-the-fold: import directly ─────────────────────────────────────────
 import FeaturedProperties from '@/components/home/FeaturedProperties';
-import StateExplorer from '@/components/home/StateExplorer';
+// StateExplorer hidden — city-first UX, states not shown on home
+// import StateExplorer from '@/components/home/StateExplorer';
 import HomeLocationSelector from '@/components/home/HomeLocationSelector';
 import PlatformStatsCards from '@/components/home/PlatformStatsCards';
 import CTAStatsText from '@/components/home/CTAStatsText';
@@ -177,8 +178,8 @@ export default function HomePage() {
       {/* ─── Featured Properties ──────────────────────────────────────────── */}
       <FeaturedProperties />
 
-      {/* ─── State Explorer / Top States ─────────────────────────────────── */}
-      <StateExplorer />
+      {/* ─── State Explorer hidden — city-first UX ────────────────────────── */}
+      {/* <StateExplorer /> */}
 
       {/* ─── Top Residential Cities in India (horizontal scroll) ─────────── */}
       <TopCitiesSection />
