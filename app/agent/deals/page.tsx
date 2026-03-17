@@ -109,11 +109,15 @@ export default function DealsPage() {
   const doCreate = async () => {
     setCreating(true);
     try {
-      await dealsApi.create({
-        ...createForm,
+      const payload: any = {
+        leadId: createForm.leadId,
         agreedPrice: Number(createForm.agreedPrice),
         commissionRate: Number(createForm.commissionRate),
-      });
+        sellerType: createForm.sellerType,
+        notes: createForm.notes || undefined,
+      };
+      if (createForm.propertyId) payload.propertyId = createForm.propertyId;
+      await dealsApi.create(payload);
       setShowCreate(false);
       setCreateForm({ leadId: '', propertyId: '', agreedPrice: '', commissionRate: '2', sellerType: 'owner', notes: '' });
       load();
@@ -146,8 +150,8 @@ export default function DealsPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
             { label: 'Total Deals', value: stats.total || 0, icon: Handshake, color: 'text-blue-600', bg: 'bg-blue-50' },
-            { label: 'Closed', value: stats.closed || 0, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
-            { label: 'In Negotiation', value: stats.negotiation || 0, icon: Handshake, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+            { label: 'Closed', value: stats.byStage?.closed || 0, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
+            { label: 'In Negotiation', value: stats.byStage?.negotiation || 0, icon: Handshake, color: 'text-yellow-600', bg: 'bg-yellow-50' },
             { label: 'Total GMV', value: fmt(stats.totalRevenue || 0), icon: IndianRupee, color: 'text-purple-600', bg: 'bg-purple-50' },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm">
@@ -334,8 +338,7 @@ export default function DealsPage() {
                 >
                   <option value="owner">Owner</option>
                   <option value="builder">Builder</option>
-                  <option value="agent">Agent</option>
-                  <option value="co_agent">Co-Agent</option>
+                  <option value="agency">Agency</option>
                 </select>
               </div>
               <div>

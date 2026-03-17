@@ -303,15 +303,99 @@ function CitySelector({ compact = false }: { compact?: boolean }) {
   );
 }
 
+// ─── SEO URL builder ──────────────────────────────────────────────────────────
+
+function toSlug(s: string) {
+  return s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
+/**
+ * Converts a short internal href + optional city slug into a clean SEO URL.
+ * Without a city the original path/query is kept as-is.
+ */
+function buildUrl(href: string, citySlug: string): string {
+  if (!citySlug) return href;
+
+  const [path, rawQs] = href.split('?');
+  const p    = new URLSearchParams(rawQs || '');
+  const type = p.get('type') || '';
+  const cat  = p.get('category') || '';
+  const fs   = p.get('furnishingStatus') || '';
+
+  // Extra params: everything except type & category (e.g. bedrooms, maxPrice…)
+  const ex = new URLSearchParams(rawQs || '');
+  ex.delete('type');
+  ex.delete('category');
+  const xs = ex.toString();          // e.g. "bedrooms=3"
+  const xq = xs ? `?${xs}` : '';    // e.g. "?bedrooms=3"
+  const xsuf = (base: string) => xs ? `${base}&${xs}` : base; // join with existing qs
+
+  // ── Buy ────────────────────────────────────────────────────────────────────
+  if (path === '/buy') {
+    if (type === 'apartment') return `/flats-for-sale-in-${citySlug}${xq}`;
+    if (type === 'villa')     return `/villas-for-sale-in-${citySlug}${xq}`;
+    if (type === 'plot')      return `/plots-for-sale-in-${citySlug}${xq}`;
+    if (type)                 return xsuf(`/property-for-sale-in-${citySlug}?type=${type}`);
+    return `/property-for-sale-in-${citySlug}${xq}`;
+  }
+
+  // ── Rent ───────────────────────────────────────────────────────────────────
+  if (path === '/rent') {
+    if (type === 'apartment') return `/flats-for-rent-in-${citySlug}${xq}`;
+    if (type === 'studio')    return `/flats-for-rent-in-${citySlug}?type=studio`;
+    if (fs)                   return `/property-for-rent-in-${citySlug}?furnishingStatus=${fs}`;
+    if (type)                 return xsuf(`/property-for-rent-in-${citySlug}?type=${type}`);
+    return `/property-for-rent-in-${citySlug}${xq}`;
+  }
+
+  // ── PG ─────────────────────────────────────────────────────────────────────
+  if (path === '/pg') return `/pg-in-${citySlug}`;
+
+  // ── Commercial ─────────────────────────────────────────────────────────────
+  if (path === '/commercial') {
+    if (type === 'commercial_office' && cat === 'rent') return `/office-space-for-rent-in-${citySlug}`;
+    if (type) return `/commercial-property-in-${citySlug}?type=${type}${cat ? `&category=${cat}` : ''}`;
+    return `/commercial-property-in-${citySlug}`;
+  }
+
+  // ── New Projects ───────────────────────────────────────────────────────────
+  if (path === '/new-projects') {
+    return `/new-projects-in-${citySlug}${rawQs ? `?${rawQs}` : ''}`;
+  }
+
+  return href;
+}
+
 // ─── Properties Mega Dropdown ─────────────────────────────────────────────────
 
 function PropertiesMega({ onClose }: { onClose: () => void }) {
+  const selectedCity = useAppSelector((s) => s.ui.selectedCity);
+  const citySlug     = selectedCity ? toSlug(selectedCity) : '';
+
+  const u = (href: string) => buildUrl(href, citySlug);
+
+  const viewAllHref  = citySlug ? `/property-in-${citySlug}` : '/properties';
+  const headerLabel  = selectedCity ? `Browse Properties in ${selectedCity}` : 'Browse Properties';
+
+  const dynamicSections = MEGA_SECTIONS.map(sec => ({
+    ...sec,
+    href:  u(sec.href),
+    links: sec.links.map(l => ({ ...l, href: u(l.href) })),
+  }));
+
+  const quickLinks = [
+    { label: '🏠 Ready to Move', href: u('/buy?possessionStatus=ready_to_move') },
+    { label: '💰 Under 50L',     href: u('/buy?maxPrice=5000000') },
+    { label: '🛏 3BHK Flats',    href: u('/buy?type=apartment&bedrooms=3') },
+    { label: '🏢 PG / Hostel',   href: u('/pg') },
+  ];
+
   return (
     <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden w-[720px] max-w-[calc(100vw-2rem)]">
       <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-3 flex items-center justify-between">
-        <span className="text-white font-semibold text-sm">Browse Properties</span>
+        <span className="text-white font-semibold text-sm">{headerLabel}</span>
         <Link
-          href="/properties"
+          href={viewAllHref}
           onClick={onClose}
           className="text-primary-100 hover:text-white text-xs underline underline-offset-2 transition-colors"
         >
@@ -320,7 +404,7 @@ function PropertiesMega({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="grid grid-cols-4 divide-x divide-gray-100 p-2">
-        {MEGA_SECTIONS.map((section) => (
+        {dynamicSections.map((section) => (
           <div key={section.heading} className="px-4 py-4">
             <Link
               href={section.href}
@@ -351,12 +435,7 @@ function PropertiesMega({ onClose }: { onClose: () => void }) {
 
       <div className="border-t border-gray-100 bg-gray-50 px-6 py-3 flex items-center gap-6">
         <span className="text-xs text-gray-400 font-medium">Quick:</span>
-        {[
-          { label: '🏠 Ready to Move', href: '/buy?possessionStatus=ready_to_move' },
-          { label: '💰 Under 50L', href: '/buy?maxPrice=5000000' },
-          { label: '🛏 3BHK Flats', href: '/buy?type=apartment&bedrooms=3' },
-          { label: '🏢 PG Near Metro', href: '/pg' },
-        ].map((q) => (
+        {quickLinks.map((q) => (
           <Link
             key={q.label}
             href={q.href}
@@ -689,16 +768,23 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
             <User className="w-4 h-4 text-gray-400" />
             Profile
           </Link>
-          <Link href="/properties" onClick={onClose} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+          <Link
+            href={selectedCity ? `/property-in-${toSlug(selectedCity)}` : '/properties'}
+            onClick={onClose}
+            className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
             <Search className="w-4 h-4 text-gray-400" />
-            Properties
+            {selectedCity ? `Properties in ${selectedCity}` : 'Properties'}
           </Link>
-          {navLinks.map(link => (
-            <Link key={link.key} href={link.href} onClick={onClose} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-              <Search className="w-4 h-4 text-gray-400" />
-              {link.label}
-            </Link>
-          ))}
+          {navLinks.map(link => {
+            const dynHref = selectedCity ? buildUrl(link.href, toSlug(selectedCity)) : link.href;
+            return (
+              <Link key={link.key} href={dynHref} onClick={onClose} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                <Search className="w-4 h-4 text-gray-400" />
+                {link.label}
+              </Link>
+            );
+          })}
         </div>
 
         {/* Sign out */}
@@ -732,6 +818,8 @@ export default function Header() {
   const { user, loading } = useAuth();
   const dispatch = useAppDispatch();
   const pathname = usePathname();
+  const selectedCity = useAppSelector((s) => s.ui.selectedCity);
+  const citySlug     = selectedCity ? toSlug(selectedCity) : '';
   const [megaOpen, setMegaOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -884,7 +972,7 @@ export default function Header() {
                     megaOpen ? 'text-primary-600 bg-primary-50' : 'text-gray-700 hover:text-primary-600 hover:bg-gray-50'
                   )}
                 >
-                  Properties
+                  {selectedCity ? `Properties in ${selectedCity}` : 'Properties'}
                   <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', megaOpen && 'rotate-180')} />
                 </button>
 
@@ -901,7 +989,7 @@ export default function Header() {
               {visibleNavLinks.map((link) => (
                 <Link
                   key={link.key}
-                  href={link.href}
+                  href={citySlug ? buildUrl(link.href, citySlug) : link.href}
                   className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-md transition-colors"
                 >
                   {link.label}
