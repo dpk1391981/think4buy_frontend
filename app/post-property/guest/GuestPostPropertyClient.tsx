@@ -88,14 +88,17 @@ export default function GuestPostPropertyPage() {
       // Persist the token so subsequent API calls are authenticated
       login(data.token || data.accessToken, data.user);
 
+      if (data.user?.needsOnboarding) {
+        // New user — send to onboarding to collect name + role, then come back to post-property
+        // Pass the selected userType so onboarding pre-selects owner/agent
+        router.replace(`/auth/onboarding?redirect=/post-property&role=${userType}`);
+        return;
+      }
+
       // Resolve the user role based on their selected type on this page
       const targetRole = userType as 'owner' | 'agent';
 
-      if (data.user?.needsOnboarding) {
-        // New OTP user — complete onboarding to set role (clears needsOnboarding flag)
-        const { data: onboarded } = await authApi.completeOnboarding({ role: targetRole });
-        login(onboarded.token || onboarded.accessToken, onboarded.user);
-      } else if (data.user?.role === 'buyer') {
+      if (data.user?.role === 'buyer') {
         // Existing buyer — upgrade role to owner/agent
         const { data: upgraded } = await authApi.upgradeRole(targetRole);
         login(upgraded.token || upgraded.accessToken, upgraded.user);

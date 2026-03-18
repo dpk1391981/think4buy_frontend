@@ -82,7 +82,10 @@ function OnboardingForm() {
   const searchParams = useSearchParams();
   const { login, user, loading: authLoading } = useAuth();
 
-  const [selectedRole, setSelectedRole] = useState<RoleId>('buyer');
+  const roleParam = searchParams.get('role') as RoleId | null;
+  const [selectedRole, setSelectedRole] = useState<RoleId>(
+    roleParam && ['buyer', 'owner', 'agent'].includes(roleParam) ? roleParam : 'buyer',
+  );
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [firstNameError, setFirstNameError] = useState('');
@@ -129,13 +132,16 @@ function OnboardingForm() {
       // Re-login with updated user (new role, needsOnboarding = false)
       login(data.token, data.user, data.menus);
 
-      // Redirect to role-appropriate dashboard
-      const dest =
-        selectedRole === 'agent' ? '/agent' :
-        selectedRole === 'owner' ? '/owner' :
-        '/buyer';
-
-      router.replace(dest);
+      // Honour ?redirect= param if present, otherwise go to role dashboard
+      if (redirect && redirect !== '/') {
+        router.replace(redirect);
+      } else {
+        const dest =
+          selectedRole === 'agent' ? '/agent' :
+          selectedRole === 'owner' ? '/owner' :
+          '/buyer';
+        router.replace(dest);
+      }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Something went wrong. Please try again.');
     } finally {
