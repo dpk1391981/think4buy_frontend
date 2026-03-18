@@ -950,10 +950,12 @@ function Step3PropertyType({ form, dispatch, config }: any) {
 
 function Step4Location({ form, dispatch }: any) {
   const [cities, setCities] = useState<any[]>([]);
+  const [citiesLoading, setCitiesLoading] = useState(false);
   const [localities, setLocalities] = useState<any[]>([]);
   const [localitiesLoading, setLocalitiesLoading] = useState(false);
   const [citySearch, setCitySearch] = useState(form.city || '');
   const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [localitySearch, setLocalitySearch] = useState('');
   // In edit mode, if locality is a free-text value (no localityId), start in custom mode
   const [customLocality, setCustomLocality] = useState(() => !!(form.locality && !form.localityId));
   const [geoStatus, setGeoStatus] = useState<'idle' | 'detecting' | 'found' | 'denied' | 'error'>('idle');
@@ -963,19 +965,25 @@ function Step4Location({ form, dispatch }: any) {
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const cityRef = useRef<HTMLDivElement>(null);
+  const cityDebounceRef = useRef<NodeJS.Timeout>();
 
-  // ── Load all cities on mount ──────────────────────────────────────────────
-  useEffect(() => {
-    locationsApi.getCities().then(r => {
+  // ── Async city search — debounced ─────────────────────────────────────────
+  const fetchCities = (search: string) => {
+    setCitiesLoading(true);
+    locationsApi.getCities(search || undefined, 50).then(r => {
       const d = r.data;
       setCities(Array.isArray(d) ? d : d?.items || []);
-    }).catch(() => {});
-  }, []);
+    }).catch(() => setCities([])).finally(() => setCitiesLoading(false));
+  };
+
+  // Load top cities on mount
+  useEffect(() => { fetchCities(''); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load localities when city changes ─────────────────────────────────────
   useEffect(() => {
-    if (!form.city) { setLocalities([]); return; }
+    if (!form.city) { setLocalities([]); setLocalitySearch(''); return; }
     setLocalitiesLoading(true);
+    setLocalitySearch('');
     locationsApi.getLocalities(form.city).then(r => {
       const d = r.data;
       const locs = Array.isArray(d) ? d : [];
@@ -985,6 +993,22 @@ function Step4Location({ form, dispatch }: any) {
       }
     }).catch(() => setLocalities([])).finally(() => setLocalitiesLoading(false));
   }, [form.city]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Debounced locality server search when typed term not found locally ─────
+  useEffect(() => {
+    if (!form.city || !localitySearch) return;
+    const matched = localities.filter(l =>
+      (l.locality || l.city || '').toLowerCase().includes(localitySearch.toLowerCase())
+    );
+    if (matched.length > 0) return; // client-side results sufficient
+    const t = setTimeout(() => {
+      locationsApi.getLocalities(form.city, undefined, localitySearch).then(r => {
+        const d = r.data;
+        if (Array.isArray(d) && d.length > 0) setLocalities(d);
+      }).catch(() => {});
+    }, 350);
+    return () => clearTimeout(t);
+  }, [localitySearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Close city dropdown on outside click ─────────────────────────────────
   useEffect(() => {
@@ -1048,7 +1072,7 @@ function Step4Location({ form, dispatch }: any) {
         if (!cm) cm = cities.find((c: any) => c.name && (normalize(loc.city).includes(normalize(c.name)) || normalize(c.name).includes(normalize(loc.city))));
         if (cm) {
           setCitySearch(cm.name);
-          dispatch(updateForm({ cityId: cm.id, city: cm.name, stateId: cm.stateId || '', state: cm.state?.name || '', localityId: '', locality: '', pincode: '' }));
+          dispatch(updateForm({ cityId: cm.id, city: cm.name, stateId: cm.stateId || '', state: cm.stateName || '', localityId: '', locality: '', pincode: '' }));
         } else if (loc.city) {
           setCitySearch(loc.city);
           dispatch(updateForm({ city: loc.city, cityId: '', localityId: '', locality: '' }));
@@ -1061,22 +1085,25 @@ function Step4Location({ form, dispatch }: any) {
     }
   };
 
-  // ── City search filtering ─────────────────────────────────────────────────
-  const filteredCities = citySearch
-    ? cities.filter(c => c.name?.toLowerCase().includes(citySearch.toLowerCase()))
-    : cities.filter(c => c.name);
-
+  // ── City async search with debounce ──────────────────────────────────────
   const handleCityInputChange = (val: string) => {
     setCitySearch(val);
     setShowCityDropdown(true);
     if (!val) dispatch(updateForm({ city: '', cityId: '', localityId: '', locality: '', pincode: '' }));
+    clearTimeout(cityDebounceRef.current);
+    cityDebounceRef.current = setTimeout(() => fetchCities(val), 300);
   };
+
+  // Filtered locality list (client-side first, server-side fallback via effect above)
+  const filteredLocalities = localitySearch
+    ? localities.filter(l => (l.locality || l.city || '').toLowerCase().includes(localitySearch.toLowerCase()))
+    : localities;
 
   const handleCityPick = (c: any) => {
     setCitySearch(c.name);
     setShowCityDropdown(false);
     setCustomLocality(false);
-    dispatch(updateForm({ cityId: c.id, city: c.name, stateId: c.stateId || '', state: c.state?.name || '', localityId: '', locality: '', pincode: '', latitude: null, longitude: null }));
+    dispatch(updateForm({ cityId: c.id, city: c.name, stateId: c.stateId || '', state: c.stateName || '', localityId: '', locality: '', pincode: '', latitude: null, longitude: null }));
   };
 
   // ── When a DB locality is selected ───────────────────────────────────────
@@ -1148,28 +1175,36 @@ function Step4Location({ form, dispatch }: any) {
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-xs font-semibold">✓</span>
             )}
           </div>
-          {showCityDropdown && filteredCities.length > 0 && (
-            <div className="absolute z-20 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
-              {filteredCities.slice(0, 20).map((c: any) => (
+          {showCityDropdown && (cities.length > 0 || citiesLoading) && (
+            <div className="absolute z-20 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+              {citiesLoading && (
+                <div className="flex items-center gap-2 px-3 py-2.5 text-xs text-gray-400">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Searching cities…
+                </div>
+              )}
+              {!citiesLoading && cities.length === 0 && citySearch && (
+                <div className="px-3 py-2.5 text-xs text-gray-400">No cities found for "{citySearch}"</div>
+              )}
+              {cities.map((c: any) => (
                 <button key={c.id} type="button"
                   onClick={() => handleCityPick(c)}
                   className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-primary-50 text-left transition-colors">
                   <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                   {c.name}
-                  {c.state?.name && <span className="text-xs text-gray-400 ml-auto">{c.state.name}</span>}
+                  {c.stateName && <span className="text-xs text-gray-400 ml-auto">{c.stateName}</span>}
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        {/* Locality — dropdown from DB, or free text */}
+        {/* Locality — searchable list from DB, or free text */}
         <div className="sm:col-span-2">
           <div className="flex items-center justify-between mb-1.5">
             <FieldLabel required>Area / Locality</FieldLabel>
             {localities.length > 0 && (
               <button type="button"
-                onClick={() => { setCustomLocality(!customLocality); dispatch(updateForm({ localityId: '', locality: '', pincode: '' })); }}
+                onClick={() => { setCustomLocality(!customLocality); dispatch(updateForm({ localityId: '', locality: '', pincode: '' })); setLocalitySearch(''); }}
                 className="text-xs text-blue-600 hover:underline">
                 {customLocality ? '← Pick from list' : 'Enter manually'}
               </button>
@@ -1177,16 +1212,49 @@ function Step4Location({ form, dispatch }: any) {
           </div>
 
           {showLocalityDropdown ? (
-            <Select value={form.localityId || ''}
-              onChange={(e: any) => handleLocalitySelect(e.target.value)}
-              disabled={!form.city || localitiesLoading}>
-              <option value="">{localitiesLoading ? 'Loading localities…' : form.city ? 'Select locality' : 'Select city first'}</option>
-              {localities.map((l: any) => (
-                <option key={l.id} value={l.id}>
-                  {l.locality || l.city}{l.pincode ? ` — ${l.pincode}` : ''}
-                </option>
-              ))}
-            </Select>
+            <div>
+              {/* Search box */}
+              <div className="relative mb-1">
+                <input
+                  type="text"
+                  value={localitySearch}
+                  onChange={(e) => setLocalitySearch(e.target.value)}
+                  placeholder={localitiesLoading ? 'Loading localities…' : `Search in ${form.city}…`}
+                  disabled={!form.city || localitiesLoading}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400 placeholder:text-gray-400 disabled:opacity-50"
+                />
+                {localitiesLoading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />}
+                {localitySearch && !localitiesLoading && (
+                  <button type="button" onClick={() => setLocalitySearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                )}
+              </div>
+              {/* Scrollable list */}
+              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-xl bg-white">
+                {filteredLocalities.length === 0 && !localitiesLoading && (
+                  <div className="px-4 py-3 text-xs text-gray-400">
+                    {localitySearch ? `No localities found for "${localitySearch}"` : 'No localities available'}
+                  </div>
+                )}
+                {filteredLocalities.map((l: any) => (
+                  <button key={l.id} type="button"
+                    onClick={() => handleLocalitySelect(l.id)}
+                    className={cn(
+                      'w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors hover:bg-primary-50',
+                      form.localityId === l.id ? 'bg-primary-50 text-primary-700 font-semibold' : 'text-gray-700'
+                    )}>
+                    <span>{l.locality || l.city}</span>
+                    {l.pincode && <span className="text-xs text-gray-400 ml-2 flex-shrink-0">{l.pincode}</span>}
+                  </button>
+                ))}
+              </div>
+              {localities.length > 0 && (
+                <p className="text-xs text-gray-400 mt-1">
+                  {filteredLocalities.length} of {localities.length} localities
+                  {localitySearch ? ` matching "${localitySearch}"` : ''}
+                </p>
+              )}
+            </div>
           ) : (
             <Input value={form.locality}
               onChange={(e: any) => dispatch(updateForm({ locality: e.target.value, localityId: '' }))}

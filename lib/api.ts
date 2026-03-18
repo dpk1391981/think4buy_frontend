@@ -138,12 +138,13 @@ export const menusApi = {
 // Locations
 export const locationsApi = {
   search: (q: string) => api.get('/locations/search', { params: { q } }),
-  getCities: () => api.get('/locations/cities'),
-  getLocalities: (city: string, state?: string) =>
-    api.get('/locations/localities', { params: { city, state } }),
+  getCities: (search?: string, limit?: number) =>
+    api.get('/locations/cities', { params: { search: search || undefined, limit } }),
+  getLocalities: (city: string, state?: string, search?: string) =>
+    api.get('/locations/localities', { params: { city, state, search: search || undefined } }),
   /** Alias used by FindPropertyClient */
-  getLocalitiesByCity: (city: string, state?: string) =>
-    api.get('/locations/localities', { params: { city, state } }),
+  getLocalitiesByCity: (city: string, state?: string, search?: string) =>
+    api.get('/locations/localities', { params: { city, state, search: search || undefined } }),
   getStates: () => api.get('/locations/states'),
   getCitiesByState: (stateId: string) => api.get(`/locations/states/${stateId}/cities`),
   getSeoContent: (params: { city?: string; state?: string }) =>

@@ -17,7 +17,6 @@ function LoginForm() {
 
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
-  const [name, setName] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -59,7 +58,7 @@ function LoginForm() {
     if (otp.length < 6) { setError('Enter the 6-digit OTP sent to your phone'); return; }
     setLoading(true); setError('');
     try {
-      const { data } = await authApi.verifyOtp(phone, otp, name || undefined);
+      const { data } = await authApi.verifyOtp(phone, otp);
       login(data.token, data.user, data.menus);
       const redirect = searchParams.get('redirect') || '';
       if (data.isNewUser) {
@@ -126,18 +125,6 @@ function LoginForm() {
 
         {step === 'phone' ? (
           <form onSubmit={handleSendOtp} className="space-y-4">
-            {/* Name */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Your Name (optional)</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Full name"
-                className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm text-gray-900 outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
-              />
-            </div>
-
             {/* Phone */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">

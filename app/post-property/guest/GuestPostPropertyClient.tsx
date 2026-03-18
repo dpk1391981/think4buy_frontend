@@ -37,7 +37,6 @@ export default function GuestPostPropertyPage() {
 
   const [userType, setUserType] = useState('owner');
   const [phone, setPhone]       = useState('');
-  const [name,  setName]        = useState('');
   const [otp,   setOtp]         = useState('');
   const [step,  setStep]        = useState<'landing' | 'otp' | 'agency' | 'success'>('landing');
   const [loading, setLoading]   = useState(false);
@@ -85,7 +84,7 @@ export default function GuestPostPropertyPage() {
     if (otp.length < 6) { setError('Enter the 6-digit OTP sent to your phone'); return; }
     setLoading(true); setError('');
     try {
-      const { data } = await authApi.verifyOtp(phone, otp, name || undefined);
+      const { data } = await authApi.verifyOtp(phone, otp);
       // Persist the token so subsequent API calls are authenticated
       login(data.token || data.accessToken, data.user);
 
@@ -301,16 +300,6 @@ export default function GuestPostPropertyPage() {
 
                   {/* Phone form */}
                   <form onSubmit={handleSendOtp} className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Your Name</label>
-                      <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Full name (optional)"
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
-                      />
-                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">
                         Mobile Number <span className="text-red-500">*</span>

@@ -43,7 +43,6 @@ export default function AuthModal() {
 
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
-  const [name, setName] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -67,7 +66,6 @@ export default function AuthModal() {
       setTimeout(() => {
         setStep('phone');
         setPhone('');
-        setName('');
         setOtp('');
         setError('');
         setDevOtp('');
@@ -119,7 +117,7 @@ export default function AuthModal() {
     if (otp.length < 6) { setError('Enter the 6-digit OTP sent to your phone'); return; }
     setLoading(true); setError('');
     try {
-      const { data } = await authApi.verifyOtp(phone, otp, name || undefined);
+      const { data } = await authApi.verifyOtp(phone, otp);
       login(data.token, data.user);
       dispatch(closeAuthModal());
       if (data.isNewUser) {
@@ -219,18 +217,6 @@ export default function AuthModal() {
 
           {step === 'phone' ? (
             <form onSubmit={handleSendOtp} className="space-y-4">
-              {/* Name (optional) */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Your Name (optional)</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Full name"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
-                />
-              </div>
-
               {/* Phone */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">

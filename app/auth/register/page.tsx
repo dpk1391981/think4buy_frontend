@@ -3,14 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Home, Loader2, Eye, EyeOff, CheckCircle, User, Mail, Phone, Lock, ArrowRight } from 'lucide-react';
+import { Home, Loader2, Eye, EyeOff, CheckCircle, Mail, Phone, Lock, ArrowRight } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 type UserType = 'owner' | 'agent';
 
 interface FormData {
-  name: string;
   email: string;
   phone: string;
   password: string;
@@ -63,7 +62,6 @@ export default function RegisterPage() {
   const { login } = useAuth();
 
   const [form, setForm] = useState<FormData>({
-    name: '',
     email: '',
     phone: '',
     password: '',
@@ -86,8 +84,6 @@ export default function RegisterPage() {
   const validate = (): boolean => {
     const errs: Partial<Record<keyof FormData, string>> = {};
 
-    if (!form.name.trim() || form.name.trim().length < 2)
-      errs.name = 'Full name must be at least 2 characters';
     if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       errs.email = 'Enter a valid email address';
     if (form.phone && !/^[6-9]\d{9}$/.test(form.phone))
@@ -111,7 +107,6 @@ export default function RegisterPage() {
     setError('');
     try {
       const payload: any = {
-        name: form.name.trim(),
         email: form.email.toLowerCase().trim(),
         password: form.password,
         role: form.userType,
@@ -186,27 +181,6 @@ export default function RegisterPage() {
                   {error}
                 </div>
               )}
-
-              {/* Full Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name *</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => set('name', e.target.value)}
-                    placeholder="Rahul Sharma"
-                    autoFocus
-                    className={`w-full pl-9 pr-4 py-2.5 border rounded-xl text-sm outline-none transition-all ${
-                      fieldErrors.name
-                        ? 'border-red-400 focus:ring-2 focus:ring-red-200'
-                        : 'border-gray-200 focus:ring-2 focus:ring-primary-400 focus:border-transparent'
-                    }`}
-                  />
-                </div>
-                {fieldErrors.name && <p className="text-red-500 text-xs mt-1">{fieldErrors.name}</p>}
-              </div>
 
               {/* Email */}
               <div>

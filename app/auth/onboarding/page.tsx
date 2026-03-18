@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Search, Home, Briefcase, ChevronRight, Loader2,
-  CheckCircle2, Building2, Star, Shield, Zap,
+  CheckCircle2, Building2, Star, Shield, Zap, User,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -83,6 +83,9 @@ function OnboardingForm() {
   const { login, user, loading: authLoading } = useAuth();
 
   const [selectedRole, setSelectedRole] = useState<RoleId>('buyer');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [firstNameError, setFirstNameError] = useState('');
   const [agentLicense, setAgentLicense] = useState('');
   const [agentExperience, setAgentExperience] = useState('');
   const [agencyName, setAgencyName] = useState('');
@@ -104,11 +107,17 @@ function OnboardingForm() {
   }
 
   const handleSubmit = async () => {
+    if (!firstName.trim()) {
+      setFirstNameError('First name is required');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      const payload: { role: string; agentLicense?: string; agentExperience?: number; agencyName?: string } = {
+      const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
+      const payload: { role: string; name?: string; agentLicense?: string; agentExperience?: number; agencyName?: string } = {
         role: selectedRole,
+        name: fullName,
       };
       if (selectedRole === 'agent') {
         if (agentLicense.trim()) payload.agentLicense = agentLicense.trim();
@@ -167,6 +176,47 @@ function OnboardingForm() {
             <p className="text-gray-500 text-sm sm:text-base max-w-sm mx-auto leading-relaxed">
               Choose your role so we can personalise your experience and show you the right tools.
             </p>
+          </div>
+
+          {/* Name fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            {/* First Name — required */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                First Name <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => { setFirstName(e.target.value); if (firstNameError) setFirstNameError(''); }}
+                  placeholder="e.g. Rahul"
+                  autoFocus
+                  className={cn(
+                    'w-full pl-9 pr-4 py-3 border rounded-2xl text-sm outline-none transition-all',
+                    firstNameError
+                      ? 'border-red-400 focus:ring-2 focus:ring-red-200'
+                      : 'border-gray-200 focus:ring-2 focus:ring-primary-400 focus:border-transparent',
+                  )}
+                />
+              </div>
+              {firstNameError && <p className="text-red-500 text-xs mt-1">{firstNameError}</p>}
+            </div>
+
+            {/* Last Name — optional */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                Last Name <span className="text-gray-400 font-normal text-xs">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="e.g. Sharma"
+                className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm outline-none transition-all focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+              />
+            </div>
           </div>
 
           {/* Role cards */}
