@@ -63,7 +63,7 @@ function getAmenityIcon(name: string): string {
 
 function buildAgentSlug(name: string, city: string, _id: string): string {
   const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return city ? `${slug(name)}-in-${slug(city)}` : slug(name);
+  return city ? `${slug(name)}/${slug(city)}` : slug(name);
 }
 
 type InquiryType = 'general' | 'site_visit' | 'price_negotiation';
@@ -781,7 +781,7 @@ export default function PropertyDetailClient({ property }: Props) {
               <div className="flex items-start gap-4">
                 <div className="relative w-14 h-14 flex-shrink-0">
                   {owner?.avatar ? (
-                    <Image src={owner.avatar} alt={owner.name} fill className="object-cover rounded-2xl" sizes="56px" />
+                    <img src={resolveImageUrl(owner.avatar)} alt={owner.name} className="w-14 h-14 object-cover rounded-2xl" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   ) : (
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold text-xl">
                       {owner?.name?.charAt(0) || (isAgent ? 'A' : 'O')}
@@ -1079,7 +1079,7 @@ export default function PropertyDetailClient({ property }: Props) {
                   <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-gray-50/50">
                     <div className="relative w-12 h-12 flex-shrink-0">
                       {owner?.avatar ? (
-                        <Image src={owner.avatar} alt={owner.name || ''} fill className="object-cover rounded-xl" sizes="48px" />
+                        <img src={resolveImageUrl(owner.avatar)} alt={owner.name || ''} className="w-12 h-12 object-cover rounded-xl" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       ) : (
                         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold text-lg">
                           {owner?.name?.charAt(0) || (isAgent ? 'A' : 'O')}

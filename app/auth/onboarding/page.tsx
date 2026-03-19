@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Search, Home, Briefcase, ChevronRight, Loader2,
-  CheckCircle2, Building2, Star, Shield, Zap, User,
+  CheckCircle2, Building2, Star, Shield, Zap, User, Plus, X,
 } from 'lucide-react';
 import { authApi, agencyApi, locationsApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -96,11 +96,19 @@ function OnboardingForm() {
   const [businessAddress, setBusinessAddress] = useState('');
   // Coverage
   const [states, setStates] = useState<{ id: string; name: string }[]>([]);
-  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
-  const [coverageStateId, setCoverageStateId] = useState('');
-  const [coverageStateName, setCoverageStateName] = useState('');
-  const [coverageCityId, setCoverageCityId] = useState('');
-  const [coverageCityName, setCoverageCityName] = useState('');
+
+  // Each coverage entry: { stateId, stateName, cityId, cityName, localityId?, localityName? }
+  type CoverageEntry = {
+    stateId: string; stateName: string;
+    cityId: string; cityName: string;
+    localityId?: string; localityName?: string;
+    cities: { id: string; name: string }[];
+    localities: { id: string; name: string; locality?: string }[];
+  };
+  const [coverageEntries, setCoverageEntries] = useState<CoverageEntry[]>([
+    { stateId: '', stateName: '', cityId: '', cityName: '', cities: [], localities: [] },
+  ]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -109,15 +117,38 @@ function OnboardingForm() {
     locationsApi.getStates().then((r) => setStates(r.data || [])).catch(() => {});
   }, []);
 
-  // Load cities when state changes
-  useEffect(() => {
-    if (!coverageStateId) { setCities([]); setCoverageCityId(''); setCoverageCityName(''); return; }
-    locationsApi.getCitiesByState(coverageStateId)
-      .then((r) => setCities(r.data || []))
-      .catch(() => {});
-    setCoverageCityId('');
-    setCoverageCityName('');
-  }, [coverageStateId]);
+  const updateEntry = (idx: number, patch: Partial<CoverageEntry>) => {
+    setCoverageEntries(prev => prev.map((e, i) => i === idx ? { ...e, ...patch } : e));
+  };
+
+  const handleStateChange = async (idx: number, stateId: string) => {
+    const opt = states.find(s => s.id === stateId);
+    updateEntry(idx, { stateId, stateName: opt?.name || '', cityId: '', cityName: '', cities: [], localities: [], localityId: '', localityName: '' });
+    if (!stateId) return;
+    try {
+      const r = await locationsApi.getCitiesByState(stateId);
+      updateEntry(idx, { cities: r.data || [] });
+    } catch {}
+  };
+
+  const handleCityChange = async (idx: number, cityId: string) => {
+    const entry = coverageEntries[idx];
+    const opt = entry.cities.find(c => c.id === cityId);
+    updateEntry(idx, { cityId, cityName: opt?.name || '', localityId: '', localityName: '', localities: [] });
+    if (!cityId || !opt) return;
+    try {
+      const r = await locationsApi.getLocalities(opt.name, entry.stateName);
+      updateEntry(idx, { localities: r.data || [] });
+    } catch {}
+  };
+
+  const addCoverageEntry = () => {
+    setCoverageEntries(prev => [...prev, { stateId: '', stateName: '', cityId: '', cityName: '', cities: [], localities: [] }]);
+  };
+
+  const removeCoverageEntry = (idx: number) => {
+    setCoverageEntries(prev => prev.filter((_, i) => i !== idx));
+  };
 
   const redirect = searchParams.get('redirect') || '/';
 
@@ -143,8 +174,9 @@ function OnboardingForm() {
       if (!contactPhone.trim()) { setError('Contact Phone is required.'); return; }
       if (!agentExperience) { setError('Years of Experience is required.'); return; }
       if (!businessAddress.trim()) { setError('Business Address is required.'); return; }
-      if (!coverageStateId) { setError('Please select your coverage State.'); return; }
-      if (!coverageCityId) { setError('Please select your coverage City.'); return; }
+      const firstEntry = coverageEntries[0];
+      if (!firstEntry.stateId) { setError('Please select at least one coverage State.'); return; }
+      if (!firstEntry.cityId) { setError('Please select at least one coverage City.'); return; }
     }
     setLoading(true);
     setError('');
@@ -163,15 +195,19 @@ function OnboardingForm() {
       // Re-login so token is stored before coverage call
       login(data.token, data.user, data.menus);
 
-      // Add initial coverage area for agents
-      if (selectedRole === 'agent' && coverageCityId) {
-        await agencyApi.addMyLocation({
-          coverageType: 'city',
-          stateId: coverageStateId,
-          stateName: coverageStateName,
-          cityId: coverageCityId,
-          cityName: coverageCityName,
-        }).catch(() => {}); // non-fatal — agent can add more in profile
+      // Add all coverage entries for agents
+      if (selectedRole === 'agent') {
+        for (const entry of coverageEntries) {
+          if (!entry.cityId) continue;
+          await agencyApi.addMyLocation({
+            coverageType: entry.localityId ? 'locality' : 'city',
+            stateId: entry.stateId,
+            stateName: entry.stateName,
+            cityId: entry.cityId,
+            cityName: entry.cityName,
+            ...(entry.localityId ? { localityId: entry.localityId, localityName: entry.localityName } : {}),
+          }).catch(() => {}); // non-fatal
+        }
       }
 
       // Honour ?redirect= param if present, otherwise go to role dashboard
@@ -398,41 +434,74 @@ function OnboardingForm() {
                 {/* Coverage Area */}
                 <div className="sm:col-span-2">
                   <div className="border-t border-violet-200 pt-3 mt-1">
-                    <p className="text-xs font-bold text-violet-700 mb-2">Primary Coverage Area <span className="text-red-500">*</span></p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">State</label>
-                        <select
-                          value={coverageStateId}
-                          onChange={(e) => {
-                            const opt = states.find((s) => s.id === e.target.value);
-                            setCoverageStateId(e.target.value);
-                            setCoverageStateName(opt?.name || '');
-                          }}
-                          className="w-full px-3 py-2.5 border border-violet-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
-                        >
-                          <option value="">Select state</option>
-                          {states.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">City</label>
-                        <select
-                          value={coverageCityId}
-                          disabled={!coverageStateId || cities.length === 0}
-                          onChange={(e) => {
-                            const opt = cities.find((c) => c.id === e.target.value);
-                            setCoverageCityId(e.target.value);
-                            setCoverageCityName(opt?.name || '');
-                          }}
-                          className="w-full px-3 py-2.5 border border-violet-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
-                        >
-                          <option value="">Select city</option>
-                          {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      </div>
+                    <p className="text-xs font-bold text-violet-700 mb-2">Coverage Areas <span className="text-red-500">*</span></p>
+                    <div className="space-y-3">
+                      {coverageEntries.map((entry, idx) => (
+                        <div key={idx} className="border border-violet-100 rounded-xl p-3 bg-white relative">
+                          {coverageEntries.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeCoverageEntry(idx)}
+                              className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <p className="text-[10px] font-semibold text-violet-600 mb-2">
+                            {idx === 0 ? 'Primary Area' : `Area ${idx + 1}`}
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">State</label>
+                              <select
+                                value={entry.stateId}
+                                onChange={(e) => handleStateChange(idx, e.target.value)}
+                                className="w-full px-3 py-2 border border-violet-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                              >
+                                <option value="">Select state</option>
+                                {states.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">City</label>
+                              <select
+                                value={entry.cityId}
+                                disabled={!entry.stateId || entry.cities.length === 0}
+                                onChange={(e) => handleCityChange(idx, e.target.value)}
+                                className="w-full px-3 py-2 border border-violet-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                              >
+                                <option value="">Select city</option>
+                                {entry.cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                                Locality <span className="text-gray-400 font-normal">(optional)</span>
+                              </label>
+                              <select
+                                value={entry.localityId || ''}
+                                disabled={!entry.cityId || entry.localities.length === 0}
+                                onChange={(e) => {
+                                  const opt = entry.localities.find(l => l.id === e.target.value);
+                                  updateEntry(idx, { localityId: e.target.value, localityName: opt?.locality || opt?.name || '' });
+                                }}
+                                className="w-full px-3 py-2 border border-violet-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                              >
+                                <option value="">All localities</option>
+                                {entry.localities.map((l) => <option key={l.id} value={l.id}>{l.locality || l.name}</option>)}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-1.5">You can add more cities and localities from your profile later.</p>
+                    <button
+                      type="button"
+                      onClick={addCoverageEntry}
+                      className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add more city / locality
+                    </button>
                   </div>
                 </div>
               </div>

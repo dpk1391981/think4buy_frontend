@@ -31,7 +31,7 @@ function buildAgentSlug(agent: Agent): string {
   const name = agent.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   if (!agent.city) return name;
   const city = agent.city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  return `${name}-in-${city}`;
+  return `${name}/${city}`;
 }
 
 // ── 3D Metallic tier themes ────────────────────────────────────────────────────

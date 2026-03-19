@@ -51,8 +51,8 @@ export default async function AgentNameOnlyPage({ params }: { params: { name: st
   // If agent has a city, redirect to canonical two-segment URL
   if (agent.city) {
     const citySlug = agent.city.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const nameSlug = params.name;
-    redirect(`/agents/${nameSlug}-in-${citySlug}`);
+    const nameSlug = agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    redirect(`/agents/${nameSlug}/${citySlug}`);
   }
 
   // Agent has no city — render inline using the same page component from [city]

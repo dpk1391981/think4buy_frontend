@@ -218,7 +218,7 @@ function buildSlug(a: Agent) {
   const n = (a.name || 'agent').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   if (!a.city) return n;
   const c = a.city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  return `${n}-in-${c}`;
+  return `${n}/${c}`;
 }
 
 function getInitials(name: string) {
@@ -354,10 +354,11 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
           <div className="relative">
             {agent.avatar ? (
               <img
-                src={agent.avatar}
+                src={resolveImageSrc(agent.avatar)}
                 alt={agent.name}
                 className={cn('w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-white', theme.avatarRing)}
                 style={isPremium ? { boxShadow: theme.avatarShadow } : {}}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
             ) : (
               <div
