@@ -54,7 +54,7 @@ function slug(name: string, city?: string) {
   const n = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   if (!city) return n;
   const c = city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  return `${n}-in-${c}`;
+  return `${n}/${c}`;
 }
 
 function initials(name: string) {

@@ -1133,7 +1133,7 @@ export default function AgentsListingClient({
                       {/* Avatar */}
                       <div className="relative flex-shrink-0">
                         {a.avatar ? (
-                          <img src={a.avatar} alt={a.name}
+                          <img src={resolveImageSrc(a.avatar)} alt={a.name}
                             className={`w-10 h-10 rounded-lg object-cover border border-white ${theme.avatarRing}`}
                             style={{ boxShadow: theme.avatarShadow || '0 2px 8px rgba(0,0,0,0.12)' }}
                           />

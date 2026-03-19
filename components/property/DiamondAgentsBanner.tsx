@@ -30,7 +30,7 @@ function buildSlug(a: DiamondAgent) {
   const n = (a.name || 'agent').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
   if (!a.city) return n;
   const c = a.city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  return `${n}-in-${c}`;
+  return `${n}/${c}`;
 }
 
 function getInitials(name: string) {
