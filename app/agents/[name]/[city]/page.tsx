@@ -15,7 +15,7 @@ import { resolveImageUrl } from '@/lib/imageUtils';
 
 type Params = { name: string; city: string };
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+const BASE = process.env.BACKEND_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 
 /** Lookup agent by name slug + optional city slug, returns first match */
 async function fetchAgentBySlug(nameSlug: string, citySlug: string) {

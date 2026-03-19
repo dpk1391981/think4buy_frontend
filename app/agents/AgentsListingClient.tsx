@@ -1154,10 +1154,13 @@ export default function AgentsListingClient({
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1 mb-0.5">
-                          <p className="text-xs font-extrabold text-gray-900 truncate leading-tight">{a.name}</p>
+                        <div className="flex items-center gap-1 mb-0">
+                          <p className="text-xs font-extrabold text-gray-900 truncate leading-tight">{a.company || a.name}</p>
                           {isGold && <span className="gold-crown-3d text-[11px] flex-shrink-0">♛</span>}
                         </div>
+                        {a.company && (
+                          <p className="text-[10px] text-gray-500 truncate leading-tight mb-0.5">{a.name}</p>
+                        )}
                         <div className="flex items-center gap-1 mb-0.5">
                           {(a.agentRating ?? 0) > 0 && (
                             <>

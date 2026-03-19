@@ -13,7 +13,7 @@ import type { Params } from 'next/dist/shared/lib/router/utils/route-matcher';
  * so the two-segment route handles it (avoids duplicate content).
  */
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+const BASE = process.env.BACKEND_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 
 async function fetchAgentByName(nameSlug: string) {
   try {
