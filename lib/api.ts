@@ -188,6 +188,11 @@ export const adminApi = {
   updateQuota: (id: string, agentFreeQuota: number) =>
     api.patch(`/admin/agents/${id}/quota`, { agentFreeQuota }),
   toggleAgentStatus: (id: string) => api.patch(`/admin/agents/${id}/toggle-status`),
+  // Agent avatar approval
+  getPendingAvatarAgents: (params?: { page?: number; limit?: number }) =>
+    api.get('/admin/agents/pending-images', { params }),
+  approveAgentAvatar: (id: string) => api.patch(`/admin/agents/${id}/approve-avatar`),
+  rejectAgentAvatar: (id: string) => api.patch(`/admin/agents/${id}/reject-avatar`),
   // Countries
   getCountries: () => api.get('/admin/countries'),
   createCountry: (data: any) => api.post('/admin/countries', data),
@@ -382,6 +387,13 @@ export const agencyApi = {
   getMyProperties: (params?: { page?: number; limit?: number }) =>
     api.get('/agency/me/properties', { params }),
   getMyLocations: () => api.get('/agency/me/locations'),
+  addMyLocation: (dto: {
+    coverageType?: 'state' | 'city' | 'locality';
+    stateId?: string; stateName?: string;
+    cityId?: string; cityName?: string;
+    localityId?: string; localityName?: string;
+  }) => api.post('/agency/me/locations', dto),
+  removeMyLocation: (id: string) => api.delete(`/agency/me/locations/${id}`),
 
   // Agent self-registration
   selfRegisterOrJoin: (data: { agencyName: string; contactPhone?: string; address?: string; city?: string; cityId?: string }) =>

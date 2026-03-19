@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { authApi } from '@/lib/api';
+import { authApi, agencyApi, locationsApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import AvatarUpload from '@/components/common/AvatarUpload';
 
@@ -14,6 +14,22 @@ interface ProfileForm {
   agentBio: string;
   agentExperience: string;
 }
+
+interface LocationEntry {
+  id: string;
+  coverageType: 'state' | 'city' | 'locality';
+  stateName?: string;
+  cityName?: string;
+  localityName?: string;
+  stateSlug?: string;
+  citySlug?: string;
+  localitySlug?: string;
+  isActive?: boolean;
+}
+
+interface StateOption { id: string; name: string; slug?: string; }
+interface CityOption  { id: string; name: string; slug?: string; stateId?: string; }
+interface LocalityOption { id: string; name: string; slug?: string; }
 
 export default function AgentProfilePage() {
   const { user, refresh } = useAuth();
@@ -29,6 +45,20 @@ export default function AgentProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+
+  // Coverage areas
+  const [locations, setLocations] = useState<LocationEntry[]>([]);
+  const [locLoading, setLocLoading] = useState(false);
+  const [states, setStates] = useState<StateOption[]>([]);
+  const [cities, setCities] = useState<CityOption[]>([]);
+  const [localities, setLocalities] = useState<LocalityOption[]>([]);
+  const [newLoc, setNewLoc] = useState<{
+    coverageType: 'state' | 'city' | 'locality';
+    stateId: string; stateName: string;
+    cityId: string; cityName: string;
+    localityId: string; localityName: string;
+  }>({ coverageType: 'city', stateId: '', stateName: '', cityId: '', cityName: '', localityId: '', localityName: '' });
+  const [addingLoc, setAddingLoc] = useState(false);
 
   useEffect(() => {
     authApi.getProfile()
@@ -47,6 +77,72 @@ export default function AgentProfilePage() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  // Load coverage areas and states on mount
+  useEffect(() => {
+    agencyApi.getMyLocations().then((r) => setLocations(r.data || [])).catch(console.error);
+    locationsApi.getStates().then((r) => setStates(r.data || [])).catch(console.error);
+  }, []);
+
+  // Load cities when state changes
+  useEffect(() => {
+    if (!newLoc.stateId) { setCities([]); setLocalities([]); return; }
+    locationsApi.getCitiesByState(newLoc.stateId)
+      .then((r) => setCities(r.data || []))
+      .catch(console.error);
+    setLocalities([]);
+    setNewLoc((p) => ({ ...p, cityId: '', cityName: '', localityId: '', localityName: '' }));
+  }, [newLoc.stateId]);
+
+  // Load localities when city changes
+  useEffect(() => {
+    if (!newLoc.cityName) { setLocalities([]); return; }
+    locationsApi.getLocalities(newLoc.cityName)
+      .then((r) => setLocalities(r.data || []))
+      .catch(console.error);
+    setNewLoc((p) => ({ ...p, localityId: '', localityName: '' }));
+  }, [newLoc.cityName]);
+
+  async function handleAddLocation() {
+    const { coverageType, stateId, stateName, cityId, cityName, localityId, localityName } = newLoc;
+    if (coverageType === 'state' && !stateId) { showToast('error', 'Select a state.'); return; }
+    if (coverageType === 'city' && !cityId) { showToast('error', 'Select a city.'); return; }
+    if (coverageType === 'locality' && !localityId) { showToast('error', 'Select a locality.'); return; }
+    setAddingLoc(true);
+    try {
+      const dto: any = { coverageType };
+      if (stateId) { dto.stateId = stateId; dto.stateName = stateName; }
+      if (cityId)  { dto.cityId = cityId;   dto.cityName = cityName; }
+      if (coverageType === 'locality' && localityId) { dto.localityId = localityId; dto.localityName = localityName; }
+      const r = await agencyApi.addMyLocation(dto);
+      setLocations((prev) => [...prev, r.data]);
+      setNewLoc({ coverageType: 'city', stateId: '', stateName: '', cityId: '', cityName: '', localityId: '', localityName: '' });
+      showToast('success', 'Coverage area added.');
+    } catch (e: any) {
+      showToast('error', e?.response?.data?.message || 'Failed to add coverage area.');
+    } finally {
+      setAddingLoc(false);
+    }
+  }
+
+  async function handleRemoveLocation(id: string) {
+    setLocLoading(true);
+    try {
+      await agencyApi.removeMyLocation(id);
+      setLocations((prev) => prev.filter((l) => l.id !== id));
+      showToast('success', 'Coverage area removed.');
+    } catch (e: any) {
+      showToast('error', e?.response?.data?.message || 'Failed to remove coverage area.');
+    } finally {
+      setLocLoading(false);
+    }
+  }
+
+  function coverageLabel(loc: LocationEntry) {
+    if (loc.coverageType === 'locality') return `${loc.localityName}, ${loc.cityName}, ${loc.stateName}`;
+    if (loc.coverageType === 'city') return `${loc.cityName}, ${loc.stateName}`;
+    return loc.stateName || 'Unknown';
+  }
 
   function showToast(type: 'success' | 'error', msg: string) {
     setToast({ type, msg });
@@ -232,6 +328,133 @@ export default function AgentProfilePage() {
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </form>
+
+      {/* Coverage Areas — outside the profile form */}
+      <div className="max-w-2xl mt-8">
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="font-semibold text-gray-800 mb-1">Coverage Areas</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            Add the states, cities, or localities you cover. This determines where you appear as a featured agent.
+          </p>
+
+          {/* Add new coverage */}
+          <div className="border border-gray-100 rounded-lg p-4 bg-gray-50 mb-5 space-y-3">
+            {/* Coverage type selector */}
+            <div className="flex gap-2">
+              {(['state', 'city', 'locality'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setNewLoc((p) => ({ ...p, coverageType: t }))}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize border transition-colors ${
+                    newLoc.coverageType === t
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* State */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+                <select
+                  value={newLoc.stateId}
+                  onChange={(e) => {
+                    const opt = states.find((s) => s.id === e.target.value);
+                    setNewLoc((p) => ({ ...p, stateId: e.target.value, stateName: opt?.name || '' }));
+                  }}
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select state</option>
+                  {states.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+
+              {/* City */}
+              {(newLoc.coverageType === 'city' || newLoc.coverageType === 'locality') && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+                  <select
+                    value={newLoc.cityId}
+                    disabled={!newLoc.stateId}
+                    onChange={(e) => {
+                      const opt = cities.find((c) => c.id === e.target.value);
+                      setNewLoc((p) => ({ ...p, cityId: e.target.value, cityName: opt?.name || '' }));
+                    }}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  >
+                    <option value="">Select city</option>
+                    {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {/* Locality */}
+              {newLoc.coverageType === 'locality' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Locality</label>
+                  <select
+                    value={newLoc.localityId}
+                    disabled={!newLoc.cityId}
+                    onChange={(e) => {
+                      const opt = localities.find((l) => l.id === e.target.value);
+                      setNewLoc((p) => ({ ...p, localityId: e.target.value, localityName: opt?.name || '' }));
+                    }}
+                    className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  >
+                    <option value="">Select locality</option>
+                    {localities.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAddLocation}
+              disabled={addingLoc}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {addingLoc ? 'Adding...' : '+ Add Coverage'}
+            </button>
+          </div>
+
+          {/* Existing coverage list */}
+          {locations.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">No coverage areas added yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {locations.map((loc) => (
+                <li key={loc.id} className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${
+                      loc.coverageType === 'state'    ? 'bg-purple-100 text-purple-700' :
+                      loc.coverageType === 'city'     ? 'bg-blue-100 text-blue-700' :
+                                                        'bg-green-100 text-green-700'
+                    }`}>{loc.coverageType}</span>
+                    <span className="text-sm text-gray-800">{coverageLabel(loc)}</span>
+                    {loc.isActive === false && (
+                      <span className="px-2 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700">Pending</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveLocation(loc.id)}
+                    disabled={locLoading}
+                    className="text-red-500 hover:text-red-700 text-xs font-medium disabled:opacity-50 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

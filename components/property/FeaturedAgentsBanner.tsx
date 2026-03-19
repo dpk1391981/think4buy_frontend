@@ -151,7 +151,7 @@ function Stars({ rating }: { rating: number }) {
 // ─── Agent Card ───────────────────────────────────────────────────────────────
 
 function AgentCard({ agent, city }: { agent: FeaturedAgent; city: string }) {
-  const name    = agent.name || agent.agentName || 'Agent';
+  const name    = agent.company || agent.name || agent.agentName || 'Agent';
   const phone   = agent.phone || agent.agentPhone;
   const avatar  = agent.avatar || agent.agentAvatar;
   const tick    = (agent.agentTick && agent.agentTick !== 'none') ? agent.agentTick : 'none';
@@ -250,7 +250,7 @@ function AgentCard({ agent, city }: { agent: FeaturedAgent; city: string }) {
               {name}
             </Link>
             {agent.company && (
-              <p className="text-xs text-gray-500 mt-0.5 truncate font-medium">{agent.company}</p>
+              <p className="text-xs text-gray-500 mt-0.5 truncate">{agent.name || agent.agentName}</p>
             )}
             {(agent.city || agent.state) && (
               <p className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">

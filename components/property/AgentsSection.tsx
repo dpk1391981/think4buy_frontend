@@ -153,9 +153,9 @@ function DiamondCard({ agent, city }: { agent: Agent; city: string }) {
 
         <div className="flex-1 min-w-0 pt-0.5" style={{ paddingRight: agent.isSponsored ? '72px' : '0' }}>
           <Link href={`/agents/${agentSlug}`} className={`block text-sm font-bold text-gray-900 ${profileHoverCls} transition-colors leading-snug`}>
-            {agent.name}
+            {agent.company || agent.name}
           </Link>
-          {agent.company && <p className="text-xs text-gray-500 mt-0.5 truncate">{agent.company}</p>}
+          {agent.company && <p className="text-xs text-gray-500 mt-0.5 truncate">{agent.name}</p>}
           {(agent.city || agent.state) && (
             <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1">
               <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
@@ -288,9 +288,9 @@ function FeaturedCard({ agent, city }: { agent: Agent; city: string }) {
 
         <div className="flex-1 min-w-0 pt-0.5" style={{ paddingRight: agent.isSponsored ? '72px' : '0' }}>
           <Link href={`/agents/${agentSlug}`} className="block text-sm font-bold text-gray-900 group-hover:text-primary-700 transition-colors leading-snug">
-            {agent.name}
+            {agent.company || agent.name}
           </Link>
-          {agent.company && <p className="text-xs text-gray-500 mt-0.5 truncate">{agent.company}</p>}
+          {agent.company && <p className="text-xs text-gray-500 mt-0.5 truncate">{agent.name}</p>}
           {(agent.city || agent.state) && (
             <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-1">
               <MapPin className="w-3 h-3 flex-shrink-0" />
@@ -333,9 +333,6 @@ function FeaturedCard({ agent, city }: { agent: Agent; city: string }) {
         </div>
       )}
 
-      {agent.bio && (
-        <p className="px-4 pb-3 text-[11px] text-gray-500 leading-relaxed line-clamp-2">{agent.bio}</p>
-      )}
 
       <div className="flex-1" />
 

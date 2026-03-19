@@ -212,26 +212,16 @@ function AgentCard({ agent }: { agent: Agent }) {
       <Link href={`/agents/${slug}`} className="block px-4 pt-2 pb-3 flex-1">
         {/* Name + company + city */}
         <h3 className="font-bold text-gray-900 text-sm leading-snug group-hover:text-primary-700 transition-colors">
-          {agent.name}
+          {agent.company || agent.name}
         </h3>
-        {agent.company && (
-          <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
-            <Building2 className="w-3 h-3 flex-shrink-0" />
-            <span className="truncate">{agent.company}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+          <span className="truncate">{agent.name}</span>
+        </div>
         {agent.city && (
           <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
             <MapPin className="w-3 h-3 flex-shrink-0" />
             <span>{agent.city}{agent.state ? `, ${agent.state}` : ''}</span>
           </div>
-        )}
-
-        {/* Bio */}
-        {agent.agentBio && (
-          <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed mt-2">
-            {agent.agentBio}
-          </p>
         )}
 
         {/* Stats row */}

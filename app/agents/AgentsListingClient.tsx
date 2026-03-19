@@ -12,6 +12,7 @@ import { usersApi, locationsApi, agencyApi } from '@/lib/api';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { CallButton, WhatsAppButton } from '@/components/common/PhoneRevealButton';
+import { resolveImageSrc } from '@/components/common/OptimizedImage';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -258,7 +259,7 @@ function Avatar({ agent, size = 'lg' }: { agent: Agent; size?: 'sm' | 'md' | 'lg
   const sz = { sm: 'w-11 h-11 text-sm rounded-xl', md: 'w-14 h-14 text-base rounded-2xl', lg: 'w-[72px] h-[72px] text-lg rounded-2xl' }[size];
   const tick = agent.agentTick && agent.agentTick !== 'none' ? TICK[agent.agentTick] : null;
   const grad = tick?.grad ?? 'from-slate-400 to-slate-600';
-  if (agent.avatar) return <img src={agent.avatar} alt={agent.name} className={`${sz} object-cover flex-shrink-0 shadow-sm`} />;
+  if (agent.avatar) return <img src={resolveImageSrc(agent.avatar)} alt={agent.name} className={`${sz} object-cover flex-shrink-0 shadow-sm`} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />;
   return (
     <div className={`${sz} bg-gradient-to-br ${grad} flex items-center justify-center text-white font-extrabold flex-shrink-0 shadow-sm`}>
       {getInitials(agent.name)}
@@ -385,7 +386,7 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
             {/* Name row */}
             <div className="flex flex-wrap items-center gap-1.5 mb-0.5 pr-20">
               <h2 className={cn('text-base font-extrabold text-gray-900 transition-colors leading-tight', theme.nameCls)}>
-                {agent.name}
+                {agent.company || agent.name}
               </h2>
               {agent.isVerified && (
                 <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
@@ -409,11 +410,11 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
               </p>
             )}
 
-            {/* Company + location */}
+            {/* Agent name (secondary) + location */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mb-2.5 text-xs text-gray-500">
               {agent.company && (
-                <span className={cn('flex items-center gap-1 font-semibold', isPremium ? theme.nameCls.replace('group-hover:', '') : 'text-gray-700')}>
-                  <Building2 className="w-3 h-3 text-gray-400" />{agent.company}
+                <span className="flex items-center gap-1 text-gray-500">
+                  {agent.name}
                 </span>
               )}
               {(agent.city || agent.state) && (
@@ -446,9 +447,6 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
               </div>
             </div>
 
-            {agent.agentBio && (
-              <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{agent.agentBio}</p>
-            )}
           </div>
         </Link>
 

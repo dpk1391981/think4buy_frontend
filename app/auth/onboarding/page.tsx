@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Search, Home, Briefcase, ChevronRight, Loader2,
   CheckCircle2, Building2, Star, Shield, Zap, User,
 } from 'lucide-react';
-import { authApi } from '@/lib/api';
+import { authApi, agencyApi, locationsApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -92,8 +92,32 @@ function OnboardingForm() {
   const [agentLicense, setAgentLicense] = useState('');
   const [agentExperience, setAgentExperience] = useState('');
   const [agencyName, setAgencyName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+  // Coverage
+  const [states, setStates] = useState<{ id: string; name: string }[]>([]);
+  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+  const [coverageStateId, setCoverageStateId] = useState('');
+  const [coverageStateName, setCoverageStateName] = useState('');
+  const [coverageCityId, setCoverageCityId] = useState('');
+  const [coverageCityName, setCoverageCityName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Load states once on mount
+  useEffect(() => {
+    locationsApi.getStates().then((r) => setStates(r.data || [])).catch(() => {});
+  }, []);
+
+  // Load cities when state changes
+  useEffect(() => {
+    if (!coverageStateId) { setCities([]); setCoverageCityId(''); setCoverageCityName(''); return; }
+    locationsApi.getCitiesByState(coverageStateId)
+      .then((r) => setCities(r.data || []))
+      .catch(() => {});
+    setCoverageCityId('');
+    setCoverageCityName('');
+  }, [coverageStateId]);
 
   const redirect = searchParams.get('redirect') || '/';
 
@@ -114,23 +138,41 @@ function OnboardingForm() {
       setFirstNameError('First name is required');
       return;
     }
+    if (selectedRole === 'agent') {
+      if (!agencyName.trim()) { setError('Business / Agency Name is required.'); return; }
+      if (!contactPhone.trim()) { setError('Contact Phone is required.'); return; }
+      if (!agentExperience) { setError('Years of Experience is required.'); return; }
+      if (!businessAddress.trim()) { setError('Business Address is required.'); return; }
+      if (!coverageStateId) { setError('Please select your coverage State.'); return; }
+      if (!coverageCityId) { setError('Please select your coverage City.'); return; }
+    }
     setLoading(true);
     setError('');
     try {
       const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
-      const payload: { role: string; name?: string; agentLicense?: string; agentExperience?: number; agencyName?: string } = {
-        role: selectedRole,
-        name: fullName,
-      };
+      const payload: any = { role: selectedRole, name: fullName };
       if (selectedRole === 'agent') {
+        payload.agencyName    = agencyName.trim();
+        payload.contactPhone  = contactPhone.trim();
+        payload.agentExperience = Number(agentExperience);
+        payload.businessAddress = businessAddress.trim();
         if (agentLicense.trim()) payload.agentLicense = agentLicense.trim();
-        if (agentExperience) payload.agentExperience = Number(agentExperience);
-        if (agencyName.trim()) payload.agencyName = agencyName.trim();
       }
 
       const { data } = await authApi.completeOnboarding(payload);
-      // Re-login with updated user (new role, needsOnboarding = false)
+      // Re-login so token is stored before coverage call
       login(data.token, data.user, data.menus);
+
+      // Add initial coverage area for agents
+      if (selectedRole === 'agent' && coverageCityId) {
+        await agencyApi.addMyLocation({
+          coverageType: 'city',
+          stateId: coverageStateId,
+          stateName: coverageStateName,
+          cityId: coverageCityId,
+          cityName: coverageCityName,
+        }).catch(() => {}); // non-fatal — agent can add more in profile
+      }
 
       // Honour ?redirect= param if present, otherwise go to role dashboard
       if (redirect && redirect !== '/') {
@@ -287,11 +329,13 @@ function OnboardingForm() {
             <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4 mb-5 space-y-3">
               <div className="flex items-center gap-2 text-violet-700 text-xs font-bold mb-1">
                 <Star className="w-3.5 h-3.5" />
-                Agent Profile (optional — helps verify your listing)
+                Agent Profile
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Agency / Company Name</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Business / Agency Name <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={agencyName}
@@ -299,20 +343,23 @@ function OnboardingForm() {
                     placeholder="e.g. PropElite Realty Pvt Ltd"
                     className="w-full px-3 py-2.5 border border-violet-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
                   />
-                  <p className="text-[10px] text-violet-500 mt-1">Will be submitted for admin approval as a pending agency</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">RERA / License Number</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Contact Phone <span className="text-red-500">*</span>
+                  </label>
                   <input
-                    type="text"
-                    value={agentLicense}
-                    onChange={(e) => setAgentLicense(e.target.value)}
-                    placeholder="e.g. MH/RERA/A12345"
+                    type="tel"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="e.g. 9876543210"
                     className="w-full px-3 py-2.5 border border-violet-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Years of Experience</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Years of Experience <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="number"
                     value={agentExperience}
@@ -322,6 +369,71 @@ function OnboardingForm() {
                     placeholder="e.g. 5"
                     className="w-full px-3 py-2.5 border border-violet-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    RERA / License Number <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={agentLicense}
+                    onChange={(e) => setAgentLicense(e.target.value)}
+                    placeholder="e.g. MH/RERA/A12345"
+                    className="w-full px-3 py-2.5 border border-violet-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Business Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={businessAddress}
+                    onChange={(e) => setBusinessAddress(e.target.value)}
+                    placeholder="e.g. 12, MG Road, Bangalore 560001"
+                    className="w-full px-3 py-2.5 border border-violet-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                  />
+                </div>
+
+                {/* Coverage Area */}
+                <div className="sm:col-span-2">
+                  <div className="border-t border-violet-200 pt-3 mt-1">
+                    <p className="text-xs font-bold text-violet-700 mb-2">Primary Coverage Area <span className="text-red-500">*</span></p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">State</label>
+                        <select
+                          value={coverageStateId}
+                          onChange={(e) => {
+                            const opt = states.find((s) => s.id === e.target.value);
+                            setCoverageStateId(e.target.value);
+                            setCoverageStateName(opt?.name || '');
+                          }}
+                          className="w-full px-3 py-2.5 border border-violet-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                        >
+                          <option value="">Select state</option>
+                          {states.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">City</label>
+                        <select
+                          value={coverageCityId}
+                          disabled={!coverageStateId || cities.length === 0}
+                          onChange={(e) => {
+                            const opt = cities.find((c) => c.id === e.target.value);
+                            setCoverageCityId(e.target.value);
+                            setCoverageCityName(opt?.name || '');
+                          }}
+                          className="w-full px-3 py-2.5 border border-violet-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                        >
+                          <option value="">Select city</option>
+                          {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1.5">You can add more cities and localities from your profile later.</p>
+                  </div>
                 </div>
               </div>
             </div>

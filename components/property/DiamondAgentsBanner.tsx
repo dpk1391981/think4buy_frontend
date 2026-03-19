@@ -108,10 +108,10 @@ function AgentCard({ agent }: { agent: DiamondAgent }) {
             href={`/agents/${slug}`}
             className="block text-sm font-bold text-gray-900 group-hover:text-violet-700 transition-colors leading-tight truncate"
           >
-            {agent.name}
+            {agent.company || agent.name}
           </Link>
           {agent.company && (
-            <p className="text-xs text-gray-500 mt-0.5 truncate">{agent.company}</p>
+            <p className="text-xs text-gray-500 mt-0.5 truncate">{agent.name}</p>
           )}
           {(agent.city || agent.state) && (
             <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">

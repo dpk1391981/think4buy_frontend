@@ -193,10 +193,10 @@ function AgentCard({ agent, city, onContact }: { agent: Agent; city: string; onC
             <div className="flex items-start justify-between gap-2">
               <div>
                 <Link href={`/agents/${slug}`} className="font-bold text-gray-900 hover:text-primary-600 transition-colors">
-                  {agent.name}
+                  {agent.company || agent.name}
                 </Link>
                 {agent.company && (
-                  <p className="text-xs text-gray-500 mt-0.5">{agent.company}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{agent.name}</p>
                 )}
               </div>
               {tickConf && (
@@ -227,10 +227,6 @@ function AgentCard({ agent, city, onContact }: { agent: Agent; city: string; onC
               )}
             </div>
 
-            {/* Bio */}
-            {agent.agentBio && (
-              <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">{agent.agentBio}</p>
-            )}
           </div>
         </div>
 

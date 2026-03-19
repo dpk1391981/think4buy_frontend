@@ -11,6 +11,7 @@ import AgentListings from '@/components/agent/AgentListings';
 import AgentAnalyticsTracker from '@/components/agent/AgentAnalyticsTracker';
 import AgentFeedbackSection from '@/components/agent/AgentFeedbackSection';
 import AgentCallCTA from '@/components/agent/AgentCallCTA';
+import { resolveImageUrl } from '@/lib/imageUtils';
 
 type Params = { name: string; city: string };
 
@@ -281,10 +282,11 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
               <div className="flex-shrink-0 relative">
                 {agent.avatar ? (
                   <img
-                    src={agent.avatar}
+                    src={resolveImageUrl(agent.avatar)}
                     alt={agent.name}
                     className={`w-28 h-28 md:w-36 md:h-36 rounded-3xl object-cover shadow-2xl border-2 border-white/20 ${tier.avatarRing}`}
                     style={{ boxShadow: tier.avatarShadow }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 ) : (
                   <div
@@ -533,10 +535,11 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
                     <div className="flex items-center gap-3 mb-4">
                       {agent.avatar ? (
                         <img
-                          src={agent.avatar}
+                          src={resolveImageUrl(agent.avatar)}
                           alt={agent.name}
                           className={`w-16 h-16 rounded-2xl object-cover border-2 border-white flex-shrink-0 ${tier.avatarRing}`}
                           style={{ boxShadow: tier.avatarShadow }}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                       ) : (
                         <div

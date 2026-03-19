@@ -22,7 +22,6 @@ import {
   FileText,
   Link2,
   Settings,
-  Building2,
   UserCheck,
   Target,
   Handshake,
@@ -53,9 +52,8 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Agencies',
+    label: 'Agents',
     items: [
-      { href: '/admin/agencies', label: 'Agencies', icon: Building2 },
       { href: '/admin/agents', label: 'Agents', icon: UserCheck },
       { href: '/admin/premium-slots',   label: 'Premium Slots',    icon: Zap },
       { href: '/admin/agent-coverage',  label: 'Agent Coverage', icon: Gem },
