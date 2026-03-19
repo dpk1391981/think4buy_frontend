@@ -97,16 +97,16 @@ function OnboardingForm() {
   // Coverage
   const [states, setStates] = useState<{ id: string; name: string }[]>([]);
 
-  // Each coverage entry: { stateId, stateName, cityId, cityName, localityId?, localityName? }
+  // Each coverage entry: supports multiple selected localities per city
   type CoverageEntry = {
     stateId: string; stateName: string;
     cityId: string; cityName: string;
-    localityId?: string; localityName?: string;
+    selectedLocalities: { id: string; name: string }[];
     cities: { id: string; name: string }[];
     localities: { id: string; name: string; locality?: string }[];
   };
   const [coverageEntries, setCoverageEntries] = useState<CoverageEntry[]>([
-    { stateId: '', stateName: '', cityId: '', cityName: '', cities: [], localities: [] },
+    { stateId: '', stateName: '', cityId: '', cityName: '', selectedLocalities: [], cities: [], localities: [] },
   ]);
 
   const [loading, setLoading] = useState(false);
@@ -123,7 +123,7 @@ function OnboardingForm() {
 
   const handleStateChange = async (idx: number, stateId: string) => {
     const opt = states.find(s => s.id === stateId);
-    updateEntry(idx, { stateId, stateName: opt?.name || '', cityId: '', cityName: '', cities: [], localities: [], localityId: '', localityName: '' });
+    updateEntry(idx, { stateId, stateName: opt?.name || '', cityId: '', cityName: '', cities: [], localities: [], selectedLocalities: [] });
     if (!stateId) return;
     try {
       const r = await locationsApi.getCitiesByState(stateId);
@@ -134,7 +134,7 @@ function OnboardingForm() {
   const handleCityChange = async (idx: number, cityId: string) => {
     const entry = coverageEntries[idx];
     const opt = entry.cities.find(c => c.id === cityId);
-    updateEntry(idx, { cityId, cityName: opt?.name || '', localityId: '', localityName: '', localities: [] });
+    updateEntry(idx, { cityId, cityName: opt?.name || '', selectedLocalities: [], localities: [] });
     if (!cityId || !opt) return;
     try {
       const r = await locationsApi.getLocalities(opt.name, entry.stateName);
@@ -142,8 +142,21 @@ function OnboardingForm() {
     } catch {}
   };
 
+  const toggleLocality = (idx: number, loc: { id: string; name: string }) => {
+    setCoverageEntries(prev => prev.map((e, i) => {
+      if (i !== idx) return e;
+      const exists = e.selectedLocalities.some(l => l.id === loc.id);
+      return {
+        ...e,
+        selectedLocalities: exists
+          ? e.selectedLocalities.filter(l => l.id !== loc.id)
+          : [...e.selectedLocalities, loc],
+      };
+    }));
+  };
+
   const addCoverageEntry = () => {
-    setCoverageEntries(prev => [...prev, { stateId: '', stateName: '', cityId: '', cityName: '', cities: [], localities: [] }]);
+    setCoverageEntries(prev => [...prev, { stateId: '', stateName: '', cityId: '', cityName: '', selectedLocalities: [], cities: [], localities: [] }]);
   };
 
   const removeCoverageEntry = (idx: number) => {
@@ -199,14 +212,24 @@ function OnboardingForm() {
       if (selectedRole === 'agent') {
         for (const entry of coverageEntries) {
           if (!entry.cityId) continue;
-          await agencyApi.addMyLocation({
-            coverageType: entry.localityId ? 'locality' : 'city',
-            stateId: entry.stateId,
-            stateName: entry.stateName,
-            cityId: entry.cityId,
-            cityName: entry.cityName,
-            ...(entry.localityId ? { localityId: entry.localityId, localityName: entry.localityName } : {}),
-          }).catch(() => {}); // non-fatal
+          if (entry.selectedLocalities.length > 0) {
+            // Create one coverage entry per selected locality
+            for (const loc of entry.selectedLocalities) {
+              await agencyApi.addMyLocation({
+                coverageType: 'locality',
+                stateId: entry.stateId, stateName: entry.stateName,
+                cityId: entry.cityId, cityName: entry.cityName,
+                localityId: loc.id, localityName: loc.name,
+              }).catch(() => {});
+            }
+          } else {
+            // City-level coverage
+            await agencyApi.addMyLocation({
+              coverageType: 'city',
+              stateId: entry.stateId, stateName: entry.stateName,
+              cityId: entry.cityId, cityName: entry.cityName,
+            }).catch(() => {});
+          }
         }
       }
 
@@ -476,20 +499,43 @@ function OnboardingForm() {
                             </div>
                             <div>
                               <label className="block text-xs font-semibold text-gray-600 mb-1">
-                                Locality <span className="text-gray-400 font-normal">(optional)</span>
+                                Localities <span className="text-gray-400 font-normal">(optional, multi-select)</span>
                               </label>
-                              <select
-                                value={entry.localityId || ''}
-                                disabled={!entry.cityId || entry.localities.length === 0}
-                                onChange={(e) => {
-                                  const opt = entry.localities.find(l => l.id === e.target.value);
-                                  updateEntry(idx, { localityId: e.target.value, localityName: opt?.locality || opt?.name || '' });
-                                }}
-                                className="w-full px-3 py-2 border border-violet-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
-                              >
-                                <option value="">All localities</option>
-                                {entry.localities.map((l) => <option key={l.id} value={l.id}>{l.locality || l.name}</option>)}
-                              </select>
+                              {!entry.cityId || entry.localities.length === 0 ? (
+                                <div className="w-full px-3 py-2 border border-violet-100 rounded-lg text-xs text-gray-400 bg-gray-50">
+                                  {entry.cityId ? 'No localities available' : 'Select city first'}
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="border border-violet-200 rounded-lg max-h-36 overflow-y-auto bg-white">
+                                    {entry.localities.map((l) => {
+                                      const displayName = l.locality || l.name;
+                                      const checked = entry.selectedLocalities.some(s => s.id === l.id);
+                                      return (
+                                        <label key={l.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-violet-50 cursor-pointer">
+                                          <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => toggleLocality(idx, { id: l.id, name: displayName })}
+                                            className="accent-violet-600"
+                                          />
+                                          <span className="text-xs text-gray-700">{displayName}</span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                  {entry.selectedLocalities.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                      {entry.selectedLocalities.map(l => (
+                                        <span key={l.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-100 text-violet-700 rounded text-[10px] font-medium">
+                                          {l.name}
+                                          <button type="button" onClick={() => toggleLocality(idx, l)} className="hover:text-violet-900">×</button>
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>

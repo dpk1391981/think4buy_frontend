@@ -418,6 +418,7 @@ export const agencyApi = {
   adminAssignAgentToAgency: (profileId: string, agencyId: string | null) =>
     api.patch(`/agency/admin/agent-profiles/${profileId}/assign-agency`, { agencyId }),
   adminGetAgentProfile: (id: string) => api.get(`/agency/admin/agent-profiles/${id}`),
+  adminGetAgentProfileByUser: (userId: string) => api.get(`/agency/admin/agent-profile-by-user/${userId}`),
 
   // Admin — Property Assignment
   adminAssignProperty: (data: { propertyId: string; agentId: string; assignedByAdmin?: boolean }) =>

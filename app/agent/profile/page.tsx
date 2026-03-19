@@ -55,9 +55,12 @@ export default function AgentProfilePage() {
   const [newLoc, setNewLoc] = useState<{
     coverageType: 'state' | 'city' | 'locality';
     stateId: string; stateName: string;
+    // For type='city': multiple cities can be selected
+    selectedCities: { id: string; name: string }[];
+    // For type='locality': single city to load localities, then multiple localities
     cityId: string; cityName: string;
-    localityId: string; localityName: string;
-  }>({ coverageType: 'city', stateId: '', stateName: '', cityId: '', cityName: '', localityId: '', localityName: '' });
+    selectedLocalities: { id: string; name: string }[];
+  }>({ coverageType: 'city', stateId: '', stateName: '', selectedCities: [], cityId: '', cityName: '', selectedLocalities: [] });
   const [addingLoc, setAddingLoc] = useState(false);
 
   useEffect(() => {
@@ -91,32 +94,49 @@ export default function AgentProfilePage() {
       .then((r) => setCities(r.data || []))
       .catch(console.error);
     setLocalities([]);
-    setNewLoc((p) => ({ ...p, cityId: '', cityName: '', localityId: '', localityName: '' }));
+    setNewLoc((p) => ({ ...p, selectedCities: [], cityId: '', cityName: '', selectedLocalities: [] }));
   }, [newLoc.stateId]);
 
-  // Load localities when city changes
+  // Load localities when city changes (for locality coverage type)
   useEffect(() => {
     if (!newLoc.cityName) { setLocalities([]); return; }
     locationsApi.getLocalities(newLoc.cityName)
       .then((r) => setLocalities(r.data || []))
       .catch(console.error);
-    setNewLoc((p) => ({ ...p, localityId: '', localityName: '' }));
+    setNewLoc((p) => ({ ...p, selectedLocalities: [] }));
   }, [newLoc.cityName]);
 
   async function handleAddLocation() {
-    const { coverageType, stateId, stateName, cityId, cityName, localityId, localityName } = newLoc;
+    const { coverageType, stateId, stateName, selectedCities, cityId, cityName, selectedLocalities } = newLoc;
     if (coverageType === 'state' && !stateId) { showToast('error', 'Select a state.'); return; }
-    if (coverageType === 'city' && !cityId) { showToast('error', 'Select a city.'); return; }
-    if (coverageType === 'locality' && !localityId) { showToast('error', 'Select a locality.'); return; }
+    if (coverageType === 'city' && selectedCities.length === 0) { showToast('error', 'Select at least one city.'); return; }
+    if (coverageType === 'locality' && !cityId) { showToast('error', 'Select a city.'); return; }
+    if (coverageType === 'locality' && selectedLocalities.length === 0) { showToast('error', 'Select at least one locality.'); return; }
     setAddingLoc(true);
     try {
-      const dto: any = { coverageType };
-      if (stateId) { dto.stateId = stateId; dto.stateName = stateName; }
-      if (cityId)  { dto.cityId = cityId;   dto.cityName = cityName; }
-      if (coverageType === 'locality' && localityId) { dto.localityId = localityId; dto.localityName = localityName; }
-      const r = await agencyApi.addMyLocation(dto);
-      setLocations((prev) => [...prev, r.data]);
-      setNewLoc({ coverageType: 'city', stateId: '', stateName: '', cityId: '', cityName: '', localityId: '', localityName: '' });
+      if (coverageType === 'city') {
+        for (const city of selectedCities) {
+          await agencyApi.addMyLocation({
+            coverageType: 'city',
+            stateId, stateName,
+            cityId: city.id, cityName: city.name,
+          });
+        }
+      } else if (coverageType === 'locality') {
+        for (const loc of selectedLocalities) {
+          await agencyApi.addMyLocation({
+            coverageType: 'locality',
+            stateId, stateName,
+            cityId, cityName,
+            localityId: loc.id, localityName: loc.name,
+          });
+        }
+      } else {
+        await agencyApi.addMyLocation({ coverageType: 'state', stateId, stateName });
+      }
+      const refreshed = await agencyApi.getMyLocations();
+      setLocations(refreshed.data || []);
+      setNewLoc({ coverageType: 'city', stateId: '', stateName: '', selectedCities: [], cityId: '', cityName: '', selectedLocalities: [] });
       showToast('success', 'Coverage area added.');
     } catch (e: any) {
       showToast('error', e?.response?.data?.message || 'Failed to add coverage area.');
@@ -345,7 +365,7 @@ export default function AgentProfilePage() {
                 <button
                   key={t}
                   type="button"
-                  onClick={() => setNewLoc((p) => ({ ...p, coverageType: t }))}
+                  onClick={() => setNewLoc((p) => ({ ...p, coverageType: t, selectedCities: [], cityId: '', cityName: '', selectedLocalities: [] }))}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize border transition-colors ${
                     newLoc.coverageType === t
                       ? 'bg-blue-600 text-white border-blue-600'
@@ -357,7 +377,7 @@ export default function AgentProfilePage() {
               ))}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-3">
               {/* State */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
@@ -374,41 +394,113 @@ export default function AgentProfilePage() {
                 </select>
               </div>
 
-              {/* City */}
-              {(newLoc.coverageType === 'city' || newLoc.coverageType === 'locality') && (
+              {/* City — multi-select for 'city' type, single for 'locality' type */}
+              {newLoc.coverageType === 'city' && newLoc.stateId && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
-                  <select
-                    value={newLoc.cityId}
-                    disabled={!newLoc.stateId}
-                    onChange={(e) => {
-                      const opt = cities.find((c) => c.id === e.target.value);
-                      setNewLoc((p) => ({ ...p, cityId: e.target.value, cityName: opt?.name || '' }));
-                    }}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                  >
-                    <option value="">Select city</option>
-                    {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Cities <span className="text-gray-400">(select one or more)</span>
+                  </label>
+                  {cities.length === 0 ? (
+                    <p className="text-xs text-gray-400">No cities available</p>
+                  ) : (
+                    <>
+                      <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto bg-white">
+                        {cities.map((c) => {
+                          const checked = newLoc.selectedCities.some(s => s.id === c.id);
+                          return (
+                            <label key={c.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-blue-50 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => setNewLoc((p) => ({
+                                  ...p,
+                                  selectedCities: checked
+                                    ? p.selectedCities.filter(s => s.id !== c.id)
+                                    : [...p.selectedCities, { id: c.id, name: c.name }],
+                                }))}
+                                className="accent-blue-600"
+                              />
+                              <span className="text-sm text-gray-700">{c.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {newLoc.selectedCities.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {newLoc.selectedCities.map(c => (
+                            <span key={c.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                              {c.name}
+                              <button type="button" onClick={() => setNewLoc((p) => ({ ...p, selectedCities: p.selectedCities.filter(s => s.id !== c.id) }))} className="hover:text-blue-900">×</button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
 
-              {/* Locality */}
-              {newLoc.coverageType === 'locality' && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Locality</label>
-                  <select
-                    value={newLoc.localityId}
-                    disabled={!newLoc.cityId}
-                    onChange={(e) => {
-                      const opt = localities.find((l) => l.id === e.target.value);
-                      setNewLoc((p) => ({ ...p, localityId: e.target.value, localityName: opt?.name || '' }));
-                    }}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                  >
-                    <option value="">Select locality</option>
-                    {localities.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                  </select>
+              {/* For locality type: single city dropdown then multi-locality */}
+              {newLoc.coverageType === 'locality' && newLoc.stateId && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+                    <select
+                      value={newLoc.cityId}
+                      onChange={(e) => {
+                        const opt = cities.find((c) => c.id === e.target.value);
+                        setNewLoc((p) => ({ ...p, cityId: e.target.value, cityName: opt?.name || '' }));
+                      }}
+                      className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select city</option>
+                      {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  {newLoc.cityId && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Localities <span className="text-gray-400">(select one or more)</span>
+                      </label>
+                      {localities.length === 0 ? (
+                        <p className="text-xs text-gray-400">No localities available</p>
+                      ) : (
+                        <>
+                          <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto bg-white">
+                            {localities.map((l) => {
+                              const checked = newLoc.selectedLocalities.some(s => s.id === l.id);
+                              return (
+                                <label key={l.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-blue-50 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => setNewLoc((p) => ({
+                                      ...p,
+                                      selectedLocalities: checked
+                                        ? p.selectedLocalities.filter(s => s.id !== l.id)
+                                        : [...p.selectedLocalities, { id: l.id, name: l.name }],
+                                    }))}
+                                    className="accent-blue-600"
+                                  />
+                                  <span className="text-sm text-gray-700">{l.name}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                          {newLoc.selectedLocalities.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {newLoc.selectedLocalities.map(loc => (
+                                <span key={loc.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                                  {loc.name}
+                                  <button type="button" onClick={() => setNewLoc((p) => ({ ...p, selectedLocalities: p.selectedLocalities.filter(s => s.id !== loc.id) }))} className="hover:text-blue-900">×</button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
