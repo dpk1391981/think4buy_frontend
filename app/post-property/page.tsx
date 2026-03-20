@@ -216,7 +216,25 @@ function DynamicField({ field, value, onChange }: {
           ))}
         </div>
       )}
-      {field.fieldType === 'checkbox' && (
+      {field.fieldType === 'checkbox' && options.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {options.map(o => {
+            const selected = value ? value.split(',').map(s => s.trim()).includes(o) : false;
+            return (
+              <button key={o} type="button"
+                onClick={() => {
+                  const current = value ? value.split(',').map(s => s.trim()).filter(Boolean) : [];
+                  const next = selected ? current.filter(s => s !== o) : [...current, o];
+                  onChange(next.join(','));
+                }}
+                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${selected ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400'}`}>
+                {o}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {field.fieldType === 'checkbox' && options.length === 0 && (
         <label className="flex items-center gap-3 cursor-pointer p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
           <input type="checkbox" checked={value === 'true'}
             onChange={e => onChange(e.target.checked ? 'true' : 'false')}
