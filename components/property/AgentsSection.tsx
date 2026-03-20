@@ -14,12 +14,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Gem, MapPin, Star, BadgeCheck, Phone, MessageCircle, ChevronRight,
+  Gem, MapPin, Star, BadgeCheck, Phone, ChevronRight,
   Award, Briefcase, TrendingUp, Users, Shield, Zap, Crown,
 } from 'lucide-react';
 import { agencyApi, usersApi } from '@/lib/api';
 import { resolveImageUrl } from '@/lib/imageUtils';
-import { CallButton, WhatsAppButton } from '@/components/common/PhoneRevealButton';
+import { CallButton, WhatsAppButton, WhatsAppIcon } from '@/components/common/PhoneRevealButton';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -219,8 +219,8 @@ function DiamondCard({ agent, city }: { agent: Agent; city: string }) {
             <CallButton phone={agent.phone} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-xl transition-colors">
               <Phone className="w-3.5 h-3.5" />Call
             </CallButton>
-            <WhatsAppButton phone={phone} message={waMsg} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-xl transition-colors">
-              <MessageCircle className="w-3.5 h-3.5" />WhatsApp
+            <WhatsAppButton phone={phone} message={waMsg} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-[#25D366] hover:bg-[#1ebe5d] text-white text-xs font-semibold rounded-xl transition-colors">
+              <WhatsAppIcon className="w-3.5 h-3.5" />WhatsApp
             </WhatsAppButton>
           </>
         )}
@@ -343,8 +343,8 @@ function FeaturedCard({ agent, city }: { agent: Agent; city: string }) {
             <CallButton phone={agent.phone} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-xl transition-colors">
               <Phone className="w-3.5 h-3.5" />Call
             </CallButton>
-            <WhatsAppButton phone={phone} message={waMsg} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-xl transition-colors">
-              <MessageCircle className="w-3.5 h-3.5" />WhatsApp
+            <WhatsAppButton phone={phone} message={waMsg} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-[#25D366] hover:bg-[#1ebe5d] text-white text-xs font-semibold rounded-xl transition-colors">
+              <WhatsAppIcon className="w-3.5 h-3.5" />WhatsApp
             </WhatsAppButton>
           </>
         )}

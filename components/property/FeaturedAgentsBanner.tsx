@@ -3,14 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Phone, MessageCircle, Star, Zap, ChevronRight,
+  Phone, Star, Zap, ChevronRight,
   BadgeCheck, Users, MapPin, Briefcase, TrendingUp,
   Award, Gem, Shield, Clock, ArrowUpRight, Calendar,
   Home, CheckCircle, Mail,
 } from 'lucide-react';
 import { agencyApi, usersApi } from '@/lib/api';
 import { resolveImageUrl } from '@/lib/imageUtils';
-import { CallButton, WhatsAppButton } from '@/components/common/PhoneRevealButton';
+import { CallButton, WhatsAppButton, WhatsAppIcon } from '@/components/common/PhoneRevealButton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -387,9 +387,9 @@ function AgentCard({ agent, city }: { agent: FeaturedAgent; city: string }) {
               <WhatsAppButton
                 phone={clean}
                 message={waMsg}
-                className="inline-flex items-center justify-center gap-1.5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm shadow-emerald-100 hover:-translate-y-px"
+                className="inline-flex items-center justify-center gap-1.5 py-2.5 bg-[#25D366] hover:bg-[#1ebe5d] text-white text-xs font-bold rounded-xl transition-all shadow-sm hover:-translate-y-px"
               >
-                <MessageCircle className="w-3.5 h-3.5" />WhatsApp
+                <WhatsAppIcon className="w-3.5 h-3.5" />WhatsApp
               </WhatsAppButton>
             </div>
           ) : null}

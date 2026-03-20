@@ -5,10 +5,11 @@ import Link from 'next/link';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import {
   BedDouble, Bath, Maximize2, MapPin, CheckCircle, Heart, Zap,
-  Camera, Phone, MessageCircle, Mail, Eye, Building2,
+  Camera, Phone, Mail, Eye, Building2,
   Star, TrendingDown, Shield, Car, Award, Clock,
   ChevronLeft, ChevronRight, Layers,
 } from 'lucide-react';
+import { WhatsAppIcon } from '@/components/common/PhoneRevealButton';
 import { Property } from '@/types/property';
 import {
   formatPrice, formatArea, getCategoryLabel,
@@ -486,9 +487,9 @@ export default function PropertyCard({ property, className, listView }: Property
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleWAClick}
-                className="flex items-center justify-center gap-1.5 w-full py-2.5 border border-green-400 text-green-700 hover:bg-green-50 bg-green-50/50 text-xs font-bold rounded-xl transition-all active:scale-95"
+                className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#25D366] hover:bg-[#1ebe5d] text-white text-xs font-bold rounded-xl transition-all active:scale-95"
               >
-                <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                <WhatsAppIcon className="w-3.5 h-3.5" /> WhatsApp
               </a>
             </div>
 
@@ -678,8 +679,8 @@ export default function PropertyCard({ property, className, listView }: Property
         )}
 
         <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" onClick={handleWAClick}
-          className="flex items-center justify-center gap-1.5 py-2.5 border-2 border-green-400 text-green-700 text-xs font-bold rounded-xl bg-white active:scale-95 transition-all">
-          <MessageCircle className="w-3.5 h-3.5" /> WA
+          className="flex items-center justify-center gap-1.5 py-2.5 bg-[#25D366] hover:bg-[#1ebe5d] text-white text-xs font-bold rounded-xl active:scale-95 transition-all">
+          <WhatsAppIcon className="w-3.5 h-3.5" /> WA
         </a>
       </div>
 

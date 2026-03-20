@@ -11,6 +11,7 @@ import AgentListings from '@/components/agent/AgentListings';
 import AgentAnalyticsTracker from '@/components/agent/AgentAnalyticsTracker';
 import AgentFeedbackSection from '@/components/agent/AgentFeedbackSection';
 import AgentCallCTA from '@/components/agent/AgentCallCTA';
+import AgentAvatar from '@/components/agent/AgentAvatar';
 import { resolveImageUrl } from '@/lib/imageUtils';
 
 type Params = { name: string; city: string };
@@ -242,7 +243,7 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <AgentAnalyticsTracker agentId={agent.id} city={agent.city} state={agent.state} />
 
-      <div className="min-h-screen bg-gray-50 pt-16 pb-24 md:pb-0">
+      <div className="min-h-screen bg-gray-50 pt-16 pb-32 lg:pb-0">
 
         {/* ── Hero Banner ──────────────────────────────────────────── */}
         <div className={`relative overflow-hidden bg-gradient-to-r text-white ${tier.heroBg}`}>
@@ -281,12 +282,14 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
               {/* Avatar */}
               <div className="flex-shrink-0 relative">
                 {agent.avatar ? (
-                  <img
+                  <AgentAvatar
                     src={resolveImageUrl(agent.avatar)}
                     alt={agent.name}
-                    className={`w-28 h-28 md:w-36 md:h-36 rounded-3xl object-cover shadow-2xl border-2 border-white/20 ${tier.avatarRing}`}
-                    style={{ boxShadow: tier.avatarShadow }}
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    initials={initials}
+                    size="large"
+                    avatarRing={tier.avatarRing}
+                    avatarGrad={tier.avatarGrad}
+                    avatarShadow={tier.avatarShadow}
                   />
                 ) : (
                   <div
@@ -534,12 +537,14 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
 
                     <div className="flex items-center gap-3 mb-4">
                       {agent.avatar ? (
-                        <img
+                        <AgentAvatar
                           src={resolveImageUrl(agent.avatar)}
                           alt={agent.name}
-                          className={`w-16 h-16 rounded-2xl object-cover border-2 border-white flex-shrink-0 ${tier.avatarRing}`}
-                          style={{ boxShadow: tier.avatarShadow }}
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          initials={initials}
+                          size="small"
+                          avatarRing={tier.avatarRing}
+                          avatarGrad={tier.avatarGrad}
+                          avatarShadow={tier.avatarShadow}
                         />
                       ) : (
                         <div
@@ -627,6 +632,9 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
                     </div>
                   </div>
                 </div>
+
+                {/* Sticky CTA buttons */}
+                <AgentCallCTA phone={agent.phone} email={agent.email} agentId={agent.id} agentName={agent.name} variant="desktop-hero" />
 
                 {/* Contact form */}
                 <AgentContactForm

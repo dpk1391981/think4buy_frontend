@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Gem, MapPin, Star, BadgeCheck, Phone, MessageCircle,
+  Gem, MapPin, Star, BadgeCheck, Phone,
   ChevronRight, Award, Briefcase, TrendingUp, Users,
 } from 'lucide-react';
 import { agencyApi } from '@/lib/api';
 import { resolveImageUrl } from '@/lib/imageUtils';
-import { CallButton, WhatsAppButton } from '@/components/common/PhoneRevealButton';
+import { CallButton, WhatsAppButton, WhatsAppIcon } from '@/components/common/PhoneRevealButton';
 
 interface DiamondAgent {
   id: string;
@@ -193,9 +193,9 @@ function AgentCard({ agent }: { agent: DiamondAgent }) {
             <WhatsAppButton
               phone={phone}
               message={waMsg}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-xl transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-[#25D366] hover:bg-[#1ebe5d] text-white text-xs font-semibold rounded-xl transition-colors"
             >
-              <MessageCircle className="w-3.5 h-3.5" />WhatsApp
+              <WhatsAppIcon className="w-3.5 h-3.5" />WhatsApp
             </WhatsAppButton>
           </>
         ) : null}

@@ -3,13 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Phone, MessageCircle, Star, Shield, Briefcase, Zap,
+  Phone, Star, Shield, Briefcase, Zap,
   ChevronRight, MapPin, CheckCircle, Users, TrendingUp,
   Award, Search,
 } from 'lucide-react';
 import { agencyApi, usersApi, leadsApi } from '@/lib/api';
 import { resolveImageUrl } from '@/lib/imageUtils';
-import { WhatsAppButton } from '@/components/common/PhoneRevealButton';
+import { WhatsAppButton, WhatsAppIcon } from '@/components/common/PhoneRevealButton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -258,9 +258,9 @@ function AgentCard({ agent, city, onContact }: { agent: Agent; city: string; onC
             <WhatsAppButton
               phone={agent.phone}
               message={`Hi, I found your profile on Think4BuySale. Looking for property in ${city}.`}
-              className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-xl transition-colors"
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-[#25D366] hover:bg-[#1ebe5d] text-white text-xs font-semibold rounded-xl transition-colors"
             >
-              <MessageCircle className="w-3.5 h-3.5" />WhatsApp
+              <WhatsAppIcon className="w-3.5 h-3.5" />WhatsApp
             </WhatsAppButton>
           )}
           <Link

@@ -29,17 +29,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAppDispatch } from '@/lib/store';
 import { openAuthModal } from '@/lib/store/slices/uiSlice';
 import OptimizedImage from '@/components/common/OptimizedImage';
+import { WhatsAppIcon } from '@/components/common/PhoneRevealButton';
 
 const PropertyCard = dynamic(() => import('@/components/property/PropertyCard'), { ssr: false });
-
-// ── WhatsApp SVG icon ─────────────────────────────────────────────────────────
-function WhatsAppIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-    </svg>
-  );
-}
 
 // ── Amenity icons ─────────────────────────────────────────────────────────────
 const AMENITY_ICONS: Record<string, string> = {
@@ -389,7 +381,7 @@ export default function PropertyDetailClient({ property }: Props) {
 
   // ── RENDER ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 pt-16 pb-24 md:pb-0">
+    <div className="min-h-screen bg-gray-50 pt-16 pb-32 lg:pb-0">
 
       {/* ── Fullscreen Gallery ─────────────────────────────────────────────── */}
       {showFullscreen && (
@@ -503,6 +495,168 @@ export default function PropertyDetailClient({ property }: Props) {
 
           {/* ── LEFT: Main Content ─────────────────────────────────────────── */}
           <div className="flex-1 min-w-0 space-y-4">
+
+            {/* ── Property Details / Agent Details Tabs ─────────────────── */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* Tab header */}
+              <div className="flex border-b border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('property')}
+                  className={cn(
+                    'flex-1 py-3.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2',
+                    activeTab === 'property'
+                      ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50',
+                  )}
+                >
+                  <Home className="w-4 h-4" /> Property Details
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('agent')}
+                  className={cn(
+                    'flex-1 py-3.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2',
+                    activeTab === 'agent'
+                      ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50',
+                  )}
+                >
+                  {isAgent ? <Building2 className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                  {isAgent ? 'Agent Details' : 'Owner Details'}
+                </button>
+              </div>
+
+              {/* Property Details Tab */}
+              {activeTab === 'property' && specs.length > 0 && (
+                <div className="p-5 md:p-6">
+                  <div className="divide-y divide-gray-50">
+                    {specs.map(({ label, value }, i) => (
+                      <div key={label} className={cn('flex items-center justify-between py-2.5 text-sm',
+                        i % 2 === 0 ? '' : 'bg-gray-50/50 rounded-lg px-2')}>
+                        <span className="text-gray-500 font-medium">{label}</span>
+                        <span className="font-semibold text-gray-900 text-right">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Agent/Owner Details Tab */}
+              {activeTab === 'agent' && (
+                <div className="p-5 md:p-6">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="relative w-16 h-16 flex-shrink-0">
+                      {owner?.avatar ? (
+                        <img src={resolveImageUrl(owner.avatar)} alt={owner.name} className="w-16 h-16 object-cover rounded-2xl" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      ) : (
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold text-2xl">
+                          {owner?.name?.charAt(0) || (isAgent ? 'A' : 'O')}
+                        </div>
+                      )}
+                      {owner?.isVerified && (
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center ring-2 ring-white">
+                          <CheckCircle className="w-3.5 h-3.5 text-white fill-white" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-900 text-lg leading-tight">
+                        {isAgent ? (owner?.company || owner?.name) : (owner?.name || 'Owner')}
+                      </h3>
+                      {isAgent && owner?.company && <p className="text-sm text-gray-500 mt-0.5">{owner.name}</p>}
+                      {owner?.isVerified && (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mt-1">
+                          <CheckCircle className="w-3 h-3" /> Verified {isAgent ? 'Agent' : 'Owner'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Agent stats grid */}
+                  {isAgent && (
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      {(owner as any)?.agentExperience && (
+                        <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+                          <p className="text-lg font-black text-gray-900">{(owner as any).agentExperience}</p>
+                          <p className="text-[10px] text-gray-500 font-medium mt-0.5">Yrs Exp</p>
+                        </div>
+                      )}
+                      {(owner as any)?.agentRating > 0 && (
+                        <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-100">
+                          <p className="text-lg font-black text-amber-700 flex items-center justify-center gap-1">
+                            <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                            {Number((owner as any).agentRating).toFixed(1)}
+                          </p>
+                          <p className="text-[10px] text-gray-500 font-medium mt-0.5">Rating</p>
+                        </div>
+                      )}
+                      {(owner as any)?.agentUsedQuota > 0 && (
+                        <div className="bg-primary-50 rounded-xl p-3 text-center border border-primary-100">
+                          <p className="text-lg font-black text-primary-700">{(owner as any).agentUsedQuota}</p>
+                          <p className="text-[10px] text-gray-500 font-medium mt-0.5">Listings</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Bio */}
+                  {isAgent && (owner as any)?.agentBio && (
+                    <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 rounded-xl p-3 border border-gray-100 mb-4">
+                      {(owner as any).agentBio}
+                    </p>
+                  )}
+
+                  {/* License */}
+                  {isAgent && (owner as any)?.agentLicense && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-4 bg-green-50 border border-green-100 rounded-xl p-3">
+                      <Shield className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      <span>License: <strong className="text-gray-800">{(owner as any).agentLicense}</strong></span>
+                    </div>
+                  )}
+
+                  {/* Contact actions */}
+                  <div className="flex flex-wrap gap-2">
+                    {phone && (
+                      user ? (
+                        <a href={`tel:${phone}`} onClick={() => captureContactLead('call')}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition-colors">
+                          <Phone className="w-4 h-4" /> Call Now
+                        </a>
+                      ) : (
+                        <button onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition-colors">
+                          <Lock className="w-4 h-4" /> Call Now
+                        </button>
+                      )
+                    )}
+                    {waLink && (
+                      user ? (
+                        <a href={waLink} target="_blank" rel="noopener noreferrer" onClick={() => captureContactLead('whatsapp')}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] transition-colors">
+                          <WhatsAppIcon className="w-4 h-4" /> WhatsApp
+                        </a>
+                      ) : (
+                        <button onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] transition-colors">
+                          <WhatsAppIcon className="w-4 h-4" /> WhatsApp
+                        </button>
+                      )
+                    )}
+                    {isAgent && owner?.id && (
+                      <Link href={`/agents/${buildAgentSlug(owner.name, property.city, owner.id)}`}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl text-sm font-bold hover:bg-violet-100 transition-colors">
+                        <UserCircle className="w-4 h-4" /> Full Profile
+                      </Link>
+                    )}
+                    <Link href={`/properties?agentId=${owner?.id}`}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-sm font-bold hover:bg-gray-100 transition-colors">
+                      <Building className="w-4 h-4" /> All Listings
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* ── 99acres-style Gallery ──────────────────────────────────── */}
             <div className="bg-black rounded-2xl overflow-hidden shadow-sm">
@@ -792,168 +946,6 @@ export default function PropertyDetailClient({ property }: Props) {
                 )}
               </div>
             )}
-
-            {/* ── Property Details / Agent Details Tabs ─────────────────── */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              {/* Tab header */}
-              <div className="flex border-b border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('property')}
-                  className={cn(
-                    'flex-1 py-3.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2',
-                    activeTab === 'property'
-                      ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50',
-                  )}
-                >
-                  <Home className="w-4 h-4" /> Property Details
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('agent')}
-                  className={cn(
-                    'flex-1 py-3.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2',
-                    activeTab === 'agent'
-                      ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50',
-                  )}
-                >
-                  {isAgent ? <Building2 className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                  {isAgent ? 'Agent Details' : 'Owner Details'}
-                </button>
-              </div>
-
-              {/* Property Details Tab */}
-              {activeTab === 'property' && specs.length > 0 && (
-                <div className="p-5 md:p-6">
-                  <div className="divide-y divide-gray-50">
-                    {specs.map(({ label, value }, i) => (
-                      <div key={label} className={cn('flex items-center justify-between py-2.5 text-sm',
-                        i % 2 === 0 ? '' : 'bg-gray-50/50 rounded-lg px-2')}>
-                        <span className="text-gray-500 font-medium">{label}</span>
-                        <span className="font-semibold text-gray-900 text-right">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Agent/Owner Details Tab */}
-              {activeTab === 'agent' && (
-                <div className="p-5 md:p-6">
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="relative w-16 h-16 flex-shrink-0">
-                      {owner?.avatar ? (
-                        <img src={resolveImageUrl(owner.avatar)} alt={owner.name} className="w-16 h-16 object-cover rounded-2xl" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                      ) : (
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold text-2xl">
-                          {owner?.name?.charAt(0) || (isAgent ? 'A' : 'O')}
-                        </div>
-                      )}
-                      {owner?.isVerified && (
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center ring-2 ring-white">
-                          <CheckCircle className="w-3.5 h-3.5 text-white fill-white" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 text-lg leading-tight">
-                        {isAgent ? (owner?.company || owner?.name) : (owner?.name || 'Owner')}
-                      </h3>
-                      {isAgent && owner?.company && <p className="text-sm text-gray-500 mt-0.5">{owner.name}</p>}
-                      {owner?.isVerified && (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mt-1">
-                          <CheckCircle className="w-3 h-3" /> Verified {isAgent ? 'Agent' : 'Owner'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Agent stats grid */}
-                  {isAgent && (
-                    <div className="grid grid-cols-3 gap-3 mb-4">
-                      {(owner as any)?.agentExperience && (
-                        <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
-                          <p className="text-lg font-black text-gray-900">{(owner as any).agentExperience}</p>
-                          <p className="text-[10px] text-gray-500 font-medium mt-0.5">Yrs Exp</p>
-                        </div>
-                      )}
-                      {(owner as any)?.agentRating > 0 && (
-                        <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-100">
-                          <p className="text-lg font-black text-amber-700 flex items-center justify-center gap-1">
-                            <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
-                            {Number((owner as any).agentRating).toFixed(1)}
-                          </p>
-                          <p className="text-[10px] text-gray-500 font-medium mt-0.5">Rating</p>
-                        </div>
-                      )}
-                      {(owner as any)?.agentUsedQuota > 0 && (
-                        <div className="bg-primary-50 rounded-xl p-3 text-center border border-primary-100">
-                          <p className="text-lg font-black text-primary-700">{(owner as any).agentUsedQuota}</p>
-                          <p className="text-[10px] text-gray-500 font-medium mt-0.5">Listings</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Bio */}
-                  {isAgent && (owner as any)?.agentBio && (
-                    <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 rounded-xl p-3 border border-gray-100 mb-4">
-                      {(owner as any).agentBio}
-                    </p>
-                  )}
-
-                  {/* License */}
-                  {isAgent && (owner as any)?.agentLicense && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-4 bg-green-50 border border-green-100 rounded-xl p-3">
-                      <Shield className="w-4 h-4 text-green-600 flex-shrink-0" />
-                      <span>License: <strong className="text-gray-800">{(owner as any).agentLicense}</strong></span>
-                    </div>
-                  )}
-
-                  {/* Contact actions */}
-                  <div className="flex flex-wrap gap-2">
-                    {phone && (
-                      user ? (
-                        <a href={`tel:${phone}`} onClick={() => captureContactLead('call')}
-                          className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition-colors">
-                          <Phone className="w-4 h-4" /> Call Now
-                        </a>
-                      ) : (
-                        <button onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
-                          className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition-colors">
-                          <Lock className="w-4 h-4" /> Call Now
-                        </button>
-                      )
-                    )}
-                    {waLink && (
-                      user ? (
-                        <a href={waLink} target="_blank" rel="noopener noreferrer" onClick={() => captureContactLead('whatsapp')}
-                          className="flex items-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] transition-colors">
-                          <WhatsAppIcon className="w-4 h-4" /> WhatsApp
-                        </a>
-                      ) : (
-                        <button onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
-                          className="flex items-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] transition-colors">
-                          <WhatsAppIcon className="w-4 h-4" /> WhatsApp
-                        </button>
-                      )
-                    )}
-                    {isAgent && owner?.id && (
-                      <Link href={`/agents/${buildAgentSlug(owner.name, property.city, owner.id)}`}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl text-sm font-bold hover:bg-violet-100 transition-colors">
-                        <UserCircle className="w-4 h-4" /> Full Profile
-                      </Link>
-                    )}
-                    <Link href={`/properties?agentId=${owner?.id}`}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-sm font-bold hover:bg-gray-100 transition-colors">
-                      <Building className="w-4 h-4" /> All Listings
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* ── Agent / Owner Card ────────────────────────────────────── */}
             <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100">
@@ -1355,7 +1347,7 @@ export default function PropertyDetailClient({ property }: Props) {
 
       {/* ── Mobile Sticky Bottom Bar ──────────────────────────────────────────── */}
       {!isInactiveListing && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-2xl safe-bottom">
+        <div className="lg:hidden fixed bottom-16 left-0 right-0 z-[55] bg-white border-t border-gray-200 shadow-2xl">
           <div className="flex items-center gap-2 px-3 py-3">
             {/* Call */}
             {user ? (
