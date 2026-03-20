@@ -118,11 +118,10 @@ const TICK = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildSlug(a: FeaturedAgent, city: string) {
-  const n  = (a.name || a.agentName || 'agent').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const rc = city || a.city || '';
-  if (!rc) return n;
-  return `${n}-in-${rc.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`;
+function buildSlug(a: FeaturedAgent) {
+  const n = (a.name || a.agentName || 'agent').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const c = (a.city || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  return c ? `${n}/${c}` : n;
 }
 
 function getInitials(name: string) {
@@ -162,7 +161,7 @@ function AgentCard({ agent, city }: { agent: FeaturedAgent; city: string }) {
   const score   = agent.authorityScore ?? 0;
   const areas   = parseAreas(agent.coverageAreas);
   const since   = agent.createdAt ? new Date(agent.createdAt).getFullYear() : null;
-  const slug    = buildSlug(agent, city);
+  const slug    = buildSlug(agent);
   const clean   = phone?.replace(/[^0-9]/g, '') ?? '';
   const waMsg   = `Hi ${name.split(' ')[0]}, I found your profile on Think4BuySale. I'm looking for a property in ${city}.`;
 

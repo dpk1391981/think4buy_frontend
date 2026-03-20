@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import type { Params } from 'next/dist/shared/lib/router/utils/route-matcher';
+import { toSlug } from '@/lib/agentUrl';
 
 /**
  * Handles /agents/amit-verma (no city segment).
@@ -48,10 +49,11 @@ export default async function AgentNameOnlyPage({ params }: { params: { name: st
   const agent = await fetchAgentByName(params.name);
   if (!agent) notFound();
 
-  // If agent has a city, redirect to canonical two-segment URL
+  // If agent has a coverage city, redirect to canonical two-segment URL
+  // Always use agent.city (coverage city), never property city
   if (agent.city) {
-    const citySlug = agent.city.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const nameSlug = agent.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const citySlug = toSlug(agent.city);
+    const nameSlug = toSlug(agent.name);
     redirect(`/agents/${nameSlug}/${citySlug}`);
   }
 

@@ -84,7 +84,7 @@ function Stars({ rating }: { rating: number }) {
 // ── Gold/coverage card (formerly DiamondCard) ──────────────────────────────────
 
 function DiamondCard({ agent, city }: { agent: Agent; city: string }) {
-  const agentSlug = slug(agent.name, agent.city || city);
+  const agentSlug = slug(agent.name, agent.city);
   const phone     = agent.phone?.replace(/[^0-9]/g, '') ?? '';
   const waMsg     = `Hi ${agent.name.split(' ')[0]}, I found your profile on Think4BuySale. Looking for property in ${city}.`;
   const tick      = agent.tick && agent.tick !== 'none' ? agent.tick : 'gold';
@@ -235,7 +235,7 @@ function DiamondCard({ agent, city }: { agent: Agent; city: string }) {
 // ── Featured card ──────────────────────────────────────────────────────────────
 
 function FeaturedCard({ agent, city }: { agent: Agent; city: string }) {
-  const agentSlug = slug(agent.name, agent.city || city);
+  const agentSlug = slug(agent.name, agent.city);
   const phone     = agent.phone?.replace(/[^0-9]/g, '') ?? '';
   const waMsg     = `Hi ${agent.name.split(' ')[0]}, I found your profile on Think4BuySale. Looking for property in ${city}.`;
   const tick      = agent.tick && agent.tick !== 'none' ? agent.tick : null;

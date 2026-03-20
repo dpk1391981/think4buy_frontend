@@ -225,7 +225,8 @@ export function generatePropertyTitle(params: {
   parts.push(typeLabels[propertyType] || propertyType);
   parts.push(listingType === 'rent' ? 'for Rent' : listingType === 'buy' ? 'for Sale' : `for ${listingType}`);
   parts.push('in');
-  parts.push(locality || city || 'India');
+  const location = locality && city ? `${locality}, ${city}` : (locality || city || 'India');
+  parts.push(location);
 
   return parts.join(' ');
 }

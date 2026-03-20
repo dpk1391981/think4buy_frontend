@@ -249,20 +249,20 @@ export default function AdminLeadsPage() {
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 max-w-full">
+    <div className="p-3 sm:p-6 max-w-full">
 
       {/* ── Header ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Lead Management</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Lead Management</h1>
           <p className="text-sm text-gray-500 mt-0.5">{total.toLocaleString()} leads · track, assign &amp; convert</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/admin/leads/analytics"
             className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 transition-colors"
           >
-            <BarChart2 className="w-3.5 h-3.5" />Analytics
+            <BarChart2 className="w-3.5 h-3.5" /><span className="hidden sm:inline">Analytics</span>
           </Link>
           <button
             onClick={handleExport}
@@ -270,14 +270,14 @@ export default function AdminLeadsPage() {
             className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             <Download className={`w-3.5 h-3.5 ${exporting ? 'animate-bounce' : ''}`} />
-            {exporting ? 'Exporting…' : 'Export CSV'}
+            <span className="hidden sm:inline">{exporting ? 'Exporting…' : 'Export CSV'}</span>
           </button>
           <button
             onClick={load}
             className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
@@ -501,8 +501,8 @@ export default function AdminLeadsPage() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-3 sm:mx-0">
+            <table className="w-full text-sm min-w-[700px]">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="px-3 py-3 w-10">
@@ -512,8 +512,20 @@ export default function AdminLeadsPage() {
                         : <Square className="w-4 h-4" />}
                     </button>
                   </th>
-                  {['Contact', 'Property Need', 'Budget + Area', 'Location', 'Source', 'Status', 'Temp', 'Score', 'Agent', 'Date', ''].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  {[
+                    { label: 'Contact',       cls: '' },
+                    { label: 'Property Need', cls: 'hidden md:table-cell' },
+                    { label: 'Budget',        cls: 'hidden lg:table-cell' },
+                    { label: 'Location',      cls: 'hidden sm:table-cell' },
+                    { label: 'Source',        cls: 'hidden md:table-cell' },
+                    { label: 'Status',        cls: '' },
+                    { label: 'Temp',          cls: 'hidden sm:table-cell' },
+                    { label: 'Score',         cls: 'hidden lg:table-cell' },
+                    { label: 'Agent',         cls: 'hidden lg:table-cell' },
+                    { label: 'Date',          cls: 'hidden sm:table-cell' },
+                    { label: '',              cls: '' },
+                  ].map(({ label, cls }) => (
+                    <th key={label} className={`px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap ${cls}`}>{label}</th>
                   ))}
                 </tr>
               </thead>
@@ -530,19 +542,14 @@ export default function AdminLeadsPage() {
                     </td>
 
                     {/* Contact */}
-                    <td className="px-4 py-3 min-w-[140px]">
+                    <td className="px-3 sm:px-4 py-3 min-w-[130px]">
                       <div className="font-semibold text-gray-900 text-xs">{l.contactName}</div>
                       <div className="text-gray-500 text-xs mt-0.5">{l.contactPhone}</div>
-                      {l.contactEmail && <div className="text-gray-400 text-[10px] truncate max-w-[130px]">{l.contactEmail}</div>}
-                      {l.userType && (
-                        <span className="text-[10px] font-semibold capitalize text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
-                          {l.userType}
-                        </span>
-                      )}
+                      {l.contactEmail && <div className="text-gray-400 text-[10px] truncate max-w-[120px]">{l.contactEmail}</div>}
                     </td>
 
                     {/* Property Need */}
-                    <td className="px-4 py-3 min-w-[130px]">
+                    <td className="hidden md:table-cell px-4 py-3 min-w-[110px]">
                       {l.propertyType && (
                         <div className="text-xs font-semibold text-gray-700 capitalize">{l.propertyType}</div>
                       )}
@@ -554,51 +561,46 @@ export default function AdminLeadsPage() {
                       {!l.propertyType && !l.propertyFor && <span className="text-gray-300 text-xs">—</span>}
                     </td>
 
-                    {/* Budget + Area */}
-                    <td className="px-4 py-3 min-w-[120px]">
+                    {/* Budget */}
+                    <td className="hidden lg:table-cell px-4 py-3 min-w-[110px]">
                       {(l.budgetMin || l.budgetMax) ? (
                         <div className="flex items-center gap-1 text-xs text-gray-700 font-semibold">
                           <IndianRupee className="w-3 h-3 text-emerald-500 flex-shrink-0" />
                           {l.budgetMin ? fmt(Number(l.budgetMin)) : '—'}
-                          {l.budgetMax ? ` – ${fmt(Number(l.budgetMax))}` : '+'}
+                          {l.budgetMax ? `–${fmt(Number(l.budgetMax))}` : '+'}
                         </div>
                       ) : (
                         <span className="text-gray-300 text-xs">—</span>
                       )}
-                      {(l.areaMin || l.areaMax) && (
-                        <div className="text-[10px] text-gray-400 mt-0.5">
-                          {l.areaMin || '?'}–{l.areaMax || '?'} {l.areaUnit || 'sqft'}
-                        </div>
-                      )}
                     </td>
 
                     {/* Location */}
-                    <td className="px-4 py-3 min-w-[120px]">
+                    <td className="hidden sm:table-cell px-4 py-3 min-w-[100px]">
                       {l.city ? (
                         <div className="flex items-start gap-1">
                           <MapPin className="w-3 h-3 text-gray-400 mt-0.5 flex-shrink-0" />
                           <div>
                             <div className="text-xs font-semibold text-gray-700">{l.city}</div>
-                            {l.locality && <div className="text-[10px] text-gray-500">{l.locality}</div>}
+                            {l.locality && <div className="text-[10px] text-gray-500 truncate max-w-[80px]">{l.locality}</div>}
                           </div>
                         </div>
                       ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
 
                     {/* Source */}
-                    <td className="px-4 py-3 text-xs text-gray-600">
+                    <td className="hidden md:table-cell px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
                       {SOURCE_LABEL[l.source] || l.source?.replace(/_/g, ' ') || '—'}
                     </td>
 
                     {/* Status */}
-                    <td className="px-4 py-3">
+                    <td className="px-3 sm:px-4 py-3">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize whitespace-nowrap ${STATUS_BADGE[l.status] || 'bg-gray-100 text-gray-600'}`}>
                         {l.status?.replace(/_/g, ' ')}
                       </span>
                     </td>
 
                     {/* Temp */}
-                    <td className="px-4 py-3">
+                    <td className="hidden sm:table-cell px-4 py-3">
                       {TEMP_BADGE[l.temperature] ? (
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TEMP_BADGE[l.temperature].cls}`}>
                           {TEMP_BADGE[l.temperature].icon}{l.temperature}
@@ -607,9 +609,9 @@ export default function AdminLeadsPage() {
                     </td>
 
                     {/* Score */}
-                    <td className="px-4 py-3">
+                    <td className="hidden lg:table-cell px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="w-10 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full ${l.leadScore >= 75 ? 'bg-red-500' : l.leadScore >= 45 ? 'bg-orange-400' : 'bg-blue-400'}`}
                             style={{ width: `${l.leadScore}%` }}
@@ -620,7 +622,7 @@ export default function AdminLeadsPage() {
                     </td>
 
                     {/* Agent */}
-                    <td className="px-4 py-3 text-xs text-gray-500">
+                    <td className="hidden lg:table-cell px-4 py-3 text-xs text-gray-500">
                       {l.assignedAgentId ? (
                         <button
                           type="button"
@@ -639,7 +641,7 @@ export default function AdminLeadsPage() {
                     </td>
 
                     {/* Date */}
-                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                    <td className="hidden sm:table-cell px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                       {new Date(l.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
                     </td>
 

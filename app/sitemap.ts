@@ -19,6 +19,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE_URL}/properties`,        lastModified: now, changeFrequency: 'daily',   priority: 0.9 },
     { url: `${BASE_URL}/privacy`,           lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
     { url: `${BASE_URL}/terms`,             lastModified: now, changeFrequency: 'yearly',  priority: 0.3 },
+    { url: `${BASE_URL}/about`,             lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${BASE_URL}/contact`,           lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${BASE_URL}/feedback`,          lastModified: now, changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${BASE_URL}/complaints`,        lastModified: now, changeFrequency: 'monthly', priority: 0.4 },
+    { url: `${BASE_URL}/testimonials`,      lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${BASE_URL}/faq`,               lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${BASE_URL}/property-leads`,    lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${BASE_URL}/advertise`,         lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
   ];
 
   // Service detail pages

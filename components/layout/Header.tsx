@@ -673,10 +673,10 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
         )}
         onClick={onClose}
       />
-      {/* Drawer */}
+      {/* Drawer — full-height flex column; logout always pinned at bottom */}
       <div
         className={cn(
-          'lg:hidden fixed top-0 right-0 bottom-0 z-[201] w-[300px] bg-white shadow-2xl flex flex-col transition-transform duration-300',
+          'lg:hidden fixed inset-y-0 right-0 z-[201] w-[300px] bg-white shadow-2xl flex flex-col transition-transform duration-300',
           open ? 'translate-x-0' : 'translate-x-full'
         )}
       >
@@ -697,7 +697,7 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
         </div>
 
         {/* Scrollable middle: city selector + nav links */}
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
           {/* City selector */}
           <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
             <div className="flex items-center gap-2 mb-2">

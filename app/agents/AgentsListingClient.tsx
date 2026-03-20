@@ -9,6 +9,7 @@ import {
   Home, Handshake, Quote, Sparkles, Zap, Flame, Trophy, MessageCircle,
 } from 'lucide-react';
 import { usersApi, locationsApi, agencyApi } from '@/lib/api';
+import { getAgentUrl } from '@/lib/agentUrl';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { CallButton, WhatsAppButton, WhatsAppIcon } from '@/components/common/PhoneRevealButton';
@@ -215,11 +216,10 @@ const LIMIT = 15;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** @deprecated use getAgentUrl from @/lib/agentUrl */
 function buildSlug(a: Agent) {
-  const n = (a.name || 'agent').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  if (!a.city) return n;
-  const c = a.city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-  return `${n}/${c}`;
+  // Delegates to centralized helper — always uses agent's coverage city
+  return getAgentUrl(a).replace('/agents/', '');
 }
 
 function getInitials(name: string) {

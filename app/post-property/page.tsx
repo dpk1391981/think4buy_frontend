@@ -210,11 +210,12 @@ function parseDependentValue(v: string): DependentRow[] {
   return [{ label: '', value: '', unit: '' }];
 }
 
-function DependentRowsField({ labelOptions, unitOptions, value, onChange }: {
+function DependentRowsField({ labelOptions, unitOptions, value, onChange, required }: {
   labelOptions: string[];
   unitOptions: string[];
   value: string;
   onChange: (v: string) => void;
+  required?: boolean;
 }) {
   const [rows, setRows] = useState<DependentRow[]>(() => parseDependentValue(value));
   const lastExternalValue = useRef(value);
@@ -254,6 +255,7 @@ function DependentRowsField({ labelOptions, unitOptions, value, onChange }: {
           <select
             value={row.label}
             onChange={e => updateRow(idx, 'label', e.target.value)}
+            required={required}
             className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
           >
             <option value="">Select type…</option>
@@ -265,6 +267,7 @@ function DependentRowsField({ labelOptions, unitOptions, value, onChange }: {
             value={row.value}
             onChange={e => updateRow(idx, 'value', e.target.value)}
             placeholder="Value"
+            required={required}
             className="w-24 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
           />
           {/* Unit select (only if units are configured) */}
@@ -369,6 +372,7 @@ function DynamicField({ field, value, onChange }: {
           unitOptions={field.placeholder ? field.placeholder.split('|').map(u => u.trim()).filter(Boolean) : []}
           value={value}
           onChange={onChange}
+          required={field.isRequired}
         />
       )}
     </div>
@@ -1156,32 +1160,57 @@ function Step4Location({ form, dispatch }: any) {
   // ── Initialize Leaflet map (owner only) ────────────────────────────────────
   useEffect(() => {
     if (!isOwner) return; // agents don't see map
-    let cancelled = false;
+    let destroyed = false;
+    let sizeTimer: ReturnType<typeof setTimeout>;
+
     loadLeafletCDN().then((L) => {
-      if (cancelled || !mapContainerRef.current || mapInstanceRef.current) return;
+      if (destroyed || !mapContainerRef.current || mapInstanceRef.current) return;
+
       const lat = form.latitude || 20.5937;
       const lng = form.longitude || 78.9629;
-      const zoom = form.latitude ? 14 : 5;
-      const map = L.map(mapContainerRef.current, { zoomControl: true }).setView([lat, lng], zoom);
+      const zoom = form.latitude ? 15 : 5;
+
+      const map = L.map(mapContainerRef.current, {
+        zoomControl: true,
+        attributionControl: true,
+      }).setView([lat, lng], zoom);
+
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors', maxZoom: 19,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+        crossOrigin: true,
       }).addTo(map);
+
       const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+
       marker.on('dragend', (e: any) => {
         const { lat: newLat, lng: newLng } = e.target.getLatLng();
         dispatch(updateForm({ latitude: parseFloat(newLat.toFixed(6)), longitude: parseFloat(newLng.toFixed(6)) }));
       });
+
       map.on('click', (e: any) => {
         const { lat: cLat, lng: cLng } = e.latlng;
         marker.setLatLng([cLat, cLng]);
         dispatch(updateForm({ latitude: parseFloat(cLat.toFixed(6)), longitude: parseFloat(cLng.toFixed(6)) }));
       });
+
       mapInstanceRef.current = map;
       markerRef.current = marker;
+
+      // Force tile re-render after the container is fully painted in the DOM
+      sizeTimer = setTimeout(() => {
+        if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
+      }, 300);
     }).catch(() => {});
+
     return () => {
-      cancelled = true;
-      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; markerRef.current = null; }
+      destroyed = true;
+      clearTimeout(sizeTimer);
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markerRef.current = null;
+      }
     };
   }, [isOwner]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1529,6 +1558,23 @@ function Step6Details({ form, dispatch, config }: any) {
   const isIndustrial = cat === 'industrial';
   const showBedrooms = isResidential && !['plot', 'land', 'pg', 'co_living', 'farm_house'].includes(form.propertyType);
 
+  // Split dynamic fields: dependent/units fields first (TOP), rest below industrial
+  const dependentFields = fields.filter((f: PropConfigField) => f.fieldType === 'dependent');
+  const regularFields   = fields.filter((f: PropConfigField) => f.fieldType !== 'dependent');
+
+  const renderField = (field: PropConfigField) => (
+    <div
+      key={field.id}
+      className={['textarea', 'radio', 'checkbox', 'dependent'].includes(field.fieldType) ? 'sm:col-span-2' : ''}
+    >
+      <DynamicField
+        field={field}
+        value={form.dynamicFields[field.fieldName] || ''}
+        onChange={(v) => dispatch(setDynamicField({ key: field.fieldName, value: v }))}
+      />
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -1536,7 +1582,22 @@ function Step6Details({ form, dispatch, config }: any) {
         <p className="text-gray-500 text-sm mt-1">Specific measurements and specifications</p>
       </div>
 
-      {/* BHK */}
+      {/* ① Dynamic dependent fields — ALWAYS AT TOP (units, carpet area, etc.)
+           Required when parent field is required */}
+      {loadingFields ? (
+        <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading additional fields…
+        </div>
+      ) : dependentFields.length > 0 && (
+        <div className="border border-primary-100 bg-primary-50/30 rounded-2xl p-5">
+          <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-4">Unit / Area Details</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {dependentFields.map(renderField)}
+          </div>
+        </div>
+      )}
+
+      {/* ② BHK */}
       {showBedrooms && (
         <div>
           <FieldLabel required>BHK Configuration</FieldLabel>
@@ -1549,7 +1610,7 @@ function Step6Details({ form, dispatch, config }: any) {
         </div>
       )}
 
-      {/* Industrial specifics */}
+      {/* ③ Industrial specifics — MIDDLE (after units, before residential extras) */}
       {isIndustrial && (
         <SectionCard title="Industrial Specifications">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -1579,7 +1640,7 @@ function Step6Details({ form, dispatch, config }: any) {
         </SectionCard>
       )}
 
-      {/* Residential extras */}
+      {/* ④ Residential extras */}
       {isResidential && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
@@ -1621,22 +1682,12 @@ function Step6Details({ form, dispatch, config }: any) {
         </div>
       )}
 
-      {/* Dynamic fields */}
-      {loadingFields ? (
-        <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading additional fields…
-        </div>
-      ) : fields.length > 0 && (
+      {/* ⑤ Other dynamic fields (non-dependent) */}
+      {!loadingFields && regularFields.length > 0 && (
         <div className="border-t border-gray-100 pt-6">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Additional Details</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {fields.map((field: PropConfigField) => (
-              <div key={field.id} className={['textarea', 'radio', 'checkbox', 'dependent'].includes(field.fieldType) ? 'sm:col-span-2' : ''}>
-                <DynamicField field={field}
-                  value={form.dynamicFields[field.fieldName] || ''}
-                  onChange={(v) => dispatch(setDynamicField({ key: field.fieldName, value: v }))} />
-              </div>
-            ))}
+            {regularFields.map(renderField)}
           </div>
         </div>
       )}
@@ -1735,13 +1786,23 @@ function Step8Description({ form, dispatch }: any) {
       category: form.mainCategory, listingType: form.listingType || 'rent',
       propertyType: form.propertyType, bedrooms: form.bedrooms, city: form.city, locality: form.locality,
     });
-    const parts: string[] = [];
     const { area: dynArea, areaUnit: dynAreaUnit } = parseAreaFromDynamic(form.dynamicFields);
-    if (form.bedrooms) parts.push(`${form.bedrooms} BHK`);
-    if (dynArea) parts.push(`${dynArea} ${dynAreaUnit}`);
-    if (form.locality) parts.push(`in ${form.locality}`);
-    if (form.city) parts.push(form.city);
-    dispatch(updateForm({ description: `${title}. ${parts.join(', ')}. Contact us for more details and site visit.` }));
+    const locationStr = form.locality && form.city
+      ? `${form.locality}, ${form.city}`
+      : form.locality || form.city || '';
+    const listingWord = form.listingType === 'rent' ? 'rent' : 'sale';
+    const sentences: string[] = [];
+    sentences.push(`${title} is available for ${listingWord}${locationStr ? ` in ${locationStr}` : ''}.`);
+    if (dynArea) {
+      sentences.push(`The property spans ${dynArea} ${dynAreaUnit}${form.bedrooms ? ` with ${form.bedrooms} bedrooms` : ''}.`);
+    } else if (form.bedrooms) {
+      sentences.push(`This ${form.bedrooms} BHK property offers comfortable living spaces.`);
+    }
+    if (form.city) {
+      sentences.push(`Located in ${form.city}${form.locality ? ` (${form.locality})` : ''}, it provides excellent connectivity to major hubs and local amenities.`);
+    }
+    sentences.push('Contact us today to schedule a site visit and get more details.');
+    dispatch(updateForm({ description: sentences.join(' ') }));
   };
 
   return (
@@ -2319,7 +2380,15 @@ function PostPropertyPageInner() {
       case 2: return !!form.typeId;
       case 3: return !!form.city && !!form.locality && (isAgent || !!form.address);
       case 4: return true;
-      case 5: return true;
+      case 5: {
+        // Validate all required dynamic config fields
+        const requiredDynamic = (config.fields || []).filter((f: PropConfigField) => f.isRequired);
+        for (const f of requiredDynamic) {
+          const val = (form.dynamicFields[f.fieldName] || '').trim();
+          if (!val) return false;
+        }
+        return true;
+      }
       case 6: return true;
       case 7: return true;
       case 8: return !!form.price;

@@ -53,9 +53,9 @@ function getAmenityIcon(name: string): string {
   return '✓';
 }
 
-function buildAgentSlug(name: string, city: string, _id: string): string {
+function buildAgentSlug(name: string, agentCity: string): string {
   const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return city ? `${slug(name)}/${slug(city)}` : slug(name);
+  return agentCity ? `${slug(name)}/${slug(agentCity)}` : slug(name);
 }
 
 type InquiryType = 'general' | 'site_visit' | 'price_negotiation';
@@ -968,7 +968,7 @@ export default function PropertyDetailClient({ property }: Props) {
                       )
                     )}
                     {isAgent && owner?.id && (
-                      <Link href={`/agents/${buildAgentSlug(owner.name, property.city, owner.id)}`}
+                      <Link href={`/agents/${buildAgentSlug(owner.name, owner.city)}`}
                         className="flex items-center gap-2 px-4 py-2.5 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl text-sm font-bold hover:bg-violet-100 transition-colors">
                         <UserCircle className="w-4 h-4" /> Full Profile
                       </Link>
@@ -1101,7 +1101,7 @@ export default function PropertyDetailClient({ property }: Props) {
                   </div>
                   {isAgent && owner?.id && (
                     <div className="mt-4 text-center">
-                      <Link href={`/agents/${buildAgentSlug(owner.name, property.city, owner.id)}`}
+                      <Link href={`/agents/${buildAgentSlug(owner.name, owner.city)}`}
                         className="inline-flex items-center gap-2 px-5 py-2.5 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl text-sm font-bold hover:bg-violet-100 transition-colors">
                         <UserCircle className="w-4 h-4" /> View {owner.company || owner.name}'s Full Profile <ChevronRight className="w-4 h-4" />
                       </Link>
@@ -1231,7 +1231,7 @@ export default function PropertyDetailClient({ property }: Props) {
                       )}
                     </div>
                     {isAgent && owner?.id && (
-                      <Link href={`/agents/${buildAgentSlug(owner.name, property.city, owner.id)}`}
+                      <Link href={`/agents/${buildAgentSlug(owner.name, owner.city)}`}
                         className="text-xs text-violet-600 font-semibold hover:text-violet-700 flex items-center gap-1 flex-shrink-0">
                         <UserCircle className="w-3.5 h-3.5" /> Profile
                       </Link>

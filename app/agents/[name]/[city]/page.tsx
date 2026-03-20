@@ -13,6 +13,7 @@ import AgentFeedbackSection from '@/components/agent/AgentFeedbackSection';
 import AgentCallCTA from '@/components/agent/AgentCallCTA';
 import AgentAvatar from '@/components/agent/AgentAvatar';
 import { resolveImageUrl } from '@/lib/imageUtils';
+import { toSlug, getAgentUrl } from '@/lib/agentUrl';
 
 type Params = { name: string; city: string };
 
@@ -54,14 +55,15 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const agent = await fetchAgentBySlug(params.name, params.city);
   if (!agent) return { title: 'Agent Not Found | Think4BuySale' };
 
-  const city = agent.city || params.city;
+  // Use agent's coverage city for canonical URL, not the URL param
+  const coverageCity = agent.city || params.city.replace(/-/g, ' ');
   const name = agent.name || 'Agent';
-  const slug = `${params.name}-in-${params.city}`;
+  const canonicalPath = getAgentUrl({ name: agent.name, city: agent.city });
   return {
-    title: `${name} – Real Estate Agent in ${city} | Think4BuySale`,
-    description: `${agent.agentBio || `${name} is a verified real estate agent in ${city} with ${agent.agentExperience || 0}+ years of experience and ${agent.totalDeals || 0} successful deals.`}`,
-    keywords: `${name} real estate agent ${city}, property agent ${city}, buy sell rent property ${city}`,
-    alternates: { canonical: `https://think4buysale.com/agents/${slug}` },
+    title: `${name} – Real Estate Agent in ${coverageCity} | Think4BuySale`,
+    description: `${agent.agentBio || `${name} is a verified real estate agent in ${coverageCity} with ${agent.agentExperience || 0}+ years of experience and ${agent.totalDeals || 0} successful deals.`}`,
+    keywords: `${name} real estate agent ${coverageCity}, property agent ${coverageCity}, buy sell rent property ${coverageCity}`,
+    alternates: { canonical: `https://think4buysale.com${canonicalPath}` },
     openGraph: {
       title: `${name} – Real Estate Agent | Think4BuySale`,
       description: agent.agentBio || `Verified real estate agent in ${city}`,
@@ -214,8 +216,8 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
 
   const initials = agent.name?.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase() || 'AG';
 
-  const slug = `${params.name}-in-${params.city}`;
-  const profileUrl = `https://think4buysale.com/agents/${slug}`;
+  // Canonical profile URL always uses agent's coverage city
+  const profileUrl = `https://think4buysale.com${getAgentUrl({ name: agent.name, city: agent.city })}`;
 
   const jsonLd = {
     '@context': 'https://schema.org',
