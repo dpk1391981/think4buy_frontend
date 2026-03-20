@@ -6,7 +6,7 @@ import {
   Search, MapPin, Phone, Star, Shield, CheckCircle, Building2,
   Briefcase, TrendingUp, ChevronRight, ChevronDown, ChevronLeft,
   X, Users, SlidersHorizontal, BadgeCheck,
-  Home, Handshake, Quote, Sparkles, Zap, Flame, Trophy,
+  Home, Handshake, Quote, Sparkles, Zap, Flame, Trophy, MessageCircle,
 } from 'lucide-react';
 import { usersApi, locationsApi, agencyApi } from '@/lib/api';
 import Link from 'next/link';
