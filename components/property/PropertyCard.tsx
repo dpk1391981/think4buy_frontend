@@ -12,7 +12,7 @@ import {
 import { WhatsAppIcon } from '@/components/common/PhoneRevealButton';
 import { Property } from '@/types/property';
 import {
-  formatPrice, formatArea, getCategoryLabel,
+  formatPrice, formatArea, getPropertyArea, getCategoryLabel,
   getPropertyTypeLabel, getPrimaryImage, timeAgo, getFurnishingLabel,
 } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -184,9 +184,10 @@ export default function PropertyCard({ property, className, listView }: Property
   const saved          = isSaved(property.id);
   const plan           = property.listingPlan && PLAN_BADGE[property.listingPlan];
   const statusOverlay  = STATUS_OVERLAY[property.status];
+  const { area: resolvedArea } = getPropertyArea(property);
   const pricePerSqft =
-    property.area && property.price && property.priceUnit !== 'per month'
-      ? Math.round(property.price / property.area) : null;
+    resolvedArea && property.price && property.priceUnit !== 'per month'
+      ? Math.round(property.price / resolvedArea) : null;
   const isAgent   = property.owner?.role === 'agent';
   const ownerName = isAgent
     ? property.owner?.company || property.owner?.name
@@ -351,11 +352,7 @@ export default function PropertyCard({ property, className, listView }: Property
                     <Bath className="w-3.5 h-3.5 text-gray-400" />{property.bathrooms} Bath
                   </span>
                 )}
-                {property.area && (
-                  <span className="flex items-center gap-1 text-gray-500">
-                    <Maximize2 className="w-3.5 h-3.5 text-gray-400" />{formatArea(property.area, property.areaUnit)}
-                  </span>
-                )}
+                {(() => { const { area: a, areaUnit: u } = getPropertyArea(property); return a ? <span className="flex items-center gap-1 text-gray-500"><Maximize2 className="w-3.5 h-3.5 text-gray-400" />{formatArea(a, u)}</span> : null; })()}
                 {property.floorNumber != null && (
                   <span className="flex items-center gap-1 text-gray-400">
                     <Layers className="w-3.5 h-3.5" />Floor {property.floorNumber}
@@ -610,11 +607,7 @@ export default function PropertyCard({ property, className, listView }: Property
                 <Bath className="w-4 h-4 text-gray-400" />{property.bathrooms} Bath
               </span>
             )}
-            {property.area && (
-              <span className="flex items-center gap-1.5 text-gray-500">
-                <Maximize2 className="w-4 h-4 text-gray-400" />{formatArea(property.area, property.areaUnit)}
-              </span>
-            )}
+            {(() => { const { area: a, areaUnit: u } = getPropertyArea(property); return a ? <span className="flex items-center gap-1.5 text-gray-500"><Maximize2 className="w-4 h-4 text-gray-400" />{formatArea(a, u)}</span> : null; })()}
             {property.furnishingStatus && (
               <span className="text-gray-400 text-xs">{getFurnishingLabel(property.furnishingStatus)}</span>
             )}

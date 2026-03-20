@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Property } from '@/types/property';
 import {
-  formatPrice, formatArea, getPropertyTypeLabel, getCategoryLabel,
+  formatPrice, formatArea, getPropertyArea, getPropertyTypeLabel, getCategoryLabel,
   getFurnishingLabel, getPrimaryImage, timeAgo,
 } from '@/lib/utils';
 import { resolveImageUrl } from '@/lib/imageUtils';
@@ -261,15 +261,16 @@ export default function PropertyDetailClient({ property }: Props) {
   const waText   = encodeURIComponent(`Hi, I'm interested in "${property.title}" listed on Think4BuySale. Please share more details.`);
   const waLink   = waNumber ? `https://wa.me/${waNumber}?text=${waText}` : null;
 
-  const pricePerSqft = property.area && property.price
-    ? Math.round(Number(property.price) / Number(property.area))
+  const { area: resolvedArea, areaUnit: resolvedAreaUnit } = getPropertyArea(property);
+  const pricePerSqft = resolvedArea && property.price
+    ? Math.round(Number(property.price) / resolvedArea)
     : null;
 
   // Key overview specs
   const overviewSpecs = [
     property.bedrooms    && { icon: <BedDouble className="w-5 h-5" />,  label: 'Bedrooms',   value: `${property.bedrooms} BHK` },
     property.bathrooms   && { icon: <Bath className="w-5 h-5" />,       label: 'Bathrooms',  value: `${property.bathrooms}` },
-    property.area        && { icon: <Maximize2 className="w-5 h-5" />,  label: 'Area',       value: formatArea(property.area, property.areaUnit) },
+    resolvedArea         && { icon: <Maximize2 className="w-5 h-5" />,  label: 'Area',       value: formatArea(resolvedArea, resolvedAreaUnit) },
     property.floorNumber != null && { icon: <FloorIcon className="w-5 h-5" />, label: 'Floor', value: `${property.floorNumber}${property.totalFloors ? '/' + property.totalFloors : ''}` },
     property.parkingSpots && { icon: <Car className="w-5 h-5" />,       label: 'Parking',    value: `${property.parkingSpots}` },
     property.furnishingStatus && { icon: <Wind className="w-5 h-5" />,  label: 'Furnishing', value: getFurnishingLabel(property.furnishingStatus) },
@@ -277,9 +278,9 @@ export default function PropertyDetailClient({ property }: Props) {
 
   // Full specs table
   const baseSpecs = [
-    { label: 'Bedrooms',      value: property.bedrooms   ? `${property.bedrooms} BHK`                    : null },
-    { label: 'Bathrooms',     value: property.bathrooms  ? `${property.bathrooms}`                       : null },
-    { label: 'Carpet Area',   value: property.area       ? formatArea(property.area, property.areaUnit)  : null },
+    { label: 'Bedrooms',      value: property.bedrooms   ? `${property.bedrooms} BHK`         : null },
+    { label: 'Bathrooms',     value: property.bathrooms  ? `${property.bathrooms}`             : null },
+    { label: 'Carpet Area',   value: resolvedArea        ? formatArea(resolvedArea, resolvedAreaUnit) : null },
     { label: 'Floor',         value: property.floorNumber != null ? `${property.floorNumber}${property.totalFloors ? ' of ' + property.totalFloors : ''}` : null },
     { label: 'Balconies',     value: property.balconies  ? `${property.balconies}` : null },
     { label: 'Parking',       value: property.parkingSpots ? `${property.parkingSpots} spot${property.parkingSpots > 1 ? 's' : ''}` : null },
@@ -295,6 +296,8 @@ export default function PropertyDetailClient({ property }: Props) {
   if (property.extraDetails && typeof property.extraDetails === 'object') {
     for (const [key, val] of Object.entries(property.extraDetails)) {
       if (val === null || val === undefined || val === '') continue;
+      // carpet_area is already shown in baseSpecs as "Carpet Area"
+      if (key === 'carpet_area') continue;
       const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
       if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && 'label' in val[0]) {
         // Dependent field: [{label, value, unit}]
@@ -1135,7 +1138,7 @@ export default function PropertyDetailClient({ property }: Props) {
               <p className="text-sm text-gray-600 leading-relaxed">
                 {property.city} is one of the most sought-after real estate destinations.
                 This {property.bedrooms ? `${property.bedrooms} BHK ` : ''}{getPropertyTypeLabel(property.type).toLowerCase()}
-                {property.area ? ` of ${formatArea(property.area, property.areaUnit)} ` : ' '}
+                {resolvedArea ? ` of ${formatArea(resolvedArea, resolvedAreaUnit)} ` : ' '}
                 in {property.locality} is priced at {formatPrice(property.price, property.priceUnit)}.
                 {property.possessionStatus === 'ready_to_move' ? ' Ready to move in immediately.' : ''}
                 {property.amenities?.length ? ` Premium amenities: ${property.amenities.slice(0, 3).map(a => a.name).join(', ')}.` : ''}
@@ -1170,7 +1173,7 @@ export default function PropertyDetailClient({ property }: Props) {
                 {pricePerSqft && <p className="text-primary-200 text-sm">₹{pricePerSqft.toLocaleString('en-IN')}/sqft</p>}
                 <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/20 text-sm flex-wrap">
                   {property.bedrooms && <span className="flex items-center gap-1"><BedDouble className="w-4 h-4 text-primary-300" />{property.bedrooms} BHK</span>}
-                  {property.area    && <span className="flex items-center gap-1"><Maximize2 className="w-4 h-4 text-primary-300" />{formatArea(property.area, property.areaUnit)}</span>}
+                  {resolvedArea     && <span className="flex items-center gap-1"><Maximize2 className="w-4 h-4 text-primary-300" />{formatArea(resolvedArea, resolvedAreaUnit)}</span>}
                   {property.furnishingStatus && <span className="text-primary-200 text-xs">{getFurnishingLabel(property.furnishingStatus)}</span>}
                 </div>
                 <div className="flex gap-2 mt-4">

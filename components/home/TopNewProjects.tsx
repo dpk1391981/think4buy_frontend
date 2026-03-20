@@ -10,7 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { propertiesApi } from '@/lib/api';
 import { useAppSelector } from '@/lib/store';
 import OptimizedImage from '@/components/common/OptimizedImage';
-import { formatPrice, formatArea, getPropertyTypeLabel, getPrimaryImage } from '@/lib/utils';
+import { formatPrice, formatArea, getPropertyArea, getPropertyTypeLabel, getPrimaryImage } from '@/lib/utils';
 import { Property } from '@/types/property';
 
 
@@ -100,12 +100,7 @@ function ProjectCard({ property }: { property: Property }) {
               {property.bedrooms} BHK
             </span>
           )}
-          {property.area && (
-            <span className="inline-flex items-center gap-1 bg-gray-50 border border-gray-100 text-gray-600 text-[11px] font-medium px-2.5 py-1 rounded-lg">
-              <Maximize2 className="w-3 h-3 text-gray-400" />
-              {formatArea(property.area, property.areaUnit ?? 'sqft')}
-            </span>
-          )}
+          {(() => { const { area: a, areaUnit: u } = getPropertyArea(property); return a ? <span className="inline-flex items-center gap-1 bg-gray-50 border border-gray-100 text-gray-600 text-[11px] font-medium px-2.5 py-1 rounded-lg"><Maximize2 className="w-3 h-3 text-gray-400" />{formatArea(a, u)}</span> : null; })()}
           <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg ${
             isUC
               ? 'bg-amber-50 border border-amber-100 text-amber-700'

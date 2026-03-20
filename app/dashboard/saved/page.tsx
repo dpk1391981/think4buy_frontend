@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { savedApi } from '@/lib/api';
-import { formatPrice, timeAgo } from '@/lib/utils';
+import { formatPrice, formatArea, getPropertyArea, timeAgo } from '@/lib/utils';
 
 interface SavedProperty {
   id: string;
@@ -17,6 +17,8 @@ interface SavedProperty {
   propertyType: string;
   bedrooms?: number;
   area?: number;
+  areaUnit?: string;
+  extraDetails?: Record<string, any> | null;
   isActive: boolean;
   isBoosted: boolean;
   createdAt: string;
@@ -79,7 +81,7 @@ function PropertyCard({ property, onUnsave }: { property: SavedProperty; onUnsav
 
         <div className="flex items-center gap-3 text-xs text-gray-500 mb-3">
           {property.bedrooms && <span>🛏 {property.bedrooms} BHK</span>}
-          {property.area && <span>📐 {property.area.toLocaleString()} sq.ft</span>}
+          {(() => { const { area: a, areaUnit: u } = getPropertyArea(property); return a ? <span>📐 {formatArea(a, u)}</span> : null; })()}
           <span className="capitalize">{property.propertyType?.replace(/_/g, ' ')}</span>
         </div>
 

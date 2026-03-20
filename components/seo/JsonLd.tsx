@@ -6,6 +6,7 @@
  *   <JsonLd schema={[breadcrumbSchema, orgSchema]} />
  */
 import { resolveImageUrl } from '@/lib/imageUtils';
+import { getPropertyArea } from '@/lib/utils';
 
 interface Props {
   schema: Record<string, unknown> | Record<string, unknown>[];
@@ -87,6 +88,8 @@ export function buildRealEstateListingSchema(property: {
   slug: string;
   price?: number;
   area?: number;
+  areaUnit?: string;
+  extraDetails?: Record<string, any> | null;
   bedrooms?: number;
   bathrooms?: number;
   city?: string;
@@ -127,8 +130,8 @@ export function buildRealEstateListingSchema(property: {
         longitude: property.longitude,
       },
     }),
-    ...(property.area && {
-      floorSize: { '@type': 'QuantitativeValue', value: property.area, unitCode: 'FTK' },
+    ...(getPropertyArea(property).area && {
+      floorSize: { '@type': 'QuantitativeValue', value: getPropertyArea(property).area, unitCode: 'FTK' },
     }),
     numberOfRooms: property.bedrooms,
     numberOfBathroomsTotal: property.bathrooms,

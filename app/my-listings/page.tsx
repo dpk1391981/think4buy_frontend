@@ -14,7 +14,7 @@ import { propertiesApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import {
-  formatPrice, formatArea, getPrimaryImage,
+  formatPrice, formatArea, getPropertyArea, getPrimaryImage,
   timeAgo, getPropertyTypeLabel, getCategoryLabel,
 } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -548,7 +548,7 @@ function ListingCard({ p, onPublish, onStatusChange }: { p: any; onPublish?: (id
 
         <div className="absolute bottom-2.5 left-3">
           <p className="text-white font-black text-base leading-tight drop-shadow">{formatPrice(p.price, p.priceUnit)}</p>
-          {p.area && p.price && <p className="text-white/65 text-[10px]">₹{Math.round(p.price / p.area).toLocaleString('en-IN')}/sqft</p>}
+          {(() => { const { area: a } = getPropertyArea(p); return a && p.price ? <p className="text-white/65 text-[10px]">₹{Math.round(p.price / a).toLocaleString('en-IN')}/sqft</p> : null; })()}
         </div>
         <p className="absolute bottom-2.5 right-3 text-white/60 text-[10px]">{timeAgo(p.createdAt)}</p>
       </div>
@@ -559,7 +559,7 @@ function ListingCard({ p, onPublish, onStatusChange }: { p: any; onPublish?: (id
           <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md capitalize">{getCategoryLabel(p.category)}</span>
           <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md capitalize">{getPropertyTypeLabel(p.type)}</span>
           {p.bedrooms && <span className="flex items-center gap-0.5 text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md"><BedDouble className="w-2.5 h-2.5" />{p.bedrooms} BHK</span>}
-          {p.area && <span className="flex items-center gap-0.5 text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md"><Maximize2 className="w-2.5 h-2.5" />{formatArea(p.area, p.areaUnit)}</span>}
+          {(() => { const { area: a, areaUnit: u } = getPropertyArea(p); return a ? <span className="flex items-center gap-0.5 text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md"><Maximize2 className="w-2.5 h-2.5" />{formatArea(a, u)}</span> : null; })()}
         </div>
 
         <h3 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2 mb-1">{p.title}</h3>

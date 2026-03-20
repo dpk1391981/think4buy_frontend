@@ -185,6 +185,19 @@ function SectionCard({ title, children, className = '' }: { title?: string; chil
 
 interface DependentRow { label: string; value: string; unit: string; }
 
+// ─── Parse area from carpet_area dynamic field ────────────────────────────────
+function parseAreaFromDynamic(dynamicFields: Record<string, string>): { area: number | undefined; areaUnit: string } {
+  const raw = dynamicFields?.carpet_area;
+  if (!raw) return { area: undefined, areaUnit: 'Sq.ft.' };
+  try {
+    const rows = JSON.parse(raw);
+    if (Array.isArray(rows) && rows.length > 0 && rows[0].value) {
+      return { area: Number(rows[0].value), areaUnit: rows[0].unit || 'Sq.ft.' };
+    }
+  } catch {}
+  return { area: undefined, areaUnit: 'Sq.ft.' };
+}
+
 function parseDependentValue(v: string): DependentRow[] {
   if (!v) return [{ label: '', value: '', unit: '' }];
   try {
@@ -647,13 +660,13 @@ function SidebarProgress({ currentStep, form }: { currentStep: number; form: any
               )}
 
               {/* Specs row */}
-              {(form.bedrooms || form.area || form.furnishingStatus) && (
+              {(form.bedrooms || parseAreaFromDynamic(form.dynamicFields).area || form.furnishingStatus) && (
                 <div className="flex flex-wrap gap-1">
                   {form.bedrooms && (
                     <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">{form.bedrooms} BHK</span>
                   )}
-                  {form.area && (
-                    <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">{form.area} {form.areaUnit}</span>
+                  {parseAreaFromDynamic(form.dynamicFields).area && (
+                    <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">{parseAreaFromDynamic(form.dynamicFields).area} {parseAreaFromDynamic(form.dynamicFields).areaUnit}</span>
                   )}
                   {form.furnishingStatus && form.furnishingStatus !== 'unfurnished' && (
                     <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium capitalize">
@@ -1536,26 +1549,6 @@ function Step6Details({ form, dispatch, config }: any) {
         </div>
       )}
 
-      {/* Area */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <div className="col-span-2 sm:col-span-2">
-          <FieldLabel required>Area</FieldLabel>
-          <Input type="number" value={form.area}
-            onChange={(e: any) => dispatch(updateForm({ area: e.target.value }))}
-            placeholder={isIndustrial ? '5000' : '1200'} />
-        </div>
-        <div>
-          <FieldLabel>Unit</FieldLabel>
-          <Select value={form.areaUnit} onChange={(e: any) => dispatch(updateForm({ areaUnit: e.target.value }))}>
-            <option value="sqft">Sq.ft</option>
-            <option value="sqmt">Sq.mt</option>
-            <option value="acre">Acre</option>
-            <option value="gaj">Gaj</option>
-            {isIndustrial && <option value="sqyd">Sq.yd</option>}
-          </Select>
-        </div>
-      </div>
-
       {/* Industrial specifics */}
       {isIndustrial && (
         <SectionCard title="Industrial Specifications">
@@ -1743,8 +1736,9 @@ function Step8Description({ form, dispatch }: any) {
       propertyType: form.propertyType, bedrooms: form.bedrooms, city: form.city, locality: form.locality,
     });
     const parts: string[] = [];
+    const { area: dynArea, areaUnit: dynAreaUnit } = parseAreaFromDynamic(form.dynamicFields);
     if (form.bedrooms) parts.push(`${form.bedrooms} BHK`);
-    if (form.area) parts.push(`${form.area} ${form.areaUnit}`);
+    if (dynArea) parts.push(`${dynArea} ${dynAreaUnit}`);
     if (form.locality) parts.push(`in ${form.locality}`);
     if (form.city) parts.push(form.city);
     dispatch(updateForm({ description: `${title}. ${parts.join(', ')}. Contact us for more details and site visit.` }));
@@ -1970,7 +1964,7 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImage
         </p>
         <div className="flex flex-wrap gap-3 text-xs text-gray-500 mb-3">
           {form.bedrooms && <span className="bg-gray-100 px-2.5 py-1 rounded-full">{form.bedrooms} BHK</span>}
-          {form.area && <span className="bg-gray-100 px-2.5 py-1 rounded-full">{form.area} {form.areaUnit}</span>}
+          {(() => { const { area: da, areaUnit: dau } = parseAreaFromDynamic(form.dynamicFields); return da ? <span className="bg-gray-100 px-2.5 py-1 rounded-full">{da} {dau}</span> : null; })()}
           {form.furnishingStatus && <span className="bg-gray-100 px-2.5 py-1 rounded-full capitalize">{form.furnishingStatus.replace('_',' ')}</span>}
           {form.amenityIds?.length > 0 && <span className="bg-primary-50 text-primary-600 px-2.5 py-1 rounded-full">{form.amenityIds.length} amenities</span>}
         </div>
@@ -2142,8 +2136,8 @@ function PostPropertyPageInner() {
       longitude: formData.longitude ?? undefined,
       price: Number(formData.price) || 0,
       priceUnit: formData.priceUnit,
-      area: formData.area ? Number(formData.area) : undefined,
-      areaUnit: formData.areaUnit,
+      area: parseAreaFromDynamic(formData.dynamicFields).area,
+      areaUnit: parseAreaFromDynamic(formData.dynamicFields).areaUnit,
       bedrooms: formData.bedrooms ? Number(formData.bedrooms) : undefined,
       bathrooms: formData.bathrooms ? Number(formData.bathrooms) : undefined,
       floorNumber: formData.floor ? Number(formData.floor) : undefined,
@@ -2270,8 +2264,6 @@ function PostPropertyPageInner() {
           latitude: property.latitude ?? null,
           longitude: property.longitude ?? null,
           autoTitle: property.title || '',
-          area: property.area ? String(property.area) : '',
-          areaUnit: property.areaUnit || 'sqft',
           bedrooms: property.bedrooms ? String(property.bedrooms) : '',
           bathrooms: property.bathrooms ? String(property.bathrooms) : '',
           floor: property.floorNumber ? String(property.floorNumber) : '',
@@ -2282,7 +2274,17 @@ function PostPropertyPageInner() {
           brokerage: property.brokerage || '',
           description: property.description || '',
           amenityIds,
-          dynamicFields: property.extraDetails || {},
+          dynamicFields: (() => {
+            const df: Record<string, string> = {};
+            Object.entries(property.extraDetails || {}).forEach(([k, v]) => {
+              df[k] = typeof v === 'string' ? v : JSON.stringify(v);
+            });
+            // Reconstruct carpet_area from legacy area/areaUnit fields if not present
+            if (property.area && !df.carpet_area) {
+              df.carpet_area = JSON.stringify([{ value: String(property.area), unit: property.areaUnit || 'Sq.ft.' }]);
+            }
+            return df;
+          })(),
           userType: property.listedBy === 'agent' ? 'agent' : 'owner',
           agencyName: property.builderName || '',
         }));
@@ -2317,7 +2319,7 @@ function PostPropertyPageInner() {
       case 2: return !!form.typeId;
       case 3: return !!form.city && !!form.locality && (isAgent || !!form.address);
       case 4: return true;
-      case 5: return !!form.area;
+      case 5: return true;
       case 6: return true;
       case 7: return true;
       case 8: return !!form.price;
@@ -2382,8 +2384,8 @@ function PostPropertyPageInner() {
         longitude: form.longitude ?? undefined,
         price: Number(form.price),
         priceUnit: form.priceUnit,
-        area: form.area ? Number(form.area) : undefined,
-        areaUnit: form.areaUnit,
+        area: parseAreaFromDynamic(form.dynamicFields).area,
+        areaUnit: parseAreaFromDynamic(form.dynamicFields).areaUnit,
         bedrooms: form.bedrooms ? Number(form.bedrooms) : undefined,
         bathrooms: form.bathrooms ? Number(form.bathrooms) : undefined,
         floorNumber: form.floor ? Number(form.floor) : undefined,

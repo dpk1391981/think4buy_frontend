@@ -26,6 +26,24 @@ export function formatArea(area?: number, unit = 'sqft'): string {
   return `${area.toLocaleString('en-IN')} ${unit}`;
 }
 
+/** Resolve area and unit from carpet_area dynamic field (extraDetails) with fallback to area/areaUnit columns. */
+export function getPropertyArea(property: {
+  area?: number;
+  areaUnit?: string;
+  extraDetails?: Record<string, any> | null;
+}): { area: number | undefined; areaUnit: string } {
+  const raw = property.extraDetails?.carpet_area;
+  if (raw) {
+    try {
+      const rows: any[] = Array.isArray(raw) ? raw : JSON.parse(raw);
+      if (rows.length > 0 && rows[0].value) {
+        return { area: Number(rows[0].value), areaUnit: rows[0].unit || property.areaUnit || 'Sq.ft.' };
+      }
+    } catch {}
+  }
+  return { area: property.area, areaUnit: property.areaUnit || 'sqft' };
+}
+
 export function getPropertyTypeLabel(type: string): string {
   const labels: Record<string, string> = {
     apartment: 'Apartment',
