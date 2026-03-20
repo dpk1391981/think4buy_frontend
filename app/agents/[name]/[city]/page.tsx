@@ -66,7 +66,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     alternates: { canonical: `https://think4buysale.com${canonicalPath}` },
     openGraph: {
       title: `${name} – Real Estate Agent | Think4BuySale`,
-      description: agent.agentBio || `Verified real estate agent in ${city}`,
+      description: agent.agentBio || `Verified real estate agent in ${coverageCity}`,
       type: 'profile',
     },
   };
