@@ -33,6 +33,7 @@ interface Agent {
   agentBio?: string;
   totalDeals?: number;
   agentUsedQuota?: number;
+  activeListingsCount?: number;
   createdAt?: string;
 }
 
@@ -230,7 +231,7 @@ function clientSort(agents: Agent[], by: string) {
     if (by === 'rating')     return (b.agentRating ?? 0) - (a.agentRating ?? 0);
     if (by === 'deals')      return (b.totalDeals ?? 0) - (a.totalDeals ?? 0);
     if (by === 'experience') return (b.agentExperience ?? 0) - (a.agentExperience ?? 0);
-    if (by === 'listings')   return (b.agentUsedQuota ?? 0) - (a.agentUsedQuota ?? 0);
+    if (by === 'listings')   return (b.activeListingsCount ?? b.agentUsedQuota ?? 0) - (a.activeListingsCount ?? a.agentUsedQuota ?? 0);
     if (by === 'newest')     return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
     return 0;
   });
@@ -444,7 +445,7 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
                 <span className={cn('w-6 h-6 rounded-lg border flex items-center justify-center flex-shrink-0', theme.statIconBg)}>
                   <Building2 className={cn('w-3.5 h-3.5', theme.statIconColor)} />
                 </span>
-                <span><b className="text-gray-900">{agent.agentUsedQuota ?? 0}</b> listings</span>
+                <span><b className="text-gray-900">{agent.activeListingsCount ?? agent.agentUsedQuota ?? 0}</b> active listings</span>
               </div>
             </div>
 

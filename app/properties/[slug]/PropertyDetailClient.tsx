@@ -21,7 +21,7 @@ import {
 } from '@/lib/utils';
 import { resolveImageUrl } from '@/lib/imageUtils';
 import { cn } from '@/lib/utils';
-import { inquiriesApi, propertiesApi, savedApi } from '@/lib/api';
+import { inquiriesApi, leadsApi, propertiesApi, savedApi } from '@/lib/api';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useLazyComponent } from '@/hooks/useLazyComponent';
 import { PropertyGridSkeleton } from '@/components/skeleton';
@@ -108,6 +108,9 @@ export default function PropertyDetailClient({ property }: Props) {
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const [descExpanded, setDescExpanded] = useState(false);
   const [amenitiesExpanded, setAmenitiesExpanded] = useState(false);
+
+  // Agent/Property detail tab
+  const [activeTab, setActiveTab] = useState<'property' | 'agent'>('property');
 
   const images = property.images?.length
     ? property.images.map((img) => ({ ...img, url: resolveImageUrl(img.url) }))
@@ -203,6 +206,26 @@ export default function PropertyDetailClient({ property }: Props) {
     } catch {}
   };
 
+  // ── Lead capture helper ─────────────────────────────────────────────────────
+  const captureContactLead = (
+    source: 'call' | 'whatsapp' | 'enquiry' | 'schedule_visit',
+    overrides: { contactName?: string; contactPhone?: string; contactEmail?: string } = {},
+  ) => {
+    const name  = overrides.contactName  ?? (user as any)?.name  ?? '';
+    const phone = overrides.contactPhone ?? (user as any)?.phone ?? '';
+    if (!phone) return; // don't capture if no phone available
+    leadsApi.capturePublic({
+      source,
+      propertyId: property.id,
+      contactName:  name  || 'Unknown',
+      contactPhone: phone,
+      contactEmail: overrides.contactEmail ?? (user as any)?.email ?? undefined,
+      contactUserId: (user as any)?.id ?? undefined,
+      city:  property.city  ?? undefined,
+      state: property.state ?? undefined,
+    }).catch(() => {}); // fire-and-forget; never block UI
+  };
+
   // Inquiry
   const handleInquiry = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,6 +234,15 @@ export default function PropertyDetailClient({ property }: Props) {
       await inquiriesApi.create(property.id, { ...inquiryForm, type: inquiryType });
       setSubmitted(true);
       trackPropertyInquiry(property.id, { city: property.city || undefined });
+      // Also create a lead for CRM tracking
+      captureContactLead(
+        inquiryType === 'site_visit' ? 'schedule_visit' : 'enquiry',
+        {
+          contactName:  inquiryForm.name,
+          contactPhone: inquiryForm.phone,
+          contactEmail: inquiryForm.email,
+        },
+      );
     } catch (err: any) {
       const status  = err?.response?.status;
       const message = err?.response?.data?.message || err?.message;
@@ -677,7 +709,10 @@ export default function PropertyDetailClient({ property }: Props) {
                   {/* Call */}
                   {user ? (
                     <a href={phone ? `tel:${phone}` : '#'}
-                      onClick={() => trackPropertyInquiry(property.id, { city: property.city || undefined })}
+                      onClick={() => {
+                        trackPropertyInquiry(property.id, { city: property.city || undefined });
+                        captureContactLead('call');
+                      }}
                       className="flex items-center justify-center gap-2 py-3 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 active:scale-95 transition-all">
                       <Phone className="w-4 h-4" /> Call Now
                     </a>
@@ -690,6 +725,7 @@ export default function PropertyDetailClient({ property }: Props) {
                   {/* WhatsApp */}
                   {waLink && user ? (
                     <a href={waLink} target="_blank" rel="noopener noreferrer"
+                      onClick={() => captureContactLead('whatsapp')}
                       className="flex items-center justify-center gap-2 py-3 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] active:scale-95 transition-all">
                       <WhatsAppIcon className="w-4 h-4" /> WhatsApp
                     </a>
@@ -711,23 +747,6 @@ export default function PropertyDetailClient({ property }: Props) {
               </div>
             )}
 
-            {/* ── Property Details Table ────────────────────────────────── */}
-            {specs.length > 0 && (
-              <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100">
-                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Home className="w-5 h-5 text-primary-500" /> Property Details
-                </h2>
-                <div className="divide-y divide-gray-50">
-                  {specs.map(({ label, value }, i) => (
-                    <div key={label} className={cn('flex items-center justify-between py-2.5 text-sm',
-                      i % 2 === 0 ? '' : 'bg-gray-50/50 rounded-lg px-2')}>
-                      <span className="text-gray-500 font-medium">{label}</span>
-                      <span className="font-semibold text-gray-900 text-right">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* ── Description ──────────────────────────────────────────── */}
             {property.description && (
@@ -772,6 +791,168 @@ export default function PropertyDetailClient({ property }: Props) {
               </div>
             )}
 
+            {/* ── Property Details / Agent Details Tabs ─────────────────── */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* Tab header */}
+              <div className="flex border-b border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('property')}
+                  className={cn(
+                    'flex-1 py-3.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2',
+                    activeTab === 'property'
+                      ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50',
+                  )}
+                >
+                  <Home className="w-4 h-4" /> Property Details
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('agent')}
+                  className={cn(
+                    'flex-1 py-3.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2',
+                    activeTab === 'agent'
+                      ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50',
+                  )}
+                >
+                  {isAgent ? <Building2 className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                  {isAgent ? 'Agent Details' : 'Owner Details'}
+                </button>
+              </div>
+
+              {/* Property Details Tab */}
+              {activeTab === 'property' && specs.length > 0 && (
+                <div className="p-5 md:p-6">
+                  <div className="divide-y divide-gray-50">
+                    {specs.map(({ label, value }, i) => (
+                      <div key={label} className={cn('flex items-center justify-between py-2.5 text-sm',
+                        i % 2 === 0 ? '' : 'bg-gray-50/50 rounded-lg px-2')}>
+                        <span className="text-gray-500 font-medium">{label}</span>
+                        <span className="font-semibold text-gray-900 text-right">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Agent/Owner Details Tab */}
+              {activeTab === 'agent' && (
+                <div className="p-5 md:p-6">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="relative w-16 h-16 flex-shrink-0">
+                      {owner?.avatar ? (
+                        <img src={resolveImageUrl(owner.avatar)} alt={owner.name} className="w-16 h-16 object-cover rounded-2xl" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      ) : (
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold text-2xl">
+                          {owner?.name?.charAt(0) || (isAgent ? 'A' : 'O')}
+                        </div>
+                      )}
+                      {owner?.isVerified && (
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center ring-2 ring-white">
+                          <CheckCircle className="w-3.5 h-3.5 text-white fill-white" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-900 text-lg leading-tight">
+                        {isAgent ? (owner?.company || owner?.name) : (owner?.name || 'Owner')}
+                      </h3>
+                      {isAgent && owner?.company && <p className="text-sm text-gray-500 mt-0.5">{owner.name}</p>}
+                      {owner?.isVerified && (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mt-1">
+                          <CheckCircle className="w-3 h-3" /> Verified {isAgent ? 'Agent' : 'Owner'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Agent stats grid */}
+                  {isAgent && (
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      {(owner as any)?.agentExperience && (
+                        <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+                          <p className="text-lg font-black text-gray-900">{(owner as any).agentExperience}</p>
+                          <p className="text-[10px] text-gray-500 font-medium mt-0.5">Yrs Exp</p>
+                        </div>
+                      )}
+                      {(owner as any)?.agentRating > 0 && (
+                        <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-100">
+                          <p className="text-lg font-black text-amber-700 flex items-center justify-center gap-1">
+                            <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                            {Number((owner as any).agentRating).toFixed(1)}
+                          </p>
+                          <p className="text-[10px] text-gray-500 font-medium mt-0.5">Rating</p>
+                        </div>
+                      )}
+                      {(owner as any)?.agentUsedQuota > 0 && (
+                        <div className="bg-primary-50 rounded-xl p-3 text-center border border-primary-100">
+                          <p className="text-lg font-black text-primary-700">{(owner as any).agentUsedQuota}</p>
+                          <p className="text-[10px] text-gray-500 font-medium mt-0.5">Listings</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Bio */}
+                  {isAgent && (owner as any)?.agentBio && (
+                    <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 rounded-xl p-3 border border-gray-100 mb-4">
+                      {(owner as any).agentBio}
+                    </p>
+                  )}
+
+                  {/* License */}
+                  {isAgent && (owner as any)?.agentLicense && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-4 bg-green-50 border border-green-100 rounded-xl p-3">
+                      <Shield className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      <span>License: <strong className="text-gray-800">{(owner as any).agentLicense}</strong></span>
+                    </div>
+                  )}
+
+                  {/* Contact actions */}
+                  <div className="flex flex-wrap gap-2">
+                    {phone && (
+                      user ? (
+                        <a href={`tel:${phone}`} onClick={() => captureContactLead('call')}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition-colors">
+                          <Phone className="w-4 h-4" /> Call Now
+                        </a>
+                      ) : (
+                        <button onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition-colors">
+                          <Lock className="w-4 h-4" /> Call Now
+                        </button>
+                      )
+                    )}
+                    {waLink && (
+                      user ? (
+                        <a href={waLink} target="_blank" rel="noopener noreferrer" onClick={() => captureContactLead('whatsapp')}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] transition-colors">
+                          <WhatsAppIcon className="w-4 h-4" /> WhatsApp
+                        </a>
+                      ) : (
+                        <button onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] transition-colors">
+                          <WhatsAppIcon className="w-4 h-4" /> WhatsApp
+                        </button>
+                      )
+                    )}
+                    {isAgent && owner?.id && (
+                      <Link href={`/agents/${buildAgentSlug(owner.name, property.city, owner.id)}`}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-violet-50 text-violet-700 border border-violet-200 rounded-xl text-sm font-bold hover:bg-violet-100 transition-colors">
+                        <UserCircle className="w-4 h-4" /> Full Profile
+                      </Link>
+                    )}
+                    <Link href={`/properties?agentId=${owner?.id}`}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-sm font-bold hover:bg-gray-100 transition-colors">
+                      <Building className="w-4 h-4" /> All Listings
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* ── Agent / Owner Card ────────────────────────────────────── */}
             <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100">
               <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -814,6 +995,7 @@ export default function PropertyDetailClient({ property }: Props) {
                     {phone && (
                       user ? (
                         <a href={`tel:${phone}`}
+                          onClick={() => captureContactLead('call')}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-bold hover:bg-primary-700 transition-colors">
                           <Phone className="w-3.5 h-3.5" /> Call
                         </a>
@@ -827,6 +1009,7 @@ export default function PropertyDetailClient({ property }: Props) {
                     {waLink && (
                       user ? (
                         <a href={waLink} target="_blank" rel="noopener noreferrer"
+                          onClick={() => captureContactLead('whatsapp')}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] text-white rounded-lg text-xs font-bold hover:bg-[#1ebe5d] transition-colors">
                           <WhatsAppIcon className="w-3.5 h-3.5" /> WhatsApp
                         </a>
@@ -1118,7 +1301,7 @@ export default function PropertyDetailClient({ property }: Props) {
                       </button>
                     ) : phone ? (
                       <a href={showPhone ? `tel:${phone}` : undefined}
-                        onClick={() => setShowPhone(true)}
+                        onClick={() => { setShowPhone(true); captureContactLead('call'); }}
                         className="flex items-center justify-center gap-2 w-full py-3 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition-colors cursor-pointer">
                         <Phone className="w-4 h-4" />
                         {showPhone ? phone : `${phone.slice(0, 5)}XXXXX — Tap to Reveal`}
@@ -1133,6 +1316,7 @@ export default function PropertyDetailClient({ property }: Props) {
                     {waLink ? (
                       user ? (
                         <a href={waLink} target="_blank" rel="noopener noreferrer"
+                          onClick={() => captureContactLead('whatsapp')}
                           className="flex items-center justify-center gap-2.5 w-full py-3 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] transition-colors shadow-md shadow-green-200">
                           <WhatsAppIcon className="w-5 h-5" /> Chat on WhatsApp
                         </a>
@@ -1174,7 +1358,12 @@ export default function PropertyDetailClient({ property }: Props) {
             {/* Call */}
             {user ? (
               <a href={phone ? `tel:${phone}` : '#'}
-                onClick={() => phone && trackPropertyInquiry(property.id, { city: property.city || undefined })}
+                onClick={() => {
+                  if (phone) {
+                    trackPropertyInquiry(property.id, { city: property.city || undefined });
+                    captureContactLead('call');
+                  }
+                }}
                 className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 active:scale-95 transition-all">
                 <Phone className="w-4 h-4" /> Call
               </a>
@@ -1189,6 +1378,7 @@ export default function PropertyDetailClient({ property }: Props) {
             {waLink ? (
               user ? (
                 <a href={waLink} target="_blank" rel="noopener noreferrer"
+                  onClick={() => captureContactLead('whatsapp')}
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] active:scale-95 transition-all">
                   <WhatsAppIcon className="w-4 h-4" /> WhatsApp
                 </a>

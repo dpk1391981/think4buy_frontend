@@ -59,8 +59,8 @@ export default function AuthGuard({ children, allowedRoles, redirectTo, loginRed
       return;
     }
 
-    // New users who haven't selected a role yet — send to onboarding
-    if (user.needsOnboarding) {
+    // New users who haven't selected a role yet, or whose name is still missing — send to onboarding
+    if (user.needsOnboarding || !user.name?.trim()) {
       const dest = typeof window !== 'undefined' ? window.location.pathname : '/';
       router.replace(`/auth/onboarding?redirect=${encodeURIComponent(dest)}`);
       return;
@@ -77,6 +77,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo, loginRed
     loading ||
     !user ||
     user.needsOnboarding ||
+    !user.name?.trim() ||
     (allowedRoles && !allowedRoles.includes(user.role ?? ''));
 
   if (shouldShowLoader) {
