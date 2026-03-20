@@ -242,7 +242,7 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <AgentAnalyticsTracker agentId={agent.id} city={agent.city} state={agent.state} />
 
-      <div className="min-h-screen bg-gray-50 pt-16">
+      <div className="min-h-screen bg-gray-50 pt-16 pb-24 md:pb-0">
 
         {/* ── Hero Banner ──────────────────────────────────────────── */}
         <div className={`relative overflow-hidden bg-gradient-to-r text-white ${tier.heroBg}`}>
@@ -385,13 +385,13 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
               </div>
 
               {/* CTA buttons — visible on desktop in hero */}
-              <AgentCallCTA phone={agent.phone} email={agent.email} agentId={agent.id} variant="desktop-hero" />
+              <AgentCallCTA phone={agent.phone} email={agent.email} agentId={agent.id} agentName={agent.name} variant="desktop-hero" />
             </div>
           </div>
         </div>
 
         {/* ── Mobile CTA bar ──────────────────────────────────────── */}
-        <AgentCallCTA phone={agent.phone} email={agent.email} agentId={agent.id} variant="mobile-bar" />
+        <AgentCallCTA phone={agent.phone} email={agent.email} agentId={agent.id} agentName={agent.name} variant="mobile-bar" />
 
         {/* ── Main Content ────────────────────────────────────────── */}
         <div className="container-max py-8">

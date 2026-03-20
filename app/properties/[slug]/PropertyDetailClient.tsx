@@ -211,14 +211,16 @@ export default function PropertyDetailClient({ property }: Props) {
     source: 'call' | 'whatsapp' | 'enquiry' | 'schedule_visit',
     overrides: { contactName?: string; contactPhone?: string; contactEmail?: string } = {},
   ) => {
-    const name  = overrides.contactName  ?? (user as any)?.name  ?? '';
-    const phone = overrides.contactPhone ?? (user as any)?.phone ?? '';
-    if (!phone) return; // don't capture if no phone available
+    const rawPhone = overrides.contactPhone ?? (user as any)?.phone ?? '';
+    if (!rawPhone) return; // don't capture without a phone — it's the dedup key
+    // Use real name if set; fall back to last-4 of phone so we never send a placeholder
+    const rawName = overrides.contactName ?? (user as any)?.name ?? '';
+    const contactName = rawName.trim() || `User ${String(rawPhone).slice(-4)}`;
     leadsApi.capturePublic({
       source,
       propertyId: property.id,
-      contactName:  name  || 'Unknown',
-      contactPhone: phone,
+      contactName,
+      contactPhone: rawPhone,
       contactEmail: overrides.contactEmail ?? (user as any)?.email ?? undefined,
       contactUserId: (user as any)?.id ?? undefined,
       city:  property.city  ?? undefined,

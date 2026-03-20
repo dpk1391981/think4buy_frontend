@@ -9,6 +9,7 @@ import { WishlistProvider } from '@/contexts/WishlistContext';
 import { ReduxProvider } from '@/providers/ReduxProvider';
 import AuthModal from '@/components/auth/AuthModal';
 import MobileGuestLoginPrompt from '@/components/auth/MobileGuestLoginPrompt';
+import OnboardingEnforcer from '@/components/auth/OnboardingEnforcer';
 
 const APP_NAME = 'Think4BuySale';
 const APP_URL  = process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com';
@@ -97,6 +98,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <main className="min-h-screen pb-safe-nav lg:pb-0">{children}</main>
               <ConditionalFooter />
               <MobileBottomNav />
+              <OnboardingEnforcer />
               <MobileGuestLoginPrompt />
               <AuthModal />
               </WishlistProvider>

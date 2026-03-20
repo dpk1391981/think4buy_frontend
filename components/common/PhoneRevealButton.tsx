@@ -54,9 +54,9 @@ export function CallButton({ phone, className, children, agentId, propertyId }: 
     if (cleanPhone.length === 10) {
       leadsApi.capturePublic({
         source: 'call',
-        contactName: user.name || '',
+        contactName: user.name?.trim() || `User ${cleanPhone.slice(-4)}`,
         contactPhone: cleanPhone,
-        contactEmail: user.email ?? '',
+        contactEmail: user.email ?? undefined,
         propertyId: propertyId ?? undefined,
         assignedAgentId: agentId ?? undefined,
       }).catch(() => {});
@@ -114,9 +114,9 @@ export function WhatsAppButton({ phone, message = '', className, style, children
     if (cleanPhone.length === 10) {
       leadsApi.capturePublic({
         source: 'whatsapp',
-        contactName: user.name || '',
+        contactName: user.name?.trim() || `User ${cleanPhone.slice(-4)}`,
         contactPhone: cleanPhone,
-        contactEmail: user.email ?? '',
+        contactEmail: user.email ?? undefined,
         propertyId: propertyId ?? undefined,
         assignedAgentId: agentId ?? undefined,
       }).catch(() => {});
@@ -168,9 +168,9 @@ export function RevealPhoneButton({ phone, className, revealedClassName, agentId
       if (cleanPhone.length === 10) {
         leadsApi.capturePublic({
           source: 'view_phone',
-          contactName: user.name || '',
+          contactName: user.name?.trim() || `User ${cleanPhone.slice(-4)}`,
           contactPhone: cleanPhone,
-          contactEmail: user.email ?? '',
+          contactEmail: user.email ?? undefined,
           propertyId: propertyId ?? undefined,
           assignedAgentId: agentId ?? undefined,
         }).catch(() => {});

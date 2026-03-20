@@ -171,8 +171,8 @@ function OnboardingForm() {
     return null;
   }
 
-  // If user already completed onboarding, redirect them onward
-  if (!authLoading && user && !user.needsOnboarding) {
+  // Only redirect away if onboarding is complete AND name is filled
+  if (!authLoading && user && !user.needsOnboarding && user.name?.trim()) {
     router.replace(redirect);
     return null;
   }
