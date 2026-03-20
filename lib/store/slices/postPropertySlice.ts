@@ -27,7 +27,7 @@ export interface PropConfigField {
   id: string;
   fieldName: string;
   fieldLabel: string;
-  fieldType: 'text' | 'number' | 'dropdown' | 'checkbox' | 'radio' | 'textarea';
+  fieldType: 'text' | 'number' | 'dropdown' | 'checkbox' | 'radio' | 'textarea' | 'dependent';
   optionsJson: string[] | string | null;
   placeholder: string | null;
   isRequired: boolean;

@@ -38,7 +38,7 @@ const TABS = [
 
 type Tab = typeof TABS[number]['key'];
 
-const FIELD_TYPES = ['text', 'number', 'dropdown', 'checkbox', 'radio', 'textarea'];
+const FIELD_TYPES = ['text', 'number', 'dropdown', 'checkbox', 'radio', 'textarea', 'dependent'];
 const ICON_OPTIONS = ['🏠','🔑','🛏️','🏢','🏭','🏗️','📈','🏪','🌿','🏖️','🏔️','🏘️','🌆',
                       '🏙️','🏡','📐','🖥️','🛍️','🏬','💼','🌾','📍','📌','🌐','🏚️'];
 
@@ -733,7 +733,7 @@ function FormFieldsTab() {
   };
   const closeModal = () => { setShowModal(false); setEditing(null); };
 
-  const needsOptions = ['dropdown', 'radio', 'checkbox'].includes(form.fieldType);
+  const needsOptions = ['dropdown', 'radio', 'checkbox', 'dependent'].includes(form.fieldType);
 
   const addOption = () => {
     const v = optionInput.trim();
@@ -778,6 +778,7 @@ function FormFieldsTab() {
     text: 'bg-blue-50 text-blue-700', number: 'bg-purple-50 text-purple-700',
     dropdown: 'bg-orange-50 text-orange-700', radio: 'bg-pink-50 text-pink-700',
     checkbox: 'bg-teal-50 text-teal-700', textarea: 'bg-gray-100 text-gray-600',
+    dependent: 'bg-indigo-50 text-indigo-700',
   };
 
   return (
@@ -923,27 +924,61 @@ function FormFieldsTab() {
                   <input type="number" value={form.sortOrder} min={0} onChange={e => setForm(f => ({ ...f, sortOrder: Number(e.target.value) }))} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400" />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Placeholder</label>
-                <input type="text" value={form.placeholder} onChange={e => setForm(f => ({ ...f, placeholder: e.target.value }))} placeholder="e.g. e.g. 950" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400" />
-              </div>
-              {/* Options for dropdown/radio/checkbox */}
-              {needsOptions && (
+              {/* Placeholder (hidden for dependent — we use placeholder field for unit options) */}
+              {form.fieldType !== 'dependent' && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Options *</label>
-                  <div className="flex gap-2 mb-2">
-                    <input type="text" value={optionInput} onChange={e => setOptionInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addOption()} placeholder="Type option and press Enter" className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400" />
-                    <button onClick={addOption} className="px-3 py-2 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700">Add</button>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Placeholder</label>
+                  <input type="text" value={form.placeholder} onChange={e => setForm(f => ({ ...f, placeholder: e.target.value }))} placeholder="e.g. 950" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400" />
+                </div>
+              )}
+              {/* Options for dropdown/radio/checkbox/dependent */}
+              {needsOptions && (
+                <div className="space-y-4">
+                  {/* Label options */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">
+                      {form.fieldType === 'dependent' ? 'Label Options (select column) *' : 'Options *'}
+                    </label>
+                    {form.fieldType === 'dependent' && (
+                      <p className="text-xs text-indigo-600 bg-indigo-50 rounded-lg px-3 py-2 mb-2">
+                        Each row: <strong>Label (select)</strong> → <strong>Number</strong> → <strong>Unit (select)</strong>. Users can add multiple rows.
+                      </p>
+                    )}
+                    <div className="flex gap-2 mb-2">
+                      <input type="text" value={optionInput} onChange={e => setOptionInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addOption()} placeholder="Type option and press Enter" className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400" />
+                      <button onClick={addOption} className="px-3 py-2 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700">Add</button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(form.optionsJson || []).map((o, i) => (
+                        <span key={i} className="flex items-center gap-1.5 bg-gray-100 text-gray-700 text-xs px-2.5 py-1.5 rounded-lg">
+                          {o}
+                          <button onClick={() => removeOption(i)} className="text-gray-400 hover:text-red-500"><X className="w-3 h-3" /></button>
+                        </span>
+                      ))}
+                    </div>
+                    {(!form.optionsJson || !form.optionsJson.length) && <p className="text-xs text-amber-600 mt-1">At least one option required</p>}
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(form.optionsJson || []).map((o, i) => (
-                      <span key={i} className="flex items-center gap-1.5 bg-gray-100 text-gray-700 text-xs px-2.5 py-1.5 rounded-lg">
-                        {o}
-                        <button onClick={() => removeOption(i)} className="text-gray-400 hover:text-red-500"><X className="w-3 h-3" /></button>
-                      </span>
-                    ))}
-                  </div>
-                  {(!form.optionsJson || !form.optionsJson.length) && <p className="text-xs text-amber-600 mt-1">At least one option required</p>}
+                  {/* Unit options — only for dependent field type, stored in placeholder as pipe-separated */}
+                  {form.fieldType === 'dependent' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Unit Options (unit column)</label>
+                      <input
+                        type="text"
+                        value={form.placeholder}
+                        onChange={e => setForm(f => ({ ...f, placeholder: e.target.value }))}
+                        placeholder="e.g. sq.ft|sq.m|acres|cents|Unit"
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Separate units with <code className="bg-gray-100 px-1 rounded">|</code> — leave empty to hide unit column</p>
+                      {form.placeholder && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {form.placeholder.split('|').map(u => u.trim()).filter(Boolean).map(u => (
+                            <span key={u} className="bg-indigo-50 text-indigo-700 text-xs px-2 py-1 rounded-lg font-medium">{u}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               <label className="flex items-center gap-3 cursor-pointer">

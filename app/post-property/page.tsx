@@ -6,6 +6,7 @@ import {
   CheckCircle2, ArrowLeft, ArrowRight, ImagePlus,
   MapPin, Loader2, Building2, Home, Factory,
   Zap, Info, Camera, Eye, ChevronRight, Save, Clock,
+  X, Plus,
 } from 'lucide-react';
 import { propertiesApi, locationsApi, propertyConfigApi, authApi, agencyApi } from '@/lib/api';
 import { resolveImageUrl } from '@/lib/imageUtils';
@@ -180,6 +181,113 @@ function SectionCard({ title, children, className = '' }: { title?: string; chil
   );
 }
 
+// ─── Dependent Rows Field (label-select + number + unit-select, repeatable) ───
+
+interface DependentRow { label: string; value: string; unit: string; }
+
+function parseDependentValue(v: string): DependentRow[] {
+  if (!v) return [{ label: '', value: '', unit: '' }];
+  try {
+    const p = JSON.parse(v);
+    if (Array.isArray(p) && p.length > 0) {
+      // Migrate old rows that don't have unit key
+      return p.map((r: any) => ({ label: r.label || '', value: r.value || '', unit: r.unit || '' }));
+    }
+  } catch {}
+  return [{ label: '', value: '', unit: '' }];
+}
+
+function DependentRowsField({ labelOptions, unitOptions, value, onChange }: {
+  labelOptions: string[];
+  unitOptions: string[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [rows, setRows] = useState<DependentRow[]>(() => parseDependentValue(value));
+  const lastExternalValue = useRef(value);
+
+  // Sync when external value changes (edit mode pre-fill or reset)
+  if (lastExternalValue.current !== value) {
+    lastExternalValue.current = value;
+    const parsed = parseDependentValue(value);
+    const current = JSON.stringify(rows.map(r => ({ label: r.label, value: r.value, unit: r.unit })));
+    const incoming = JSON.stringify(parsed.map(r => ({ label: r.label, value: r.value, unit: r.unit })));
+    if (current !== incoming) setRows(parsed);
+  }
+
+  const commit = (newRows: DependentRow[]) => {
+    setRows(newRows);
+    const filtered = newRows.filter(r => r.label || r.value);
+    onChange(filtered.length > 0 ? JSON.stringify(filtered) : '');
+  };
+
+  const updateRow = (idx: number, key: keyof DependentRow, val: string) =>
+    commit(rows.map((r, i) => i === idx ? { ...r, [key]: val } : r));
+
+  const addRow = () => commit([...rows, { label: '', value: '', unit: '' }]);
+
+  const removeRow = (idx: number) => {
+    const next = rows.filter((_, i) => i !== idx);
+    commit(next.length > 0 ? next : [{ label: '', value: '', unit: '' }]);
+  };
+
+  const hasUnits = unitOptions.length > 0;
+
+  return (
+    <div className="space-y-2.5">
+      {rows.map((row, idx) => (
+        <div key={idx} className="flex gap-2 items-center">
+          {/* Label select */}
+          <select
+            value={row.label}
+            onChange={e => updateRow(idx, 'label', e.target.value)}
+            className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+          >
+            <option value="">Select type…</option>
+            {labelOptions.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+          {/* Number value */}
+          <input
+            type="number"
+            value={row.value}
+            onChange={e => updateRow(idx, 'value', e.target.value)}
+            placeholder="Value"
+            className="w-24 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+          />
+          {/* Unit select (only if units are configured) */}
+          {hasUnits && (
+            <select
+              value={row.unit}
+              onChange={e => updateRow(idx, 'unit', e.target.value)}
+              className="w-28 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+            >
+              <option value="">Unit…</option>
+              {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+          )}
+          {/* Remove row */}
+          {rows.length > 1 && (
+            <button
+              type="button"
+              onClick={() => removeRow(idx)}
+              className="flex-shrink-0 p-1.5 text-gray-300 hover:text-red-500 rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addRow}
+        className="flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-700 font-semibold px-1 py-1"
+      >
+        <Plus className="w-3.5 h-3.5" /> Add More
+      </button>
+    </div>
+  );
+}
+
 // ─── Dynamic Field Renderer ───────────────────────────────────────────────────
 
 function DynamicField({ field, value, onChange }: {
@@ -241,6 +349,14 @@ function DynamicField({ field, value, onChange }: {
             className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-400" />
           <span className="text-sm text-gray-700">{field.placeholder || field.fieldLabel}</span>
         </label>
+      )}
+      {field.fieldType === 'dependent' && (
+        <DependentRowsField
+          labelOptions={options}
+          unitOptions={field.placeholder ? field.placeholder.split('|').map(u => u.trim()).filter(Boolean) : []}
+          value={value}
+          onChange={onChange}
+        />
       )}
     </div>
   );
@@ -1522,7 +1638,7 @@ function Step6Details({ form, dispatch, config }: any) {
           <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Additional Details</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {fields.map((field: PropConfigField) => (
-              <div key={field.id} className={['textarea', 'radio', 'checkbox'].includes(field.fieldType) ? 'sm:col-span-2' : ''}>
+              <div key={field.id} className={['textarea', 'radio', 'checkbox', 'dependent'].includes(field.fieldType) ? 'sm:col-span-2' : ''}>
                 <DynamicField field={field}
                   value={form.dynamicFields[field.fieldName] || ''}
                   onChange={(v) => dispatch(setDynamicField({ key: field.fieldName, value: v }))} />
@@ -2002,7 +2118,13 @@ function PostPropertyPageInner() {
       extraDetails.hasDock = formData.hasDock;
       extraDetails.hasRamp = formData.hasRamp;
     }
-    Object.entries(formData.dynamicFields).forEach(([k, v]) => { if (v !== '') extraDetails[k] = v; });
+    Object.entries(formData.dynamicFields).forEach(([k, v]) => {
+      if (v === '') return;
+      if (v.startsWith('[') || v.startsWith('{')) {
+        try { extraDetails[k] = JSON.parse(v); return; } catch {}
+      }
+      extraDetails[k] = v;
+    });
     return {
       title: effectiveTitle,
       description: formData.description || effectiveTitle,
@@ -2237,7 +2359,13 @@ function PostPropertyPageInner() {
         extraDetails.hasDock = form.hasDock;
         extraDetails.hasRamp = form.hasRamp;
       }
-      Object.entries(form.dynamicFields).forEach(([k, v]) => { if (v !== '') extraDetails[k] = v; });
+      Object.entries(form.dynamicFields).forEach(([k, v]) => {
+        if (v === '') return;
+        if (v.startsWith('[') || v.startsWith('{')) {
+          try { extraDetails[k] = JSON.parse(v); return; } catch {}
+        }
+        extraDetails[k] = v;
+      });
 
       const payload: any = {
         title: effectiveTitle,

@@ -99,6 +99,7 @@ export interface Property {
   brokerage?: string;
   possessionDate?: string;
   isNewProject?: boolean;
+  extraDetails?: Record<string, any>;
   createdAt: string;
   updatedAt: string;
 }

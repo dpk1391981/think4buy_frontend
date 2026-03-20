@@ -276,7 +276,7 @@ export default function PropertyDetailClient({ property }: Props) {
   ].filter(Boolean) as { icon: React.ReactNode; label: string; value: string }[];
 
   // Full specs table
-  const specs = [
+  const baseSpecs = [
     { label: 'Bedrooms',      value: property.bedrooms   ? `${property.bedrooms} BHK`                    : null },
     { label: 'Bathrooms',     value: property.bathrooms  ? `${property.bathrooms}`                       : null },
     { label: 'Carpet Area',   value: property.area       ? formatArea(property.area, property.areaUnit)  : null },
@@ -290,6 +290,23 @@ export default function PropertyDetailClient({ property }: Props) {
     { label: 'Listed By',     value: isAgent ? 'Agent / Broker' : 'Owner' },
     { label: 'RERA No.',      value: property.reraNumber || null },
   ].filter(s => s.value);
+
+  // Extra dynamic fields from extraDetails
+  const extraSpecs: { label: string; value: string; isDependentRows?: boolean; rows?: { label: string; value: string; unit: string }[] }[] = [];
+  if (property.extraDetails && typeof property.extraDetails === 'object') {
+    for (const [key, val] of Object.entries(property.extraDetails)) {
+      if (val === null || val === undefined || val === '') continue;
+      const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && 'label' in val[0]) {
+        // Dependent field: [{label, value, unit}]
+        extraSpecs.push({ label, isDependentRows: true, value: '', rows: val as { label: string; value: string; unit: string }[] });
+      } else {
+        extraSpecs.push({ label, value: String(val) });
+      }
+    }
+  }
+
+  const specs = [...baseSpecs, ...extraSpecs.filter(s => !s.isDependentRows)] as { label: string; value: string }[];
 
   // FAQ
   const faqs = [
@@ -528,7 +545,7 @@ export default function PropertyDetailClient({ property }: Props) {
               </div>
 
               {/* Property Details Tab */}
-              {activeTab === 'property' && specs.length > 0 && (
+              {activeTab === 'property' && (specs.length > 0 || extraSpecs.some(s => s.isDependentRows)) && (
                 <div className="p-5 md:p-6">
                   <div className="divide-y divide-gray-50">
                     {specs.map(({ label, value }, i) => (
@@ -536,6 +553,21 @@ export default function PropertyDetailClient({ property }: Props) {
                         i % 2 === 0 ? '' : 'bg-gray-50/50 rounded-lg px-2')}>
                         <span className="text-gray-500 font-medium">{label}</span>
                         <span className="font-semibold text-gray-900 text-right">{value}</span>
+                      </div>
+                    ))}
+                    {/* Dependent multi-row fields */}
+                    {extraSpecs.filter(s => s.isDependentRows).map((spec, i) => (
+                      <div key={spec.label} className={cn('py-2.5 text-sm', (specs.length + i) % 2 !== 0 ? '' : 'bg-gray-50/50 rounded-lg px-2')}>
+                        <span className="text-gray-500 font-medium block mb-1.5">{spec.label}</span>
+                        <div className="space-y-1">
+                          {(spec.rows || []).filter(r => r.label || r.value).map((row, j) => (
+                            <div key={j} className="flex items-center gap-2 text-sm">
+                              {row.label && <span className="text-gray-600 font-medium">{row.label}</span>}
+                              {row.value && <span className="font-semibold text-gray-900">{row.value}</span>}
+                              {row.unit && <span className="text-gray-500 text-xs">{row.unit}</span>}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
