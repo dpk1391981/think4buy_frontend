@@ -687,7 +687,12 @@ export default function PropertyDetailClient({ property }: Props) {
 
               {/* Stats row */}
               <div className="flex items-center gap-3 text-xs text-gray-400 pt-3 mt-3 border-t border-gray-100 flex-wrap">
-                <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" /> {property.viewCount} views</span>
+                <span className="flex items-center gap-1 font-semibold bg-primary-50 text-primary-600 px-2.5 py-1 rounded-full">
+                  <Eye className="w-3.5 h-3.5" />
+                  {property.viewCount >= 1000
+                    ? `${(property.viewCount / 1000).toFixed(1)}k`
+                    : property.viewCount} views
+                </span>
                 <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {timeAgo(property.createdAt)}</span>
                 {property.reraNumber && (
                   <span className="text-green-600 font-semibold flex items-center gap-1">

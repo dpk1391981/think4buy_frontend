@@ -41,6 +41,7 @@ export interface PropertyOwner {
   email: string;
   avatar?: string;
   company?: string;
+  city?: string;
   isVerified: boolean;
   role?: string;
 }
