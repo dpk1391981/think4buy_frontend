@@ -299,10 +299,19 @@ export default function PropertyDetailClient({ property }: Props) {
       // carpet_area is already shown in baseSpecs as "Carpet Area"
       if (key === 'carpet_area') continue;
       const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-      if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && 'label' in val[0]) {
-        // Dependent field: [{label, value, unit}]
-        extraSpecs.push({ label, isDependentRows: true, value: '', rows: val as { label: string; value: string; unit: string }[] });
-      } else {
+      if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
+        if ('label' in val[0]) {
+          // Dependent field: [{label, value, unit}]
+          extraSpecs.push({ label, isDependentRows: true, value: '', rows: val as { label: string; value: string; unit: string }[] });
+        } else if ('value' in val[0]) {
+          // Area-type field: [{value, unit}] — render as "1200 Sq.ft."
+          const formatted = (val as { value: string; unit?: string }[])
+            .filter(r => r.value)
+            .map(r => `${r.value}${r.unit ? ' ' + r.unit : ''}`)
+            .join(', ');
+          if (formatted) extraSpecs.push({ label, value: formatted });
+        }
+      } else if (!Array.isArray(val)) {
         extraSpecs.push({ label, value: String(val) });
       }
     }
