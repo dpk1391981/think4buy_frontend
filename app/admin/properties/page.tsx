@@ -16,6 +16,7 @@ const STATUS_TABS = [
   { label: 'Pending',  value: 'pending' },
   { label: 'Approved', value: 'approved' },
   { label: 'Rejected', value: 'rejected' },
+  { label: 'Drafts',   value: 'draft' },
 ];
 
 const PLAN_BADGE: Record<string, string> = {
@@ -177,7 +178,11 @@ export default function AdminPropertiesPage() {
     setLoading(true);
     try {
       const params: any = { page, limit: 15 };
-      if (activeStatus) params.approvalStatus = activeStatus;
+      if (activeStatus === 'draft') {
+        params.isDraft = true;
+      } else if (activeStatus) {
+        params.approvalStatus = activeStatus;
+      }
       if (search) params.search = search;
       const r = await adminApi.getProperties(params);
       setProperties(r.data.items || r.data.properties || []);
