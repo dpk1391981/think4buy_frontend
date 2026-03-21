@@ -30,12 +30,6 @@ interface Suggestion {
   count?: number;
 }
 
-const POPULAR_SEARCHES = [
-  { label: '2 BHK in Mumbai', icon: '🏠' },
-  { label: 'Flats in Bangalore under 50L', icon: '🏢' },
-  { label: 'Villa in Goa', icon: '🏖️' },
-  { label: 'Office space in Gurgaon', icon: '🏬' },
-];
 
 function SuggestionIcon({ type }: { type: string }) {
   if (type === 'city') return <MapPin className="w-4 h-4 text-primary-500 flex-shrink-0" />;
@@ -80,9 +74,19 @@ export default function SearchBar({
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [popularCities, setPopularCities] = useState<{ id: string; cityName: string; counts: { total: number } }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
+
+  // Fetch top cities once on mount
+  useEffect(() => {
+    locationsApi.getTopCities().then(r => {
+      const raw = r.data;
+      const arr: any[] = Array.isArray(raw) ? raw : raw?.cities ?? [];
+      setPopularCities(arr.slice(0, 8));
+    }).catch(() => {});
+  }, []);
 
   const fetchSuggestions = useCallback(async (val: string) => {
     if (!val.trim() || val.length < 2) {
@@ -349,23 +353,26 @@ export default function SearchBar({
                 <div className="px-4 py-3 text-sm text-gray-500 text-center">
                   No suggestions. Press Enter to search.
                 </div>
-              ) : query.length < 2 ? (
+              ) : query.length < 2 && popularCities.length > 0 ? (
                 <div className="py-2">
                   <div className="px-4 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" /> Popular Searches
+                    <TrendingUp className="w-3 h-3" /> Popular Cities
                   </div>
-                  {POPULAR_SEARCHES.map((s, i) => (
+                  {popularCities.map((c) => (
                     <button
-                      key={i}
+                      key={c.id}
                       className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left transition-colors"
                       onClick={() => {
-                        setQuery(s.label);
-                        router.push(buildSearchUrl({ keyword: s.label }));
+                        setQuery(c.cityName);
+                        router.push(buildSearchUrl({ city: c.cityName }));
                         setShowSuggestions(false);
                       }}
                     >
-                      <span className="text-base">{s.icon}</span>
-                      <span className="text-sm text-gray-700">{s.label}</span>
+                      <MapPin className="w-4 h-4 text-primary-400 flex-shrink-0" />
+                      <span className="text-sm text-gray-700 flex-1">{c.cityName}</span>
+                      {c.counts?.total > 0 && (
+                        <span className="text-[10px] text-gray-400 flex-shrink-0">{c.counts.total} listings</span>
+                      )}
                     </button>
                   ))}
                 </div>

@@ -186,15 +186,24 @@ function SectionCard({ title, children, className = '' }: { title?: string; chil
 interface DependentRow { label: string; value: string; unit: string; }
 
 // ─── Parse area from carpet_area dynamic field ────────────────────────────────
+// Handles both DEPENDENT [{label, value, unit}] and plain NUMBER "2000" formats
 function parseAreaFromDynamic(dynamicFields: Record<string, string>): { area: number | undefined; areaUnit: string } {
   const raw = dynamicFields?.carpet_area;
   if (!raw) return { area: undefined, areaUnit: 'Sq.ft.' };
   try {
     const rows = JSON.parse(raw);
+    // DEPENDENT field: [{label, value, unit}]
     if (Array.isArray(rows) && rows.length > 0 && rows[0].value) {
       return { area: Number(rows[0].value), areaUnit: rows[0].unit || 'Sq.ft.' };
     }
+    // JSON.parse of "2000" returns number 2000
+    if (typeof rows === 'number' && rows > 0) {
+      return { area: rows, areaUnit: 'Sq.ft.' };
+    }
   } catch {}
+  // Plain number string (F.NUMBER field type): "2000"
+  const num = Number(raw);
+  if (!isNaN(num) && num > 0) return { area: num, areaUnit: 'Sq.ft.' };
   return { area: undefined, areaUnit: 'Sq.ft.' };
 }
 
@@ -402,7 +411,7 @@ function BuyerRoleSelectionScreen({
     setLoading(true);
     setError('');
     try {
-      onRoleSelected(
+      await onRoleSelected(
         selectedRole,
         selectedRole === 'agent'
           ? { agencyName: agencyName.trim(), contactPhone: agencyPhone.trim() || undefined, address: agencyAddress.trim() || undefined }

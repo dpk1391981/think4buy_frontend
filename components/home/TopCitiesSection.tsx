@@ -342,7 +342,7 @@ export default function TopCitiesSection() {
   const localitiesQuery = useQuery<LocalityData[]>({
     queryKey: ['top-localities', selectedCity],
     queryFn: async () => {
-      const res = await locationsApi.getLocalities(selectedCity);
+      const res = await locationsApi.getLocalities(selectedCity, undefined, undefined, true);
       const raw: any[] = Array.isArray(res.data) ? res.data : [];
       return raw
         .filter(l => l.locality && l.locality.trim())
@@ -399,7 +399,7 @@ export default function TopCitiesSection() {
   const subtext  = cityMode
     ? `Popular localities & neighbourhoods in ${selectedCity}`
     : "India's most sought-after real estate markets";
-  const viewAllHref = cityMode ? `/property-in-${citySlug}` : '/properties';
+  const viewAllHref = cityMode ? `/property-in-${citySlug}` : '/property-for-sale-in-top-cities';
   const viewAllText = cityMode ? `All in ${selectedCity}` : 'View All';
 
   return (

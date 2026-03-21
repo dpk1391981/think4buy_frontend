@@ -79,18 +79,7 @@ const MEGA_SECTIONS: MegaSection[] = [
 
 // ─── City Selector ────────────────────────────────────────────────────────────
 
-const POPULAR_CITIES = [
-  { name: 'Delhi' },
-  { name: 'Mumbai' },
-  { name: 'Bangalore' },
-  { name: 'Pune' },
-  { name: 'Hyderabad' },
-  { name: 'Chennai' },
-  { name: 'Noida' },
-  { name: 'Gurgaon' },
-  { name: 'Kolkata' },
-  { name: 'Ahmedabad' },
-];
+const POPULAR_CITY_LIMIT = 5;
 
 function CitySelector({ compact = false }: { compact?: boolean }) {
   const dispatch = useAppDispatch();
@@ -104,12 +93,12 @@ function CitySelector({ compact = false }: { compact?: boolean }) {
   const [detecting, setDetecting] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Load cities from DB once
+  // Load cities with active listings, sorted by most active
   useEffect(() => {
-    locationsApi.getCities().then(r => {
-      const data = r.data;
-      const arr = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-      setDbCities(arr);
+    locationsApi.getTopCities().then(r => {
+      const raw = r.data;
+      const arr: any[] = Array.isArray(raw) ? raw : raw?.cities ?? [];
+      setDbCities(arr.map((c: any) => ({ id: c.id, name: c.cityName })));
     }).catch(() => {});
   }, []);
 
@@ -180,11 +169,8 @@ function CitySelector({ compact = false }: { compact?: boolean }) {
       .finally(() => setDetecting(false));
   };
 
-  // Popular cities to show when no query
-  const popularToShow = POPULAR_CITIES.map(p => {
-    const found = dbCities.find(c => c.name?.toLowerCase() === p.name.toLowerCase());
-    return found ?? { id: '', name: p.name };
-  });
+  // Top cities (most active) — first N from the sorted-by-active list
+  const popularToShow = dbCities.slice(0, POPULAR_CITY_LIMIT);
 
   return (
     <div className="relative" ref={ref}>
@@ -268,7 +254,7 @@ function CitySelector({ compact = false }: { compact?: boolean }) {
                     {c.name}
                   </button>
                 ))}
-                {dbCities.length > POPULAR_CITIES.length && (
+                {dbCities.length > POPULAR_CITY_LIMIT && (
                   <div className="px-3 pt-2 pb-1 border-t border-gray-100 mt-1">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">All Cities</span>
                   </div>
@@ -278,7 +264,7 @@ function CitySelector({ compact = false }: { compact?: boolean }) {
 
             {/* Filtered results */}
             {filtered
-              .filter(c => c.name && (query || !POPULAR_CITIES.find(p => p.name.toLowerCase() === c.name.toLowerCase())))
+              .filter(c => c.name && (query || !popularToShow.find(p => p.name.toLowerCase() === c.name.toLowerCase())))
               .map((c) => (
                 <button
                   key={c.id}
@@ -586,10 +572,10 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
   const pathname = usePathname();
 
   useEffect(() => {
-    locationsApi.getCities().then(r => {
-      const data = r.data;
-      const arr = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-      setDbCities(arr);
+    locationsApi.getTopCities().then(r => {
+      const raw = r.data;
+      const arr: any[] = Array.isArray(raw) ? raw : raw?.cities ?? [];
+      setDbCities(arr.map((c: any) => ({ id: c.id, name: c.cityName })));
     }).catch(() => {});
   }, []);
 

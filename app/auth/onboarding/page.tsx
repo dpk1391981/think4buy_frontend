@@ -80,7 +80,7 @@ type RoleId = 'buyer' | 'owner' | 'agent';
 function OnboardingForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, user, loading: authLoading } = useAuth();
+  const { login, refresh: refreshAuth, user, loading: authLoading } = useAuth();
 
   const roleParam = searchParams.get('role') as RoleId | null;
   const [selectedRole, setSelectedRole] = useState<RoleId>(
@@ -171,8 +171,8 @@ function OnboardingForm() {
     return null;
   }
 
-  // Only redirect away if onboarding is complete AND name is filled
-  if (!authLoading && user && !user.needsOnboarding && user.name?.trim()) {
+  // If onboarding already completed, redirect away immediately — never show again
+  if (!authLoading && user && user.needsOnboarding === false && user.name?.trim()) {
     router.replace(redirect);
     return null;
   }
@@ -205,7 +205,8 @@ function OnboardingForm() {
       }
 
       const { data } = await authApi.completeOnboarding(payload);
-      // Re-login so token is stored before coverage call
+      // Re-login so token is stored before coverage call; this also updates localStorage
+      // so any in-flight refresh() call will be overridden with the new needsOnboarding:false state
       login(data.token, data.user, data.menus);
 
       // Add all coverage entries for agents
@@ -232,6 +233,10 @@ function OnboardingForm() {
           }
         }
       }
+
+      // Re-fetch fresh profile so needsOnboarding:false is confirmed in auth state
+      // (prevents any in-flight background refresh from overwriting with stale data)
+      await refreshAuth();
 
       // Honour ?redirect= param if present, otherwise go to role dashboard
       if (redirect && redirect !== '/') {

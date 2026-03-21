@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import { Flame, TrendingUp, Eye, ArrowRight, Zap, BarChart2, MessageCircle } from 'lucide-react';
 import { homeApi } from '@/lib/api';
-import { formatPrice, formatArea } from '@/lib/utils';
+import { formatPrice, formatArea, getPropertyArea } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { useAppSelector } from '@/lib/store';
 
@@ -44,7 +44,8 @@ function getDemandLevel(property: any): DemandLevel {
 function TrendingCard({ property, rank }: { property: any; rank: number }) {
   const img         = property.images?.[0]?.url;
   const price       = formatPrice(property.price, property.priceUnit);
-  const area        = formatArea(property.area, property.areaUnit);
+  const { area: resolvedArea, areaUnit: resolvedAreaUnit } = getPropertyArea(property);
+  const area        = formatArea(resolvedArea, resolvedAreaUnit);
   const slug        = property.slug || property.id;
   const demandLevel = getDemandLevel(property);
 
@@ -173,14 +174,14 @@ export default function TrendingProperties() {
             </p>
           </div>
 
-          {/* Filter pills */}
-          <div className="hidden sm:flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs">
+          {/* Filter pills — shown on all screen sizes */}
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs">
             {(['all', 'buy', 'rent'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setActiveFilter(f)}
                 className={cn(
-                  'px-3 py-1.5 rounded-lg font-medium capitalize transition-all',
+                  'px-3 py-1.5 rounded-lg font-medium transition-all',
                   activeFilter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
                 )}
               >

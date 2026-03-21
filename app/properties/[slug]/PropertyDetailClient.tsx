@@ -109,6 +109,9 @@ export default function PropertyDetailClient({ property }: Props) {
   // Agent/Property detail tab
   const [activeTab, setActiveTab] = useState<'property' | 'agent'>('property');
 
+  // About section tabs
+  const [aboutTab, setAboutTab] = useState<'about' | 'more_info'>('about');
+
   const images = property.images?.length
     ? property.images.map((img) => ({ ...img, url: resolveImageUrl(img.url) }))
     : [{ url: getPrimaryImage([]), alt: property.title, id: '0', isPrimary: true, sortOrder: 0 }];
@@ -736,6 +739,97 @@ export default function PropertyDetailClient({ property }: Props) {
               </div>
             )}
 
+            {/* ── About This Property (tabbed) ──────────────────────────── */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* Header + tabs */}
+              <div className="flex items-center justify-between px-5 pt-4 pb-0 gap-3">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 flex-shrink-0">
+                  <Layers className="w-5 h-5 text-primary-500" /> About
+                </h2>
+                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs">
+                  <button
+                    onClick={() => setAboutTab('about')}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg font-medium transition-all',
+                      aboutTab === 'about' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
+                    )}
+                  >
+                    About
+                  </button>
+                  <button
+                    onClick={() => setAboutTab('more_info')}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg font-medium transition-all',
+                      aboutTab === 'more_info' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
+                    )}
+                  >
+                    More Info
+                  </button>
+                </div>
+              </div>
+
+              {/* Tab content */}
+              <div className="p-5 md:p-6 pt-4">
+                {aboutTab === 'about' ? (
+                  property.description ? (
+                    <>
+                      <div
+                        className="text-gray-600 leading-relaxed text-sm md:text-base whitespace-pre-line overflow-hidden transition-[max-height] duration-300 ease-in-out"
+                        style={{ maxHeight: descExpanded ? '9999px' : '8rem' }}
+                      >
+                        {property.description}
+                      </div>
+                      {property.description.length > 200 && (
+                        <button
+                          onClick={() => setDescExpanded(v => !v)}
+                          className="mt-2 text-primary-600 text-sm font-semibold flex items-center gap-1 hover:text-primary-700 active:opacity-70"
+                        >
+                          {descExpanded
+                            ? <><ChevronUp className="w-4 h-4" /> Read less</>
+                            : <><ChevronDown className="w-4 h-4" /> Read more</>}
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic">No description provided for this property.</p>
+                  )
+                ) : (
+                  /* More Info tab — SEO / property overview */
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900 mb-2">
+                      {property.bedrooms ? `${property.bedrooms} BHK ` : ''}
+                      {getPropertyTypeLabel(property.type)} for {property.category === 'buy' ? 'Sale' : property.category === 'rent' ? 'Rent' : getCategoryLabel(property.category)} in {property.locality}, {property.city}
+                    </h3>
+                    <p className="text-sm text-gray-600 leading-relaxed mb-3">
+                      {property.city} is one of the most sought-after real estate destinations.
+                      This {property.bedrooms ? `${property.bedrooms} BHK ` : ''}{getPropertyTypeLabel(property.type).toLowerCase()}
+                      {resolvedArea ? ` of ${formatArea(resolvedArea, resolvedAreaUnit)} ` : ' '}
+                      in {property.locality} is priced at {formatPrice(property.price, property.priceUnit)}.
+                      {property.possessionStatus === 'ready_to_move' ? ' Ready to move in immediately.' : ''}
+                      {property.amenities?.length ? ` Premium amenities: ${property.amenities.slice(0, 3).map(a => a.name).join(', ')}.` : ''}
+                      {' '}Contact the {isAgent ? 'agent' : 'owner'} now for the best deal.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        `${property.category === 'buy' ? 'Buy' : 'Rent'} property in ${property.city}`,
+                        `${property.bedrooms ? property.bedrooms + ' BHK ' : ''}${getPropertyTypeLabel(property.type)} ${property.city}`,
+                        `${getPropertyTypeLabel(property.type)} in ${property.locality}`,
+                        `Real estate ${property.city}`,
+                      ].map((tag, i) => (
+                        <Link
+                          key={i}
+                          href={`/properties?city=${property.city}&type=${property.type}&category=${property.category}`}
+                          className="text-xs bg-primary-50 text-primary-700 px-3 py-1 rounded-full border border-primary-200 hover:bg-primary-100 transition-colors font-medium"
+                        >
+                          {tag}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* ── Mobile Contact Buttons ────────────────────────────────── */}
             {!isInactiveListing && (
               <div className="md:hidden bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
@@ -781,25 +875,6 @@ export default function PropertyDetailClient({ property }: Props) {
                     <Send className="w-4 h-4" /> Send Inquiry
                   </button>
                 </div>
-              </div>
-            )}
-
-
-            {/* ── Description ──────────────────────────────────────────── */}
-            {property.description && (
-              <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100">
-                <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-primary-500" /> About This Property
-                </h2>
-                <div className={cn('text-gray-600 leading-relaxed text-sm md:text-base whitespace-pre-line', !descExpanded && 'line-clamp-5')}>
-                  {property.description}
-                </div>
-                {property.description?.length > 300 && (
-                  <button onClick={() => setDescExpanded(v => !v)}
-                    className="mt-2 text-primary-600 text-sm font-semibold flex items-center gap-1 hover:text-primary-700">
-                    {descExpanded ? <><ChevronUp className="w-4 h-4" /> Read less</> : <><ChevronDown className="w-4 h-4" /> Read more</>}
-                  </button>
-                )}
               </div>
             )}
 
@@ -1153,35 +1228,6 @@ export default function PropertyDetailClient({ property }: Props) {
               </div>
             </div>
 
-            {/* ── SEO content ──────────────────────────────────────────── */}
-            <div className="bg-gradient-to-br from-primary-50 to-blue-50 rounded-2xl p-5 md:p-6 border border-primary-100">
-              <h2 className="text-base font-bold text-gray-900 mb-2">
-                {property.bedrooms ? `${property.bedrooms} BHK ` : ''}{getPropertyTypeLabel(property.type)} for {property.category === 'buy' ? 'Sale' : property.category === 'rent' ? 'Rent' : getCategoryLabel(property.category)} in {property.locality}, {property.city}
-              </h2>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                {property.city} is one of the most sought-after real estate destinations.
-                This {property.bedrooms ? `${property.bedrooms} BHK ` : ''}{getPropertyTypeLabel(property.type).toLowerCase()}
-                {resolvedArea ? ` of ${formatArea(resolvedArea, resolvedAreaUnit)} ` : ' '}
-                in {property.locality} is priced at {formatPrice(property.price, property.priceUnit)}.
-                {property.possessionStatus === 'ready_to_move' ? ' Ready to move in immediately.' : ''}
-                {property.amenities?.length ? ` Premium amenities: ${property.amenities.slice(0, 3).map(a => a.name).join(', ')}.` : ''}
-                {' '}Contact the {isAgent ? 'agent' : 'owner'} now for the best deal.
-              </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {[
-                  `${property.category === 'buy' ? 'Buy' : 'Rent'} property in ${property.city}`,
-                  `${property.bedrooms ? property.bedrooms + ' BHK ' : ''}${getPropertyTypeLabel(property.type)} ${property.city}`,
-                  `${getPropertyTypeLabel(property.type)} in ${property.locality}`,
-                  `Real estate ${property.city}`,
-                ].map((tag, i) => (
-                  <Link key={i}
-                    href={`/properties?city=${property.city}&type=${property.type}&category=${property.category}`}
-                    className="text-xs bg-white text-primary-700 px-3 py-1 rounded-full border border-primary-200 hover:bg-primary-50 transition-colors font-medium">
-                    {tag}
-                  </Link>
-                ))}
-              </div>
-            </div>
 
           </div>{/* end left column */}
 

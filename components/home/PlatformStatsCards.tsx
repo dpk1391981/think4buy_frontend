@@ -16,7 +16,7 @@ const STATIC_CARDS = [
     color: '#1a56db',
     icon:  <Home className="w-5 h-5 text-white" />,
     title: 'Post Property Free',
-    stat:  '50K+ Active Listings',
+    stat:  'List in minutes, reach buyers',
     cta:   'Post Now',
   },
 ] as const;
@@ -33,15 +33,15 @@ export default function PlatformStatsCards() {
     ? `/properties-in-${toSlug(selectedState)}`
     : selectedCountry
     ? `/property-for-sale-rent-in-${toSlug(selectedCountry)}`
-    : '/property-for-sale-rent-in-india';
+    : '/property-for-sale-rent-in-top-cities';
 
   const citiesStat = selectedCity
-    ? `Properties in ${selectedCity}`
+    ? `Browse listings in ${selectedCity}`
     : selectedState
-    ? `Cities in ${selectedState}`
+    ? `Browse cities in ${selectedState}`
     : selectedCountry
-    ? `States in ${selectedCountry}`
-    : '50+ Cities Covered';
+    ? `Explore states in ${selectedCountry}`
+    : 'Top residential markets';
 
   const citiesTag = selectedCity || selectedState ? 'IN YOUR AREA' : 'EXPLORE';
 
@@ -53,10 +53,10 @@ export default function PlatformStatsCards() {
     : '/agents';
 
   const agentsStat = selectedCity
-    ? `Agents in ${selectedCity}`
+    ? `Local agents in ${selectedCity}`
     : selectedState
-    ? `Agents in ${selectedState}`
-    : '10K+ Verified Agents';
+    ? `Local agents in ${selectedState}`
+    : 'Verified & RERA registered';
 
   const agentsTag = selectedCity || selectedState ? 'LOCAL AGENTS' : 'TOP AGENTS';
 

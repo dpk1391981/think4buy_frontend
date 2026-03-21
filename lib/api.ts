@@ -77,6 +77,8 @@ export const propertiesApi = {
   getForMap: (params?: Record<string, any>) => api.get('/properties/map', { params }),
   getSearchSuggestions: (q: string) =>
     api.get('/properties/search/suggestions', { params: { q } }),
+  getPopularKeywords: (limit = 8) =>
+    api.get('/properties/search/popular-keywords', { params: { limit } }),
   getFeatured: (limit = 8) => api.get('/properties/featured', { params: { limit } }),
   getStats: () => api.get('/properties/stats'),
   getCities: () => api.get('/properties/cities'),
@@ -140,8 +142,8 @@ export const locationsApi = {
   search: (q: string) => api.get('/locations/search', { params: { q } }),
   getCities: (search?: string, limit?: number) =>
     api.get('/locations/cities', { params: { search: search || undefined, limit } }),
-  getLocalities: (city: string, state?: string, search?: string) =>
-    api.get('/locations/localities', { params: { city, state, search: search || undefined } }),
+  getLocalities: (city: string, state?: string, search?: string, onlyWithActiveProps?: boolean) =>
+    api.get('/locations/localities', { params: { city, state, search: search || undefined, onlyWithActiveProps: onlyWithActiveProps || undefined } }),
   /** Alias used by FindPropertyClient */
   getLocalitiesByCity: (city: string, state?: string, search?: string) =>
     api.get('/locations/localities', { params: { city, state, search: search || undefined } }),

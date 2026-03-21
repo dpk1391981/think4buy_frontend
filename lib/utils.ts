@@ -26,22 +26,49 @@ export function formatArea(area?: number, unit = 'sqft'): string {
   return `${area.toLocaleString('en-IN')} ${unit}`;
 }
 
-/** Resolve area and unit from carpet_area dynamic field (extraDetails) with fallback to area/areaUnit columns. */
+/** Resolve area and unit from carpet_area dynamic field (extraDetails) with fallback to area/areaUnit columns.
+ *  Handles both DEPENDENT field format [{label, value, unit}] and plain NUMBER format "2000". */
 export function getPropertyArea(property: {
   area?: number;
   areaUnit?: string;
-  extraDetails?: Record<string, any> | null;
+  extraDetails?: Record<string, any> | string | null;
 }): { area: number | undefined; areaUnit: string } {
-  const raw = property.extraDetails?.carpet_area;
-  if (raw) {
-    try {
-      const rows: any[] = Array.isArray(raw) ? raw : JSON.parse(raw);
-      if (rows.length > 0 && rows[0].value) {
-        return { area: Number(rows[0].value), areaUnit: rows[0].unit || property.areaUnit || 'Sq.ft.' };
-      }
-    } catch {}
+  // extraDetails may be a raw JSON string (from raw SQL queries) — parse it first
+  let details: Record<string, any> | null = null;
+  if (property.extraDetails && typeof property.extraDetails === 'string') {
+    try { details = JSON.parse(property.extraDetails); } catch {}
+  } else if (property.extraDetails && typeof property.extraDetails === 'object') {
+    details = property.extraDetails as Record<string, any>;
   }
-  return { area: property.area, areaUnit: property.areaUnit || 'sqft' };
+
+  const raw = details?.carpet_area;
+  if (raw !== undefined && raw !== null && raw !== '') {
+    // Case 1: DEPENDENT field — array of [{label, value, unit}]
+    if (Array.isArray(raw) && raw.length > 0 && raw[0].value) {
+      return { area: Number(raw[0].value), areaUnit: raw[0].unit || property.areaUnit || 'Sq.ft.' };
+    }
+    // Case 2: JSON string that parses to array or number
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].value) {
+          return { area: Number(parsed[0].value), areaUnit: parsed[0].unit || property.areaUnit || 'Sq.ft.' };
+        }
+        // JSON.parse of "2000" gives number 2000
+        if (typeof parsed === 'number' && parsed > 0) {
+          return { area: parsed, areaUnit: property.areaUnit || 'Sq.ft.' };
+        }
+      } catch {}
+      // Plain number string "2000"
+      const num = Number(raw);
+      if (!isNaN(num) && num > 0) return { area: num, areaUnit: property.areaUnit || 'Sq.ft.' };
+    }
+    // Case 3: already a number (TypeORM parsed JSON number)
+    if (typeof raw === 'number' && raw > 0) {
+      return { area: raw, areaUnit: property.areaUnit || 'Sq.ft.' };
+    }
+  }
+  return { area: property.area, areaUnit: property.areaUnit || 'Sq.ft.' };
 }
 
 export function getPropertyTypeLabel(type: string): string {

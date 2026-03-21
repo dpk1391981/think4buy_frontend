@@ -11,10 +11,19 @@ import { homeApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useAppSelector } from '@/lib/store';
 
+// Indian number formatter: 1500 → "1.5K", 250000 → "2.5L", 10000000 → "1Cr"
+function fmtINR(n: number, decimals = 1): string {
+  if (!n || n <= 0) return '0';
+  if (n >= 1_00_00_000) return `${(n / 1_00_00_000).toFixed(decimals).replace(/\.0$/, '')}Cr`;
+  if (n >= 1_00_000)    return `${(n / 1_00_000).toFixed(decimals).replace(/\.0$/, '')}L`;
+  if (n >= 1_000)       return `${(n / 1_000).toFixed(decimals).replace(/\.0$/, '')}K`;
+  return n.toLocaleString('en-IN');
+}
+
 // Fallback cities shown before the API responds (popular Indian metros)
 const FALLBACK_CITIES = [
-  'Mumbai', 'Delhi', 'Bangalore', 'Pune', 'Hyderabad', 'Chennai',
-  'Kolkata', 'Ahmedabad', 'Noida', 'Gurgaon',
+  'Noida', 'Delhi', 'Bangalore', 'Pune', 'Hyderabad', 'Chennai',
+  'Kolkata', 'Ahmedabad', 'Mumbai', 'Gurgaon',
 ];
 
 type Trend = 'up' | 'down' | 'stable';
@@ -27,9 +36,12 @@ function TrendIcon({ trend, size = 'sm' }: { trend: Trend; size?: 'sm' | 'xs' })
 }
 
 function LocalityBar({
-  name, psf, maxPsf, trend, city,
-}: { name: string; psf: number; maxPsf: number; trend: Trend; city: string }) {
-  const pct = maxPsf > 0 ? Math.round((psf / maxPsf) * 100) : 0;
+  name, value, maxValue, trend, city, isRent,
+}: { name: string; value: number; maxValue: number; trend: Trend; city: string; isRent: boolean }) {
+  const pct = maxValue > 0 ? Math.round((value / maxValue) * 100) : 0;
+  const label = isRent
+    ? `₹${fmtINR(value)}/mo`
+    : `₹${fmtINR(value)}/sqft`;
   return (
     <Link
       href={`/properties?city=${encodeURIComponent(city)}&locality=${encodeURIComponent(name)}`}
@@ -45,27 +57,37 @@ function LocalityBar({
         />
       </div>
       <div className="w-28 flex-shrink-0 flex items-center justify-end gap-1">
-        <span className="text-xs font-bold text-gray-900">₹{psf.toLocaleString('en-IN')}/sqft</span>
+        <span className="text-xs font-bold text-gray-900">{value > 0 ? label : '—'}</span>
         <TrendIcon trend={trend} size="xs" />
       </div>
     </Link>
   );
 }
 
-function PriceGauge({ avgPsf, trend, trendPct, listingCount }: {
-  avgPsf: number; trend: Trend; trendPct: number; listingCount: number;
+function PriceGauge({ avgPsf, avgMonthlyRent, trend, trendPct, listingCount, totalListingCount }: {
+  avgPsf: number; avgMonthlyRent: number; trend: Trend; trendPct: number;
+  listingCount: number; totalListingCount: number;
 }) {
+  const hasPsf = avgPsf > 0;
+  const displayCount = listingCount > 0 ? listingCount : totalListingCount;
   return (
     <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-2xl p-5 text-white">
-      <p className="text-xs text-primary-200 font-medium uppercase tracking-wide mb-1">Avg. Price / Sq.Ft</p>
+      <p className="text-xs text-primary-200 font-medium uppercase tracking-wide mb-1">
+        {hasPsf ? 'Avg. Price / Sq.Ft' : 'Avg. Monthly Rent'}
+      </p>
       <div className="flex items-end gap-2 mb-3">
         <span className="text-3xl sm:text-4xl font-black">
-          {avgPsf > 0 ? `₹${avgPsf.toLocaleString('en-IN')}` : '—'}
+          {hasPsf
+            ? `₹${fmtINR(avgPsf)}`
+            : avgMonthlyRent > 0
+              ? `₹${fmtINR(avgMonthlyRent)}`
+              : '—'}
         </span>
-        {avgPsf > 0 && <span className="text-primary-200 text-sm mb-1">per sqft</span>}
+        {hasPsf && <span className="text-primary-200 text-sm mb-1">per sqft</span>}
+        {!hasPsf && avgMonthlyRent > 0 && <span className="text-primary-200 text-sm mb-1">per month</span>}
       </div>
 
-      {avgPsf > 0 && (
+      {hasPsf && (
         <div className={cn(
           'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold mb-4',
           trend === 'up'   ? 'bg-green-500/20 text-green-300' :
@@ -90,10 +112,10 @@ function PriceGauge({ avgPsf, trend, trendPct, listingCount }: {
             {trend === 'up' ? '⚡ Buy Now' : trend === 'stable' ? '📋 Evaluate' : '⏳ Wait'}
           </p>
         </div>
-        {listingCount > 0 && (
+        {displayCount > 0 && (
           <div className="col-span-2 border-t border-primary-500/30 pt-3">
             <p className="text-primary-300 mb-0.5">Active Listings</p>
-            <p className="font-semibold">{listingCount.toLocaleString('en-IN')} properties</p>
+            <p className="font-semibold">{fmtINR(displayCount, 0)} properties</p>
           </div>
         )}
       </div>
@@ -198,9 +220,14 @@ export default function CityPriceSnapshot() {
   });
 
   const snap = snapRes?.data;
-  const hasData = !isLoading && snap && snap.avgPricePerSqft > 0;
+  const hasPsfData = !isLoading && snap && snap.avgPricePerSqft > 0;
+  const hasRentData = !isLoading && snap && snap.avgMonthlyRent > 0;
+  const hasData = !isLoading && snap && (snap.totalListingCount > 0 || hasPsfData || hasRentData);
   const localities = snap?.localities ?? [];
-  const maxPsf = localities.length > 0 ? Math.max(...localities.map((l: any) => l.avgPsf)) : 0;
+  // Use avgRent for locality bars when no PSF data exists
+  const maxPsf = hasPsfData
+    ? Math.max(...localities.map((l: any) => l.medianPsf || l.avgPsf || 0))
+    : Math.max(...localities.map((l: any) => l.avgRent || 0));
 
   return (
     <section className="py-5 sm:py-14 bg-gray-50">
@@ -275,9 +302,11 @@ export default function CityPriceSnapshot() {
             <div className="space-y-4">
               <PriceGauge
                 avgPsf={snap.avgPricePerSqft}
+                avgMonthlyRent={snap.avgMonthlyRent}
                 trend={snap.trend}
                 trendPct={snap.trendPct}
                 listingCount={snap.listingCount}
+                totalListingCount={snap.totalListingCount ?? 0}
               />
               <BuyVsRentCard city={activeCity} snap={snap} />
             </div>
@@ -285,8 +314,12 @@ export default function CityPriceSnapshot() {
             {/* Right: Locality bars */}
             <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
               <div className="flex items-center justify-between mb-5">
-                <h3 className="font-bold text-gray-900 text-sm">Top Localities by Price/Sqft</h3>
-                <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">₹/sqft</span>
+                <h3 className="font-bold text-gray-900 text-sm">
+                  {hasPsfData ? 'Top Localities by Price/Sqft' : 'Top Localities by Monthly Rent'}
+                </h3>
+                <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">
+                  {hasPsfData ? '₹/sqft' : '₹/mo'}
+                </span>
               </div>
 
               {localities.length === 0 ? (
@@ -295,16 +328,22 @@ export default function CityPriceSnapshot() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {localities.map((loc: any) => (
-                    <LocalityBar
-                      key={loc.name}
-                      name={loc.name}
-                      psf={loc.avgPsf}
-                      maxPsf={maxPsf}
-                      trend={loc.trend}
-                      city={activeCity}
-                    />
-                  ))}
+                  {localities.map((loc: any) => {
+                    const locValue = hasPsfData
+                      ? (loc.medianPsf || loc.avgPsf || 0)
+                      : (loc.avgRent || 0);
+                    return (
+                      <LocalityBar
+                        key={loc.name}
+                        name={loc.name}
+                        value={locValue}
+                        maxValue={maxPsf}
+                        trend={loc.trend}
+                        city={activeCity}
+                        isRent={!hasPsfData}
+                      />
+                    );
+                  })}
                 </div>
               )}
 
@@ -320,7 +359,7 @@ export default function CityPriceSnapshot() {
                   <TrendingDown className="w-3 h-3 text-red-500"  /> Falling
                 </span>
                 <span className="ml-auto text-[10px]">
-                  Based on {snap.listingCount.toLocaleString('en-IN')} buy listings (last 90d)
+                  Based on {fmtINR(snap.totalListingCount ?? snap.listingCount, 0)} active listings (last 90d)
                   {snap.lastUpdated && ` · Updated ${new Date(snap.lastUpdated).toLocaleDateString('en-IN')}`}
                 </span>
               </div>
