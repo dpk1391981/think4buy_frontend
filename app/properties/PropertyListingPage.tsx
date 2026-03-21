@@ -19,6 +19,7 @@ import { PropertyGridSkeleton, InlineLoader } from '@/components/skeleton';
 
 // ssr:false — FilterPanel uses useSearchParams + renders SVG icons that differ on server/client
 const FilterPanel = dynamic(() => import('@/components/search/FilterPanel'), { ssr: false });
+import { MobileFilterSheet, FilterModal } from '@/components/search/FilterPanel';
 
 const MapPropertySearch = dynamic(
   () => import('@/components/search/MapPropertySearch'),
@@ -28,6 +29,7 @@ const MapPropertySearch = dynamic(
 const SORT_OPTIONS = [
   { value: 'relevance',      label: 'Relevance' },
   { value: 'createdAt:DESC', label: 'Newest First' },
+  { value: 'trending',       label: '🔥 Trending' },
   { value: 'price:ASC',      label: 'Price ↑' },
   { value: 'price:DESC',     label: 'Price ↓' },
   { value: 'area:DESC',      label: 'Area ↓' },
@@ -53,6 +55,7 @@ const FILTER_LABELS: Record<string, string> = {
   agentId: 'Agent', amenityIds: 'Amenities', listedBy: 'Posted By',
   builderName: 'Builder', isVerified: 'Verified', isNewProject: 'New Project',
   keyword: 'Search', search: 'Search', locality: 'Locality', pincode: 'Pincode',
+  isTrending: 'Trending', topAgent: 'Top Agent',
 };
 
 function formatFilterValue(key: string, value: string): string {
@@ -72,6 +75,8 @@ function formatFilterValue(key: string, value: string): string {
   if (key === 'bedrooms')     return `${value} BHK`;
   if (key === 'isVerified')   return 'Verified';
   if (key === 'isNewProject') return 'New Project';
+  if (key === 'isTrending')   return 'Trending';
+  if (key === 'topAgent')     return 'Top Agent';
   if (key === 'amenityIds')   return `${value.split(',').length} Amenities`;
   return value;
 }
@@ -88,7 +93,15 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
   const [loading, setLoading]             = useState(true);
   const [viewMode, setViewMode]           = useState<'list' | 'map'>('list');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [sortValue, setSortValue]         = useState('relevance');
+  const [showFilterModal,   setShowFilterModal]   = useState(false);
+  const [sortValue, setSortValue]         = useState(() => {
+    // Initialise from URL on first render (e.g. ?sortBy=trending from homepage)
+    const sb = propSearchParams?.sortBy as string | undefined;
+    const so = propSearchParams?.sortOrder as string | undefined;
+    if (!sb || sb === 'relevance') return 'relevance';
+    if (sb === 'trending') return 'trending';
+    return so ? `${sb}:${so}` : sb;
+  });
   const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
   const [seoContent, setSeoContent]       = useState<{
     type: 'city' | 'state'; name: string;
@@ -135,8 +148,8 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
     try {
       const params: Record<string, any> = { ...propDefaults };
       urlSearchParams.forEach((val, key) => { params[key] = val; });
-      if (sortValue === 'relevance') {
-        params.sortBy = 'relevance';
+      if (sortValue === 'relevance' || sortValue === 'trending') {
+        params.sortBy = sortValue;
       } else {
         const [sortBy, sortOrder] = sortValue.split(':');
         params.sortBy = sortBy;
@@ -222,6 +235,15 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
     router.push(`/properties?${params.toString()}`, { scroll: false });
   };
 
+  const topAgentActive = urlSearchParams.get('topAgent') === 'true';
+
+  const toggleBoolFilter = (key: string, active: boolean) => {
+    const params = new URLSearchParams(urlSearchParams.toString());
+    if (active) { params.delete(key); } else { params.set(key, 'true'); }
+    params.set('page', '1');
+    router.push(`/properties?${params.toString()}`, { scroll: false });
+  };
+
   const handlePageChange = (page: number) => {
     const params = new URLSearchParams(urlSearchParams.toString());
     params.set('page', String(page));
@@ -255,7 +277,17 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
       <div className="sticky top-16 z-30 bg-white shadow-sm border-b border-gray-100">
 
         {/* Search bar ─────────────────────────────────────────────────────── */}
-        <div className="container-max py-2 sm:py-3">
+        {/* Mobile: compact tap-to-edit input */}
+        <div className="sm:hidden px-3 py-2">
+          <SearchBar
+            size="sm"
+            initialCity={city}
+            initialSearch={search}
+            initialKeyword={keyword}
+          />
+        </div>
+        {/* Desktop: full search bar */}
+        <div className="hidden sm:block container-max py-3">
           <SearchBar
             size="sm"
             initialCity={city}
@@ -265,17 +297,19 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
           />
         </div>
 
-        {/* Mobile toolbar: Filter + Sort + Count  (hidden on lg+) ─────────── */}
+        {/* Mobile toolbar: Filter + Sort + Quick chips  (hidden on lg+) ────── */}
         <div className="lg:hidden border-t border-gray-100">
+
+          {/* Row 1: Filter pill + Sort + Count */}
           <div className="flex items-center gap-2 px-3 py-2">
 
             {/* Filter button */}
             <button
               onClick={() => setShowMobileFilters(true)}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors flex-shrink-0',
+                'flex items-center gap-1.5 h-9 px-3.5 rounded-2xl text-xs font-bold border-2 transition-all active:scale-95 flex-shrink-0',
                 activeFilters.length > 0
-                  ? 'bg-primary-600 text-white border-primary-600'
+                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm shadow-primary-600/30'
                   : 'border-gray-200 text-gray-700 bg-white',
               )}
             >
@@ -288,39 +322,64 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
               )}
             </button>
 
-            {/* Sort */}
+            {/* Sort select */}
             <div className="relative flex-1">
               <select
                 value={sortValue}
                 onChange={e => setSortValue(e.target.value)}
-                className="w-full appearance-none pl-2.5 pr-6 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary-400"
+                className="w-full appearance-none h-9 pl-3 pr-6 border-2 border-gray-200 rounded-2xl text-xs font-semibold text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400"
               >
                 {SORT_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
             </div>
 
-            {/* Count */}
-            <span className="text-xs text-gray-500 flex-shrink-0 font-medium tabular-nums">
-              {totalStr}
-            </span>
+            {/* Result count badge */}
+            <div className="flex-shrink-0 h-9 px-3 rounded-2xl bg-gray-100 flex items-center">
+              <span className="text-xs text-gray-600 font-semibold tabular-nums">{totalStr}</span>
+            </div>
           </div>
 
-          {/* Active filter chips — horizontal scroll */}
-          {dedupedFilters.length > 0 && (
-            <div className="flex items-center gap-1.5 px-3 pb-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {dedupedFilters.map(([key, value]) => (
-                <button
-                  key={key}
-                  onClick={() => removeFilter(key)}
-                  className="flex-shrink-0 flex items-center gap-1 bg-primary-50 text-primary-700 border border-primary-200 text-[11px] font-semibold px-2.5 py-1 rounded-full"
-                >
-                  {FILTER_LABELS[key] || key}: {formatFilterValue(key, value)}
-                  <X className="w-3 h-3" />
-                </button>
-              ))}
+          {/* Row 2: Quick filter chips (horizontal scroll) */}
+          <div className="flex items-center gap-2 px-3 pb-2.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <button
+              onClick={() => setSortValue(sortValue === 'trending' ? 'relevance' : 'trending')}
+              className={cn(
+                'flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold h-7 px-3 rounded-full border-2 transition-all active:scale-95',
+                sortValue === 'trending'
+                  ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-400/40'
+                  : 'bg-white text-gray-600 border-gray-200',
+              )}
+            >
+              🔥 Trending
+            </button>
+            <button
+              onClick={() => toggleBoolFilter('topAgent', topAgentActive)}
+              className={cn(
+                'flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold h-7 px-3 rounded-full border-2 transition-all active:scale-95',
+                topAgentActive
+                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm shadow-primary-600/30'
+                  : 'bg-white text-gray-600 border-gray-200',
+              )}
+            >
+              ⭐ Top Agent
+            </button>
+
+            {/* Active filter chips inline */}
+            {dedupedFilters.map(([key, value]) => (
+              <button
+                key={key}
+                onClick={() => removeFilter(key)}
+                className="flex-shrink-0 flex items-center gap-1 bg-primary-600 text-white text-[11px] font-bold h-7 px-3 rounded-full active:scale-95 transition-all"
+              >
+                {formatFilterValue(key, value)}
+                <X className="w-3 h-3 opacity-80" />
+              </button>
+            ))}
+
+            {dedupedFilters.length > 1 && (
               <button
                 onClick={() => {
                   const params = new URLSearchParams();
@@ -328,12 +387,12 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
                   if (city) params.set('city', city);
                   router.push(`/properties?${params.toString()}`);
                 }}
-                className="flex-shrink-0 text-[11px] text-red-500 font-semibold px-2 whitespace-nowrap"
+                className="flex-shrink-0 text-[11px] text-red-500 font-bold h-7 px-2 whitespace-nowrap active:opacity-70"
               >
                 Clear all
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
       {/* ══ end sticky block ══════════════════════════════════════════════════ */}
@@ -380,6 +439,14 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
           {/* Desktop sidebar ─────────────────────────────────────────────── */}
           {viewMode === 'list' && (
             <div className="hidden lg:block w-[260px] flex-shrink-0 sticky top-[125px] self-start h-[calc(100vh-133px)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent pb-4">
+              {/* Expand to modal button */}
+              <button
+                onClick={() => setShowFilterModal(true)}
+                className="w-full flex items-center justify-center gap-2 mb-3 py-2.5 border-2 border-dashed border-primary-200 text-primary-600 rounded-2xl text-sm font-semibold hover:border-primary-400 hover:bg-primary-50 transition-all group"
+              >
+                <SlidersHorizontal className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
+                Open Full Filter Panel
+              </button>
               <FilterPanel />
             </div>
           )}
@@ -402,7 +469,48 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
               </div>
 
               {/* Desktop controls */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* All Filters modal trigger */}
+                <button
+                  onClick={() => setShowFilterModal(true)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors',
+                    activeFilters.length > 0
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400 hover:text-primary-600',
+                  )}
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                  Filters
+                  {activeFilters.length > 0 && (
+                    <span className="bg-white text-primary-700 text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center leading-none">
+                      {activeFilters.length}
+                    </span>
+                  )}
+                </button>
+                {/* Quick-filter toggles */}
+                <button
+                  onClick={() => setSortValue(sortValue === 'trending' ? 'relevance' : 'trending')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors',
+                    sortValue === 'trending'
+                      ? 'bg-orange-500 text-white border-orange-500'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-orange-400 hover:text-orange-600',
+                  )}
+                >
+                  🔥 Trending
+                </button>
+                <button
+                  onClick={() => toggleBoolFilter('topAgent', topAgentActive)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors',
+                    topAgentActive
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400 hover:text-primary-600',
+                  )}
+                >
+                  ⭐ Top Agent
+                </button>
                 {viewMode !== 'map' && (
                   <div className="relative">
                     <select
@@ -636,45 +744,19 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
         </div>
       </div>
 
-      {/* ── Mobile Filter Drawer ─────────────────────────────────────────── */}
-      {showMobileFilters && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
-            onClick={() => setShowMobileFilters(false)}
-          />
-          <div className="absolute right-0 top-0 bottom-0 w-[85vw] max-w-sm bg-white shadow-2xl flex flex-col">
-            <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal className="w-4 h-4 text-primary-600" />
-                <span className="font-bold text-gray-900">Filters</span>
-                {activeFilters.length > 0 && (
-                  <span className="bg-primary-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                    {activeFilters.length}
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => setShowMobileFilters(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100"
-              >
-                <X className="w-4 h-4 text-gray-600" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <FilterPanel className="m-4 border-0 shadow-none" />
-            </div>
-            <div className="border-t border-gray-100 p-4 bg-white flex-shrink-0">
-              <button
-                className="w-full bg-primary-600 text-white font-bold py-3.5 rounded-2xl text-sm"
-                onClick={() => setShowMobileFilters(false)}
-              >
-                Show {data?.meta.total?.toLocaleString('en-IN') || ''} Properties
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── Mobile Filter Sheet ──────────────────────────────────────────── */}
+      <MobileFilterSheet
+        open={showMobileFilters}
+        onClose={() => setShowMobileFilters(false)}
+        totalCount={data?.meta.total}
+      />
+
+      {/* ── Desktop Filter Modal ─────────────────────────────────────────── */}
+      <FilterModal
+        open={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        totalCount={data?.meta.total}
+      />
 
     </div>
   );

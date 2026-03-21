@@ -54,41 +54,46 @@ export default function AgentCallCTA({ phone, email, agentId, agentName, variant
   }, [user, agentId]);
 
   if (variant === 'mobile-bar') {
-    // ── Fixed floating bar above MobileBottomNav (which is lg:hidden z-50) ────
+    // ── Fixed floating bar above MobileBottomNav ─────────────────────────────
     return (
-      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-[55] bg-white border-t border-gray-200 shadow-2xl">
-        <div className="flex items-center gap-2 px-3 py-3">
-          {cleanPhone ? (
-            <CallButton
-              phone={`+91${cleanPhone}`}
-              agentId={agentId}
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-600 text-white rounded-xl font-bold text-sm active:scale-95 transition-all"
-            >
-              <Phone className="w-4 h-4" /> Call
-            </CallButton>
-          ) : null}
+      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-[55]">
+        <div className="bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-8px_32px_rgba(0,0,0,0.13)]">
+          <div className="flex items-center gap-2 px-3 py-3">
+            {cleanPhone ? (
+              <CallButton
+                phone={`+91${cleanPhone}`}
+                agentId={agentId}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 bg-primary-600 text-white rounded-2xl font-bold active:scale-95 transition-all shadow-md shadow-primary-600/30"
+              >
+                <Phone className="w-4 h-4" />
+                <span className="text-[11px] font-bold">Call</span>
+              </CallButton>
+            ) : null}
 
-          {waLink ? (
-            <a
-              href={waLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => captureLead('whatsapp')}
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#25D366] text-white rounded-xl font-bold text-sm active:scale-95 transition-all"
-            >
-              <WhatsAppIcon className="w-4 h-4" /> WhatsApp
-            </a>
-          ) : null}
+            {waLink ? (
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => captureLead('whatsapp')}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 bg-[#25D366] text-white rounded-2xl font-bold active:scale-95 transition-all shadow-md shadow-[#25D366]/30"
+              >
+                <WhatsAppIcon className="w-4 h-4" />
+                <span className="text-[11px] font-bold">WhatsApp</span>
+              </a>
+            ) : null}
 
-          {email && !cleanPhone && !waLink && (
-            <a
-              href={`mailto:${email}`}
-              onClick={() => captureLead('contact_form')}
-              className="flex-1 flex items-center justify-center gap-2 py-3 border border-gray-200 text-gray-700 rounded-xl font-bold text-sm"
-            >
-              <Mail className="w-4 h-4" /> Email
-            </a>
-          )}
+            {email && (
+              <a
+                href={`mailto:${email}`}
+                onClick={() => captureLead('contact_form')}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 bg-gray-900 text-white rounded-2xl font-bold active:scale-95 transition-all shadow-md shadow-gray-900/20"
+              >
+                <Mail className="w-4 h-4" />
+                <span className="text-[11px] font-bold">Email</span>
+              </a>
+            )}
+          </div>
         </div>
       </div>
     );

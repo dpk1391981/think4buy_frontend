@@ -83,6 +83,11 @@ export default function PropertyDetailClient({ property }: Props) {
   const [showFullscreen, setShowFullscreen] = useState(false);
   const touchStartX = useRef<number | null>(null);
 
+  // Mount guard — prevents user-conditional rendering hydration mismatch
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const isLoggedIn = mounted && !!user;
+
   // Contact
   const [showPhone, setShowPhone] = useState(false);
   const [showInquiryModal, setShowInquiryModal] = useState(false);
@@ -329,17 +334,17 @@ export default function PropertyDetailClient({ property }: Props) {
   ];
 
   // ── Inquiry Form render ─────────────────────────────────────────────────────
-  const renderInquiryForm = ({ onClose }: { onClose?: () => void } = {}) => {
-    if (!user) return (
-      <div className="text-center py-4">
-        <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
-          <Lock className="w-6 h-6 text-blue-500" />
+  const renderInquiryForm = ({ onClose, hideSubmit }: { onClose?: () => void; hideSubmit?: boolean } = {}) => {
+    if (!isLoggedIn) return (
+      <div className="text-center py-6">
+        <div className="w-14 h-14 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-3">
+          <Lock className="w-7 h-7 text-primary-500" />
         </div>
         <p className="font-bold text-gray-900 mb-1">Login to Contact {isAgent ? 'Agent' : 'Owner'}</p>
-        <p className="text-sm text-gray-500 mb-4">Sign in to send inquiry, schedule visit or negotiate price.</p>
+        <p className="text-sm text-gray-500 mb-5">Sign in to send inquiry, schedule visit or negotiate price.</p>
         <button type="button"
           onClick={() => { dispatch(openAuthModal({ mode: 'login' })); if (onClose) onClose(); }}
-          className="w-full py-3 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition-colors">
+          className="w-full py-3.5 bg-primary-600 text-white rounded-2xl text-sm font-bold hover:bg-primary-700 transition-colors">
           Login / Sign Up — It's Free
         </button>
         <p className="text-xs text-gray-400 mt-2">Details auto-filled after login.</p>
@@ -347,62 +352,66 @@ export default function PropertyDetailClient({ property }: Props) {
     );
 
     if (submitted) return (
-      <div className="text-center py-6">
-        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-          <CheckCircle className="w-7 h-7 text-green-600" />
+      <div className="text-center py-8">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle className="w-9 h-9 text-green-600" />
         </div>
         <p className="font-bold text-gray-900 text-lg mb-1">Inquiry Sent!</p>
-        <p className="text-sm text-gray-500">The {isAgent ? 'agent' : 'owner'} will contact you shortly.</p>
+        <p className="text-sm text-gray-500 mb-5">The {isAgent ? 'agent' : 'owner'} will contact you shortly.</p>
         {onClose && (
-          <button onClick={onClose} className="mt-4 px-8 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold">Done</button>
+          <button onClick={onClose} className="px-10 py-3 bg-primary-600 text-white rounded-2xl text-sm font-bold">Done</button>
         )}
       </div>
     );
 
     const isAutoFilled = !!(user as any)?.name && !!(user as any)?.phone;
     return (
-      <form onSubmit={handleInquiry} className="space-y-3">
+      <form id="inquiry-form" onSubmit={handleInquiry} className="space-y-3">
         {isAutoFilled && (
-          <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+          <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5">
             <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" /> Details auto-filled from your profile
           </div>
         )}
         <div className="flex gap-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold">
           {(['general', 'site_visit', 'price_negotiation'] as const).map(t => (
             <button key={t} type="button" onClick={() => setInquiryType(t)}
-              className={cn('flex-1 py-1.5 rounded-lg transition-colors',
+              className={cn('flex-1 py-2 rounded-lg transition-colors',
                 inquiryType === t ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
-              {t === 'general' ? 'General' : t === 'site_visit' ? '📅 Visit' : '💬 Negotiate'}
+              {t === 'general' ? '💬 General' : t === 'site_visit' ? '📅 Visit' : '🤝 Negotiate'}
             </button>
           ))}
         </div>
         <input type="text" placeholder="Your Name *" required value={inquiryForm.name}
           onChange={e => setInquiryForm(f => ({ ...f, name: e.target.value }))}
-          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white" />
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white" />
         <input type="tel" placeholder="Phone Number *" required value={inquiryForm.phone}
           onChange={e => setInquiryForm(f => ({ ...f, phone: e.target.value }))}
-          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white" />
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white" />
         <input type="email" placeholder="Email (optional)" value={inquiryForm.email}
           onChange={e => setInquiryForm(f => ({ ...f, email: e.target.value }))}
-          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white" />
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white" />
         <textarea placeholder={
             inquiryType === 'site_visit' ? 'Preferred date & time for site visit…'
             : inquiryType === 'price_negotiation' ? 'Your offer or budget…'
             : 'Your message (optional)…'}
-          rows={2} value={inquiryForm.message}
+          rows={3} value={inquiryForm.message}
           onChange={e => setInquiryForm(f => ({ ...f, message: e.target.value }))}
-          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-400 resize-none bg-white" />
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary-400 resize-none bg-white" />
         {inquiryError && (
-          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{inquiryError}</p>
+          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">{inquiryError}</p>
         )}
-        <button type="submit" disabled={submitting}
-          className="w-full py-3 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
-          {submitting
-            ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending…</>
-            : <><Send className="w-4 h-4" /> {inquiryType === 'site_visit' ? 'Request Site Visit' : inquiryType === 'price_negotiation' ? 'Send Offer' : 'Send Inquiry'}</>
-          }
-        </button>
-        <p className="text-[10px] text-gray-400 text-center">By submitting you agree to our Privacy Policy.</p>
+        {!hideSubmit && (
+          <>
+            <button type="submit" disabled={submitting}
+              className="w-full py-3.5 bg-primary-600 text-white rounded-2xl text-sm font-bold hover:bg-primary-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+              {submitting
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending…</>
+                : <><Send className="w-4 h-4" /> {inquiryType === 'site_visit' ? 'Request Site Visit' : inquiryType === 'price_negotiation' ? 'Send Offer' : 'Send Inquiry'}</>
+              }
+            </button>
+            <p className="text-[10px] text-gray-400 text-center">By submitting you agree to our Privacy Policy.</p>
+          </>
+        )}
       </form>
     );
   };
@@ -649,7 +658,7 @@ export default function PropertyDetailClient({ property }: Props) {
                 </button>
 
                 {/* Edit listing (owner/admin) */}
-                {user && ((user as any).id === owner?.id || (user as any).role === 'admin') && (
+                {isLoggedIn && ((user as any).id === owner?.id || (user as any).role === 'admin') && (
                   <Link href={`/post-property?edit=${property.id}`}
                     className="absolute bottom-4 right-4 flex items-center gap-1.5 px-3 py-2 bg-white text-gray-800 rounded-full text-xs font-semibold hover:bg-gray-100 shadow-lg">
                     <Pencil className="w-3.5 h-3.5" /> Edit Listing
@@ -735,7 +744,7 @@ export default function PropertyDetailClient({ property }: Props) {
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {/* Call */}
-                  {user ? (
+                  {isLoggedIn ? (
                     <a href={phone ? `tel:${phone}` : '#'}
                       onClick={() => {
                         trackPropertyInquiry(property.id, { city: property.city || undefined });
@@ -751,7 +760,7 @@ export default function PropertyDetailClient({ property }: Props) {
                     </button>
                   )}
                   {/* WhatsApp */}
-                  {waLink && user ? (
+                  {waLink && isLoggedIn ? (
                     <a href={waLink} target="_blank" rel="noopener noreferrer"
                       onClick={() => captureContactLead('whatsapp')}
                       className="flex items-center justify-center gap-2 py-3 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] active:scale-95 transition-all">
@@ -956,7 +965,7 @@ export default function PropertyDetailClient({ property }: Props) {
                   {/* Contact actions */}
                   <div className="flex flex-wrap gap-2">
                     {phone && (
-                      user ? (
+                      isLoggedIn ? (
                         <a href={`tel:${phone}`} onClick={() => captureContactLead('call')}
                           className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition-colors">
                           <Phone className="w-4 h-4" /> Call Now
@@ -969,7 +978,7 @@ export default function PropertyDetailClient({ property }: Props) {
                       )
                     )}
                     {waLink && (
-                      user ? (
+                      isLoggedIn ? (
                         <a href={waLink} target="_blank" rel="noopener noreferrer" onClick={() => captureContactLead('whatsapp')}
                           className="flex items-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] transition-colors">
                           <WhatsAppIcon className="w-4 h-4" /> WhatsApp
@@ -1255,7 +1264,7 @@ export default function PropertyDetailClient({ property }: Props) {
                   {/* Contact buttons */}
                   <div className="p-4 space-y-3">
                     {/* Phone */}
-                    {!user ? (
+                    {!isLoggedIn ? (
                       <button onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
                         className="flex items-center justify-center gap-2 w-full py-3 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition-colors">
                         <Lock className="w-4 h-4" /> Login to View Phone Number
@@ -1275,7 +1284,7 @@ export default function PropertyDetailClient({ property }: Props) {
 
                     {/* WhatsApp — prominent green */}
                     {waLink ? (
-                      user ? (
+                      isLoggedIn ? (
                         <a href={waLink} target="_blank" rel="noopener noreferrer"
                           onClick={() => captureContactLead('whatsapp')}
                           className="flex items-center justify-center gap-2.5 w-full py-3 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] transition-colors shadow-md shadow-green-200">
@@ -1314,78 +1323,122 @@ export default function PropertyDetailClient({ property }: Props) {
 
       {/* ── Mobile Sticky Bottom Bar ──────────────────────────────────────────── */}
       {!isInactiveListing && (
-        <div className="lg:hidden fixed bottom-16 left-0 right-0 z-[55] bg-white border-t border-gray-200 shadow-2xl">
-          <div className="flex items-center gap-2 px-3 py-3">
-            {/* Call */}
-            {user ? (
-              <a href={phone ? `tel:${phone}` : '#'}
-                onClick={() => {
-                  if (phone) {
-                    trackPropertyInquiry(property.id, { city: property.city || undefined });
-                    captureContactLead('call');
-                  }
-                }}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 active:scale-95 transition-all">
-                <Phone className="w-4 h-4" /> Call
-              </a>
-            ) : (
-              <button onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-600 text-white rounded-xl text-sm font-bold active:scale-95 transition-all">
-                <Lock className="w-4 h-4" /> Call
-              </button>
-            )}
+        <div className="lg:hidden fixed bottom-16 left-0 right-0 z-[55]">
+          <div className="bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-8px_32px_rgba(0,0,0,0.13)]">
+            {/* Mini contact info strip */}
+            <div className="flex items-center gap-2.5 px-4 pt-2.5 pb-1.5 border-b border-gray-100">
+              <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center overflow-hidden flex-shrink-0 ring-2 ring-primary-200">
+                {(owner as any)?.profileImage
+                  ? <img src={resolveImageUrl((owner as any).profileImage)} className="w-full h-full object-cover" alt="" />
+                  : <UserCircle className="w-4 h-4 text-primary-600" />
+                }
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{owner?.name || 'Property Owner'}</p>
+                <p className="text-[10px] text-gray-400 leading-tight">{isAgent ? '🏅 Verified Agent' : '🏠 Owner'}</p>
+              </div>
+              {property.isVerified && (
+                <span className="flex-shrink-0 text-[10px] bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5 font-semibold">
+                  ✓ Verified
+                </span>
+              )}
+            </div>
 
-            {/* WhatsApp */}
-            {waLink ? (
-              user ? (
-                <a href={waLink} target="_blank" rel="noopener noreferrer"
-                  onClick={() => captureContactLead('whatsapp')}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#25D366] text-white rounded-xl text-sm font-bold hover:bg-[#1ebe5d] active:scale-95 transition-all">
-                  <WhatsAppIcon className="w-4 h-4" /> WhatsApp
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 px-3 py-2.5">
+              {/* Call */}
+              {isLoggedIn ? (
+                <a href={phone ? `tel:${phone}` : '#'}
+                  onClick={() => {
+                    if (phone) {
+                      trackPropertyInquiry(property.id, { city: property.city || undefined });
+                      captureContactLead('call');
+                    }
+                  }}
+                  className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 bg-primary-600 text-white rounded-2xl font-bold active:scale-95 transition-all shadow-md shadow-primary-600/30">
+                  <Phone className="w-4 h-4" />
+                  <span className="text-[11px] font-bold">Call</span>
                 </a>
               ) : (
                 <button onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#25D366] text-white rounded-xl text-sm font-bold active:scale-95 transition-all">
-                  <WhatsAppIcon className="w-4 h-4" /> WhatsApp
+                  className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 bg-primary-600 text-white rounded-2xl font-bold active:scale-95 transition-all shadow-md shadow-primary-600/30">
+                  <Phone className="w-4 h-4" />
+                  <span className="text-[11px] font-bold">Call</span>
                 </button>
-              )
-            ) : null}
+              )}
 
-            {/* Enquire */}
-            <button onClick={() => openInquiryModal('general')}
-              className={cn(
-                'flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold active:scale-95 transition-all',
-                (!phone && !waLink) ? 'flex-1 bg-primary-600 text-white' : 'px-4 border-2 border-gray-200 text-gray-700 hover:bg-gray-50',
-              )}>
-              <Send className="w-4 h-4" /> {(!phone && !waLink) ? 'Send Inquiry' : 'Enquire'}
-            </button>
+              {/* WhatsApp */}
+              {isLoggedIn ? (
+                <a href={waLink || '#'} target="_blank" rel="noopener noreferrer"
+                  onClick={() => { if (waLink) captureContactLead('whatsapp'); }}
+                  className={cn(
+                    'flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 rounded-2xl font-bold active:scale-95 transition-all shadow-md',
+                    waLink ? 'bg-[#25D366] text-white shadow-[#25D366]/30' : 'bg-gray-100 text-gray-400',
+                  )}>
+                  <WhatsAppIcon className="w-4 h-4" />
+                  <span className="text-[11px] font-bold">WhatsApp</span>
+                </a>
+              ) : (
+                <button onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                  className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 bg-[#25D366] text-white rounded-2xl font-bold active:scale-95 transition-all shadow-md shadow-[#25D366]/30">
+                  <WhatsAppIcon className="w-4 h-4" />
+                  <span className="text-[11px] font-bold">WhatsApp</span>
+                </button>
+              )}
+
+              {/* Enquire */}
+              <button onClick={() => openInquiryModal('general')}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 bg-gray-900 text-white rounded-2xl font-bold active:scale-95 transition-all shadow-md shadow-gray-900/20">
+                <Send className="w-4 h-4" />
+                <span className="text-[11px] font-bold">Enquire</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* ── Inquiry Modal ─────────────────────────────────────────────────────── */}
       {showInquiryModal && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end md:justify-center md:items-center md:p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => setShowInquiryModal(false)} />
-          <div className="relative bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full md:max-w-lg max-h-[92dvh] flex flex-col">
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end md:justify-center md:items-center md:p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={() => setShowInquiryModal(false)} />
+          <div className="relative bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full md:max-w-lg max-h-[88dvh] flex flex-col">
+            {/* Drag handle — mobile only */}
             <div className="flex justify-center pt-3 pb-1 flex-shrink-0 md:hidden">
-              <div className="w-10 h-1 bg-gray-300 rounded-full" />
+              <div className="w-10 h-1.5 bg-gray-200 rounded-full" />
             </div>
+            {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
               <div>
-                <h3 className="font-bold text-gray-900">
-                  {inquiryType === 'site_visit' ? '📅 Schedule a Visit' : inquiryType === 'price_negotiation' ? '💬 Negotiate Price' : `Contact ${isAgent ? 'Agent' : 'Owner'}`}
+                <h3 className="font-bold text-gray-900 text-base">
+                  {inquiryType === 'site_visit' ? '📅 Schedule a Visit' : inquiryType === 'price_negotiation' ? '🤝 Negotiate Price' : `Contact ${isAgent ? 'Agent' : 'Owner'}`}
                 </h3>
-                <p className="text-xs text-gray-500">{isAgent ? (owner?.company || owner?.name) : owner?.name} · {property.title.slice(0, 40)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{isAgent ? (owner?.company || owner?.name) : owner?.name} · {property.title.slice(0, 35)}</p>
               </div>
               <button onClick={() => setShowInquiryModal(false)}
-                className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 active:scale-90 transition-all">
                 <X className="w-4 h-4 text-gray-600" />
               </button>
             </div>
+            {/* Scrollable form fields */}
             <div className="overflow-y-auto flex-1 px-5 py-4">
-              {renderInquiryForm({ onClose: () => setShowInquiryModal(false) })}
+              {renderInquiryForm({ onClose: () => setShowInquiryModal(false), hideSubmit: !!(isLoggedIn && !submitted) })}
             </div>
+            {/* Sticky submit footer — only shown when user is logged in and not yet submitted */}
+            {isLoggedIn && !submitted && (
+              <div className="flex-shrink-0 px-5 py-4 border-t border-gray-100 bg-white rounded-b-3xl md:rounded-b-2xl">
+                <button
+                  type="submit"
+                  form="inquiry-form"
+                  disabled={submitting}
+                  className="w-full py-4 bg-primary-600 text-white rounded-2xl text-sm font-bold hover:bg-primary-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-primary-600/25">
+                  {submitting
+                    ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending…</>
+                    : <><Send className="w-4 h-4" /> {inquiryType === 'site_visit' ? 'Request Site Visit' : inquiryType === 'price_negotiation' ? 'Send Offer' : 'Send Inquiry'}</>
+                  }
+                </button>
+                <p className="text-[10px] text-gray-400 text-center mt-2">By submitting you agree to our Privacy Policy.</p>
+              </div>
+            )}
           </div>
         </div>
       )}

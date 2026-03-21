@@ -829,9 +829,8 @@ function MobileSearch({
   const [bhk, setBhk]       = useState<string[]>([]);
   const [budget, setBudget] = useState<(typeof BUDGET_BUY)[0] | null>(null);
   const [type, setType]     = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [detecting, setDetecting]     = useState(false);
-  const [detectErr, setDetectErr]     = useState('');
+  const [detecting, setDetecting] = useState(false);
+  const [detectErr, setDetectErr] = useState('');
 
   const [localTypes, setLocalTypes] = useState<PropType[]>(allTypes);
   const typeCache = useRef<Record<string, PropType[]>>({});
@@ -848,10 +847,10 @@ function MobileSearch({
 
   const isAgent      = cat === 'agents';
   const isNewProject = cat === 'new_projects';
-  const budgets    = (cat === 'rent' || cat === 'pg') ? BUDGET_RENT : BUDGET_BUY;
-  const types      = localTypes;
-  const showBHK    = !isAgent && !isNewProject && cat !== 'commercial';
-  const filterCount = [type, bhk.length > 0, budget].filter(Boolean).length;
+  const budgets      = (cat === 'rent' || cat === 'pg') ? BUDGET_RENT : BUDGET_BUY;
+  const types        = localTypes;
+  const showBHK      = !isAgent && !isNewProject && cat !== 'commercial';
+  const filterCount  = [type, bhk.length > 0, budget].filter(Boolean).length;
 
   useEffect(() => {
     window.history.pushState({ msearch: true }, '');
@@ -885,20 +884,20 @@ function MobileSearch({
       router.push(`/agents?${p}`);
     } else if (isNewProject) {
       const p = new URLSearchParams({ isNewProject: 'true' });
-      if (c)        p.set('city', c);
-      if (locality) p.set('locality', locality);
+      if (c)           p.set('city', c);
+      if (locality)    p.set('locality', locality);
       if (budget?.min) p.set('minPrice', String(budget.min));
       if (budget?.max) p.set('maxPrice', String(budget.max));
-      if (type) p.set('type', type);
+      if (type)        p.set('type', type);
       router.push(`/properties?${p}`);
     } else {
       const p = new URLSearchParams({ category: cat });
-      if (c)        p.set('city', c);
-      if (locality) p.set('locality', locality);
-      if (bhk.length) p.set('bedrooms', bhk.join(','));
-      if (budget?.min) p.set('minPrice', String(budget.min));
-      if (budget?.max) p.set('maxPrice', String(budget.max));
-      if (type) p.set('type', type);
+      if (c)             p.set('city', c);
+      if (locality)      p.set('locality', locality);
+      if (bhk.length)    p.set('bedrooms', bhk.join(','));
+      if (budget?.min)   p.set('minPrice', String(budget.min));
+      if (budget?.max)   p.set('maxPrice', String(budget.max));
+      if (type)          p.set('type', type);
       router.push(`/properties?${p}`);
     }
     onClose();
@@ -931,33 +930,53 @@ function MobileSearch({
   if (!mounted) return null;
 
   const panel = (
-    <div className="fixed inset-0 flex flex-col bg-gray-50" style={{ zIndex: 9999, height: '100dvh' }}>
+    <div className="fixed inset-0 flex flex-col" style={{ zIndex: 9999, height: '100dvh', background: '#f8fafc' }}>
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 px-4 pt-4 pb-4">
+      <div className="flex-shrink-0 bg-gradient-to-b from-slate-900 to-primary-900 px-4 pt-safe-top pb-0">
 
-        {/* Back + title row */}
-        <div className="flex items-center gap-3 mb-4">
+        {/* Top row: Back + title + GPS */}
+        <div className="flex items-center gap-3 pt-4 pb-3">
           <button
             onClick={close}
-            className="w-10 h-10 rounded-xl bg-white/15 active:bg-white/25 flex items-center justify-center flex-shrink-0 transition-colors"
+            className="w-10 h-10 rounded-2xl bg-white/10 active:bg-white/20 flex items-center justify-center flex-shrink-0 transition-colors"
             aria-label="Close"
           >
             <ArrowLeft className="w-5 h-5 text-white" />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-white font-bold text-[15px] leading-tight">
+            <p className="text-white font-bold text-base leading-tight">
               {isAgent ? 'Find Agents' : isNewProject ? 'New Projects' : 'Search Properties'}
             </p>
-            <p className="text-white/55 text-xs mt-0.5">City, locality or project name</p>
+            <p className="text-white/50 text-xs mt-0.5">
+              {isAgent ? 'Find agents by city or state' : 'City, locality or project name'}
+            </p>
           </div>
+          <button
+            onClick={handleDetect}
+            disabled={detecting}
+            className={cn(
+              'flex items-center gap-1.5 h-9 px-3 rounded-2xl border text-xs font-bold flex-shrink-0 transition-all active:scale-95',
+              detectErr
+                ? 'bg-red-900/30 border-red-500/40 text-red-300'
+                : detecting
+                ? 'bg-white/10 border-white/20 text-white/70'
+                : 'bg-white/10 border-white/20 text-white active:bg-white/20',
+            )}
+          >
+            {detecting
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <LocateFixed className="w-3.5 h-3.5" />
+            }
+            <span>{detecting ? '…' : detectErr ? 'Retry' : 'Near Me'}</span>
+          </button>
         </div>
 
-        {/* Search input row */}
-        <div className="flex items-center gap-2 bg-white rounded-2xl pl-4 pr-3 shadow-xl" style={{ height: 50 }}>
+        {/* Search input */}
+        <div className="flex items-center bg-white rounded-2xl pl-4 pr-2 shadow-2xl shadow-black/30" style={{ height: 52 }}>
           {busy
-            ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />
-            : <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            ? <Loader2 className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0 mr-2" />
+            : <Search className="w-4 h-4 text-primary-500 flex-shrink-0 mr-2" />
           }
           <input
             ref={inputRef}
@@ -977,46 +996,24 @@ function MobileSearch({
               debRef.current = setTimeout(() => fetchLocs(e.target.value), 250);
             }}
             onKeyDown={e => e.key === 'Enter' && go()}
-            className="flex-1 text-sm font-medium text-gray-900 outline-none placeholder-gray-400 min-w-0"
+            className="flex-1 text-[15px] font-medium text-gray-900 outline-none placeholder-gray-400 min-w-0"
             style={{ background: 'transparent', border: 'none', WebkitAppearance: 'none' }}
           />
-
-          {/* Inline locate button */}
-          <button
-            onClick={handleDetect}
-            disabled={detecting}
-            title={detectErr || 'Use my location'}
-            className={cn(
-              'flex items-center gap-1.5 h-8 px-3 rounded-xl border text-xs font-bold flex-shrink-0 transition-all active:scale-95',
-              detectErr
-                ? 'bg-red-50 border-red-200 text-red-500'
-                : detecting
-                ? 'bg-primary-50 border-primary-200 text-primary-500'
-                : 'bg-primary-50 border-primary-200 text-primary-600 active:bg-primary-100',
-            )}
-          >
-            {detecting
-              ? <Loader2 className="w-3 h-3 animate-spin" />
-              : <LocateFixed className={cn('w-3 h-3', detectErr ? 'text-red-400' : 'text-primary-500')} />
-            }
-            <span className="whitespace-nowrap">
-              {detecting ? '…' : detectErr ? 'Retry' : 'Locate'}
-            </span>
-          </button>
-
-          {query && (
+          {query ? (
             <button
               onClick={() => { setQuery(''); setSuggs([]); inputRef.current?.focus(); }}
-              className="w-7 h-7 rounded-full bg-gray-100 active:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors ml-1"
+              className="w-8 h-8 rounded-full bg-gray-100 active:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors"
               aria-label="Clear"
             >
-              <X className="w-3.5 h-3.5 text-gray-500" />
+              <X className="w-4 h-4 text-gray-500" />
             </button>
+          ) : (
+            <div className="w-2 flex-shrink-0" />
           )}
         </div>
 
-        {/* Category tabs */}
-        <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
+        {/* Category tabs — pill row */}
+        <div className="flex gap-1.5 py-3 overflow-x-auto no-scrollbar">
           {allTabs.map(tab => (
             <button
               key={tab.value}
@@ -1024,8 +1021,8 @@ function MobileSearch({
               className={cn(
                 'flex-shrink-0 h-8 px-4 rounded-full text-xs font-bold transition-all active:scale-95',
                 cat === tab.value
-                  ? `bg-gradient-to-r ${tab.color} text-white shadow-md`
-                  : 'bg-white/15 text-white/65 active:bg-white/25',
+                  ? 'bg-white text-gray-900 shadow-lg'
+                  : 'bg-white/12 text-white/70 active:bg-white/20',
               )}
             >
               {tab.label}
@@ -1034,10 +1031,12 @@ function MobileSearch({
         </div>
       </div>
 
-      {/* ── Content ────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto overscroll-contain bg-white" style={{ minHeight: 0 }}>
+      {/* ── Scrollable body ─────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto overscroll-contain" style={{ minHeight: 0 }}>
+
+        {/* Location suggestions when typing */}
         {query.length >= 2 ? (
-          <div>
+          <div className="bg-white">
             {suggs.length > 0 ? (
               <>
                 <SectionHeader icon={<MapPin className="w-3.5 h-3.5" />} label="Locations" />
@@ -1047,138 +1046,142 @@ function MobileSearch({
                     primary={s.locality || s.city}
                     secondary={s.locality ? `${s.city}, ${s.state}` : s.state}
                     onTap={() => go(s.city, s.locality, s.state)}
+                    count={s.propertyCount > 0 ? `${s.propertyCount}+ props` : undefined}
                   />
                 ))}
               </>
-            ) : !busy && (
+            ) : !busy ? (
               <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                 <MapPin className="w-10 h-10 mb-3 text-gray-200" />
                 <p className="text-sm font-medium">No locations found</p>
                 <p className="text-xs mt-1">Try a city or area name</p>
               </div>
-            )}
+            ) : null}
           </div>
         ) : (
           <>
-            {/* Detect my location — prominent row */}
-            <button
-              onClick={handleDetect}
-              disabled={detecting}
-              className={cn(
-                'w-full flex items-center gap-4 px-5 py-4 border-b transition-colors',
-                detectErr
-                  ? 'border-red-100 active:bg-red-50'
-                  : 'border-gray-100 active:bg-blue-50',
-              )}
-            >
-              <div className={cn(
-                'w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm',
-                detectErr
-                  ? 'bg-red-50'
-                  : 'bg-gradient-to-br from-blue-500 to-primary-600',
-              )}>
-                {detecting
-                  ? <Loader2 className="w-5 h-5 text-white animate-spin" />
-                  : detectErr
-                  ? <LocateFixed className="w-5 h-5 text-red-400" />
-                  : <LocateFixed className="w-5 h-5 text-white" />
-                }
-              </div>
-              <div className="flex-1 min-w-0 text-left">
-                <div className={cn('text-sm font-bold leading-tight', detectErr ? 'text-red-500' : 'text-primary-600')}>
-                  {detecting ? 'Detecting your location…' : detectErr ? `Failed: ${detectErr}` : 'Use my current location'}
+            {/* GPS detect + Popular Cities */}
+            <div className="bg-white">
+              <button
+                onClick={handleDetect}
+                disabled={detecting}
+                className={cn(
+                  'w-full flex items-center gap-4 px-5 py-4 border-b transition-colors',
+                  detectErr ? 'border-red-100 active:bg-red-50' : 'border-gray-100 active:bg-blue-50',
+                )}
+              >
+                <div className={cn(
+                  'w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm',
+                  detectErr ? 'bg-red-50' : 'bg-gradient-to-br from-blue-500 to-primary-600',
+                )}>
+                  {detecting
+                    ? <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    : detectErr
+                    ? <LocateFixed className="w-5 h-5 text-red-400" />
+                    : <LocateFixed className="w-5 h-5 text-white" />
+                  }
                 </div>
-                <div className="text-xs text-gray-400 mt-0.5">
-                  {detecting ? 'Please wait' : detectErr ? 'Tap to try again' : 'Auto-detect city & locality'}
-                </div>
-              </div>
-              {!detecting && (
-                <ChevronRight className={cn('w-4 h-4 flex-shrink-0', detectErr ? 'text-red-300' : 'text-gray-300')} />
-              )}
-            </button>
-
-            <SectionHeader icon={<TrendingUp className="w-3.5 h-3.5" />} label="Popular Cities" />
-            {TOP_CITIES.map(city => (
-              <LocationRow
-                key={city.name}
-                primary={city.name}
-                secondary={`${city.count} properties`}
-                onTap={() => go(city.name)}
-                dot={city.gradient}
-              />
-            ))}
-
-            {!isAgent && !isNewProject && (
-              <>
-                <button
-                  onClick={() => setShowFilters(v => !v)}
-                  className="w-full flex items-center justify-between px-5 py-3.5 mt-1 border-t border-gray-100"
-                >
-                  <div className="flex items-center gap-2">
-                    <SlidersHorizontal className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm font-bold text-gray-700">Filters</span>
-                    {filterCount > 0 && (
-                      <span className="bg-primary-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                        {filterCount}
-                      </span>
-                    )}
+                <div className="flex-1 min-w-0 text-left">
+                  <div className={cn('text-sm font-bold leading-tight', detectErr ? 'text-red-500' : 'text-primary-600')}>
+                    {detecting ? 'Detecting your location…' : detectErr ? `Failed: ${detectErr}` : 'Use my current location'}
                   </div>
-                  <span className="text-xs text-primary-600 font-semibold">{showFilters ? 'Hide' : 'Show'}</span>
-                </button>
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    {detecting ? 'Please wait' : detectErr ? 'Tap to try again' : 'Auto-detect city & locality'}
+                  </div>
+                </div>
+                {!detecting && (
+                  <ChevronRight className={cn('w-4 h-4 flex-shrink-0', detectErr ? 'text-red-300' : 'text-gray-300')} />
+                )}
+              </button>
 
-                {showFilters && (
-                  <div className="px-4 pb-4 space-y-5">
-                    <div>
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">Property Type</p>
-                      <div className="flex flex-wrap gap-2">
-                        {types.map(t => (
-                          <FilterChip key={t.slug} label={t.name} active={type === t.slug} onTap={() => setType(type === t.slug ? '' : t.slug)} />
-                        ))}
-                      </div>
-                    </div>
-                    {showBHK && (
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">BHK / Bedrooms</p>
-                        <div className="flex flex-wrap gap-2">
-                          {BHK_OPTIONS.map(b => (
-                            <FilterChip
-                              key={b.value} label={b.label}
-                              active={bhk.includes(b.value)}
-                              onTap={() => setBhk(p => p.includes(b.value) ? p.filter(x => x !== b.value) : [...p, b.value])}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">Budget</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {budgets.map(b => (
-                          <button
-                            key={b.label}
-                            onClick={() => setBudget(budget?.label === b.label ? null : b)}
-                            className={cn(
-                              'px-3 py-3 rounded-xl text-sm font-semibold border-2 text-left transition-all active:scale-95',
-                              budget?.label === b.label
-                                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                                : 'border-gray-100 bg-gray-50 text-gray-700',
-                            )}
-                          >
-                            {b.label}
-                          </button>
-                        ))}
-                      </div>
+              <SectionHeader icon={<TrendingUp className="w-3.5 h-3.5" />} label="Popular Cities" />
+              {TOP_CITIES.map(city => (
+                <LocationRow
+                  key={city.name}
+                  primary={city.name}
+                  secondary={`${city.count} properties`}
+                  onTap={() => go(city.name)}
+                  dot={city.gradient}
+                />
+              ))}
+            </div>
+
+            {/* ── Filters section — always visible ───────────────────── */}
+            {!isAgent && !isNewProject && (
+              <div className="mt-2">
+                <div className="flex items-center gap-2 px-5 pt-4 pb-3 bg-white">
+                  <SlidersHorizontal className="w-4 h-4 text-primary-500" />
+                  <span className="text-sm font-bold text-gray-800">Quick Filters</span>
+                  {filterCount > 0 && (
+                    <span className="bg-primary-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center ml-0.5">
+                      {filterCount}
+                    </span>
+                  )}
+                </div>
+
+                {/* Property Type */}
+                {types.length > 0 && (
+                  <div className="bg-white px-5 pb-4">
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2.5">Property Type</p>
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                      {types.map(t => (
+                        <FilterChip
+                          key={t.slug}
+                          label={t.name}
+                          active={type === t.slug}
+                          onTap={() => setType(type === t.slug ? '' : t.slug)}
+                        />
+                      ))}
                     </div>
                   </div>
                 )}
-              </>
+
+                {/* BHK */}
+                {showBHK && (
+                  <div className="bg-white mt-px px-5 pb-4 pt-3">
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2.5">BHK / Bedrooms</p>
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                      {BHK_OPTIONS.map(b => (
+                        <FilterChip
+                          key={b.value}
+                          label={b.label}
+                          active={bhk.includes(b.value)}
+                          onTap={() => setBhk(p => p.includes(b.value) ? p.filter(x => x !== b.value) : [...p, b.value])}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Budget */}
+                <div className="bg-white mt-px px-5 pb-5 pt-3">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2.5">Budget</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {budgets.map(b => (
+                      <button
+                        key={b.label}
+                        onClick={() => setBudget(budget?.label === b.label ? null : b)}
+                        className={cn(
+                          'px-3 py-3.5 rounded-2xl text-sm font-semibold border-2 text-left transition-all active:scale-[0.97]',
+                          budget?.label === b.label
+                            ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm shadow-primary-200'
+                            : 'border-gray-100 bg-gray-50 text-gray-700',
+                        )}
+                      >
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
+            <div className="h-4" />
           </>
         )}
-        <div className="h-4" />
       </div>
 
-      <div className="flex-shrink-0 bg-white border-t border-gray-100 px-4 py-4">
+      {/* ── Sticky footer ───────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 bg-white border-t border-gray-100 px-4 pt-3 pb-safe-bottom" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
         {filterCount > 0 && (
           <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
             {type && <ActivePill label={types.find(t => t.slug === type)?.name || type} onRemove={() => setType('')} />}
@@ -1189,12 +1192,15 @@ function MobileSearch({
         <button
           onClick={() => go()}
           className={cn(
-            'w-full h-14 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-3',
+            'w-full h-14 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-2.5',
             'bg-gradient-to-r from-primary-600 to-primary-700',
             'shadow-lg shadow-primary-600/40 active:scale-[0.98] transition-transform',
           )}
         >
-          {isAgent ? <Users className="w-5 h-5 flex-shrink-0" /> : <Search className="w-5 h-5 flex-shrink-0" />}
+          {isAgent
+            ? <Users className="w-5 h-5 flex-shrink-0" />
+            : <Search className="w-5 h-5 flex-shrink-0" />
+          }
           <span className="truncate">
             {query
               ? (isAgent ? `Find Agents — ${query}` : `Search in ${query}`)
@@ -1225,8 +1231,8 @@ function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }
   );
 }
 
-function LocationRow({ primary, secondary, onTap, dot }: {
-  primary: string; secondary?: string; onTap: () => void; dot?: string;
+function LocationRow({ primary, secondary, onTap, dot, count }: {
+  primary: string; secondary?: string; onTap: () => void; dot?: string; count?: string;
 }) {
   return (
     <button
@@ -1240,7 +1246,8 @@ function LocationRow({ primary, secondary, onTap, dot }: {
         <div className="text-sm font-semibold text-gray-900 truncate">{primary}</div>
         {secondary && <div className="text-xs text-gray-400 mt-0.5 truncate">{secondary}</div>}
       </div>
-      <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+      {count && <span className="text-xs text-gray-400 flex-shrink-0">{count}</span>}
+      <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0 ml-1" />
     </button>
   );
 }
@@ -1250,7 +1257,7 @@ function FilterChip({ label, active, onTap }: { label: string; active: boolean; 
     <button
       onClick={onTap}
       className={cn(
-        'h-9 px-4 rounded-xl text-sm font-semibold border-2 transition-all active:scale-95',
+        'flex-shrink-0 h-9 px-4 rounded-xl text-sm font-semibold border-2 transition-all active:scale-95 whitespace-nowrap',
         active ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-100 bg-gray-50 text-gray-600',
       )}
     >
@@ -1314,46 +1321,8 @@ export default function HomeSearchPanel() {
           ══════════════════════════════════ */}
       <div className="sm:hidden w-full">
 
-        {/* Search card */}
-        <div className="bg-white rounded-2xl shadow-2xl shadow-black/25 overflow-hidden">
-          {/* ── Main search row ── */}
-          <button
-            onClick={() => setOpen(true)}
-            className="w-full flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 transition-colors"
-          >
-            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br shadow-sm', catInfo.color)}>
-              {isAgent ? <Users className="w-5 h-5 text-white" /> : <Search className="w-5 h-5 text-white" />}
-            </div>
-            <div className="flex-1 text-left min-w-0">
-              <div className="text-[13px] font-semibold text-gray-800 truncate">
-                {isAgent ? 'Find Agents' : isNewProject ? 'Search New Projects' : `Search ${catInfo.label} Properties`}
-              </div>
-              <div className="text-xs text-gray-400 mt-0.5">City, locality, project...</div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
-          </button>
-
-          {/* ── Divider ── */}
-          <div className="h-px bg-gray-100 mx-4" />
-
-          {/* ── Detect location row ── */}
-          <button
-            onClick={() => setOpen(true)}
-            className="w-full flex items-center gap-3 px-4 py-3 active:bg-blue-50 transition-colors"
-          >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-primary-600 shadow-sm">
-              <LocateFixed className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex-1 text-left min-w-0">
-              <div className="text-[13px] font-semibold text-primary-600">Use my current location</div>
-              <div className="text-xs text-gray-400 mt-0.5">Auto-detect &amp; find properties near you</div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
-          </button>
-        </div>
-
-        {/* Category tabs */}
-        <div className="flex items-center gap-1.5 mt-3 overflow-x-auto no-scrollbar">
+        {/* Category tabs row */}
+        <div className="flex items-center gap-1.5 mb-3 overflow-x-auto no-scrollbar">
           {tabs.map(tab => (
             <button
               key={tab.value}
@@ -1367,6 +1336,29 @@ export default function HomeSearchPanel() {
             </button>
           ))}
         </div>
+
+        {/* Native-style search bar */}
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full flex items-center gap-3 bg-white rounded-2xl shadow-xl shadow-black/20 px-4 active:scale-[0.98] transition-transform"
+          style={{ height: 52 }}
+        >
+          <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br shadow-sm', catInfo.color)}>
+            {isAgent ? <Users className="w-4 h-4 text-white" /> : <Search className="w-4 h-4 text-white" />}
+          </div>
+          <span className="flex-1 text-left text-[14px] text-gray-400 font-medium truncate">
+            {isAgent
+              ? 'Find agents by city or state…'
+              : isNewProject
+              ? 'City, locality or builder…'
+              : `${catInfo.label} — city, locality, project…`
+            }
+          </span>
+          <div className="flex-shrink-0 flex items-center gap-1.5">
+            <div className="w-px h-5 bg-gray-200" />
+            <LocateFixed className="w-4 h-4 text-primary-400" />
+          </div>
+        </button>
 
         {open && (
           <MobileSearch initialCat={cat} onClose={() => setOpen(false)} allTabs={tabs} allTypes={types} />

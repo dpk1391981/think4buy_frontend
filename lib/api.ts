@@ -171,6 +171,17 @@ export const servicesApi = {
 // Admin
 export const adminApi = {
   getDashboard: () => api.get('/admin/dashboard'),
+  // Market Intelligence
+  listMarketSnapshots: () => api.get('/admin/market-snapshots'),
+  updateMarketSnapshot: (id: string, data: { isFeatured?: boolean; sortOrder?: number }) =>
+    api.patch(`/admin/market-snapshots/${id}`, data),
+  refreshMarketSnapshot: (city?: string, all?: boolean) =>
+    api.post('/home/market-snapshot/refresh', { city, all }),
+  // Scoring Config
+  getScoringConfig: () => api.get('/admin/scoring-config'),
+  setScoringConfig: (key: string, data: { value: number; description?: string }) =>
+    api.patch(`/admin/scoring-config/${key}`, data),
+  resetScoringConfig: (key: string) => api.delete(`/admin/scoring-config/${key}`),
   // Properties
   getProperties: (params?: Record<string, any>) => api.get('/admin/properties', { params }),
   approveProperty: (id: string) => api.patch(`/admin/properties/${id}/approve`),
@@ -335,6 +346,8 @@ export const propertyConfigApi = {
   getTypesBySlug: (categorySlug: string) => api.get('/property-config/types', { params: { categorySlug } }),
   getAmenities: (typeId: string) => api.get('/property-config/amenities', { params: { typeId } }),
   getFields: (typeId: string) => api.get('/property-config/fields', { params: { typeId } }),
+  getListingFilters: (category?: string) =>
+    api.get('/property-config/listing-filters', { params: category ? { category } : {} }),
 };
 
 // ── Property Config Admin ─────────────────────────────────────────────────────
@@ -365,6 +378,13 @@ export const propConfigAdminApi = {
   deleteField: (id: string) => api.delete(`/property-config/admin/fields/${id}`),
   reorderFields: (typeId: string, orderedIds: string[]) =>
     api.post(`/property-config/admin/types/${typeId}/fields/reorder`, { orderedIds }),
+  // Listing Filter Configs
+  getListingFilters: () => api.get('/property-config/admin/listing-filters'),
+  createListingFilter: (d: any) => api.post('/property-config/admin/listing-filters', d),
+  updateListingFilter: (id: string, d: any) => api.patch(`/property-config/admin/listing-filters/${id}`, d),
+  deleteListingFilter: (id: string) => api.delete(`/property-config/admin/listing-filters/${id}`),
+  reorderListingFilters: (orderedIds: string[]) =>
+    api.post('/property-config/admin/listing-filters/reorder', { orderedIds }),
 };
 
 // ── Agency & Agent Profile APIs ───────────────────────────────────────────────
@@ -579,6 +599,21 @@ export const homeApi = {
 
   getTopProjects: (params?: { country?: string; state?: string; city?: string; limit?: number }) =>
     api.get('/home/top-projects', { params }),
+
+  getTrending: (params?: { city?: string; state?: string; category?: string; limit?: number }) =>
+    api.get('/home/trending', { params }),
+
+  compare: (ids: string[]) =>
+    api.get('/home/compare', { params: { ids: ids.join(',') } }),
+
+  getMarketCities: (limit = 12) =>
+    api.get('/home/market-cities', { params: { limit } }),
+
+  getPriceSnapshot: (params?: { city?: string; state?: string }) =>
+    api.get('/home/price-snapshot', { params }),
+
+  getInsights: (params?: { city?: string; state?: string }) =>
+    api.get('/home/insights', { params }),
 
   trackEvent: (dto: {
     eventType: string;

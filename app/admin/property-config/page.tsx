@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Plus, Pencil, Trash2, Search, ChevronDown, ChevronRight,
   ToggleLeft, ToggleRight, GripVertical, X, Check, Tag,
-  Building2, Layers, Star, Settings2, AlertTriangle,
+  Building2, Layers, Star, Settings2, AlertTriangle, Filter,
 } from 'lucide-react';
 import { propConfigAdminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -30,10 +30,11 @@ interface Field {
 }
 
 const TABS = [
-  { key: 'categories',   label: 'Categories',     icon: Tag },
-  { key: 'types',        label: 'Property Types',  icon: Building2 },
-  { key: 'amenities',    label: 'Amenities',       icon: Star },
-  { key: 'fields',       label: 'Form Fields',     icon: Settings2 },
+  { key: 'categories',      label: 'Categories',     icon: Tag },
+  { key: 'types',           label: 'Property Types',  icon: Building2 },
+  { key: 'amenities',       label: 'Amenities',       icon: Star },
+  { key: 'fields',          label: 'Form Fields',     icon: Settings2 },
+  { key: 'listing-filters', label: 'Listing Filters', icon: Filter },
 ] as const;
 
 type Tab = typeof TABS[number]['key'];
@@ -1001,6 +1002,338 @@ function FormFieldsTab() {
   );
 }
 
+// ─── Tab 5: Listing Filters ───────────────────────────────────────────────────
+
+const WIDGET_TYPES = [
+  { value: 'price_range',    label: 'Price Range (preset chips)' },
+  { value: 'bedroom_select', label: 'Bedroom Select (BHK chips)' },
+  { value: 'property_type',  label: 'Property Type (from DB)' },
+  { value: 'area_range',     label: 'Area Range (preset chips)' },
+  { value: 'option_select',  label: 'Option Select (custom options)' },
+  { value: 'amenity_picker', label: 'Amenity Picker (from DB)' },
+  { value: 'text_input',     label: 'Text Search Input' },
+  { value: 'toggle_boolean', label: 'Boolean Toggle' },
+];
+
+const ALL_CATEGORIES = ['buy', 'rent', 'pg', 'commercial', 'industrial', 'builder_project', 'investment'];
+
+interface LFC {
+  id: string; filterKey: string; label: string; icon: string | null;
+  widgetType: string; optionsJson: {value: string; label: string}[] | null;
+  categories: string[]; defaultOpen: boolean; showOnMobile: boolean;
+  isActive: boolean; sortOrder: number;
+}
+
+function ListingFiltersTab() {
+  const [items,    setItems]    = useState<LFC[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [showModal,setShowModal]= useState(false);
+  const [editing,  setEditing]  = useState<LFC | null>(null);
+  const [delId,    setDelId]    = useState<string | null>(null);
+  const [saving,   setSaving]   = useState(false);
+
+  const EMPTY: Omit<LFC, 'id'> = {
+    filterKey: '', label: '', icon: '', widgetType: 'option_select',
+    optionsJson: [], categories: [], defaultOpen: false, showOnMobile: true,
+    isActive: true, sortOrder: 0,
+  };
+  const [form, setForm] = useState<Omit<LFC, 'id'>>(EMPTY);
+  const [optInput, setOptInput] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    try { const r = await propConfigAdminApi.getListingFilters(); setItems(r.data); }
+    catch { toast('Failed to load filters', false); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const openAdd = () => {
+    setEditing(null);
+    setForm({ ...EMPTY, sortOrder: items.length + 1 });
+    setOptInput('');
+    setShowModal(true);
+  };
+
+  const openEdit = (f: LFC) => {
+    setEditing(f);
+    setForm({
+      filterKey: f.filterKey, label: f.label, icon: f.icon || '',
+      widgetType: f.widgetType, optionsJson: f.optionsJson || [],
+      categories: f.categories, defaultOpen: f.defaultOpen,
+      showOnMobile: f.showOnMobile, isActive: f.isActive, sortOrder: f.sortOrder,
+    });
+    setOptInput('');
+    setShowModal(true);
+  };
+
+  const closeModal = () => { setShowModal(false); setEditing(null); };
+
+  const handleSave = async () => {
+    if (!form.filterKey.trim() || !form.label.trim()) return;
+    setSaving(true);
+    try {
+      const payload = { ...form, optionsJson: form.optionsJson?.length ? form.optionsJson : null };
+      if (editing) { await propConfigAdminApi.updateListingFilter(editing.id, payload); toast('Filter updated'); }
+      else         { await propConfigAdminApi.createListingFilter(payload); toast('Filter created'); }
+      await load(); closeModal();
+    } catch (e: any) { toast(e?.response?.data?.message || 'Error', false); }
+    finally { setSaving(false); }
+  };
+
+  const handleToggle = async (f: LFC) => {
+    try { await propConfigAdminApi.updateListingFilter(f.id, { isActive: !f.isActive }); await load(); }
+    catch { toast('Toggle failed', false); }
+  };
+
+  const handleDelete = async () => {
+    if (!delId) return;
+    try { await propConfigAdminApi.deleteListingFilter(delId); toast('Filter deleted'); await load(); }
+    catch { toast('Delete failed', false); }
+    finally { setDelId(null); }
+  };
+
+  const addOption = () => {
+    const trimmed = optInput.trim();
+    if (!trimmed) return;
+    const [value, ...rest] = trimmed.split(':');
+    const label = rest.join(':').trim() || value.trim();
+    setForm(f => ({ ...f, optionsJson: [...(f.optionsJson || []), { value: value.trim(), label }] }));
+    setOptInput('');
+  };
+
+  const removeOption = (idx: number) =>
+    setForm(f => ({ ...f, optionsJson: (f.optionsJson || []).filter((_, i) => i !== idx) }));
+
+  const toggleCategory = (slug: string) =>
+    setForm(f => ({
+      ...f,
+      categories: f.categories.includes(slug)
+        ? f.categories.filter(c => c !== slug)
+        : [...f.categories, slug],
+    }));
+
+  const showOptions = ['option_select'].includes(form.widgetType);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">
+          {items.filter(f => f.isActive).length} active / {items.length} total —
+          <span className="ml-1 text-gray-400">Defines which filters appear in the property listing sidebar.</span>
+        </p>
+        <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 shadow-sm">
+          <Plus className="w-4 h-4" /> Add Filter
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-10 text-gray-400 text-sm">Loading…</div>
+      ) : (
+        <div className="space-y-2">
+          {items.map(f => (
+            <div key={f.id} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+              <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0" />
+              <span className="text-lg w-6 text-center flex-shrink-0">{f.icon || '—'}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-gray-800">{f.label}</span>
+                  <span className="text-xs text-gray-400 font-mono">{f.filterKey}</span>
+                  <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{f.widgetType}</span>
+                  {f.categories.length > 0 && (
+                    <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
+                      {f.categories.join(', ')}
+                    </span>
+                  )}
+                  {f.categories.length === 0 && (
+                    <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">All categories</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  onClick={() => handleToggle(f)}
+                  className={cn('p-1.5 rounded-lg transition-colors', f.isActive ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-100')}
+                  title={f.isActive ? 'Disable' : 'Enable'}
+                >
+                  {f.isActive ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                </button>
+                <button onClick={() => openEdit(f)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500">
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button onClick={() => setDelId(f.id)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-red-400">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh] rounded-t-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+              <h3 className="font-bold text-gray-900">{editing ? 'Edit Filter' : 'Add Listing Filter'}</h3>
+              <button onClick={closeModal} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
+                <X className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+
+              {/* Filter Key + Label */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Filter Key *</label>
+                  <input
+                    value={form.filterKey}
+                    onChange={e => setForm(f => ({ ...f, filterKey: e.target.value.trim() }))}
+                    placeholder="e.g. furnishingStatus"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 font-mono"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-0.5">URL query param name</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Label *</label>
+                  <input
+                    value={form.label}
+                    onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
+                    placeholder="e.g. Furnishing"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  />
+                </div>
+              </div>
+
+              {/* Icon + Widget Type */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Icon (emoji)</label>
+                  <input
+                    value={form.icon || ''}
+                    onChange={e => setForm(f => ({ ...f, icon: e.target.value }))}
+                    placeholder="🏠"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Widget Type *</label>
+                  <select
+                    value={form.widgetType}
+                    onChange={e => setForm(f => ({ ...f, widgetType: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+                  >
+                    {WIDGET_TYPES.map(w => (
+                      <option key={w.value} value={w.value}>{w.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Options (for option_select) */}
+              {showOptions && (
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Options</label>
+                  <div className="space-y-1.5 mb-2">
+                    {(form.optionsJson || []).map((opt, i) => (
+                      <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5">
+                        <span className="text-xs font-mono text-gray-500 flex-1">{opt.value}</span>
+                        <span className="text-xs text-gray-700 flex-1">{opt.label}</span>
+                        <button onClick={() => removeOption(i)} className="text-red-400 hover:text-red-600">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={optInput}
+                      onChange={e => setOptInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && addOption()}
+                      placeholder="value:Label (e.g. furnished:Furnished)"
+                      className="flex-1 px-3 py-1.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-400 font-mono"
+                    />
+                    <button onClick={addOption} className="px-3 py-1.5 bg-primary-600 text-white rounded-xl text-xs font-semibold">
+                      Add
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">Format: <code>value:Display Label</code> — if no colon, value is used as label</p>
+                </div>
+              )}
+
+              {/* Categories */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 mb-2 block">
+                  Show for Categories
+                  <span className="font-normal text-gray-400 ml-1">(empty = all categories)</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {ALL_CATEGORIES.map(slug => (
+                    <button
+                      key={slug}
+                      type="button"
+                      onClick={() => toggleCategory(slug)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                        form.categories.includes(slug)
+                          ? 'bg-primary-600 text-white border-primary-600'
+                          : 'border-gray-200 text-gray-600 bg-gray-50 hover:border-primary-400',
+                      )}
+                    >
+                      {slug}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Flags */}
+              <div className="grid grid-cols-3 gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.defaultOpen} onChange={e => setForm(f => ({ ...f, defaultOpen: e.target.checked }))} className="w-4 h-4 accent-primary-600 rounded" />
+                  <span className="text-xs font-medium text-gray-700">Open by default</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.showOnMobile} onChange={e => setForm(f => ({ ...f, showOnMobile: e.target.checked }))} className="w-4 h-4 accent-primary-600 rounded" />
+                  <span className="text-xs font-medium text-gray-700">Show on mobile</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} className="w-4 h-4 accent-primary-600 rounded" />
+                  <span className="text-xs font-medium text-gray-700">Active</span>
+                </label>
+              </div>
+
+              {/* Sort Order */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 mb-1 block">Sort Order</label>
+                <input
+                  type="number"
+                  value={form.sortOrder}
+                  onChange={e => setForm(f => ({ ...f, sortOrder: Number(e.target.value) }))}
+                  className="w-24 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
+              <button onClick={closeModal} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50">Cancel</button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !form.filterKey.trim() || !form.label.trim()}
+                className="flex-1 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Filter'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {delId && <DeleteDialog label="Filter" onConfirm={handleDelete} onCancel={() => setDelId(null)} />}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function PropertyConfigPage() {
@@ -1039,10 +1372,11 @@ export default function PropertyConfigPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'categories'  && <CategoriesTab />}
-      {activeTab === 'types'       && <PropertyTypesTab />}
-      {activeTab === 'amenities'   && <AmenitiesTab />}
-      {activeTab === 'fields'      && <FormFieldsTab />}
+      {activeTab === 'categories'      && <CategoriesTab />}
+      {activeTab === 'types'           && <PropertyTypesTab />}
+      {activeTab === 'amenities'       && <AmenitiesTab />}
+      {activeTab === 'fields'          && <FormFieldsTab />}
+      {activeTab === 'listing-filters' && <ListingFiltersTab />}
     </div>
   );
 }

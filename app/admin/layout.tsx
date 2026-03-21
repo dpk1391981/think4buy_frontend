@@ -32,6 +32,8 @@ import {
   Zap,
   Gem,
   MessageSquare,
+  BarChart2,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
@@ -85,6 +87,8 @@ const NAV_GROUPS = [
     items: [
       { href: '/admin/countries', label: 'Countries', icon: Globe },
       { href: '/admin/locations', label: 'States & Cities', icon: MapPin },
+      { href: '/admin/market-intelligence', label: 'Market Intelligence', icon: BarChart2 },
+      { href: '/admin/scoring-config', label: 'Scoring Config', icon: SlidersHorizontal },
     ],
   },
   {
