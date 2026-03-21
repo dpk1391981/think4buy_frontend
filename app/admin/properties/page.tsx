@@ -7,7 +7,7 @@ import {
   Search, ExternalLink, Pencil, MoreVertical
 } from 'lucide-react';
 import Link from 'next/link';
-import { adminApi, adminLocationsApi, locationsApi } from '@/lib/api';
+import { adminApi } from '@/lib/api';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import { resolveImageUrl } from '@/lib/imageUtils';
 
@@ -55,11 +55,10 @@ interface ActionMenuProps {
   onToggleStatus: () => void;
   onToggleFeatured: () => void;
   onDelete: () => void;
-  onEdit: () => void;
   loading: boolean;
 }
 
-function ActionMenu({ property: p, onApprove, onReject, onToggleStatus, onToggleFeatured, onDelete, onEdit, loading }: ActionMenuProps) {
+function ActionMenu({ property: p, onApprove, onReject, onToggleStatus, onToggleFeatured, onDelete, loading }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -86,13 +85,14 @@ function ActionMenu({ property: p, onApprove, onReject, onToggleStatus, onToggle
               View on Site
             </Link>
 
-            <button
-              onClick={() => { onEdit(); setOpen(false); }}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-blue-700 hover:bg-blue-50 transition-colors"
+            <Link
+              href={`/post-property?edit=${p.id}`}
+              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-blue-700 hover:bg-blue-50 transition-colors"
+              onClick={() => setOpen(false)}
             >
               <Pencil className="w-4 h-4" />
               Edit Property
-            </button>
+            </Link>
 
             <div className="border-t border-gray-100 my-1" />
 
@@ -165,14 +165,6 @@ export default function AdminPropertiesPage() {
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [editProperty, setEditProperty] = useState<any | null>(null);
-  const [editForm, setEditForm] = useState<any>({});
-  const [editSaving, setEditSaving] = useState(false);
-
-  // Location data for edit modal
-  const [editStates, setEditStates] = useState<any[]>([]);
-  const [editCities, setEditCities] = useState<any[]>([]);
-  const [editCitiesLoading, setEditCitiesLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -217,86 +209,6 @@ export default function AdminPropertiesPage() {
     if (!deleteId) return;
     await withLoading(deleteId, () => adminApi.deleteProperty(deleteId));
     setDeleteId(null);
-  };
-
-  const openEdit = async (p: any) => {
-    setEditProperty(p);
-    setEditForm({
-      title: p.title || '',
-      description: p.description || '',
-      category: p.category || '',
-      type: p.type || '',
-      status: p.status || '',
-      approvalStatus: p.approvalStatus || '',
-      listingPlan: p.listingPlan || '',
-      price: p.price || '',
-      area: p.area || '',
-      carpetArea: p.carpetArea ?? '',
-      bedrooms: p.bedrooms ?? '',
-      bathrooms: p.bathrooms ?? '',
-      floor: p.floor ?? '',
-      totalFloors: p.totalFloors ?? '',
-      furnishingStatus: p.furnishingStatus || '',
-      possessionStatus: p.possessionStatus || '',
-      stateId: p.stateId || '',
-      state: p.state || '',
-      cityId: p.cityId || '',
-      city: p.city || '',
-      locality: p.locality || '',
-      address: p.address || '',
-      slug: p.slug || '',
-      metaTitle: p.metaTitle || '',
-      metaDescription: p.metaDescription || '',
-      allowIndexing: p.allowIndexing ?? false,
-    });
-    // Load states
-    try {
-      const r = await adminLocationsApi.getStates();
-      const data = r.data;
-      const states = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
-      setEditStates(states);
-      // Load cities for current state if stateId known
-      if (p.stateId) {
-        setEditCitiesLoading(true);
-        const cr = await locationsApi.getCitiesByState(p.stateId);
-        setEditCities(Array.isArray(cr.data) ? cr.data : cr.data?.cities || []);
-        setEditCitiesLoading(false);
-      }
-    } catch {}
-  };
-
-  const handleEditStateChange = async (stateId: string, stateName: string) => {
-    setEditForm((f: any) => ({ ...f, stateId, state: stateName, cityId: '', city: '' }));
-    setEditCities([]);
-    if (!stateId) return;
-    setEditCitiesLoading(true);
-    try {
-      const r = await locationsApi.getCitiesByState(stateId);
-      setEditCities(Array.isArray(r.data) ? r.data : r.data?.cities || []);
-    } catch {} finally {
-      setEditCitiesLoading(false);
-    }
-  };
-
-  const saveEdit = async () => {
-    if (!editProperty) return;
-    setEditSaving(true);
-    try {
-      // Build clean payload — omit empty strings for optional numeric fields
-      const payload: any = { ...editForm };
-      ['bedrooms','bathrooms','floor','totalFloors','area','carpetArea'].forEach(k => {
-        if (payload[k] === '' || payload[k] === null) delete payload[k];
-        else if (payload[k] !== undefined) payload[k] = Number(payload[k]);
-      });
-      if (payload.price) payload.price = Number(payload.price);
-      await adminApi.updateProperty(editProperty.id, payload);
-      setEditProperty(null);
-      load();
-    } catch (e: any) {
-      alert(e?.response?.data?.message || 'Failed to save changes.');
-    } finally {
-      setEditSaving(false);
-    }
   };
 
   // Count badges
@@ -450,7 +362,6 @@ export default function AdminPropertiesPage() {
                           onToggleStatus={() => toggleStatus(p.id)}
                           onToggleFeatured={() => toggleFeatured(p.id)}
                           onDelete={() => setDeleteId(p.id)}
-                          onEdit={() => openEdit(p)}
                         />
                       </div>
                     </td>
@@ -514,309 +425,6 @@ export default function AdminPropertiesPage() {
                 {actionLoading ? 'Rejecting...' : 'Confirm Reject'}
               </button>
               <button onClick={() => setRejectId(null)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Property Modal */}
-      {editProperty && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl max-h-[92vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-              <div>
-                <h3 className="font-bold text-gray-900 text-lg">Edit Property</h3>
-                <p className="text-xs text-gray-400 mt-0.5 truncate max-w-md">{editProperty.title}</p>
-              </div>
-              <button onClick={() => setEditProperty(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100">×</button>
-            </div>
-
-            <div className="p-6 space-y-5 overflow-y-auto flex-1">
-              {/* Basic Info */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Basic Info</p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Title *</label>
-                    <input value={editForm.title} onChange={(e) => setEditForm((f: any) => ({ ...f, title: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
-                    <textarea value={editForm.description} onChange={(e) => setEditForm((f: any) => ({ ...f, description: e.target.value }))}
-                      rows={3} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
-                      <select value={editForm.category} onChange={(e) => setEditForm((f: any) => ({ ...f, category: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400">
-                        <option value="">— Select —</option>
-                        <option value="buy">Buy</option>
-                        <option value="rent">Rent</option>
-                        <option value="pg">PG</option>
-                        <option value="commercial">Commercial</option>
-                        <option value="industrial">Industrial</option>
-                        <option value="builder_project">Builder Project</option>
-                        <option value="investment">Investment</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Property Type</label>
-                      <select value={editForm.type} onChange={(e) => setEditForm((f: any) => ({ ...f, type: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400">
-                        <option value="">— Select —</option>
-                        <option value="apartment">Apartment</option>
-                        <option value="villa">Villa</option>
-                        <option value="plot">Plot</option>
-                        <option value="house">House</option>
-                        <option value="penthouse">Penthouse</option>
-                        <option value="studio">Studio</option>
-                        <option value="builder_floor">Builder Floor</option>
-                        <option value="farm_house">Farm House</option>
-                        <option value="commercial_office">Commercial Office</option>
-                        <option value="commercial_shop">Commercial Shop</option>
-                        <option value="commercial_warehouse">Commercial Warehouse</option>
-                        <option value="showroom">Showroom</option>
-                        <option value="industrial_shed">Industrial Shed</option>
-                        <option value="factory">Factory</option>
-                        <option value="land">Land</option>
-                        <option value="pg">PG</option>
-                        <option value="co_living">Co-Living</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Location */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Location</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">State</label>
-                    <select
-                      value={editForm.stateId}
-                      onChange={(e) => {
-                        const opt = editStates.find((s: any) => s.id === e.target.value);
-                        handleEditStateChange(e.target.value, opt?.name || '');
-                      }}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-                    >
-                      <option value="">— Select State —</option>
-                      {editStates.map((s: any) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                    {!editForm.stateId && editForm.state && (
-                      <p className="text-xs text-amber-600 mt-1">Current: {editForm.state} (select from list to update)</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">City</label>
-                    <select
-                      value={editForm.cityId}
-                      onChange={(e) => {
-                        const opt = editCities.find((c: any) => c.id === e.target.value);
-                        setEditForm((f: any) => ({ ...f, cityId: e.target.value, city: opt?.name || '' }));
-                      }}
-                      disabled={!editForm.stateId || editCitiesLoading}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50 disabled:text-gray-400"
-                    >
-                      <option value="">
-                        {editCitiesLoading ? 'Loading...' : !editForm.stateId ? '← Select state first' : '— Select City —'}
-                      </option>
-                      {editCities.map((c: any) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                    {!editForm.cityId && editForm.city && (
-                      <p className="text-xs text-amber-600 mt-1">Current: {editForm.city}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Locality</label>
-                    <input value={editForm.locality} onChange={(e) => setEditForm((f: any) => ({ ...f, locality: e.target.value }))}
-                      placeholder="e.g. Andheri West"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
-                    <input value={editForm.address} onChange={(e) => setEditForm((f: any) => ({ ...f, address: e.target.value }))}
-                      placeholder="Full address"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Pricing & Size */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Pricing & Size</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Price (₹) *</label>
-                    <input type="number" value={editForm.price} onChange={(e) => setEditForm((f: any) => ({ ...f, price: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Built-up Area (sqft)</label>
-                    <input type="number" value={editForm.area} onChange={(e) => setEditForm((f: any) => ({ ...f, area: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Carpet Area (sqft)</label>
-                    <input type="number" value={editForm.carpetArea} onChange={(e) => setEditForm((f: any) => ({ ...f, carpetArea: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Bedrooms</label>
-                    <input type="number" value={editForm.bedrooms} onChange={(e) => setEditForm((f: any) => ({ ...f, bedrooms: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Bathrooms</label>
-                    <input type="number" value={editForm.bathrooms} onChange={(e) => setEditForm((f: any) => ({ ...f, bathrooms: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Floor No.</label>
-                    <input type="number" value={editForm.floor} onChange={(e) => setEditForm((f: any) => ({ ...f, floor: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Total Floors</label>
-                    <input type="number" value={editForm.totalFloors} onChange={(e) => setEditForm((f: any) => ({ ...f, totalFloors: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Details & Status */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Details & Status</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Furnishing</label>
-                    <select value={editForm.furnishingStatus} onChange={(e) => setEditForm((f: any) => ({ ...f, furnishingStatus: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400">
-                      <option value="">—</option>
-                      <option value="furnished">Furnished</option>
-                      <option value="semi_furnished">Semi Furnished</option>
-                      <option value="unfurnished">Unfurnished</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Possession</label>
-                    <select value={editForm.possessionStatus} onChange={(e) => setEditForm((f: any) => ({ ...f, possessionStatus: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400">
-                      <option value="">—</option>
-                      <option value="ready_to_move">Ready to Move</option>
-                      <option value="under_construction">Under Construction</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Property Status</label>
-                    <select value={editForm.status} onChange={(e) => setEditForm((f: any) => ({ ...f, status: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400">
-                      <option value="">—</option>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                      <option value="sold">Sold</option>
-                      <option value="rented">Rented</option>
-                      <option value="pending">Pending</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Approval Status</label>
-                    <select value={editForm.approvalStatus} onChange={(e) => setEditForm((f: any) => ({ ...f, approvalStatus: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400">
-                      <option value="pending">Pending</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Listing Plan</label>
-                    <select value={editForm.listingPlan} onChange={(e) => setEditForm((f: any) => ({ ...f, listingPlan: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400">
-                      <option value="">—</option>
-                      <option value="free">Free</option>
-                      <option value="basic">Basic</option>
-                      <option value="premium">Premium</option>
-                      <option value="featured">Featured</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* SEO */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">SEO & Slug</p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      SEO Slug <span className="text-gray-400 font-normal">(URL-friendly, must be unique)</span>
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-l-xl px-3 py-2 border-r-0">/properties/</span>
-                      <input
-                        value={editForm.slug}
-                        onChange={(e) => setEditForm((f: any) => ({ ...f, slug: e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') }))}
-                        placeholder="my-property-slug"
-                        className="flex-1 border border-gray-200 rounded-r-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-                      />
-                    </div>
-                    <p className="text-xs text-amber-600 mt-1">Warning: Changing slug will break existing links to this property.</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Meta Title <span className="text-gray-400 font-normal">(max 200 chars)</span></label>
-                    <input
-                      value={editForm.metaTitle}
-                      onChange={(e) => setEditForm((f: any) => ({ ...f, metaTitle: e.target.value }))}
-                      maxLength={200}
-                      placeholder="SEO meta title..."
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                    <p className="text-right text-xs text-gray-400 mt-0.5">{(editForm.metaTitle || '').length}/200</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Meta Description <span className="text-gray-400 font-normal">(max 500 chars)</span></label>
-                    <textarea
-                      value={editForm.metaDescription}
-                      onChange={(e) => setEditForm((f: any) => ({ ...f, metaDescription: e.target.value }))}
-                      maxLength={500}
-                      rows={2}
-                      placeholder="SEO meta description..."
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 resize-none"
-                    />
-                    <p className="text-right text-xs text-gray-400 mt-0.5">{(editForm.metaDescription || '').length}/500</p>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                    <div>
-                      <p className="text-sm font-semibold text-amber-800">Allow Search Engine Indexing</p>
-                      <p className="text-xs text-amber-600 mt-0.5">Off by default. Enable only for high-quality, complete listings.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setEditForm((f: any) => ({ ...f, allowIndexing: !f.allowIndexing }))}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${editForm.allowIndexing ? 'bg-green-500' : 'bg-gray-300'}`}
-                    >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${editForm.allowIndexing ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
-              <button onClick={saveEdit} disabled={editSaving}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                {editSaving ? 'Saving...' : 'Save Changes'}
-              </button>
-              <button onClick={() => setEditProperty(null)}
-                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
             </div>
