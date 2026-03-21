@@ -3,168 +3,412 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, TrendingUp } from 'lucide-react';
-import PropertyCard from '@/components/property/PropertyCard';
-import { propertiesApi } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import {
+  ArrowRight, Star, Zap, Clock, TrendingUp, Flame,
+  Eye, MessageCircle, Heart, MapPin, Maximize2,
+  BadgeCheck, Crown, Rocket, BarChart2,
+} from 'lucide-react';
+import OptimizedImage from '@/components/common/OptimizedImage';
+import { homeApi } from '@/lib/api';
+import { cn, formatPrice, formatArea, getPropertyArea } from '@/lib/utils';
 import { useAppSelector } from '@/lib/store';
-import { PropertyGridSkeleton, PropertyCarouselSkeleton } from '@/components/skeleton';
+
+// ─── Tab definitions ──────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'featured',  label: '⚡ Featured',     params: { isFeatured: true, limit: 8, approvalStatus: 'approved' } },
-  { id: 'premium',   label: '👑 Premium',      params: { isPremium: true, limit: 8, approvalStatus: 'approved' } },
-  { id: 'new',       label: '🏗 New Projects',  params: { possessionStatus: 'under_construction', limit: 8, approvalStatus: 'approved' } },
-  { id: 'recent',    label: '🕐 Just Listed',   params: { sortBy: 'createdAt', sortOrder: 'DESC', limit: 8, approvalStatus: 'approved' } },
-];
+  {
+    id:      'smart_featured',
+    label:   'Smart Pick',
+    icon:    <Star className="w-3.5 h-3.5" />,
+    emoji:   '🏆',
+    desc:    'AI-ranked by views, engagement & freshness',
+    viewAll: '/properties?sortBy=relevance',
+  },
+  {
+    id:      'most_viewed',
+    label:   'Trending',
+    icon:    <TrendingUp className="w-3.5 h-3.5" />,
+    emoji:   '🔥',
+    desc:    'Most viewed this week',
+    viewAll: '/properties?sortBy=viewCount&sortOrder=DESC',
+  },
+  {
+    id:      'premium',
+    label:   'Premium',
+    icon:    <Crown className="w-3.5 h-3.5" />,
+    emoji:   '⭐',
+    desc:    'Verified premium listings',
+    viewAll: '/properties?isPremium=true',
+  },
+  {
+    id:      'featured',
+    label:   'Boosted',
+    icon:    <Rocket className="w-3.5 h-3.5" />,
+    emoji:   '🚀',
+    desc:    'Promoted by agents & owners',
+    viewAll: '/properties?isFeatured=true',
+  },
+  {
+    id:      'just_listed',
+    label:   'Just Listed',
+    icon:    <Clock className="w-3.5 h-3.5" />,
+    emoji:   '🆕',
+    desc:    'Newest additions',
+    viewAll: '/properties?sortBy=createdAt&sortOrder=DESC',
+  },
+] as const;
+
+type TabId = typeof TABS[number]['id'];
+
+// ─── Tag badge config ─────────────────────────────────────────────────────────
+
+function PropertyTags({ property }: { property: any }) {
+  const tags: { label: string; cls: string }[] = [];
+
+  if (property.isHotDeal)
+    tags.push({ label: '🔥 Hot Deal', cls: 'bg-red-500 text-white' });
+  else if (property.isTrending)
+    tags.push({ label: '📈 Trending', cls: 'bg-orange-500 text-white' });
+
+  if (property.listingPlan === 'featured' || property.isFeatured)
+    tags.push({ label: '🚀 Boosted', cls: 'bg-blue-600 text-white' });
+  else if (property.listingPlan === 'premium' || property.isPremium)
+    tags.push({ label: '⭐ Premium', cls: 'bg-purple-600 text-white' });
+
+  const daysOld = property.createdAt
+    ? Math.floor((Date.now() - new Date(property.createdAt).getTime()) / 86_400_000)
+    : 999;
+  if (daysOld <= 3)
+    tags.push({ label: '🆕 New', cls: 'bg-green-500 text-white' });
+
+  if (!tags.length) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {tags.slice(0, 2).map((t) => (
+        <span
+          key={t.label}
+          className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none', t.cls)}
+        >
+          {t.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ─── Individual property card ─────────────────────────────────────────────────
+
+function FeaturedCard({ property, rank }: { property: any; rank: number }) {
+  const { area: resolvedArea, areaUnit: resolvedUnit } = getPropertyArea(property);
+  const price  = formatPrice(property.price, property.priceUnit);
+  const area   = resolvedArea ? formatArea(resolvedArea, resolvedUnit) : '';
+  const slug   = property.slug || property.id;
+  const imgUrl = property.images?.[0]?.url;
+
+  const views7d = property._viewsLast7d ?? property.viewsLast7d ?? 0;
+  const inq7d   = property._inqLast7d   ?? property.inquiriesLast7d ?? 0;
+
+  const isVerified = property.isVerified;
+  const score      = Math.round(property._score ?? 0);
+
+  return (
+    <Link
+      href={`/properties/${slug}`}
+      className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-primary-200 hover:shadow-[0_8px_32px_rgba(37,99,235,0.13)] hover:-translate-y-1 transition-all duration-300"
+    >
+      {/* Image */}
+      <div className="relative h-48 bg-gray-100 overflow-hidden flex-shrink-0">
+        <OptimizedImage
+          src={imgUrl}
+          alt={property.title}
+          fill
+          className="object-cover group-hover:scale-105 transition-transform duration-500"
+          sizes="(max-width:640px) 80vw, 320px"
+        />
+
+        {/* Rank badge */}
+        <div className="absolute top-2.5 left-2.5 w-6 h-6 bg-black/70 backdrop-blur-sm rounded-full flex items-center justify-center text-[10px] font-black text-white shadow">
+          #{rank}
+        </div>
+
+        {/* Score pill — top right */}
+        {score > 0 && (
+          <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+            <BarChart2 className="w-2.5 h-2.5" />
+            {score.toFixed(0)}
+          </div>
+        )}
+
+        {/* Gradient + price */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pt-8 pb-2.5">
+          <p className="text-white font-bold text-sm leading-tight">{price}</p>
+        </div>
+
+        {/* Verified badge */}
+        {isVerified && (
+          <div className="absolute bottom-8 right-2.5">
+            <BadgeCheck className="w-4 h-4 text-blue-400 drop-shadow" />
+          </div>
+        )}
+      </div>
+
+      {/* Card body */}
+      <div className="p-3.5 flex flex-col gap-1.5 flex-1">
+        {/* Tags */}
+        <PropertyTags property={property} />
+
+        {/* Title */}
+        <h3 className="font-semibold text-gray-900 text-sm line-clamp-1 group-hover:text-primary-700 transition-colors leading-snug">
+          {property.title}
+        </h3>
+
+        {/* Location */}
+        <p className="flex items-center gap-1 text-xs text-gray-400">
+          <MapPin className="w-3 h-3 flex-shrink-0" />
+          <span className="line-clamp-1">{[property.locality, property.city].filter(Boolean).join(', ')}</span>
+        </p>
+
+        {/* Specs row */}
+        <div className="flex items-center gap-2.5 text-xs text-gray-500 flex-wrap">
+          {area && (
+            <span className="flex items-center gap-0.5">
+              <Maximize2 className="w-3 h-3" /> {area}
+            </span>
+          )}
+          {property.bedrooms && <span>{property.bedrooms} BHK</span>}
+        </div>
+
+        {/* Activity footer */}
+        <div className="mt-auto pt-2 border-t border-gray-50 flex items-center justify-between text-[10px] text-gray-400">
+          <div className="flex items-center gap-2">
+            {views7d > 0 && (
+              <span className="flex items-center gap-0.5 text-orange-500 font-medium">
+                <Eye className="w-3 h-3" />
+                {views7d > 999 ? `${(views7d / 1000).toFixed(1)}k` : views7d}
+              </span>
+            )}
+            {inq7d > 0 && (
+              <span className="flex items-center gap-0.5 text-green-600 font-medium">
+                <MessageCircle className="w-3 h-3" />
+                {inq7d}
+              </span>
+            )}
+          </div>
+          <span className="text-gray-300 font-medium capitalize">{property.type?.replace(/_/g, ' ')}</span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+function FeaturedCardSkeleton() {
+  return (
+    <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 animate-pulse">
+      <div className="h-48 bg-gray-200" />
+      <div className="p-3.5 space-y-2">
+        <div className="h-3 bg-gray-200 rounded w-1/3" />
+        <div className="h-4 bg-gray-200 rounded w-3/4" />
+        <div className="h-3 bg-gray-200 rounded w-1/2" />
+        <div className="h-3 bg-gray-200 rounded w-1/4" />
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab content ──────────────────────────────────────────────────────────────
 
 function TabContent({
-  tab,
-  stateFilter,
-  stateIdFilter,
-  cityFilter,
+  tabId, city, state,
 }: {
-  tab: (typeof TABS)[0];
-  stateFilter: string;
-  stateIdFilter: string;
-  cityFilter: string;
+  tabId:  TabId;
+  city:   string;
+  state:  string;
 }) {
-  const locationParams: any = {};
-  if (cityFilter) locationParams.city = cityFilter;
-  else if (stateIdFilter) locationParams.stateId = stateIdFilter;
-  else if (stateFilter) locationParams.state = stateFilter;
-
-  const params = { ...tab.params, ...locationParams };
-
-  const { data: properties, isLoading } = useQuery({
-    queryKey: ['home-properties', tab.id, stateIdFilter || stateFilter, cityFilter],
-    queryFn: () => propertiesApi.getAll(params).then((r) => {
-      const d = r.data;
-      return Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [];
-    }),
-    staleTime: 2 * 60 * 1000,
+  const { data, isLoading } = useQuery({
+    queryKey: ['smart-featured', tabId, city, state],
+    queryFn: () =>
+      homeApi.getTopProperties({
+        tab:    tabId,
+        city:   city  || undefined,
+        state:  !city && state ? state : undefined,
+        limit:  8,
+        period: '7d',
+      }).then((r) => {
+        const d = r.data;
+        return Array.isArray(d) ? d : d?.data ?? [];
+      }),
+    staleTime: 3 * 60 * 1000,
   });
 
-  if (isLoading) return (
-    <>
-      {/* Mobile: carousel shimmer */}
-      <div className="sm:hidden -mx-4 px-4">
-        <PropertyCarouselSkeleton count={4} />
-      </div>
-      {/* Desktop: grid shimmer */}
-      <div className="hidden sm:block">
-        <PropertyGridSkeleton count={8} />
-      </div>
-    </>
-  );
+  if (isLoading) {
+    return (
+      <>
+        <div className="sm:hidden -mx-4 px-4">
+          <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex-shrink-0 w-[72vw]"><FeaturedCardSkeleton /></div>
+            ))}
+          </div>
+        </div>
+        <div className="hidden sm:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {[...Array(8)].map((_, i) => <FeaturedCardSkeleton key={i} />)}
+        </div>
+      </>
+    );
+  }
 
-  if (!properties?.length) {
+  if (!data?.length) {
     return (
       <div className="text-center py-16 text-gray-400">
         <p className="text-4xl mb-3">🏠</p>
-        <p>No properties in this category yet.</p>
+        <p className="text-sm">No properties found in this category.</p>
       </div>
     );
   }
 
   return (
     <>
-      {/* Mobile: horizontal snap scroll */}
-      <div className="sm:hidden -mx-4">
-        <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 snap-x snap-mandatory pb-2">
-          {properties.map((p: any) => (
+      {/* Mobile: horizontal scroll */}
+      <div className="sm:hidden -mx-4 px-4">
+        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 snap-x snap-mandatory">
+          {data.map((p: any, i: number) => (
             <div key={p.id} className="flex-shrink-0 w-[72vw] snap-start">
-              <PropertyCard property={p} />
+              <FeaturedCard property={p} rank={i + 1} />
             </div>
           ))}
         </div>
       </div>
-
       {/* Desktop: grid */}
-      <div className="hidden sm:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        {properties.map((p: any) => (
-          <PropertyCard key={p.id} property={p} />
+      <div className="hidden sm:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {data.map((p: any, i: number) => (
+          <FeaturedCard key={p.id} property={p} rank={i + 1} />
         ))}
       </div>
     </>
   );
 }
 
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function FeaturedProperties() {
-  const [activeTab, setActiveTab] = useState('featured');
-  const [mounted, setMounted] = useState(false);
-  const tab = TABS.find((t) => t.id === activeTab)!;
-  const selectedState = useAppSelector((s) => s.ui.selectedState);
-  const selectedStateId = useAppSelector((s) => s.ui.selectedStateId);
-  const selectedCity = useAppSelector((s) => s.ui.selectedCity);
+  const [activeTab, setActiveTab] = useState<TabId>('smart_featured');
+  const [mounted, setMounted]     = useState(false);
+
+  const selectedCity    = useAppSelector((s) => s.ui.selectedCity);
+  const selectedState   = useAppSelector((s) => s.ui.selectedState);
 
   useEffect(() => { setMounted(true); }, []);
 
-  const viewAllHref =
-    activeTab === 'new' ? '/new-projects' :
-    activeTab === 'premium' ? '/properties?isPremium=true' :
-    activeTab === 'recent' ? '/properties?sortBy=createdAt&sortOrder=DESC' :
-    '/properties?isFeatured=true';
+  const tab        = TABS.find((t) => t.id === activeTab)!;
+  const location   = selectedCity || selectedState || null;
 
   return (
     <section className="py-5 sm:py-14 bg-white">
       <div className="container-max">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3 sm:mb-6">
+
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <div className="flex items-start justify-between mb-4 sm:mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
-              <span className="text-xs font-semibold text-primary-600 uppercase tracking-wide">Curated for You</span>
+              <Flame className="w-3.5 h-3.5 text-primary-600" />
+              <span className="text-xs font-semibold text-primary-600 uppercase tracking-wide">
+                Curated for You
+              </span>
             </div>
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Top Properties</h2>
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
+              Featured Properties
+              {mounted && location && (
+                <span className="text-sm font-normal text-gray-500">in {location}</span>
+              )}
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">{tab.desc}</p>
           </div>
+
           <Link
-            href={viewAllHref}
-            className="hidden sm:flex items-center gap-1 text-primary-600 font-medium text-sm hover:underline"
+            href={tab.viewAll}
+            className="hidden sm:flex items-center gap-1 text-primary-600 font-medium text-sm hover:underline flex-shrink-0"
           >
             View All <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
 
-        {/* Tabs — horizontal scroll on mobile */}
+        {/* ── Tabs ───────────────────────────────────────────────────────── */}
         <div className="overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 mb-5 sm:mb-8">
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit min-w-full sm:min-w-0">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
                 className={cn(
-                  'px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all',
+                  'flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all',
                   activeTab === t.id
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700',
                 )}
               >
-                {t.label}
+                <span>{t.emoji}</span>
+                <span>{t.label}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Location filter indicator */}
-        {mounted && (selectedCity || selectedState) && (
-          <div className="flex items-center gap-2 mb-4 text-sm text-primary-700 bg-primary-50 px-3 py-2 rounded-xl w-fit">
-            <span>📍 Showing properties in <strong>{selectedCity || selectedState}</strong></span>
+        {/* ── Scoring legend (smart_featured only) ───────────────────────── */}
+        {activeTab === 'smart_featured' && (
+          <div className="hidden sm:flex items-center gap-4 mb-5 text-xs text-gray-400">
+            <Zap className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+            <span className="font-medium text-gray-500">Score =</span>
+            {[
+              { label: 'Views 25%', color: 'text-orange-500' },
+              { label: 'Boost 20%', color: 'text-blue-500' },
+              { label: 'Freshness 15%', color: 'text-green-500' },
+              { label: 'Trending 15%', color: 'text-red-500' },
+              { label: 'Premium 15%', color: 'text-purple-500' },
+              { label: 'Engagement 10%', color: 'text-teal-500' },
+            ].map((f) => (
+              <span key={f.label} className={cn('font-medium', f.color)}>{f.label}</span>
+            ))}
+            <span className="ml-auto flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+              Updated every 30 min
+            </span>
           </div>
         )}
 
-        {/* Content */}
+        {/* ── Monetization notice (subtle) ───────────────────────────────── */}
+        {activeTab === 'smart_featured' && (
+          <div className="flex items-center gap-2 mb-4 text-[11px] text-gray-400">
+            <BadgeCheck className="w-3.5 h-3.5 text-blue-400" />
+            <span>40% organic top-performers · 60% promoted listings — ranked by real engagement data</span>
+          </div>
+        )}
+
+        {/* ── Content ────────────────────────────────────────────────────── */}
         <TabContent
-          tab={tab}
-          stateFilter={selectedState}
-          stateIdFilter={selectedStateId}
-          cityFilter={selectedCity}
+          tabId={activeTab}
+          city={selectedCity}
+          state={selectedState}
         />
 
-        {/* View all — mobile */}
-        <div className="text-center mt-6 sm:hidden">
-          <Link href={viewAllHref} className="btn-outline text-sm py-2">
-            View All <ArrowRight className="w-4 h-4" />
-          </Link>
+        {/* ── Footer ─────────────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+          <p className="hidden sm:block text-xs text-gray-400">
+            Scores computed from views, inquiries, saves &amp; listing tier
+          </p>
+          <div className="flex items-center gap-3 mx-auto sm:mx-0">
+            <Link href={tab.viewAll} className="btn-outline text-xs py-2 sm:hidden">
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+            <Link
+              href="/properties"
+              className="hidden sm:flex items-center gap-1 text-primary-600 hover:text-primary-700 text-sm font-medium"
+            >
+              Browse All Listings <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
       </div>
     </section>
