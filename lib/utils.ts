@@ -21,13 +21,21 @@ export function formatPrice(price: number, unit?: string): string {
   return formatted;
 }
 
-export function formatArea(area?: number, unit = 'sqft'): string {
-  if (!area) return '';
-  return `${area.toLocaleString('en-IN')} ${unit}`;
+export function formatArea(area?: number | string, unit = 'sqft'): string {
+  if (area === undefined || area === null || area === '') return '';
+  const n = typeof area === 'string' ? parseFloat(area) : area;
+  if (!n || isNaN(n)) return '';
+  return `${n.toLocaleString('en-IN')} ${unit}`;
 }
 
 /** Resolve area and unit from carpet_area dynamic field (extraDetails) with fallback to area/areaUnit columns.
- *  Handles both DEPENDENT field format [{label, value, unit}] and plain NUMBER format "2000". */
+ *  Handles both DEPENDENT field format [{label, value, unit}] and plain NUMBER format "2000".
+ *
+ *  Priority order (to guarantee SSR/client hydration consistency):
+ *  1. extraDetails.carpet_area  — most specific; explicit carpet area override
+ *  2. property.area column      — main DB column; always identical on server and client
+ *  3. extraDetails.area         — new [{unit,label,value}] format; used only when column is empty
+ */
 export function getPropertyArea(property: {
   area?: number;
   areaUnit?: string;
@@ -41,41 +49,43 @@ export function getPropertyArea(property: {
     details = property.extraDetails as Record<string, any>;
   }
 
+  // ── 1. extraDetails.carpet_area (highest priority — explicit carpet area) ───
   const raw = details?.carpet_area;
   if (raw !== undefined && raw !== null && raw !== '') {
-    // Case 1: DEPENDENT field — array of [{label, value, unit}]
     if (Array.isArray(raw) && raw.length > 0 && raw[0].value) {
       return { area: Number(raw[0].value), areaUnit: raw[0].unit || property.areaUnit || 'Sq.ft.' };
     }
-    // Case 2: JSON string that parses to array or number
     if (typeof raw === 'string') {
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].value) {
           return { area: Number(parsed[0].value), areaUnit: parsed[0].unit || property.areaUnit || 'Sq.ft.' };
         }
-        // JSON.parse of "2000" gives number 2000
         if (typeof parsed === 'number' && parsed > 0) {
           return { area: parsed, areaUnit: property.areaUnit || 'Sq.ft.' };
         }
       } catch {}
-      // Plain number string "2000"
       const num = Number(raw);
       if (!isNaN(num) && num > 0) return { area: num, areaUnit: property.areaUnit || 'Sq.ft.' };
     }
-    // Case 3: already a number (TypeORM parsed JSON number)
     if (typeof raw === 'number' && raw > 0) {
       return { area: raw, areaUnit: property.areaUnit || 'Sq.ft.' };
     }
   }
 
-  // Also try 'area' key — new format: [{unit, label, value}]
+  // ── 2. property.area column — always consistent between SSR and client hydration ──
+  const colArea = Number(property.area);
+  if (colArea > 0) {
+    return { area: colArea, areaUnit: property.areaUnit || 'Sq.ft.' };
+  }
+
+  // ── 3. extraDetails.area — new [{unit, label, value}] format; fallback when column is empty ──
   const rawAreaArr = details?.area;
   if (Array.isArray(rawAreaArr) && rawAreaArr.length > 0 && rawAreaArr[0].value) {
     return { area: Number(rawAreaArr[0].value), areaUnit: rawAreaArr[0].unit || property.areaUnit || 'Sq.ft.' };
   }
 
-  return { area: property.area, areaUnit: property.areaUnit || 'Sq.ft.' };
+  return { area: undefined, areaUnit: property.areaUnit || 'Sq.ft.' };
 }
 
 export function getPropertyTypeLabel(type: string): string {

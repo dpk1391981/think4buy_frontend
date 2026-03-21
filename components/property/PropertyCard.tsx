@@ -387,9 +387,16 @@ export default function PropertyCard({ property, className, listView }: Property
 
               {/* Description snippet */}
               {property.description && (
-                <p className="hidden sm:block text-xs text-gray-400 line-clamp-1 leading-relaxed">
-                  {property.description}
-                </p>
+                <div className="hidden sm:block">
+                  <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">
+                    {property.description}
+                  </p>
+                  {property.description.length > 100 && (
+                    <span className="text-[11px] text-primary-500 font-medium hover:text-primary-600 cursor-pointer">
+                      View more →
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 
