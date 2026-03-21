@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useQuery } from '@tanstack/react-query';
+import OptimizedImage from '@/components/common/OptimizedImage';
 import { Flame, TrendingUp, Eye, ArrowRight, Zap, BarChart2, MessageCircle } from 'lucide-react';
 import { homeApi } from '@/lib/api';
 import { formatPrice, formatArea } from '@/lib/utils';
@@ -55,15 +55,13 @@ function TrendingCard({ property, rank }: { property: any; rank: number }) {
     >
       {/* Image */}
       <div className="relative h-44 bg-gray-100 overflow-hidden">
-        {img ? (
-          <Image
-            src={img} alt={property.title} fill
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
-            sizes="(max-width:640px) 280px, 320px"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary-100 to-blue-50 flex items-center justify-center text-4xl">🏠</div>
-        )}
+        <OptimizedImage
+          src={img}
+          alt={property.title}
+          fill
+          className="object-cover group-hover:scale-105 transition-transform duration-500"
+          sizes="(max-width:640px) 280px, 320px"
+        />
 
         {/* Rank badge */}
         <div className="absolute top-2 left-2 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-xs font-black text-gray-800 shadow">

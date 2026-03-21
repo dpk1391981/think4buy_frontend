@@ -2,8 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useQuery } from '@tanstack/react-query';
+import OptimizedImage from '@/components/common/OptimizedImage';
 import {
   GitCompare, X, Check, Minus, ChevronDown, ArrowRight, Plus, CheckCircle2,
 } from 'lucide-react';
@@ -91,11 +91,7 @@ function PropertyPickerCard({ property, isSelected, onToggle }: {
       )}
     >
       <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-        {img ? (
-          <Image src={img} alt={property.title} width={56} height={56} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-2xl">🏠</div>
-        )}
+        <OptimizedImage src={img} alt={property.title} width={56} height={56} className="w-full h-full object-cover" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-gray-900 line-clamp-1">{property.title}</p>
@@ -129,11 +125,7 @@ function ComparisonTable({ properties, liveData }: { properties: any[]; liveData
               <th key={p.id} className="pb-4 px-3 text-center min-w-[160px]">
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 mx-auto">
-                    {p.images?.[0]?.url ? (
-                      <Image src={p.images[0].url} alt={p.title} width={48} height={48} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xl">🏠</div>
-                    )}
+                    <OptimizedImage src={p.images?.[0]?.url} alt={p.title} width={48} height={48} className="w-full h-full object-cover" />
                   </div>
                   <p className="text-xs font-semibold text-gray-900 line-clamp-2 leading-tight">{p.title}</p>
                   <Link href={`/properties/${p.slug || p.id}`} className="text-[10px] text-primary-600 hover:underline">
@@ -281,11 +273,7 @@ export default function PropertyComparison() {
                     </button>
                     <div className="flex flex-col gap-2">
                       <div className="w-full aspect-video rounded-lg overflow-hidden bg-gray-100">
-                        {p.images?.[0]?.url ? (
-                          <Image src={p.images[0].url} alt={p.title} width={200} height={112} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-2xl">🏠</div>
-                        )}
+                        <OptimizedImage src={p.images?.[0]?.url} alt={p.title} width={200} height={112} className="w-full h-full object-cover" />
                       </div>
                       <div>
                         <p className="text-[11px] sm:text-xs font-semibold text-gray-900 line-clamp-2 leading-tight">{p.title}</p>
