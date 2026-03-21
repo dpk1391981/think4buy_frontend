@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { useSearchParams } from 'next/navigation';
 import {
   CheckCircle, XCircle, Trash2, Star, StarOff, Power, PowerOff,
-  Search, ExternalLink, Pencil, MoreVertical
+  Search, ExternalLink, Pencil, MoreVertical, Crown, CrownIcon
 } from 'lucide-react';
 import Link from 'next/link';
 import { adminApi } from '@/lib/api';
@@ -55,11 +55,12 @@ interface ActionMenuProps {
   onReject: () => void;
   onToggleStatus: () => void;
   onToggleFeatured: () => void;
+  onTogglePremium: () => void;
   onDelete: () => void;
   loading: boolean;
 }
 
-function ActionMenu({ property: p, onApprove, onReject, onToggleStatus, onToggleFeatured, onDelete, loading }: ActionMenuProps) {
+function ActionMenu({ property: p, onApprove, onReject, onToggleStatus, onToggleFeatured, onTogglePremium, onDelete, loading }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -141,6 +142,14 @@ function ActionMenu({ property: p, onApprove, onReject, onToggleStatus, onToggle
             </button>
 
             <button
+              onClick={() => { onTogglePremium(); setOpen(false); }}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-purple-600 hover:bg-purple-50 transition-colors"
+            >
+              <Crown className="w-4 h-4" />
+              {p.isPremium ? 'Remove Premium' : 'Mark as Premium'}
+            </button>
+
+            <button
               onClick={() => { onToggleStatus(); setOpen(false); }}
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-blue-600 hover:bg-blue-50 transition-colors"
             >
@@ -213,6 +222,7 @@ export default function AdminPropertiesPage() {
   const approve = (id: string) => withLoading(id, () => adminApi.approveProperty(id));
   const toggleStatus = (id: string) => withLoading(id, () => adminApi.togglePropertyStatus(id));
   const toggleFeatured = (id: string) => withLoading(id, () => adminApi.togglePropertyFeatured(id));
+  const togglePremium = (id: string) => withLoading(id, () => adminApi.togglePropertyPremium(id));
 
   const reject = async () => {
     if (!rejectId) return;
@@ -314,11 +324,18 @@ export default function AdminPropertiesPage() {
                         <div className="min-w-0">
                           <div className="font-medium text-gray-900 truncate text-sm">{p.title}</div>
                           <div className="text-gray-400 text-xs mt-0.5">{p.city} · {p.locality}</div>
-                          {p.isFeatured && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full font-semibold mt-1">
-                              <Star className="w-2.5 h-2.5" fill="currentColor" /> Featured
-                            </span>
-                          )}
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {p.isFeatured && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full font-semibold">
+                                <Star className="w-2.5 h-2.5" fill="currentColor" /> Featured
+                              </span>
+                            )}
+                            {p.isPremium && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] bg-purple-50 text-purple-600 border border-purple-200 px-1.5 py-0.5 rounded-full font-semibold">
+                                <Crown className="w-2.5 h-2.5" /> Premium
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -377,6 +394,7 @@ export default function AdminPropertiesPage() {
                           onReject={() => { setRejectId(p.id); setRejectReason(''); }}
                           onToggleStatus={() => toggleStatus(p.id)}
                           onToggleFeatured={() => toggleFeatured(p.id)}
+                          onTogglePremium={() => togglePremium(p.id)}
                           onDelete={() => setDeleteId(p.id)}
                         />
                       </div>

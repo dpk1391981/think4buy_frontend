@@ -193,6 +193,7 @@ export const adminApi = {
   deleteProperty: (id: string) => api.delete(`/admin/properties/${id}`),
   togglePropertyStatus: (id: string) => api.patch(`/admin/properties/${id}/toggle-status`),
   togglePropertyFeatured: (id: string) => api.patch(`/admin/properties/${id}/toggle-featured`),
+  togglePropertyPremium: (id: string) => api.patch(`/admin/properties/${id}/toggle-premium`),
   // Agents
   getAgents: (params?: Record<string, any>) => api.get('/admin/agents', { params }),
   getAgent: (id: string) => api.get(`/admin/agents/${id}`),

@@ -9,7 +9,7 @@ import {
   BadgeCheck, Crown, Rocket, BarChart2,
 } from 'lucide-react';
 import OptimizedImage from '@/components/common/OptimizedImage';
-import { homeApi } from '@/lib/api';
+import { homeApi, propertiesApi } from '@/lib/api';
 import { cn, formatPrice, formatArea, getPropertyArea } from '@/lib/utils';
 import { useAppSelector } from '@/lib/store';
 
@@ -220,6 +220,33 @@ function FeaturedCardSkeleton() {
 
 // ─── Tab content ──────────────────────────────────────────────────────────────
 
+// ─── Per-tab data fetcher ────────────────────────────────────────────────────
+// premium/featured use propertiesApi (always joins images via TypeORM).
+// smart_featured/most_viewed/just_listed use homeApi analytics cache.
+
+function fetchTab(tabId: TabId, city: string, state: string) {
+  const loc: Record<string, any> = {};
+  if (city)        loc.city  = city;
+  else if (state)  loc.state = state;
+
+  switch (tabId) {
+    case 'premium':
+      return propertiesApi
+        .getAll({ isPremium: true, limit: 8, approvalStatus: 'approved', sortBy: 'featuredScore', sortOrder: 'DESC', ...loc })
+        .then((r) => { const d = r.data; return Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : []; });
+
+    case 'featured':
+      return propertiesApi
+        .getAll({ isFeatured: true, limit: 8, approvalStatus: 'approved', sortBy: 'featuredScore', sortOrder: 'DESC', ...loc })
+        .then((r) => { const d = r.data; return Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : []; });
+
+    default:
+      return homeApi
+        .getTopProperties({ tab: tabId, city: city || undefined, state: !city && state ? state : undefined, limit: 8, period: '7d' })
+        .then((r) => { const d = r.data; return Array.isArray(d) ? d : d?.data ?? []; });
+  }
+}
+
 function TabContent({
   tabId, city, state,
 }: {
@@ -229,17 +256,7 @@ function TabContent({
 }) {
   const { data, isLoading } = useQuery({
     queryKey: ['smart-featured', tabId, city, state],
-    queryFn: () =>
-      homeApi.getTopProperties({
-        tab:    tabId,
-        city:   city  || undefined,
-        state:  !city && state ? state : undefined,
-        limit:  8,
-        period: '7d',
-      }).then((r) => {
-        const d = r.data;
-        return Array.isArray(d) ? d : d?.data ?? [];
-      }),
+    queryFn: () => fetchTab(tabId, city, state),
     staleTime: 3 * 60 * 1000,
   });
 
