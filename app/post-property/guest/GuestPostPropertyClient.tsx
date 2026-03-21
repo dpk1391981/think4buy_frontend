@@ -78,39 +78,26 @@ export default function GuestPostPropertyPage() {
     } finally { setLoading(false); }
   };
 
-  // ── Step 2: Verify OTP → set role → go to post form ─────────────────────
+  // ── Step 2: Verify OTP → redirect to onboarding (with role pre-selected) ──
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otp.length < 6) { setError('Enter the 6-digit OTP sent to your phone'); return; }
     setLoading(true); setError('');
     try {
       const { data } = await authApi.verifyOtp(phone, otp);
-      // Persist the token so subsequent API calls are authenticated
       login(data.token || data.accessToken, data.user);
 
-      if (data.user?.needsOnboarding) {
-        // New user — send to onboarding to collect name + role, then come back to post-property
-        // Pass the selected userType so onboarding pre-selects owner/agent
-        router.replace(`/auth/onboarding?redirect=/post-property&role=${userType}`);
+      const currentRole = data.user?.role;
+
+      // New user OR existing buyer — go to onboarding with selected role pre-filled
+      if (data.user?.needsOnboarding || currentRole === 'buyer') {
+        const upgradeFlag = !data.user?.needsOnboarding ? '&upgrade=1' : '';
+        router.replace(`/auth/onboarding?redirect=/post-property&role=${userType}${upgradeFlag}`);
         return;
       }
 
-      // Resolve the user role based on their selected type on this page
-      const targetRole = userType as 'owner' | 'agent';
-
-      if (data.user?.role === 'buyer') {
-        // Existing buyer — upgrade role to owner/agent
-        const { data: upgraded } = await authApi.upgradeRole(targetRole);
-        login(upgraded.token || upgraded.accessToken, upgraded.user);
-      }
-      // If already owner/agent/admin, go straight to form
-
-      // Agents need to register/join an agency before posting
-      if (targetRole === 'agent') {
-        setStep('agency');
-      } else {
-        setStep('success');
-      }
+      // Already an owner / agent / admin / seller — go straight to the post form
+      setStep('success');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid OTP. Please try again.');
     } finally { setLoading(false); }

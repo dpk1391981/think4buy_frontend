@@ -206,6 +206,12 @@ export const adminApi = {
     api.get('/admin/agents/pending-images', { params }),
   approveAgentAvatar: (id: string) => api.patch(`/admin/agents/${id}/approve-avatar`),
   rejectAgentAvatar: (id: string) => api.patch(`/admin/agents/${id}/reject-avatar`),
+  // Professional details approval
+  getPendingProfessionalAgents: (params?: { page?: number; limit?: number }) =>
+    api.get('/admin/agents/pending-professional', { params }),
+  approveProfessionalDetails: (id: string) => api.patch(`/admin/agents/${id}/approve-professional`),
+  rejectProfessionalDetails: (id: string) => api.patch(`/admin/agents/${id}/reject-professional`),
+  setAgentProfileInactive: (id: string) => api.patch(`/admin/agents/${id}/set-profile-inactive`),
   // Countries
   getCountries: () => api.get('/admin/countries'),
   createCountry: (data: any) => api.post('/admin/countries', data),

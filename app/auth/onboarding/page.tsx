@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Search, Home, Briefcase, ChevronRight, Loader2,
-  CheckCircle2, Building2, Star, Shield, Zap, User, Plus, X,
+  CheckCircle2, Building2, Star, Shield, Zap, User, Plus, X, Camera, MapPin,
 } from 'lucide-react';
 import { authApi, agencyApi, locationsApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -83,63 +83,93 @@ function OnboardingForm() {
   const { login, refresh: refreshAuth, user, loading: authLoading } = useAuth();
 
   const roleParam = searchParams.get('role') as RoleId | null;
+  // upgrade=1 means an existing buyer is upgrading their role (not a brand-new user)
+  const isUpgrade = searchParams.get('upgrade') === '1';
+
   const [selectedRole, setSelectedRole] = useState<RoleId>(
     roleParam && ['buyer', 'owner', 'agent'].includes(roleParam) ? roleParam : 'buyer',
   );
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [firstNameError, setFirstNameError] = useState('');
+
+  // Pre-fill name for role upgrades (existing buyers)
+  useEffect(() => {
+    if (isUpgrade && user?.name && !firstName) {
+      const parts = user.name.trim().split(' ');
+      setFirstName(parts[0] || '');
+      setLastName(parts.slice(1).join(' ') || '');
+    }
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
   const [agentLicense, setAgentLicense] = useState('');
+  const [agentGstNumber, setAgentGstNumber] = useState('');
   const [agentExperience, setAgentExperience] = useState('');
   const [agencyName, setAgencyName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
-  // Coverage
-  const [states, setStates] = useState<{ id: string; name: string }[]>([]);
 
-  // Each coverage entry: supports multiple selected localities per city
+  // Profile image (optional, uploaded after onboarding completes)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Coverage — city auto-search based, no state required
   type CoverageEntry = {
-    stateId: string; stateName: string;
+    citySearch: string;
+    citySuggestions: { id: string; name: string }[];
+    showCitySuggestions: boolean;
     cityId: string; cityName: string;
     selectedLocalities: { id: string; name: string }[];
-    cities: { id: string; name: string }[];
     localities: { id: string; name: string; locality?: string }[];
+    localitiesLoading: boolean;
   };
+
   const [coverageEntries, setCoverageEntries] = useState<CoverageEntry[]>([
-    { stateId: '', stateName: '', cityId: '', cityName: '', selectedLocalities: [], cities: [], localities: [] },
+    { citySearch: '', citySuggestions: [], showCitySuggestions: false, cityId: '', cityName: '', selectedLocalities: [], localities: [], localitiesLoading: false },
   ]);
+
+  // Per-entry debounce timers for city search
+  const cityTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Load states once on mount
-  useEffect(() => {
-    locationsApi.getStates().then((r) => setStates(r.data || [])).catch(() => {});
-  }, []);
 
   const updateEntry = (idx: number, patch: Partial<CoverageEntry>) => {
     setCoverageEntries(prev => prev.map((e, i) => i === idx ? { ...e, ...patch } : e));
   };
 
-  const handleStateChange = async (idx: number, stateId: string) => {
-    const opt = states.find(s => s.id === stateId);
-    updateEntry(idx, { stateId, stateName: opt?.name || '', cityId: '', cityName: '', cities: [], localities: [], selectedLocalities: [] });
-    if (!stateId) return;
-    try {
-      const r = await locationsApi.getCitiesByState(stateId);
-      updateEntry(idx, { cities: r.data || [] });
-    } catch {}
+  const handleCitySearch = (idx: number, value: string) => {
+    updateEntry(idx, { citySearch: value, showCitySuggestions: true, cityId: '', cityName: '' });
+    clearTimeout(cityTimers.current[idx]);
+    if (!value.trim()) {
+      updateEntry(idx, { citySuggestions: [], showCitySuggestions: false });
+      return;
+    }
+    cityTimers.current[idx] = setTimeout(async () => {
+      try {
+        const r = await locationsApi.getCities(value, 20);
+        const d = r.data?.data || r.data || [];
+        updateEntry(idx, { citySuggestions: Array.isArray(d) ? d : [] });
+      } catch {}
+    }, 300);
   };
 
-  const handleCityChange = async (idx: number, cityId: string) => {
-    const entry = coverageEntries[idx];
-    const opt = entry.cities.find(c => c.id === cityId);
-    updateEntry(idx, { cityId, cityName: opt?.name || '', selectedLocalities: [], localities: [] });
-    if (!cityId || !opt) return;
+  const handleCitySelect = async (idx: number, city: { id: string; name: string }) => {
+    updateEntry(idx, {
+      cityId: city.id, cityName: city.name,
+      citySearch: city.name,
+      showCitySuggestions: false,
+      selectedLocalities: [],
+      localities: [],
+      localitiesLoading: true,
+    });
     try {
-      const r = await locationsApi.getLocalities(opt.name, entry.stateName);
-      updateEntry(idx, { localities: r.data || [] });
-    } catch {}
+      const r = await locationsApi.getLocalities(city.name);
+      const d = r.data;
+      updateEntry(idx, { localities: Array.isArray(d) ? d : [], localitiesLoading: false });
+    } catch {
+      updateEntry(idx, { localitiesLoading: false });
+    }
   };
 
   const toggleLocality = (idx: number, loc: { id: string; name: string }) => {
@@ -156,11 +186,20 @@ function OnboardingForm() {
   };
 
   const addCoverageEntry = () => {
-    setCoverageEntries(prev => [...prev, { stateId: '', stateName: '', cityId: '', cityName: '', selectedLocalities: [], cities: [], localities: [] }]);
+    setCoverageEntries(prev => [...prev, { citySearch: '', citySuggestions: [], showCitySuggestions: false, cityId: '', cityName: '', selectedLocalities: [], localities: [], localitiesLoading: false }]);
   };
 
   const removeCoverageEntry = (idx: number) => {
     setCoverageEntries(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { setError('Profile image must be under 3 MB'); return; }
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    if (avatarInputRef.current) avatarInputRef.current.value = '';
   };
 
   const redirect = searchParams.get('redirect') || '/';
@@ -171,8 +210,8 @@ function OnboardingForm() {
     return null;
   }
 
-  // If onboarding already completed, redirect away immediately — never show again
-  if (!authLoading && user && user.needsOnboarding === false && user.name?.trim()) {
+  // If onboarding already completed, redirect away — UNLESS this is a role upgrade
+  if (!authLoading && user && user.needsOnboarding === false && user.name?.trim() && !isUpgrade) {
     router.replace(redirect);
     return null;
   }
@@ -185,60 +224,103 @@ function OnboardingForm() {
     if (selectedRole === 'agent') {
       if (!agencyName.trim()) { setError('Business / Agency Name is required.'); return; }
       if (!contactPhone.trim()) { setError('Contact Phone is required.'); return; }
-      if (!agentExperience) { setError('Years of Experience is required.'); return; }
-      if (!businessAddress.trim()) { setError('Business Address is required.'); return; }
+      if (!isUpgrade && !agentExperience) { setError('Years of Experience is required.'); return; }
+      if (!isUpgrade && !businessAddress.trim()) { setError('Business Address is required.'); return; }
       const firstEntry = coverageEntries[0];
-      if (!firstEntry.stateId) { setError('Please select at least one coverage State.'); return; }
       if (!firstEntry.cityId) { setError('Please select at least one coverage City.'); return; }
     }
     setLoading(true);
     setError('');
     try {
       const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
-      const payload: any = { role: selectedRole, name: fullName };
-      if (selectedRole === 'agent') {
-        payload.agencyName    = agencyName.trim();
-        payload.contactPhone  = contactPhone.trim();
-        payload.agentExperience = Number(agentExperience);
-        payload.businessAddress = businessAddress.trim();
-        if (agentLicense.trim()) payload.agentLicense = agentLicense.trim();
-      }
 
-      const { data } = await authApi.completeOnboarding(payload);
-      // Re-login so token is stored before coverage call; this also updates localStorage
-      // so any in-flight refresh() call will be overridden with the new needsOnboarding:false state
-      login(data.token, data.user, data.menus);
+      if (isUpgrade) {
+        // Existing buyer upgrading role — use upgradeRole endpoint
+        const { data } = await authApi.upgradeRole(selectedRole as 'owner' | 'agent');
+        login(data.token || data.accessToken, data.user, data.menus);
 
-      // Add all coverage entries for agents
-      if (selectedRole === 'agent') {
-        for (const entry of coverageEntries) {
-          if (!entry.cityId) continue;
-          if (entry.selectedLocalities.length > 0) {
-            // Create one coverage entry per selected locality
-            for (const loc of entry.selectedLocalities) {
+        // Update name if it was changed
+        if (fullName && fullName !== user?.name) {
+          await authApi.updateProfile({ name: fullName }).catch(() => {});
+        }
+
+        // Upload avatar if selected
+        if (avatarFile) {
+          try { await authApi.uploadAvatar(avatarFile); } catch {}
+        }
+
+        // For agents: register agency and add coverage
+        if (selectedRole === 'agent') {
+          if (agencyName.trim()) {
+            await agencyApi.selfRegisterOrJoin({
+              agencyName: agencyName.trim(),
+              contactPhone: contactPhone.trim() || undefined,
+              address: businessAddress.trim() || undefined,
+            }).catch(() => {});
+          }
+          for (const entry of coverageEntries) {
+            if (!entry.cityId) continue;
+            if (entry.selectedLocalities.length > 0) {
+              for (const loc of entry.selectedLocalities) {
+                await agencyApi.addMyLocation({
+                  coverageType: 'locality',
+                  cityId: entry.cityId, cityName: entry.cityName,
+                  localityId: loc.id, localityName: loc.name,
+                }).catch(() => {});
+              }
+            } else {
               await agencyApi.addMyLocation({
-                coverageType: 'locality',
-                stateId: entry.stateId, stateName: entry.stateName,
+                coverageType: 'city',
                 cityId: entry.cityId, cityName: entry.cityName,
-                localityId: loc.id, localityName: loc.name,
               }).catch(() => {});
             }
-          } else {
-            // City-level coverage
-            await agencyApi.addMyLocation({
-              coverageType: 'city',
-              stateId: entry.stateId, stateName: entry.stateName,
-              cityId: entry.cityId, cityName: entry.cityName,
-            }).catch(() => {});
+          }
+        }
+      } else {
+        // New user — standard onboarding flow
+        const payload: any = { role: selectedRole, name: fullName };
+        if (selectedRole === 'agent') {
+          payload.agencyName      = agencyName.trim();
+          payload.contactPhone    = contactPhone.trim();
+          payload.agentExperience = Number(agentExperience);
+          payload.businessAddress = businessAddress.trim();
+          if (agentLicense.trim()) payload.agentLicense = agentLicense.trim();
+          if (agentGstNumber.trim()) (payload as any).agentGstNumber = agentGstNumber.trim();
+        }
+
+        const { data } = await authApi.completeOnboarding(payload);
+        login(data.token, data.user, data.menus);
+
+        // Upload avatar if selected
+        if (avatarFile) {
+          try { await authApi.uploadAvatar(avatarFile); } catch {}
+        }
+
+        // Add coverage entries for agents
+        if (selectedRole === 'agent') {
+          for (const entry of coverageEntries) {
+            if (!entry.cityId) continue;
+            if (entry.selectedLocalities.length > 0) {
+              for (const loc of entry.selectedLocalities) {
+                await agencyApi.addMyLocation({
+                  coverageType: 'locality',
+                  cityId: entry.cityId, cityName: entry.cityName,
+                  localityId: loc.id, localityName: loc.name,
+                }).catch(() => {});
+              }
+            } else {
+              await agencyApi.addMyLocation({
+                coverageType: 'city',
+                cityId: entry.cityId, cityName: entry.cityName,
+              }).catch(() => {});
+            }
           }
         }
       }
 
-      // Re-fetch fresh profile so needsOnboarding:false is confirmed in auth state
-      // (prevents any in-flight background refresh from overwriting with stale data)
+      // Re-fetch fresh profile for both paths
       await refreshAuth();
 
-      // Honour ?redirect= param if present, otherwise go to role dashboard
       if (redirect && redirect !== '/') {
         router.replace(redirect);
       } else {
@@ -280,13 +362,15 @@ function OnboardingForm() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-xs font-semibold mb-4">
               <Zap className="w-3.5 h-3.5" />
-              Almost there — one last step
+              {isUpgrade ? 'Set up your listing account' : 'Almost there — one last step'}
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-gray-900 mb-2">
-              How are you using Think4BuySale?
+              {isUpgrade ? 'Complete your profile to post' : 'How are you using Think4BuySale?'}
             </h1>
             <p className="text-gray-500 text-sm sm:text-base max-w-sm mx-auto leading-relaxed">
-              Choose your role so we can personalise your experience and show you the right tools.
+              {isUpgrade
+                ? 'Tell us a bit about yourself so we can set up your listing account.'
+                : 'Choose your role so we can personalise your experience and show you the right tools.'}
             </p>
           </div>
 
@@ -395,6 +479,43 @@ function OnboardingForm() {
                 <Star className="w-3.5 h-3.5" />
                 Agent Profile
               </div>
+
+              {/* Profile Photo */}
+              <div className="flex items-center gap-4 pb-3 border-b border-violet-200">
+                <div className="relative flex-shrink-0">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center overflow-hidden ring-2 ring-white shadow-md">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-7 h-7 text-white" />
+                    )}
+                  </div>
+                  <label className="absolute -bottom-1 -right-1 w-6 h-6 bg-white border border-violet-300 rounded-full flex items-center justify-center cursor-pointer shadow-sm hover:bg-violet-50 transition-colors">
+                    <Camera className="w-3 h-3 text-violet-600" />
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-700">Profile Photo</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Upload a professional photo <span className="text-violet-500">(optional)</span></p>
+                  {avatarPreview && (
+                    <button
+                      type="button"
+                      onClick={() => { setAvatarFile(null); setAvatarPreview(null); }}
+                      className="text-[11px] text-red-500 hover:text-red-600 mt-0.5"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-gray-600 mb-1">
@@ -446,6 +567,19 @@ function OnboardingForm() {
                     className="w-full px-3 py-2.5 border border-violet-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    GST Number <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={agentGstNumber}
+                    onChange={(e) => setAgentGstNumber(e.target.value.toUpperCase())}
+                    placeholder="e.g. 27AAPFU0939F1ZV"
+                    maxLength={15}
+                    className="w-full px-3 py-2.5 border border-violet-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                  />
+                </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-gray-600 mb-1">
                     Business Address <span className="text-red-500">*</span>
@@ -462,7 +596,10 @@ function OnboardingForm() {
                 {/* Coverage Area */}
                 <div className="sm:col-span-2">
                   <div className="border-t border-violet-200 pt-3 mt-1">
-                    <p className="text-xs font-bold text-violet-700 mb-2">Coverage Areas <span className="text-red-500">*</span></p>
+                    <p className="text-xs font-bold text-violet-700 mb-2 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5" />
+                      Coverage Areas <span className="text-red-500">*</span>
+                    </p>
                     <div className="space-y-3">
                       {coverageEntries.map((entry, idx) => (
                         <div key={idx} className="border border-violet-100 rounded-xl p-3 bg-white relative">
@@ -478,37 +615,53 @@ function OnboardingForm() {
                           <p className="text-[10px] font-semibold text-violet-600 mb-2">
                             {idx === 0 ? 'Primary Area' : `Area ${idx + 1}`}
                           </p>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-600 mb-1">State</label>
-                              <select
-                                value={entry.stateId}
-                                onChange={(e) => handleStateChange(idx, e.target.value)}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {/* City auto-search */}
+                            <div className="relative">
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">City <span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={entry.citySearch}
+                                onChange={(e) => handleCitySearch(idx, e.target.value)}
+                                onFocus={() => entry.citySuggestions.length > 0 && updateEntry(idx, { showCitySuggestions: true })}
+                                placeholder="Type to search city..."
                                 className="w-full px-3 py-2 border border-violet-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
-                              >
-                                <option value="">Select state</option>
-                                {states.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                              </select>
+                              />
+                              {entry.cityId && (
+                                <CheckCircle2 className="absolute right-2.5 top-1/2 translate-y-1 w-3.5 h-3.5 text-violet-500" />
+                              )}
+                              {entry.showCitySuggestions && entry.citySuggestions.length > 0 && (
+                                <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-violet-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                  {entry.citySuggestions.map((c) => (
+                                    <button
+                                      key={c.id}
+                                      type="button"
+                                      onMouseDown={() => handleCitySelect(idx, c)}
+                                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-violet-50 transition-colors"
+                                    >
+                                      {c.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-600 mb-1">City</label>
-                              <select
-                                value={entry.cityId}
-                                disabled={!entry.stateId || entry.cities.length === 0}
-                                onChange={(e) => handleCityChange(idx, e.target.value)}
-                                className="w-full px-3 py-2 border border-violet-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
-                              >
-                                <option value="">Select city</option>
-                                {entry.cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                              </select>
-                            </div>
+
+                            {/* Localities */}
                             <div>
                               <label className="block text-xs font-semibold text-gray-600 mb-1">
-                                Localities <span className="text-gray-400 font-normal">(optional, multi-select)</span>
+                                Localities <span className="text-gray-400 font-normal">(optional)</span>
                               </label>
-                              {!entry.cityId || entry.localities.length === 0 ? (
+                              {!entry.cityId ? (
                                 <div className="w-full px-3 py-2 border border-violet-100 rounded-lg text-xs text-gray-400 bg-gray-50">
-                                  {entry.cityId ? 'No localities available' : 'Select city first'}
+                                  Select city first
+                                </div>
+                              ) : entry.localitiesLoading ? (
+                                <div className="w-full px-3 py-2 border border-violet-100 rounded-lg text-xs text-gray-400 bg-gray-50 flex items-center gap-1.5">
+                                  <Loader2 className="w-3 h-3 animate-spin" /> Loading…
+                                </div>
+                              ) : entry.localities.length === 0 ? (
+                                <div className="w-full px-3 py-2 border border-violet-100 rounded-lg text-xs text-gray-400 bg-gray-50">
+                                  No localities available
                                 </div>
                               ) : (
                                 <>
@@ -589,7 +742,9 @@ function OnboardingForm() {
           >
             {loading
               ? <><Loader2 className="w-5 h-5 animate-spin" /> Setting up your account…</>
-              : <>Continue as {selectedDef.label} <ChevronRight className="w-5 h-5" /></>
+              : isUpgrade
+                ? <>Start Posting as {selectedDef.label} <ChevronRight className="w-5 h-5" /></>
+                : <>Continue as {selectedDef.label} <ChevronRight className="w-5 h-5" /></>
             }
           </button>
 

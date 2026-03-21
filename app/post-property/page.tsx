@@ -1123,10 +1123,14 @@ function Step4Location({ form, dispatch }: any) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
+  const formRef = useRef(form);
   const cityRef = useRef<HTMLDivElement>(null);
   const localityRef = useRef<HTMLDivElement>(null);
   const cityDebounceRef = useRef<NodeJS.Timeout>();
   const localityDebounceRef = useRef<NodeJS.Timeout>();
+
+  // Keep formRef current so async callbacks always read the latest values
+  formRef.current = form;
 
   // ── Async city search — debounced ─────────────────────────────────────────
   const fetchCities = (search: string) => {
@@ -1144,13 +1148,22 @@ function Step4Location({ form, dispatch }: any) {
   useEffect(() => {
     if (!form.city) { setLocalities([]); setLocalitySearch(''); setShowLocalityList(false); return; }
     setLocalitiesLoading(true);
-    setLocalitySearch('');
+    // In edit mode (form.localityId already set), preserve the locality text until we know
+    // whether it exists in the fetched list. Only clear for a fresh city pick.
+    if (!form.localityId) setLocalitySearch('');
     locationsApi.getLocalities(form.city).then(r => {
       const d = r.data;
       const locs = Array.isArray(d) ? d : [];
       setLocalities(locs);
-      if (form.localityId && !locs.find((l: any) => l.id === form.localityId)) {
-        dispatch(updateForm({ localityId: '', locality: '', pincode: '', latitude: null, longitude: null }));
+      if (form.localityId) {
+        const found = locs.find((l: any) => l.id === form.localityId);
+        if (found) {
+          // Locality confirmed in DB — show its name in the input
+          setLocalitySearch(found.locality || found.city || form.locality || '');
+        } else {
+          // Not in initial batch (pagination) — preserve the pre-filled locality data
+          setLocalitySearch(form.locality || '');
+        }
       }
     }).catch(() => setLocalities([])).finally(() => setLocalitiesLoading(false));
   }, [form.city]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1175,9 +1188,11 @@ function Step4Location({ form, dispatch }: any) {
     loadLeafletCDN().then((L) => {
       if (destroyed || !mapContainerRef.current || mapInstanceRef.current) return;
 
-      const lat = form.latitude || 20.5937;
-      const lng = form.longitude || 78.9629;
-      const zoom = form.latitude ? 15 : 5;
+      // Use formRef.current to get the latest coords — avoids stale closure
+      // (the promise may resolve after the Redux state has been populated with edit data)
+      const lat = formRef.current.latitude || 20.5937;
+      const lng = formRef.current.longitude || 78.9629;
+      const zoom = formRef.current.latitude ? 15 : 5;
 
       const map = L.map(mapContainerRef.current, {
         zoomControl: true,
@@ -1187,7 +1202,6 @@ function Step4Location({ form, dispatch }: any) {
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19,
-        crossOrigin: true,
       }).addTo(map);
 
       const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
@@ -1207,8 +1221,16 @@ function Step4Location({ form, dispatch }: any) {
       markerRef.current = marker;
 
       // Force tile re-render after the container is fully painted in the DOM
+      // Also re-sync position in case coords arrived after effect setup
       sizeTimer = setTimeout(() => {
-        if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
+        if (!mapInstanceRef.current) return;
+        mapInstanceRef.current.invalidateSize();
+        const curLat = formRef.current.latitude;
+        const curLng = formRef.current.longitude;
+        if (curLat && curLng) {
+          markerRef.current?.setLatLng([curLat, curLng]);
+          mapInstanceRef.current.setView([curLat, curLng], 15);
+        }
       }, 300);
     }).catch(() => {});
 
@@ -2101,6 +2123,9 @@ function PostPropertyPageInner() {
 
   const TOTAL_STEPS = 10;
   const isAgent = user?.role === 'agent' || user?.role === 'seller';
+  const agentProfStatus = (user as any)?.agentProfileStatus;
+  const showProfPendingBanner = isAgent && agentProfStatus === 'pending';
+  const showProfInactiveBanner = isAgent && (agentProfStatus === 'inactive' || user?.isActive === false);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/post-property/guest');
@@ -2321,7 +2346,7 @@ function PostPropertyPageInner() {
         dispatch(updateForm({
           mainCategory: property.category || '',
           categoryId: category?.id || '',
-          listingType: property.listingType || IMPLICIT_LISTING[property.category] || '',
+          listingType: property.listingType || IMPLICIT_LISTING[property.category] || 'buy',
           propertyType: property.type || '',
           typeId,
           city: property.city || '',
@@ -2665,6 +2690,26 @@ function PostPropertyPageInner() {
                 {isAgent ? '🏢 Agent Listing' : '🏠 Owner Listing'}
               </span>
             </div>
+
+            {/* Agent profile status banners */}
+            {showProfInactiveBanner && (
+              <div className="mb-4 flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+                <span className="text-lg leading-none mt-0.5">🚫</span>
+                <div>
+                  <p className="font-semibold">Professional profile inactive</p>
+                  <p className="text-xs mt-0.5">Your professional profile has been deactivated. To post properties, please contact admin: <strong>@think4buysale</strong></p>
+                </div>
+              </div>
+            )}
+            {!showProfInactiveBanner && showProfPendingBanner && (
+              <div className="mb-4 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
+                <span className="text-lg leading-none mt-0.5">⏳</span>
+                <div>
+                  <p className="font-semibold">Professional profile under review</p>
+                  <p className="text-xs mt-0.5">Your professional details are pending admin approval. You can still post properties in the meantime.</p>
+                </div>
+              </div>
+            )}
 
             {/* Form card — full bleed on mobile, rounded on sm+ */}
             <div className="bg-white rounded-none sm:rounded-3xl shadow-none sm:shadow-sm border-y sm:border border-gray-100 p-5 sm:p-8 lg:p-10 mb-4 sm:mb-6">

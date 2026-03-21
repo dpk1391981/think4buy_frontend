@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Home, User, LogOut, Settings, Heart, MapPin, Building2, TrendingUp, Search, X, Plus, Menu } from 'lucide-react';
+import { ChevronDown, Home, User, LogOut, Settings, Heart, MapPin, Building2, TrendingUp, Search, X, Plus, Menu, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { openAuthModal, setSelectedCity, loadCityFromLS, saveCityToLS } from '@/lib/store/slices/uiSlice';
 import { locationsApi } from '@/lib/api';
+import { resolveImageSrc } from '@/components/common/OptimizedImage';
 import { detectLocation } from '@/lib/geolocation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -472,10 +473,12 @@ function UserMenu({ compact = false }: { compact?: boolean }) {
         )}
       >
         <div className={cn(
-          'rounded-full bg-primary-600 flex items-center justify-center text-white font-bold flex-shrink-0',
+          'rounded-full bg-primary-600 flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden',
           compact ? 'w-8 h-8 text-xs' : 'w-8 h-8 text-xs'
         )}>
-          {initials}
+          {(user?.avatar || user?.pendingAvatar)
+            ? <img src={resolveImageSrc(user.avatar || user.pendingAvatar)} alt={user?.name || ''} className="w-full h-full object-cover" />
+            : initials}
         </div>
         {!compact && (
           <div className="hidden lg:block text-left">
@@ -669,8 +672,10 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-              {initials}
+            <div className="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 overflow-hidden">
+              {(user?.avatar || user?.pendingAvatar)
+                ? <img src={resolveImageSrc(user.avatar || user.pendingAvatar)} alt={user?.name || ''} className="w-full h-full object-cover" />
+                : initials}
             </div>
             <div className="min-w-0">
               <div className="font-semibold text-gray-900 text-sm truncate">{user?.name}</div>
@@ -881,6 +886,17 @@ export default function Header() {
         scrolled ? 'shadow-md' : 'border-b border-gray-100'
       )}
     >
+      {/* Admin mode banner */}
+      {user?.role === 'admin' && (
+        <div className="bg-red-600 text-white text-xs flex items-center justify-center gap-3 px-4 py-1.5">
+          <Shield className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="font-semibold">Admin Mode</span>
+          <span className="hidden sm:inline text-red-200">— You are browsing as administrator</span>
+          <Link href="/admin" className="ml-2 bg-white/20 hover:bg-white/30 text-white font-semibold px-2.5 py-0.5 rounded-full text-[11px] transition-colors">
+            Admin Panel →
+          </Link>
+        </div>
+      )}
       {/* ─── Mobile Header ────────────────────────────────────────────────── */}
       <div className="lg:hidden flex items-center justify-between h-14 px-4 gap-2">
         {/* Logo */}

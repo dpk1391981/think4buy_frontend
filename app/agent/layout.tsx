@@ -42,7 +42,7 @@ const NAV_GROUPS = [
   {
     label: 'Account',
     items: [
-      { href: '/agent/agency',       label: 'My Agency',    icon: Building2 },
+      { href: '/agent/agency',       label: 'My Coverage',  icon: Building2 },
       { href: '/agent/wallet',       label: 'Wallet',        icon: Wallet },
       { href: '/agent/subscription', label: 'Subscription',  icon: Crown },
       { href: '/agent/profile',      label: 'Profile',       icon: User },

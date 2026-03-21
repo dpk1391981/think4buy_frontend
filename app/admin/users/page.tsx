@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { adminWalletApi } from '@/lib/api';
+import { resolveImageSrc } from '@/components/common/OptimizedImage';
 
 interface WalletEntry {
   id: string;
@@ -15,6 +16,7 @@ interface WalletEntry {
     role: string;
     phone?: string;
     city?: string;
+    avatar?: string;
     isActive?: boolean;
     agentTick?: string;
   };
@@ -204,9 +206,17 @@ export default function AdminUsersPage() {
                       {/* User */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
+                          {entry.user?.avatar ? (
+                            <img
+                              src={resolveImageSrc(entry.user.avatar)}
+                              alt={entry.user.name}
+                              className="w-9 h-9 rounded-xl object-cover flex-shrink-0"
+                            />
+                          ) : (
                           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">
                             {entry.user?.name?.charAt(0).toUpperCase() || '?'}
                           </div>
+                          )}
                           <div>
                             <div className="font-semibold text-gray-900 flex items-center gap-1">
                               {entry.user?.name}

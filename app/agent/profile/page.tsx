@@ -1,172 +1,108 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { authApi, agencyApi, locationsApi } from '@/lib/api';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { authApi, agencyApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import AvatarUpload from '@/components/common/AvatarUpload';
+import {
+  MapPin, Briefcase, ArrowRight, Plus, Pencil, X, Check,
+  Mail, Phone, Building2, BadgeCheck, FileText, Clock,
+  ChevronRight, AlertCircle,
+} from 'lucide-react';
 
 interface ProfileForm {
   name: string;
   phone: string;
-  city: string;
   company: string;
   agentLicense: string;
+  agentGstNumber: string;
   agentBio: string;
   agentExperience: string;
 }
 
-interface LocationEntry {
-  id: string;
-  coverageType: 'state' | 'city' | 'locality';
-  stateName?: string;
-  cityName?: string;
-  localityName?: string;
-  stateSlug?: string;
-  citySlug?: string;
-  localitySlug?: string;
-  isActive?: boolean;
-}
-
-interface StateOption { id: string; name: string; slug?: string; }
-interface CityOption  { id: string; name: string; slug?: string; stateId?: string; }
-interface LocalityOption { id: string; name: string; slug?: string; }
-
 export default function AgentProfilePage() {
   const { user, refresh } = useAuth();
-  const [form, setForm] = useState<ProfileForm>({
-    name: '',
-    phone: '',
-    city: '',
-    company: '',
-    agentLicense: '',
-    agentBio: '',
-    agentExperience: '',
-  });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  // Coverage areas
-  const [locations, setLocations] = useState<LocationEntry[]>([]);
-  const [locLoading, setLocLoading] = useState(false);
-  const [states, setStates] = useState<StateOption[]>([]);
-  const [cities, setCities] = useState<CityOption[]>([]);
-  const [localities, setLocalities] = useState<LocalityOption[]>([]);
-  const [newLoc, setNewLoc] = useState<{
-    coverageType: 'state' | 'city' | 'locality';
-    stateId: string; stateName: string;
-    // For type='city': multiple cities can be selected
-    selectedCities: { id: string; name: string }[];
-    // For type='locality': single city to load localities, then multiple localities
-    cityId: string; cityName: string;
-    selectedLocalities: { id: string; name: string }[];
-  }>({ coverageType: 'city', stateId: '', stateName: '', selectedCities: [], cityId: '', cityName: '', selectedLocalities: [] });
-  const [addingLoc, setAddingLoc] = useState(false);
+  const [form, setForm] = useState<ProfileForm>({
+    name: '', phone: '', company: '',
+    agentLicense: '', agentGstNumber: '', agentBio: '', agentExperience: '',
+  });
+
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState(false);
+  const [toast, setToast]       = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  const [profStatus, setProfStatus] = useState<'none' | 'pending' | 'approved' | 'inactive'>('none');
+  const [coverageAreas, setCoverageAreas] = useState<{
+    id: string; coverageType: string; cityName?: string; localityName?: string;
+  }[]>([]);
+
+  // Email inline-edit state
+  const [emailEdit, setEmailEdit]       = useState(false);
+  const [emailValue, setEmailValue]     = useState('');
+  const [emailSaving, setEmailSaving]   = useState(false);
+  const [emailChanged, setEmailChanged] = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    agencyApi.getMyLocations()
+      .then((r) => setCoverageAreas(r.data || []))
+      .catch(() => {});
+
     authApi.getProfile()
       .then((r) => {
         const d = r.data;
         setForm({
           name: d.name || '',
           phone: d.phone || '',
-          city: d.city || '',
           company: d.company || '',
           agentLicense: d.agentLicense || '',
+          agentGstNumber: d.agentGstNumber || '',
           agentBio: d.agentBio || '',
           agentExperience: d.agentExperience ? String(d.agentExperience) : '',
         });
+        setEmailValue(d.email || '');
+        setProfStatus(d.agentProfileStatus || 'none');
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
-  // Load coverage areas and states on mount
-  useEffect(() => {
-    agencyApi.getMyLocations().then((r) => setLocations(r.data || [])).catch(console.error);
-    locationsApi.getStates().then((r) => setStates(r.data || [])).catch(console.error);
-  }, []);
-
-  // Load cities when state changes
-  useEffect(() => {
-    if (!newLoc.stateId) { setCities([]); setLocalities([]); return; }
-    locationsApi.getCitiesByState(newLoc.stateId)
-      .then((r) => setCities(r.data || []))
-      .catch(console.error);
-    setLocalities([]);
-    setNewLoc((p) => ({ ...p, selectedCities: [], cityId: '', cityName: '', selectedLocalities: [] }));
-  }, [newLoc.stateId]);
-
-  // Load localities when city changes (for locality coverage type)
-  useEffect(() => {
-    if (!newLoc.cityName) { setLocalities([]); return; }
-    locationsApi.getLocalities(newLoc.cityName)
-      .then((r) => setLocalities(r.data || []))
-      .catch(console.error);
-    setNewLoc((p) => ({ ...p, selectedLocalities: [] }));
-  }, [newLoc.cityName]);
-
-  async function handleAddLocation() {
-    const { coverageType, stateId, stateName, selectedCities, cityId, cityName, selectedLocalities } = newLoc;
-    if (coverageType === 'state' && !stateId) { showToast('error', 'Select a state.'); return; }
-    if (coverageType === 'city' && selectedCities.length === 0) { showToast('error', 'Select at least one city.'); return; }
-    if (coverageType === 'locality' && !cityId) { showToast('error', 'Select a city.'); return; }
-    if (coverageType === 'locality' && selectedLocalities.length === 0) { showToast('error', 'Select at least one locality.'); return; }
-    setAddingLoc(true);
-    try {
-      if (coverageType === 'city') {
-        for (const city of selectedCities) {
-          await agencyApi.addMyLocation({
-            coverageType: 'city',
-            stateId, stateName,
-            cityId: city.id, cityName: city.name,
-          });
-        }
-      } else if (coverageType === 'locality') {
-        for (const loc of selectedLocalities) {
-          await agencyApi.addMyLocation({
-            coverageType: 'locality',
-            stateId, stateName,
-            cityId, cityName,
-            localityId: loc.id, localityName: loc.name,
-          });
-        }
-      } else {
-        await agencyApi.addMyLocation({ coverageType: 'state', stateId, stateName });
-      }
-      const refreshed = await agencyApi.getMyLocations();
-      setLocations(refreshed.data || []);
-      setNewLoc({ coverageType: 'city', stateId: '', stateName: '', selectedCities: [], cityId: '', cityName: '', selectedLocalities: [] });
-      showToast('success', 'Coverage area added.');
-    } catch (e: any) {
-      showToast('error', e?.response?.data?.message || 'Failed to add coverage area.');
-    } finally {
-      setAddingLoc(false);
-    }
-  }
-
-  async function handleRemoveLocation(id: string) {
-    setLocLoading(true);
-    try {
-      await agencyApi.removeMyLocation(id);
-      setLocations((prev) => prev.filter((l) => l.id !== id));
-      showToast('success', 'Coverage area removed.');
-    } catch (e: any) {
-      showToast('error', e?.response?.data?.message || 'Failed to remove coverage area.');
-    } finally {
-      setLocLoading(false);
-    }
-  }
-
-  function coverageLabel(loc: LocationEntry) {
-    if (loc.coverageType === 'locality') return `${loc.localityName}, ${loc.cityName}, ${loc.stateName}`;
-    if (loc.coverageType === 'city') return `${loc.cityName}, ${loc.stateName}`;
-    return loc.stateName || 'Unknown';
-  }
-
   function showToast(type: 'success' | 'error', msg: string) {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 3500);
+  }
+
+  function openEmailEdit() {
+    setEmailValue(user?.email || '');
+    setEmailEdit(true);
+    setTimeout(() => emailInputRef.current?.focus(), 50);
+  }
+
+  function cancelEmailEdit() {
+    setEmailEdit(false);
+    setEmailValue(user?.email || '');
+  }
+
+  async function saveEmail() {
+    const trimmed = emailValue.trim();
+    if (!trimmed || trimmed === user?.email) { setEmailEdit(false); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      showToast('error', 'Enter a valid email address.');
+      return;
+    }
+    setEmailSaving(true);
+    try {
+      await authApi.updateProfile({ email: trimmed } as any);
+      await refresh();
+      setEmailEdit(false);
+      setEmailChanged(true);
+      showToast('success', 'Email updated. Please verify your new email.');
+    } catch (e: any) {
+      showToast('error', e?.response?.data?.message || 'Failed to update email.');
+    } finally {
+      setEmailSaving(false);
+    }
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -176,10 +112,10 @@ export default function AgentProfilePage() {
     try {
       await authApi.updateProfile({
         name: form.name.trim(),
-        city: form.city.trim() || undefined,
         company: form.company.trim() || undefined,
         ...({ phone: form.phone.trim() || undefined } as any),
         ...({ agentLicense: form.agentLicense.trim() || undefined } as any),
+        ...({ agentGstNumber: form.agentGstNumber.trim() || undefined } as any),
         ...({ agentBio: form.agentBio.trim() || undefined } as any),
         ...({ agentExperience: form.agentExperience ? parseInt(form.agentExperience) : undefined } as any),
       });
@@ -192,360 +128,399 @@ export default function AgentProfilePage() {
     }
   }
 
+  /* ── Badge helpers ────────────────────────────────────────────────────────── */
+  const tickColors: Record<string, string> = {
+    blue:    'bg-blue-100 text-blue-700 border-blue-200',
+    gold:    'bg-yellow-100 text-yellow-700 border-yellow-200',
+    diamond: 'bg-purple-100 text-purple-700 border-purple-200',
+  };
+  const tickIcon: Record<string, string> = { blue: '✓', gold: '★', diamond: '◆' };
+
+  /* ── Loading skeleton ─────────────────────────────────────────────────────── */
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-6" />
-        <div className="space-y-4">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-12 bg-gray-200 rounded-lg animate-pulse" />
+      <div className="animate-pulse">
+        <div className="h-48 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-b-3xl mb-16" />
+        <div className="px-4 space-y-4 max-w-2xl mx-auto">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-16 bg-gray-200 rounded-xl" />
           ))}
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-        <p className="text-gray-500 text-sm mt-1">Update your personal and professional information</p>
-      </div>
+  const hasBadge = user?.agentTick && user.agentTick !== 'none';
 
-      {/* Toast */}
+  return (
+    <div className="min-h-screen bg-gray-50 pb-12">
+
+      {/* ── Toast ─────────────────────────────────────────────────────────────── */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium transition-all ${
-          toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+        <div className={`fixed top-5 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-sm font-medium max-w-xs ${
+          toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
         }`}>
-          {toast.type === 'success' ? '✓ ' : '✕ '}{toast.msg}
+          {toast.type === 'success'
+            ? <Check className="w-4 h-4 flex-shrink-0" />
+            : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+          {toast.msg}
         </div>
       )}
 
-      <form onSubmit={handleSave} className="max-w-2xl space-y-6">
-        {/* Avatar */}
-        <div className="bg-white rounded-xl shadow-sm p-6 flex items-center gap-5">
-          <AvatarUpload size={88} />
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-900 text-base">{user?.name}</span>
-              {user?.agentTick && user.agentTick !== 'none' && (
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${
-                  user.agentTick === 'blue'    ? 'bg-blue-100 text-blue-700' :
-                  user.agentTick === 'gold'    ? 'bg-yellow-100 text-yellow-700' :
-                  user.agentTick === 'diamond' ? 'bg-purple-100 text-purple-700' : ''
+      {/* ── Hero banner ───────────────────────────────────────────────────────── */}
+      <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 pb-20 pt-6 px-4">
+        {/* Decorative blobs */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/4 pointer-events-none" />
+
+        <div className="relative max-w-2xl mx-auto">
+          <h1 className="text-white font-bold text-xl mb-1 opacity-90">My Profile</h1>
+          <p className="text-blue-200 text-sm">Manage your personal &amp; professional info</p>
+        </div>
+      </div>
+
+      <div className="max-w-2xl mx-auto px-4 -mt-14 space-y-4">
+
+        {/* ── Identity card ─────────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+          <div className="p-5 flex flex-col sm:flex-row items-center sm:items-start gap-5">
+
+            {/* Avatar */}
+            <div className="flex-shrink-0">
+              <AvatarUpload size={96} />
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 min-w-0 text-center sm:text-left">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <span className="text-lg font-bold text-gray-900 truncate">{user?.name}</span>
+                {hasBadge && (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${tickColors[user!.agentTick!]}`}>
+                    {tickIcon[user!.agentTick!]} {user!.agentTick!.charAt(0).toUpperCase() + user!.agentTick!.slice(1)} Badge
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-1.5 text-sm text-gray-500">
+                <span className="capitalize bg-gray-100 px-2 py-0.5 rounded-full text-xs font-medium text-gray-600">
+                  {user?.role}
+                </span>
+                {form.agentExperience && (
+                  <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                    <Briefcase className="w-3.5 h-3.5 text-violet-400" />
+                    {form.agentExperience} yr{Number(form.agentExperience) !== 1 ? 's' : ''} exp
+                  </span>
+                )}
+              </div>
+
+              {/* Coverage pills */}
+              <div className="mt-3">
+                <div className="flex items-center justify-center sm:justify-start gap-1.5 mb-2">
+                  <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Coverage Areas</span>
+                </div>
+                {coverageAreas.length === 0 ? (
+                  <Link
+                    href="/agent/agency"
+                    className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add coverage areas
+                  </Link>
+                ) : (
+                  <div className="flex flex-wrap justify-center sm:justify-start gap-1.5">
+                    {coverageAreas.slice(0, 6).map((loc) => (
+                      <span
+                        key={loc.id}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                          loc.coverageType === 'locality'
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : 'bg-blue-50 text-blue-700 border-blue-200'
+                        }`}
+                      >
+                        <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                        {loc.coverageType === 'locality'
+                          ? `${loc.localityName}, ${loc.cityName}`
+                          : loc.cityName}
+                      </span>
+                    ))}
+                    {coverageAreas.length > 6 && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                        +{coverageAreas.length - 6} more
+                      </span>
+                    )}
+                    <Link
+                      href="/agent/agency"
+                      className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-medium text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors"
+                    >
+                      Edit <ArrowRight className="w-2.5 h-2.5" />
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Account details ───────────────────────────────────────────────── */}
+        <form onSubmit={handleSave} className="space-y-4">
+
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+              <Mail className="w-4 h-4 text-blue-500" />
+              <h2 className="font-semibold text-gray-800 text-sm">Account Details</h2>
+            </div>
+
+            <div className="divide-y divide-gray-50">
+
+              {/* Name */}
+              <div className="px-5 py-4">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Full Name *</label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Your full name"
+                  required
+                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                />
+              </div>
+
+              {/* Email */}
+              <div className="px-5 py-4">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Email Address</label>
+                {emailEdit ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={emailInputRef}
+                      type="email"
+                      value={emailValue}
+                      onChange={(e) => setEmailValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); saveEmail(); }
+                        if (e.key === 'Escape') cancelEmailEdit();
+                      }}
+                      className="flex-1 border border-blue-300 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                      placeholder="new@email.com"
+                      autoComplete="email"
+                    />
+                    <button
+                      type="button"
+                      onClick={saveEmail}
+                      disabled={emailSaving}
+                      className="flex-shrink-0 w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center disabled:opacity-50 transition-colors"
+                      aria-label="Save email"
+                    >
+                      {emailSaving
+                        ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        : <Check className="w-4 h-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelEmailEdit}
+                      className="flex-shrink-0 w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors"
+                      aria-label="Cancel"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center gap-2 border border-gray-100 bg-gray-50 rounded-xl px-3.5 py-2.5 text-sm text-gray-600 min-w-0">
+                      <span className="truncate">{user?.email}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={openEmailEdit}
+                      className="flex-shrink-0 w-9 h-9 rounded-xl bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-500 flex items-center justify-center transition-colors"
+                      aria-label="Edit email"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                {emailChanged && !emailEdit && (
+                  <p className="mt-1.5 text-xs text-amber-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    Please verify your new email address to confirm the change.
+                  </p>
+                )}
+              </div>
+
+              {/* Phone */}
+              <div className="px-5 py-4">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-gray-400" /> Phone Number
+                  </span>
+                </label>
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                  placeholder="+91 XXXXX XXXXX"
+                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Professional info ─────────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-violet-500" />
+              <h2 className="font-semibold text-gray-800 text-sm">Professional Details</h2>
+              {profStatus !== 'none' && (
+                <span className={`ml-auto inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                  profStatus === 'approved' ? 'bg-green-50 text-green-700 border-green-200' :
+                  profStatus === 'pending'  ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                  'bg-gray-50 text-gray-500 border-gray-200'
                 }`}>
-                  {user.agentTick === 'blue' ? '✓' : user.agentTick === 'gold' ? '★' : '◆'}
-                  {' '}{user.agentTick.charAt(0).toUpperCase() + user.agentTick.slice(1)} Badge
+                  {profStatus === 'approved' ? '✓ Approved' :
+                   profStatus === 'pending'  ? '⏳ Pending Review' :
+                   'Inactive'}
                 </span>
               )}
             </div>
-            <div className="text-sm text-gray-500 capitalize">{user?.role}</div>
-            <div className="text-xs text-gray-400 mt-0.5">{user?.email}</div>
-          </div>
-        </div>
 
-        {/* Basic Info */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="font-semibold text-gray-800 mb-4">Basic Information</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Full Name *</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Your full name"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
-                value={user?.email || ''}
-                disabled
-                className="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2.5 text-sm text-gray-400 cursor-not-allowed"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="+91 XXXXX XXXXX"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">City</label>
-              <input
-                type="text"
-                value={form.city}
-                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                placeholder="e.g. Mumbai"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </div>
+            <div className="divide-y divide-gray-50">
 
-        {/* Professional Info */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="font-semibold text-gray-800 mb-4">Professional Information</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Company / Agency</label>
-              <input
-                type="text"
-                value={form.company}
-                onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-                placeholder="e.g. XYZ Realty Pvt Ltd"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">License Number</label>
-              <input
-                type="text"
-                value={form.agentLicense}
-                onChange={(e) => setForm((f) => ({ ...f, agentLicense: e.target.value }))}
-                placeholder="e.g. RERA/MH/2024/001234"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Experience (years)</label>
-              <input
-                type="number"
-                min={0}
-                max={60}
-                value={form.agentExperience}
-                onChange={(e) => setForm((f) => ({ ...f, agentExperience: e.target.value }))}
-                placeholder="Years of experience"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-gray-700 mb-1">Bio</label>
-              <textarea
-                value={form.agentBio}
-                onChange={(e) => setForm((f) => ({ ...f, agentBio: e.target.value }))}
-                placeholder="A brief description about yourself and your expertise..."
-                rows={4}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              />
-            </div>
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="px-8 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          {saving ? 'Saving...' : 'Save Changes'}
-        </button>
-      </form>
-
-      {/* Coverage Areas — outside the profile form */}
-      <div className="max-w-2xl mt-8">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="font-semibold text-gray-800 mb-1">Coverage Areas</h2>
-          <p className="text-xs text-gray-500 mb-4">
-            Add the states, cities, or localities you cover. This determines where you appear as a featured agent.
-          </p>
-
-          {/* Add new coverage */}
-          <div className="border border-gray-100 rounded-lg p-4 bg-gray-50 mb-5 space-y-3">
-            {/* Coverage type selector */}
-            <div className="flex gap-2">
-              {(['state', 'city', 'locality'] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setNewLoc((p) => ({ ...p, coverageType: t, selectedCities: [], cityId: '', cityName: '', selectedLocalities: [] }))}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize border transition-colors ${
-                    newLoc.coverageType === t
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            <div className="space-y-3">
-              {/* State */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
-                <select
-                  value={newLoc.stateId}
-                  onChange={(e) => {
-                    const opt = states.find((s) => s.id === e.target.value);
-                    setNewLoc((p) => ({ ...p, stateId: e.target.value, stateName: opt?.name || '' }));
-                  }}
-                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select state</option>
-                  {states.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+              {/* Company */}
+              <div className="px-5 py-4">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Company / Agency</label>
+                <input
+                  type="text"
+                  value={form.company}
+                  onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+                  placeholder="e.g. XYZ Realty Pvt Ltd"
+                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                />
               </div>
 
-              {/* City — multi-select for 'city' type, single for 'locality' type */}
-              {newLoc.coverageType === 'city' && newLoc.stateId && (
+              {/* License + Experience in a row on desktop */}
+              <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Cities <span className="text-gray-400">(select one or more)</span>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <BadgeCheck className="w-3.5 h-3.5 text-gray-400" /> License Number
+                    </span>
                   </label>
-                  {cities.length === 0 ? (
-                    <p className="text-xs text-gray-400">No cities available</p>
-                  ) : (
-                    <>
-                      <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto bg-white">
-                        {cities.map((c) => {
-                          const checked = newLoc.selectedCities.some(s => s.id === c.id);
-                          return (
-                            <label key={c.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-blue-50 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => setNewLoc((p) => ({
-                                  ...p,
-                                  selectedCities: checked
-                                    ? p.selectedCities.filter(s => s.id !== c.id)
-                                    : [...p.selectedCities, { id: c.id, name: c.name }],
-                                }))}
-                                className="accent-blue-600"
-                              />
-                              <span className="text-sm text-gray-700">{c.name}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                      {newLoc.selectedCities.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {newLoc.selectedCities.map(c => (
-                            <span key={c.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                              {c.name}
-                              <button type="button" onClick={() => setNewLoc((p) => ({ ...p, selectedCities: p.selectedCities.filter(s => s.id !== c.id) }))} className="hover:text-blue-900">×</button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
+                  <input
+                    type="text"
+                    value={form.agentLicense}
+                    onChange={(e) => setForm((f) => ({ ...f, agentLicense: e.target.value }))}
+                    placeholder="e.g. RERA/MH/2024/001234"
+                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                  />
                 </div>
-              )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <BadgeCheck className="w-3.5 h-3.5 text-gray-400" /> GST Number <span className="text-gray-400 font-normal">(optional)</span>
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.agentGstNumber}
+                    onChange={(e) => setForm((f) => ({ ...f, agentGstNumber: e.target.value.toUpperCase() }))}
+                    placeholder="e.g. 27AAPFU0939F1ZV"
+                    maxLength={15}
+                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-gray-400" /> Experience (years)
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={60}
+                    value={form.agentExperience}
+                    onChange={(e) => setForm((f) => ({ ...f, agentExperience: e.target.value }))}
+                    placeholder="0"
+                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                  />
+                </div>
+              </div>
 
-              {/* For locality type: single city dropdown then multi-locality */}
-              {newLoc.coverageType === 'locality' && newLoc.stateId && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
-                    <select
-                      value={newLoc.cityId}
-                      onChange={(e) => {
-                        const opt = cities.find((c) => c.id === e.target.value);
-                        setNewLoc((p) => ({ ...p, cityId: e.target.value, cityName: opt?.name || '' }));
-                      }}
-                      className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select city</option>
-                      {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  {newLoc.cityId && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Localities <span className="text-gray-400">(select one or more)</span>
-                      </label>
-                      {localities.length === 0 ? (
-                        <p className="text-xs text-gray-400">No localities available</p>
-                      ) : (
-                        <>
-                          <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto bg-white">
-                            {localities.map((l) => {
-                              const checked = newLoc.selectedLocalities.some(s => s.id === l.id);
-                              return (
-                                <label key={l.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-blue-50 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    onChange={() => setNewLoc((p) => ({
-                                      ...p,
-                                      selectedLocalities: checked
-                                        ? p.selectedLocalities.filter(s => s.id !== l.id)
-                                        : [...p.selectedLocalities, { id: l.id, name: l.name }],
-                                    }))}
-                                    className="accent-blue-600"
-                                  />
-                                  <span className="text-sm text-gray-700">{l.name}</span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                          {newLoc.selectedLocalities.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1.5">
-                              {newLoc.selectedLocalities.map(loc => (
-                                <span key={loc.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                                  {loc.name}
-                                  <button type="button" onClick={() => setNewLoc((p) => ({ ...p, selectedLocalities: p.selectedLocalities.filter(s => s.id !== loc.id) }))} className="hover:text-blue-900">×</button>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
+              {/* Bio */}
+              <div className="px-5 py-4">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-gray-400" /> Professional Bio
+                  </span>
+                </label>
+                <textarea
+                  value={form.agentBio}
+                  onChange={(e) => setForm((f) => ({ ...f, agentBio: e.target.value }))}
+                  placeholder="A brief description about yourself and your expertise..."
+                  rows={4}
+                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow resize-none"
+                />
+                <p className="text-xs text-gray-400 mt-1">{form.agentBio.length}/500 characters</p>
+              {profStatus === 'pending' && (
+                <p className="mt-2 text-xs text-amber-600 flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  Your professional details are under review by our admin team.
+                </p>
               )}
+              {profStatus === 'inactive' && (
+                <p className="mt-2 text-xs text-red-600 flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  Your professional profile is inactive. Contact admin: @think4buysale
+                </p>
+              )}
+              </div>
             </div>
+          </div>
 
-            <button
-              type="button"
-              onClick={handleAddLocation}
-              disabled={addingLoc}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          {/* ── Quick links ─────────────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <Link
+              href="/agent/agency"
+              className="flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors group"
             >
-              {addingLoc ? 'Adding...' : '+ Add Coverage'}
+              <div className="flex items-center gap-3">
+                <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                  <MapPin className="w-4 h-4 text-blue-600" />
+                </span>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">Manage Coverage Areas</div>
+                  <div className="text-xs text-gray-400">
+                    {coverageAreas.length > 0
+                      ? `${coverageAreas.length} area${coverageAreas.length !== 1 ? 's' : ''} configured`
+                      : 'No areas added yet'}
+                  </div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
+            </Link>
+          </div>
+
+          {/* ── Save button ─────────────────────────────────────────────────── */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:justify-end pt-1 pb-4">
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm"
+            >
+              {saving ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  Save Changes
+                </>
+              )}
             </button>
           </div>
 
-          {/* Existing coverage list */}
-          {locations.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No coverage areas added yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {locations.map((loc) => (
-                <li key={loc.id} className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-4 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${
-                      loc.coverageType === 'state'    ? 'bg-purple-100 text-purple-700' :
-                      loc.coverageType === 'city'     ? 'bg-blue-100 text-blue-700' :
-                                                        'bg-green-100 text-green-700'
-                    }`}>{loc.coverageType}</span>
-                    <span className="text-sm text-gray-800">{coverageLabel(loc)}</span>
-                    {loc.isActive === false && (
-                      <span className="px-2 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700">Pending</span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveLocation(loc.id)}
-                    disabled={locLoading}
-                    className="text-red-500 hover:text-red-700 text-xs font-medium disabled:opacity-50 transition-colors"
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        </form>
       </div>
     </div>
   );

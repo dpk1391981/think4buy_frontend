@@ -1,510 +1,422 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { agencyApi, agentApi } from '@/lib/api';
-import { formatPrice, timeAgo } from '@/lib/utils';
-import {
-  Building2, Phone, Mail, Globe, MapPin, CheckCircle, Users,
-  Home, Award, Star, ExternalLink,
-} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { agencyApi, locationsApi } from '@/lib/api';
+import { MapPin, Plus, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
 
-const APPROVAL_BADGE: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
-  approved: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
-};
-
-type PropertiesTab = 'my' | 'assigned';
-
-export default function AgentAgencyPage() {
-  const [agency, setAgency] = useState<any>(null);
-  const [agentProfile, setAgentProfile] = useState<any>(null);
-  const [coAgents, setCoAgents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  // Properties
-  const [propsTab, setPropsTab] = useState<PropertiesTab>('my');
-  const [myListings, setMyListings] = useState<any[]>([]);
-  const [assignedProps, setAssignedProps] = useState<any[]>([]);
-  const [propsLoading, setPropsLoading] = useState(false);
-  const [myListingsTotal, setMyListingsTotal] = useState(0);
-  const [assignedTotal, setAssignedTotal] = useState(0);
-
-  // Agency self-registration
-  const [regForm, setRegForm] = useState({ agencyName: '', contactPhone: '', address: '' });
-  const [regLoading, setRegLoading] = useState(false);
-  const [regError, setRegError] = useState('');
-  const [regSuccess, setRegSuccess] = useState('');
-
-  useEffect(() => {
-    async function load() {
-      try {
-        // Fix: backend returns { profile, agency, ... } not { agentProfile, agency, ... }
-        const dashRes = await agencyApi.getAgentDashboard();
-        const data = dashRes.data;
-        setAgentProfile(data.profile ?? null);
-        setAgency(data.agency ?? null);
-
-        if (data.agency?.id) {
-          const agentsRes = await agencyApi.getAgencyAgents(data.agency.id, { limit: 20 });
-          const items = agentsRes.data?.items ?? agentsRes.data ?? [];
-          setCoAgents(Array.isArray(items) ? items : []);
-        }
-      } catch {
-        setError('Failed to load agency information');
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
-
-  // Load properties when tab changes
-  useEffect(() => {
-    async function loadProps() {
-      setPropsLoading(true);
-      try {
-        if (propsTab === 'my') {
-          const r = await agentApi.getMyListings({ page: 1, limit: 10 });
-          const data = r.data;
-          const arr = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
-          setMyListings(arr);
-          setMyListingsTotal(data?.total ?? arr.length);
-        } else {
-          const r = await agencyApi.getMyProperties({ page: 1, limit: 10 });
-          const data = r.data;
-          const arr = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
-          setAssignedProps(arr);
-          setAssignedTotal(data?.total ?? arr.length);
-        }
-      } catch {
-        // silent
-      } finally {
-        setPropsLoading(false);
-      }
-    }
-    loadProps();
-  }, [propsTab]);
-
-  if (loading) {
-    return (
-      <div className="p-4 md:p-8">
-        <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-6" />
-        <div className="space-y-4">
-          <div className="h-40 bg-gray-200 rounded-xl animate-pulse" />
-          <div className="h-32 bg-gray-200 rounded-xl animate-pulse" />
-          <div className="h-64 bg-gray-200 rounded-xl animate-pulse" />
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-8 text-center">
-        <p className="text-red-500 text-sm">{error}</p>
-      </div>
-    );
-  }
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!regForm.agencyName.trim()) { setRegError('Agency name is required.'); return; }
-    setRegLoading(true);
-    setRegError('');
-    setRegSuccess('');
-    try {
-      await agencyApi.selfRegisterOrJoin({
-        agencyName: regForm.agencyName.trim(),
-        contactPhone: regForm.contactPhone.trim() || undefined,
-        address: regForm.address.trim() || undefined,
-      });
-      setRegSuccess('Your agency registration has been submitted for admin approval.');
-      setRegForm({ agencyName: '', contactPhone: '', address: '' });
-    } catch (err: any) {
-      setRegError(err?.response?.data?.message || 'Failed to submit registration.');
-    } finally {
-      setRegLoading(false);
-    }
-  };
-
-  if (!agency) {
-    return (
-      <div className="p-4 md:p-8 max-w-2xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">My Agency</h1>
-          <p className="text-gray-500 mt-1 text-sm">Register or join an agency</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-5">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-              <Building2 className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Register Your Agency</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Enter your company name — an existing agency with the same name will be joined, otherwise a new agency request will be submitted for admin approval.</p>
-            </div>
-          </div>
-
-          {regSuccess ? (
-            <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-4 py-3 rounded-lg">
-              ✓ {regSuccess}
-            </div>
-          ) : (
-            <form onSubmit={handleRegister} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Agency / Company Name *</label>
-                <input
-                  type="text"
-                  value={regForm.agencyName}
-                  onChange={e => setRegForm(f => ({ ...f, agencyName: e.target.value }))}
-                  placeholder="e.g. PropElite Realty Pvt Ltd"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Contact Phone</label>
-                  <input
-                    type="tel"
-                    value={regForm.contactPhone}
-                    onChange={e => setRegForm(f => ({ ...f, contactPhone: e.target.value }))}
-                    placeholder="+91 XXXXX XXXXX"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Office Address</label>
-                  <input
-                    type="text"
-                    value={regForm.address}
-                    onChange={e => setRegForm(f => ({ ...f, address: e.target.value }))}
-                    placeholder="e.g. 123 Business Park, Mumbai"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              {regError && <p className="text-xs text-red-600">{regError}</p>}
-              <button
-                type="submit"
-                disabled={regLoading}
-                className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {regLoading ? 'Submitting...' : 'Submit for Approval'}
-              </button>
-            </form>
-          )}
-        </div>
-
-        <PropertiesSection
-          propsTab={propsTab}
-          setPropsTab={setPropsTab}
-          myListings={myListings}
-          assignedProps={assignedProps}
-          myListingsTotal={myListingsTotal}
-          assignedTotal={assignedTotal}
-          propsLoading={propsLoading}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-4 md:p-8 max-w-3xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">My Agency</h1>
-        <p className="text-gray-500 mt-1 text-sm">Your agency membership and team details</p>
-      </div>
-
-      {/* Agency Card */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-5">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
-          <div className="flex items-center gap-4">
-            {agency.logo ? (
-              <img
-                src={agency.logo}
-                alt={agency.name}
-                className="w-16 h-16 rounded-xl object-cover border-2 border-white/30 flex-shrink-0"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-xl bg-white/20 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
-                {agency.name?.slice(0, 2).toUpperCase()}
-              </div>
-            )}
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-bold text-white">{agency.name}</h2>
-                {agency.isVerified && (
-                  <CheckCircle className="w-5 h-5 text-blue-200 flex-shrink-0" />
-                )}
-              </div>
-              {agency.licenseNumber && (
-                <p className="text-blue-200 text-xs mt-0.5 font-mono">{agency.licenseNumber}</p>
-              )}
-              <span className={`inline-flex mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                agency.isActive ? 'bg-green-400/20 text-green-100' : 'bg-red-400/20 text-red-100'
-              }`}>
-                {agency.isActive ? 'Active' : 'Inactive'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 border-b border-gray-100">
-          <div className="px-5 py-3 text-center border-r border-gray-100">
-            <div className="text-lg font-bold text-gray-800">{agency.totalAgents ?? 0}</div>
-            <div className="text-xs text-gray-500 flex items-center justify-center gap-1 mt-0.5">
-              <Users className="w-3 h-3" /> Agents
-            </div>
-          </div>
-          <div className="px-5 py-3 text-center sm:border-r border-gray-100">
-            <div className="text-lg font-bold text-gray-800">{agency.totalListings ?? 0}</div>
-            <div className="text-xs text-gray-500 flex items-center justify-center gap-1 mt-0.5">
-              <Home className="w-3 h-3" /> Listings
-            </div>
-          </div>
-          <div className="px-5 py-3 text-center col-span-2 sm:col-span-1">
-            <div className="text-lg font-bold text-gray-800">
-              {agentProfile?.totalDeals ?? 0}
-            </div>
-            <div className="text-xs text-gray-500 flex items-center justify-center gap-1 mt-0.5">
-              <Award className="w-3 h-3" /> My Deals
-            </div>
-          </div>
-        </div>
-
-        {/* Details */}
-        <div className="p-5 space-y-3">
-          {agency.description && (
-            <p className="text-sm text-gray-600">{agency.description}</p>
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {agency.contactEmail && (
-              <a href={`mailto:${agency.contactEmail}`} className="flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 transition-colors">
-                <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span className="truncate">{agency.contactEmail}</span>
-              </a>
-            )}
-            {agency.contactPhone && (
-              <a href={`tel:${agency.contactPhone}`} className="flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 transition-colors">
-                <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span>{agency.contactPhone}</span>
-              </a>
-            )}
-            {agency.website && (
-              <a href={agency.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
-                <Globe className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span className="truncate">{agency.website.replace(/^https?:\/\//, '')}</span>
-              </a>
-            )}
-            {agency.address && (
-              <div className="flex items-start gap-2 text-sm text-gray-600">
-                <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                <span>{agency.address}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* My Agent Profile */}
-      {agentProfile && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
-          <h3 className="font-semibold text-gray-800 mb-4 text-sm flex items-center gap-2">
-            <Award className="w-4 h-4 text-blue-500" />
-            My Agent Profile
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-xl font-bold text-gray-800">{agentProfile.totalListings ?? 0}</div>
-              <div className="text-xs text-gray-500 mt-0.5">Listings</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xl font-bold text-gray-800">{agentProfile.totalDeals ?? 0}</div>
-              <div className="text-xs text-gray-500 mt-0.5">Deals</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xl font-bold text-gray-800 flex items-center justify-center gap-1">
-                {agentProfile.rating > 0 ? (
-                  <>
-                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                    {Number(agentProfile.rating).toFixed(1)}
-                  </>
-                ) : '—'}
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">Rating</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xl font-bold text-gray-800">{agentProfile.experienceYears ?? 0}</div>
-              <div className="text-xs text-gray-500 mt-0.5">Years Exp.</div>
-            </div>
-          </div>
-          {agentProfile.bio && (
-            <p className="mt-4 text-sm text-gray-500 border-t border-gray-50 pt-4">{agentProfile.bio}</p>
-          )}
-        </div>
-      )}
-
-      {/* Properties */}
-      <PropertiesSection
-        propsTab={propsTab}
-        setPropsTab={setPropsTab}
-        myListings={myListings}
-        assignedProps={assignedProps}
-        myListingsTotal={myListingsTotal}
-        assignedTotal={assignedTotal}
-        propsLoading={propsLoading}
-      />
-
-      {/* Co-agents */}
-      {coAgents.length > 1 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mt-5">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
-              <Users className="w-4 h-4 text-blue-500" />
-              Team Members ({coAgents.length})
-            </h3>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {coAgents.map((agent) => (
-              <div key={agent.id} className="flex items-center gap-3 px-5 py-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                  {agent.user?.name?.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase() ?? 'AG'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900">{agent.user?.name ?? '—'}</div>
-                  <div className="text-xs text-gray-400 truncate">{agent.user?.email ?? '—'}</div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0 text-xs text-gray-400">
-                  {agent.totalListings > 0 && <span>{agent.totalListings} listings</span>}
-                  {agent.rating > 0 && (
-                    <span className="flex items-center gap-0.5 text-amber-600">
-                      <Star className="w-3 h-3 fill-current" />
-                      {Number(agent.rating).toFixed(1)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+interface CoverageEntry {
+  id: string;
+  coverageType: 'state' | 'city' | 'locality';
+  stateName?: string;
+  cityName?: string;
+  localityName?: string;
+  isActive?: boolean;
 }
 
-function PropertiesSection({
-  propsTab, setPropsTab, myListings, assignedProps,
-  myListingsTotal, assignedTotal, propsLoading,
-}: {
-  propsTab: PropertiesTab;
-  setPropsTab: (t: PropertiesTab) => void;
-  myListings: any[];
-  assignedProps: any[];
-  myListingsTotal: number;
-  assignedTotal: number;
-  propsLoading: boolean;
-}) {
+interface CityOption { id: string; name: string; }
+interface LocalityOption { id: string; name: string; }
+
+export default function MyCoveragePage() {
+  const [locations, setLocations] = useState<CoverageEntry[]>([]);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+
+  // Add-coverage form state
+  const [coverageType, setCoverageType] = useState<'city' | 'locality'>('city');
+
+  // City search
+  const [citySearch, setCitySearch] = useState('');
+  const [citySuggestions, setCitySuggestions] = useState<CityOption[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const cityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // City coverage: multiple cities selected
+  const [selectedCities, setSelectedCities] = useState<CityOption[]>([]);
+
+  // Locality coverage: single city, then localities
+  const [locCity, setLocCity] = useState<CityOption | null>(null);
+  const [localities, setLocalities] = useState<LocalityOption[]>([]);
+  const [locLoading, setLocLoading] = useState(false);
+  const [selectedLocalities, setSelectedLocalities] = useState<LocalityOption[]>([]);
+  const [localitySearch, setLocalitySearch] = useState('');
+
+  const [adding, setAdding] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  // Load existing coverage on mount
+  useEffect(() => {
+    agencyApi.getMyLocations()
+      .then((r) => setLocations(r.data || []))
+      .catch(() => showToast('error', 'Failed to load coverage areas.'))
+      .finally(() => setPageLoading(false));
+  }, []);
+
+  // Load localities when locCity changes
+  useEffect(() => {
+    if (!locCity || coverageType !== 'locality') { setLocalities([]); setSelectedLocalities([]); return; }
+    setLocLoading(true);
+    locationsApi.getLocalities(locCity.name)
+      .then((r) => {
+        const raw: any[] = r.data || [];
+        // API returns { id, locality, city } — normalize to { id, name }
+        setLocalities(raw.map((l) => ({ id: l.id, name: l.locality || l.name || '' })));
+      })
+      .catch(() => {})
+      .finally(() => setLocLoading(false));
+    setSelectedLocalities([]);
+    setLocalitySearch('');
+  }, [locCity, coverageType]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset form when coverage type changes
+  useEffect(() => {
+    setCitySearch('');
+    setCitySuggestions([]);
+    setShowSuggestions(false);
+    setSelectedCities([]);
+    setLocCity(null);
+    setLocalities([]);
+    setSelectedLocalities([]);
+    setLocalitySearch('');
+  }, [coverageType]);
+
+  function handleCityInput(value: string) {
+    setCitySearch(value);
+    setShowSuggestions(true);
+    if (cityTimer.current) clearTimeout(cityTimer.current);
+    if (!value.trim()) { setCitySuggestions([]); setShowSuggestions(false); return; }
+    cityTimer.current = setTimeout(async () => {
+      try {
+        const r = await locationsApi.getCities(value, 20);
+        const d = r.data?.data || r.data || [];
+        setCitySuggestions(Array.isArray(d) ? d : []);
+      } catch {}
+    }, 300);
+  }
+
+  function handleCitySelect(city: CityOption) {
+    if (coverageType === 'city') {
+      if (!selectedCities.some(c => c.id === city.id)) {
+        setSelectedCities(prev => [...prev, city]);
+      }
+      setCitySearch('');
+      setCitySuggestions([]);
+      setShowSuggestions(false);
+    } else {
+      setLocCity(city);
+      setCitySearch(city.name);
+      setCitySuggestions([]);
+      setShowSuggestions(false);
+    }
+  }
+
+  function removeSelectedCity(id: string) {
+    setSelectedCities(prev => prev.filter(c => c.id !== id));
+  }
+
+  function toggleLocality(loc: LocalityOption) {
+    setSelectedLocalities(prev =>
+      prev.some(l => l.id === loc.id)
+        ? prev.filter(l => l.id !== loc.id)
+        : [...prev, loc]
+    );
+  }
+
+  async function handleAdd() {
+    if (coverageType === 'city' && selectedCities.length === 0) {
+      showToast('error', 'Select at least one city.');
+      return;
+    }
+    if (coverageType === 'locality' && !locCity) {
+      showToast('error', 'Select a city first.');
+      return;
+    }
+    if (coverageType === 'locality' && selectedLocalities.length === 0) {
+      showToast('error', 'Select at least one locality.');
+      return;
+    }
+
+    setAdding(true);
+    try {
+      if (coverageType === 'city') {
+        for (const city of selectedCities) {
+          await agencyApi.addMyLocation({ coverageType: 'city', cityId: city.id, cityName: city.name });
+        }
+      } else {
+        for (const loc of selectedLocalities) {
+          await agencyApi.addMyLocation({
+            coverageType: 'locality',
+            cityId: locCity!.id, cityName: locCity!.name,
+            localityId: loc.id, localityName: loc.name,
+          });
+        }
+      }
+      const r = await agencyApi.getMyLocations();
+      setLocations(r.data || []);
+      // Reset form
+      setCitySearch('');
+      setCitySuggestions([]);
+      setSelectedCities([]);
+      setLocCity(null);
+      setLocalities([]);
+      setSelectedLocalities([]);
+      setLocalitySearch('');
+      showToast('success', 'Coverage area added successfully.');
+    } catch (e: any) {
+      showToast('error', e?.response?.data?.message || 'Failed to add coverage.');
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleRemove(id: string) {
+    setRemovingId(id);
+    try {
+      await agencyApi.removeMyLocation(id);
+      setLocations(prev => prev.filter(l => l.id !== id));
+      showToast('success', 'Coverage area removed.');
+    } catch (e: any) {
+      showToast('error', e?.response?.data?.message || 'Failed to remove.');
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  function coverageLabel(loc: CoverageEntry) {
+    if (loc.coverageType === 'locality') return `${loc.localityName}, ${loc.cityName}`;
+    if (loc.coverageType === 'city') return loc.cityName || '—';
+    return loc.stateName || '—';
+  }
+
+  function showToast(type: 'success' | 'error', msg: string) {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3500);
+  }
+
+  const filteredLocalities = localities.filter(l =>
+    !localitySearch || l.name.toLowerCase().includes(localitySearch.toLowerCase())
+  );
+
+  if (pageLoading) {
+    return (
+      <div className="p-8 space-y-4">
+        <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
+        {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-gray-200 rounded-lg animate-pulse" />)}
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mt-5">
-      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-        <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
-          <Home className="w-4 h-4 text-blue-500" />
-          Properties
-        </h3>
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-          <button
-            onClick={() => setPropsTab('my')}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-              propsTab === 'my' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            My Listings ({myListingsTotal})
-          </button>
-          <button
-            onClick={() => setPropsTab('assigned')}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-              propsTab === 'assigned' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Assigned ({assignedTotal})
-          </button>
+    <div className="p-4 md:p-8 max-w-2xl">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-6 right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium ${
+          toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+        }`}>
+          {toast.type === 'success' ? '✓ ' : '✕ '}{toast.msg}
         </div>
+      )}
+
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <MapPin className="w-6 h-6 text-blue-500" />
+          My Coverage
+        </h1>
+        <p className="text-gray-500 text-sm mt-1">
+          Manage the cities and localities you serve. This controls where you appear as a featured agent.
+        </p>
       </div>
 
-      {propsLoading ? (
-        <div className="p-6 space-y-2">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-10 bg-gray-100 rounded-lg animate-pulse" />)}
+      {/* Add Coverage Card */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+        <h2 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <Plus className="w-4 h-4 text-blue-500" />
+          Add Coverage Area
+        </h2>
+
+        {/* Type tabs */}
+        <div className="flex gap-2 mb-4">
+          {(['city', 'locality'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setCoverageType(t)}
+              className={`px-4 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                coverageType === t
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+              }`}
+            >
+              {t === 'city' ? '🏙 City Level' : '📍 Locality Level'}
+            </button>
+          ))}
         </div>
-      ) : propsTab === 'my' ? (
-        myListings.length === 0 ? (
-          <div className="p-10 text-center">
-            <Home className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">No listings yet</p>
-            <Link href="/post-property" className="mt-3 inline-block px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
-              Post Property
-            </Link>
+
+        {/* City search */}
+        <div className="relative mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            {coverageType === 'city' ? 'Search & Add Cities' : 'Select City'}
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              value={citySearch}
+              onChange={(e) => handleCityInput(e.target.value)}
+              onFocus={() => citySuggestions.length > 0 && setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              placeholder="Type to search city..."
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {coverageType === 'locality' && locCity && (
+              <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+            )}
+          </div>
+          {showSuggestions && citySuggestions.length > 0 && (
+            <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-44 overflow-y-auto">
+              {citySuggestions.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onMouseDown={() => handleCitySelect(c)}
+                  className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition-colors flex items-center gap-2"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Selected cities chips (city mode) */}
+        {coverageType === 'city' && selectedCities.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {selectedCities.map(c => (
+              <span key={c.id} className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                {c.name}
+                <button type="button" onClick={() => removeSelectedCity(c.id)} className="ml-0.5 hover:text-blue-900">×</button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Localities panel (locality mode) */}
+        {coverageType === 'locality' && locCity && (
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Localities in {locCity.name}
+              <span className="text-gray-400 ml-1 font-normal">(select one or more)</span>
+            </label>
+            {locLoading ? (
+              <div className="flex items-center gap-2 text-sm text-gray-400 py-3">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading localities…
+              </div>
+            ) : localities.length === 0 ? (
+              <p className="text-sm text-gray-400 py-2">No localities found for this city.</p>
+            ) : (
+              <>
+                {/* Locality search filter */}
+                <input
+                  type="text"
+                  value={localitySearch}
+                  onChange={(e) => setLocalitySearch(e.target.value)}
+                  placeholder="Filter localities..."
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                />
+                <div className="border border-gray-200 rounded-lg max-h-44 overflow-y-auto bg-white">
+                  {filteredLocalities.length === 0 ? (
+                    <p className="px-3 py-3 text-sm text-gray-400">No matches</p>
+                  ) : filteredLocalities.map((l) => {
+                    const checked = selectedLocalities.some(s => s.id === l.id);
+                    return (
+                      <label key={l.id} className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleLocality(l)}
+                          className="accent-blue-600"
+                        />
+                        <span className="text-sm text-gray-700">{l.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {selectedLocalities.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {selectedLocalities.map(l => (
+                      <span key={l.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                        {l.name}
+                        <button type="button" onClick={() => toggleLocality(l)} className="hover:text-blue-900">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={adding}
+          className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {adding ? <><Loader2 className="w-4 h-4 animate-spin" /> Adding…</> : <><Plus className="w-4 h-4" /> Add Coverage</>}
+        </button>
+      </div>
+
+      {/* Existing coverage list */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-blue-500" />
+            Active Coverage Areas
+          </h2>
+          {locations.length > 0 && (
+            <span className="text-xs text-gray-400">{locations.length} area{locations.length !== 1 ? 's' : ''}</span>
+          )}
+        </div>
+
+        {locations.length === 0 ? (
+          <div className="px-5 py-12 text-center">
+            <MapPin className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+            <p className="text-sm text-gray-500 font-medium">No coverage areas yet</p>
+            <p className="text-xs text-gray-400 mt-1">Add cities or localities above to get started.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
-            {myListings.map((l) => (
-              <div key={l.id} className="flex items-center gap-3 px-5 py-3">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{l.title}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{formatPrice(l.price)} · {(l.type || l.propertyType)?.replace(/_/g, ' ')} · {timeAgo(l.createdAt)}</div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                    (APPROVAL_BADGE as any)[l.approvalStatus] || 'bg-gray-100 text-gray-600'
+          <ul className="divide-y divide-gray-50">
+            {locations.map((loc) => (
+              <li key={loc.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/50 transition-colors group">
+                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                  <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                    loc.coverageType === 'locality' ? 'bg-green-100 text-green-700' :
+                    loc.coverageType === 'city'     ? 'bg-blue-100 text-blue-700'  :
+                                                      'bg-purple-100 text-purple-700'
                   }`}>
-                    {l.approvalStatus}
+                    {loc.coverageType}
                   </span>
-                  {l.slug && (
-                    <Link href={`/properties/${l.slug}`} target="_blank" className="text-gray-400 hover:text-blue-600">
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Link>
+                  <span className="text-sm text-gray-800 truncate">{coverageLabel(loc)}</span>
+                  {loc.isActive === false && (
+                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] bg-yellow-100 text-yellow-700 font-medium">Pending</span>
                   )}
                 </div>
-              </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemove(loc.id)}
+                  disabled={removingId === loc.id}
+                  className="flex-shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors opacity-0 group-hover:opacity-100"
+                  title="Remove"
+                >
+                  {removingId === loc.id
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <Trash2 className="w-4 h-4" />
+                  }
+                </button>
+              </li>
             ))}
-            {myListingsTotal > 10 && (
-              <div className="px-5 py-3 text-center">
-                <Link href="/agent/listings" className="text-xs text-blue-600 hover:underline">
-                  View all {myListingsTotal} listings →
-                </Link>
-              </div>
-            )}
-          </div>
-        )
-      ) : (
-        assignedProps.length === 0 ? (
-          <div className="p-10 text-center">
-            <Building2 className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">No properties assigned by agency yet</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {assignedProps.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 px-5 py-3">
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-mono text-gray-500 truncate">Property ID: {p.propertyId}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{p.assignedByAdmin ? 'Admin assigned' : 'Agency assigned'} · {timeAgo(p.createdAt)}</div>
-                </div>
-              </div>
-            ))}
-            {assignedTotal > 10 && (
-              <div className="px-5 py-3 text-center text-xs text-gray-400">
-                +{assignedTotal - 10} more assigned properties
-              </div>
-            )}
-          </div>
-        )
-      )}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

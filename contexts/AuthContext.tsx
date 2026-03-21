@@ -17,11 +17,14 @@ interface AuthUser {
   phone?: string;
   role: string;
   avatar?: string;
+  pendingAvatar?: string;
   city?: string;
   company?: string;
   isVerified: boolean;
   needsOnboarding?: boolean;
   agentTick?: 'none' | 'blue' | 'gold' | 'diamond';
+  agentProfileStatus?: 'none' | 'pending' | 'approved' | 'inactive';
+  isActive?: boolean;
 }
 
 interface AuthContextValue {

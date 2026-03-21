@@ -22,7 +22,10 @@ export default function AvatarUpload({ size = 80, onSuccess }: AvatarUploadProps
     ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : 'U';
 
-  const avatarSrc = preview || user?.avatar || null;
+  // For agents: show pendingAvatar (uploaded but awaiting admin approval) as the display src
+  // For others: approved avatar is used immediately
+  const avatarSrc = preview || user?.avatar || user?.pendingAvatar || null;
+  const isPending = !preview && !user?.avatar && !!user?.pendingAvatar;
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -57,7 +60,7 @@ export default function AvatarUpload({ size = 80, onSuccess }: AvatarUploadProps
       >
         {/* Avatar circle */}
         <div
-          className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold overflow-hidden ring-4 ring-white shadow-lg"
+          className="relative w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold overflow-hidden ring-4 ring-white shadow-lg"
           style={{ fontSize: size * 0.28 }}
         >
           {avatarSrc ? (
@@ -67,6 +70,7 @@ export default function AvatarUpload({ size = 80, onSuccess }: AvatarUploadProps
               fill
               className="object-cover"
               sizes={`${size}px`}
+              priority
             />
           ) : (
             <span>{initials}</span>
@@ -88,7 +92,10 @@ export default function AvatarUpload({ size = 80, onSuccess }: AvatarUploadProps
         </span>
       </button>
 
-      <p className="text-xs text-gray-400">Tap to change photo</p>
+      {isPending
+        ? <p className="text-xs text-amber-600 text-center max-w-[160px]">⏳ Pending admin approval</p>
+        : <p className="text-xs text-gray-400">Tap to change photo</p>
+      }
 
       {error && (
         <p className="text-xs text-red-500 text-center max-w-[160px]">{error}</p>
