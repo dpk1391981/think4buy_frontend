@@ -86,16 +86,39 @@ function OnboardingForm() {
   // upgrade=1 means an existing buyer is upgrading their role (not a brand-new user)
   const isUpgrade = searchParams.get('upgrade') === '1';
 
+  const VALID_ROLES: RoleId[] = ['buyer', 'owner', 'agent'];
+  // True when user navigated here from the guest page (role persisted in sessionStorage)
+  const hasGuestRoleKey =
+    typeof window !== 'undefined' && !!sessionStorage.getItem('t4bs_onboarding_role');
+
+  // Initial role from URL param only (safe for SSR/hydration)
   const [selectedRole, setSelectedRole] = useState<RoleId>(
-    roleParam && ['buyer', 'owner', 'agent'].includes(roleParam) ? roleParam : 'buyer',
+    roleParam && VALID_ROLES.includes(roleParam) ? roleParam : 'buyer'
   );
+
+  // After mount: if no URL role param, restore from sessionStorage (handles refresh scenario)
+  useEffect(() => {
+    if (!roleParam) {
+      const stored = sessionStorage.getItem('t4bs_onboarding_role') as RoleId | null;
+      if (stored && VALID_ROLES.includes(stored)) {
+        setSelectedRole(stored);
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [firstNameError, setFirstNameError] = useState('');
 
+  // If URL has a role param, keep sessionStorage in sync (so refresh preserves it)
+  useEffect(() => {
+    if (roleParam && ['buyer', 'owner', 'agent'].includes(roleParam)) {
+      sessionStorage.setItem('t4bs_onboarding_role', roleParam);
+    }
+  }, [roleParam]);
+
   // Pre-fill name for role upgrades (existing buyers)
   useEffect(() => {
-    if (isUpgrade && user?.name && !firstName) {
+    if ((isUpgrade || hasGuestRoleKey) && user?.name && !firstName) {
       const parts = user.name.trim().split(' ');
       setFirstName(parts[0] || '');
       setLastName(parts.slice(1).join(' ') || '');
@@ -211,7 +234,10 @@ function OnboardingForm() {
   }
 
   // If onboarding already completed, redirect away — UNLESS this is a role upgrade
-  if (!authLoading && user && user.needsOnboarding === false && user.name?.trim() && !isUpgrade) {
+  // or the user came from the guest page (sessionStorage key indicates intent to upgrade role)
+  // Treat as upgrade if user already has a completed profile and came via guest page
+  const effectiveUpgrade = isUpgrade || (hasGuestRoleKey && user?.needsOnboarding === false && !!user?.name?.trim());
+  if (!authLoading && user && user.needsOnboarding === false && user.name?.trim() && !isUpgrade && !hasGuestRoleKey) {
     router.replace(redirect);
     return null;
   }
@@ -224,8 +250,8 @@ function OnboardingForm() {
     if (selectedRole === 'agent') {
       if (!agencyName.trim()) { setError('Business / Agency Name is required.'); return; }
       if (!contactPhone.trim()) { setError('Contact Phone is required.'); return; }
-      if (!isUpgrade && !agentExperience) { setError('Years of Experience is required.'); return; }
-      if (!isUpgrade && !businessAddress.trim()) { setError('Business Address is required.'); return; }
+      if (!effectiveUpgrade && !agentExperience) { setError('Years of Experience is required.'); return; }
+      if (!effectiveUpgrade && !businessAddress.trim()) { setError('Business Address is required.'); return; }
       const firstEntry = coverageEntries[0];
       if (!firstEntry.cityId) { setError('Please select at least one coverage City.'); return; }
     }
@@ -234,7 +260,7 @@ function OnboardingForm() {
     try {
       const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
 
-      if (isUpgrade) {
+      if (effectiveUpgrade) {
         // Existing buyer upgrading role — use upgradeRole endpoint
         const { data } = await authApi.upgradeRole(selectedRole as 'owner' | 'agent');
         login(data.token || data.accessToken, data.user, data.menus);
@@ -320,6 +346,9 @@ function OnboardingForm() {
 
       // Re-fetch fresh profile for both paths
       await refreshAuth();
+
+      // Clear the persisted role now that onboarding is done
+      sessionStorage.removeItem('t4bs_onboarding_role');
 
       if (redirect && redirect !== '/') {
         router.replace(redirect);

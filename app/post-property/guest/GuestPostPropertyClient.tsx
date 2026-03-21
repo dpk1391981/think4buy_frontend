@@ -91,6 +91,8 @@ export default function GuestPostPropertyPage() {
 
       // New user OR existing buyer — go to onboarding with selected role pre-filled
       if (data.user?.needsOnboarding || currentRole === 'buyer') {
+        // Persist chosen role so onboarding keeps it on refresh / URL edits
+        sessionStorage.setItem('t4bs_onboarding_role', userType);
         const upgradeFlag = !data.user?.needsOnboarding ? '&upgrade=1' : '';
         router.replace(`/auth/onboarding?redirect=/post-property&role=${userType}${upgradeFlag}`);
         return;
