@@ -208,7 +208,7 @@ export default function PropertyDetailClient({ property }: Props) {
 
   // ── Lead capture helper ─────────────────────────────────────────────────────
   const captureContactLead = (
-    source: 'call' | 'whatsapp' | 'enquiry' | 'schedule_visit',
+    source: 'call' | 'whatsapp' | 'enquiry' | 'schedule_visit' | 'property_page' | 'view_phone',
     overrides: { contactName?: string; contactPhone?: string; contactEmail?: string } = {},
   ) => {
     const rawPhone = overrides.contactPhone ?? (user as any)?.phone ?? '';
@@ -216,12 +216,15 @@ export default function PropertyDetailClient({ property }: Props) {
     // Use real name if set; fall back to last-4 of phone so we never send a placeholder
     const rawName = overrides.contactName ?? (user as any)?.name ?? '';
     const contactName = rawName.trim() || `User ${String(rawPhone).slice(-4)}`;
+    const rawEmail = overrides.contactEmail ?? (user as any)?.email ?? '';
+    // Strip auto-generated placeholder emails (e.g. phone@t4bs.local)
+    const contactEmail = rawEmail && !rawEmail.endsWith('@t4bs.local') ? rawEmail : undefined;
     leadsApi.capturePublic({
       source,
       propertyId: property.id,
       contactName,
       contactPhone: rawPhone,
-      contactEmail: overrides.contactEmail ?? (user as any)?.email ?? undefined,
+      contactEmail,
       contactUserId: (user as any)?.id ?? undefined,
       city:  property.city  ?? undefined,
       state: property.state ?? undefined,
