@@ -40,6 +40,8 @@ const SLUG_COLORS: Record<string, string> = {
 };
 const DEFAULT_COLOR = 'from-gray-500 to-gray-600';
 
+const ALL_TAB: CategoryTab = { value: '', label: 'All', color: DEFAULT_COLOR };
+
 const VIRTUAL_TABS = [
   { value: 'agents', label: 'Agents', color: SLUG_COLORS.agents },
 ];
@@ -101,12 +103,12 @@ function useCategoryData(activeCat: string) {
       const dbTabs: CategoryTab[] = data.map((c: any) => ({
         value: c.slug, label: c.name, color: SLUG_COLORS[c.slug] ?? DEFAULT_COLOR,
       }));
-      setTabs([...dbTabs, ...VIRTUAL_TABS]);
+      setTabs([ALL_TAB, ...dbTabs, ...VIRTUAL_TABS]);
     }).catch(() => {});
   }, []);
 
   useEffect(() => {
-    const isVirtual = activeCat === 'agents' || activeCat === 'new_projects';
+    const isVirtual = !activeCat || activeCat === 'agents' || activeCat === 'new_projects';
     if (isVirtual) { setTypes([]); return; }
     if (typeCache.current[activeCat]) { setTypes(typeCache.current[activeCat]); return; }
     propertyConfigApi.getTypesBySlug(activeCat).then(({ data }) => {
@@ -950,7 +952,8 @@ function MobileSearch({
       if (type)        p.set('type', type);
       router.push(`/properties?${p}`);
     } else {
-      const p = new URLSearchParams({ category: cat });
+      const p = new URLSearchParams();
+      if (cat)           p.set('category', cat);
       if (c)             p.set('city', c);
       if (locality)      p.set('locality', locality);
       if (bhk.length)    p.set('bedrooms', bhk.join(','));
@@ -1345,7 +1348,7 @@ function ActivePill({ label, onRemove }: { label: string; onRemove: () => void }
 export default function HomeSearchPanel() {
   const router  = useRouter();
   const { trackSearch } = useAnalytics();
-  const [cat, setCat]   = useState('buy');
+  const [cat, setCat]   = useState('');
   const [open, setOpen] = useState(false);
 
   const { tabs, types } = useCategoryData(cat);
@@ -1371,7 +1374,8 @@ export default function HomeSearchPanel() {
       const p = new URLSearchParams({ isNewProject: 'true', ...params });
       router.push(`/properties?${p}`);
     } else {
-      const p = new URLSearchParams({ category: cat, ...params });
+      const p = new URLSearchParams(params);
+      if (cat) p.set('category', cat);
       router.push(`/properties?${p}`);
     }
   }, [cat, isAgent, isNewProject, router, trackSearch]);

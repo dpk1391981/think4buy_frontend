@@ -15,6 +15,7 @@ interface SearchBarProps {
 }
 
 const CATEGORY_TABS = [
+  { value: '', label: 'All' },
   { value: 'buy', label: 'Buy' },
   { value: 'rent', label: 'Rent' },
   { value: 'pg', label: 'PG' },
@@ -68,7 +69,7 @@ export default function SearchBar({
   size = 'lg',
 }: SearchBarProps) {
   const router = useRouter();
-  const [category, setCategory] = useState('buy');
+  const [category, setCategory] = useState('');
   const [query, setQuery] = useState(initialKeyword || initialCity || initialSearch);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -154,7 +155,8 @@ export default function SearchBar({
   const isKeywordSearch = (q: string) => /\s/.test(q.trim());
 
   const buildSearchUrl = (params: Record<string, string>) => {
-    const urlParams = new URLSearchParams({ category, ...params });
+    const urlParams = new URLSearchParams(params);
+    if (category) urlParams.set('category', category);
     return `/properties?${urlParams.toString()}`;
   };
 
@@ -167,7 +169,7 @@ export default function SearchBar({
 
     const q = query.trim();
     if (!q) {
-      router.push(`/properties?category=${category}`);
+      router.push(category ? `/properties?category=${category}` : '/properties');
       setShowSuggestions(false);
       return;
     }
