@@ -353,15 +353,21 @@ export default function PropertyCard({ property, className, listView }: Property
                   </span>
                 )}
                 {(() => { const { area: a, areaUnit: u } = getPropertyArea(property); return a ? <span className="flex items-center gap-1 text-gray-500"><Maximize2 className="w-3.5 h-3.5 text-gray-400" />{formatArea(a, u)}</span> : null; })()}
-                {property.floorNumber != null && (
-                  <span className="flex items-center gap-1 text-gray-400">
-                    <Layers className="w-3.5 h-3.5" />Floor {property.floorNumber}
-                    {property.totalFloors ? `/${property.totalFloors}` : ''}
-                  </span>
-                )}
-                {property.furnishingStatus && (
-                  <span className="text-gray-400">{getFurnishingLabel(property.furnishingStatus)}</span>
-                )}
+                {(() => {
+                  const floorNum = property.floorNumber ?? (property.extraDetails as any)?.floor_number ?? null;
+                  const totalF = property.totalFloors || (property.extraDetails as any)?.floor || null;
+                  return floorNum != null ? (
+                    <span className="flex items-center gap-1 text-gray-400">
+                      <Layers className="w-3.5 h-3.5" />Floor {floorNum}{totalF ? `/${totalF}` : ''}
+                    </span>
+                  ) : null;
+                })()}
+                {(() => {
+                  const fur = property.furnishingStatus
+                    ? getFurnishingLabel(property.furnishingStatus)
+                    : (property.extraDetails as any)?.furnishing || null;
+                  return fur ? <span className="text-gray-400">{fur}</span> : null;
+                })()}
               </div>
 
               {/* Highlight tags */}
@@ -631,6 +637,17 @@ export default function PropertyCard({ property, className, listView }: Property
                 <span className="flex items-center gap-1 text-gray-500 whitespace-nowrap">
                   <Maximize2 className="w-3.5 h-3.5 text-gray-400" />{formatArea(a, u)}
                 </span>
+              </>
+            ) : null;
+          })()}
+          {(() => {
+            const fur = property.furnishingStatus
+              ? getFurnishingLabel(property.furnishingStatus)
+              : (property.extraDetails as any)?.furnishing || null;
+            return fur ? (
+              <>
+                <span className="text-gray-300">·</span>
+                <span className="text-gray-500 whitespace-nowrap truncate">{fur}</span>
               </>
             ) : null;
           })()}

@@ -274,25 +274,34 @@ export default function PropertyDetailClient({ property }: Props) {
     ? Math.round(Number(property.price) / resolvedArea)
     : null;
 
+  // Resolve area label from extraDetails.area[0].label if available (e.g. "Carpet Area")
+  const ed = property.extraDetails as Record<string, any> | null | undefined;
+  const areaLabel: string = (Array.isArray(ed?.area) && ed!.area[0]?.label) ? ed!.area[0].label : 'Carpet Area';
+
+  // ExtraDetails-derived fallbacks for fields that might not be in the main columns
+  const edFurnishing: string | null = !property.furnishingStatus && ed?.furnishing ? String(ed.furnishing) : null;
+  const edFloorNumber: string | null = property.floorNumber == null && ed?.floor_number != null ? String(ed.floor_number) : null;
+  const edTotalFloors: string | null = !property.totalFloors && ed?.floor ? String(ed.floor) : null;
+
   // Key overview specs
   const overviewSpecs = [
     property.bedrooms    && { icon: <BedDouble className="w-5 h-5" />,  label: 'Bedrooms',   value: `${property.bedrooms} BHK` },
     property.bathrooms   && { icon: <Bath className="w-5 h-5" />,       label: 'Bathrooms',  value: `${property.bathrooms}` },
-    resolvedArea         && { icon: <Maximize2 className="w-5 h-5" />,  label: 'Area',       value: formatArea(resolvedArea, resolvedAreaUnit) },
-    property.floorNumber != null && { icon: <FloorIcon className="w-5 h-5" />, label: 'Floor', value: `${property.floorNumber}${property.totalFloors ? '/' + property.totalFloors : ''}` },
+    resolvedArea         && { icon: <Maximize2 className="w-5 h-5" />,  label: areaLabel,    value: formatArea(resolvedArea, resolvedAreaUnit) },
+    (property.floorNumber != null || edFloorNumber != null) && { icon: <FloorIcon className="w-5 h-5" />, label: 'Floor', value: `${property.floorNumber ?? edFloorNumber}${(property.totalFloors || edTotalFloors) ? '/' + (property.totalFloors || edTotalFloors) : ''}` },
     property.parkingSpots && { icon: <Car className="w-5 h-5" />,       label: 'Parking',    value: `${property.parkingSpots}` },
-    property.furnishingStatus && { icon: <Wind className="w-5 h-5" />,  label: 'Furnishing', value: getFurnishingLabel(property.furnishingStatus) },
+    (property.furnishingStatus || edFurnishing) && { icon: <Wind className="w-5 h-5" />,  label: 'Furnishing', value: property.furnishingStatus ? getFurnishingLabel(property.furnishingStatus) : edFurnishing! },
   ].filter(Boolean) as { icon: React.ReactNode; label: string; value: string }[];
 
   // Full specs table
   const baseSpecs = [
     { label: 'Bedrooms',      value: property.bedrooms   ? `${property.bedrooms} BHK`         : null },
     { label: 'Bathrooms',     value: property.bathrooms  ? `${property.bathrooms}`             : null },
-    { label: 'Carpet Area',   value: resolvedArea        ? formatArea(resolvedArea, resolvedAreaUnit) : null },
-    { label: 'Floor',         value: property.floorNumber != null ? `${property.floorNumber}${property.totalFloors ? ' of ' + property.totalFloors : ''}` : null },
+    { label: areaLabel,       value: resolvedArea        ? formatArea(resolvedArea, resolvedAreaUnit) : null },
+    { label: 'Floor',         value: property.floorNumber != null ? `${property.floorNumber}${property.totalFloors ? ' of ' + property.totalFloors : ''}` : (edFloorNumber ? `${edFloorNumber}${edTotalFloors ? ' of ' + edTotalFloors : ''}` : null) },
     { label: 'Balconies',     value: property.balconies  ? `${property.balconies}` : null },
     { label: 'Parking',       value: property.parkingSpots ? `${property.parkingSpots} spot${property.parkingSpots > 1 ? 's' : ''}` : null },
-    { label: 'Furnishing',    value: getFurnishingLabel(property.furnishingStatus) },
+    { label: 'Furnishing',    value: property.furnishingStatus ? getFurnishingLabel(property.furnishingStatus) : (edFurnishing || '') },
     { label: 'Possession',    value: property.possessionStatus === 'ready_to_move' ? 'Ready to Move' : 'Under Construction' },
     { label: 'Property Age',  value: property.propertyAge ? `${property.propertyAge} yr${property.propertyAge > 1 ? 's' : ''}` : null },
     { label: 'Property Type', value: getPropertyTypeLabel(property.type) },
@@ -304,8 +313,10 @@ export default function PropertyDetailClient({ property }: Props) {
   if (property.extraDetails && typeof property.extraDetails === 'object') {
     for (const [key, val] of Object.entries(property.extraDetails)) {
       if (val === null || val === undefined || val === '') continue;
-      // carpet_area is already shown in baseSpecs as "Carpet Area"
-      if (key === 'carpet_area') continue;
+      // carpet_area and area are already shown in baseSpecs
+      if (key === 'carpet_area' || key === 'area') continue;
+      // floor_number and furnishing are already shown via baseSpecs fallbacks
+      if (key === 'floor_number' || key === 'furnishing') continue;
       const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
       if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
         if ('label' in val[0]) {

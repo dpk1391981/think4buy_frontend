@@ -98,6 +98,9 @@ function TrendingCard({ property, rank }: { property: any; rank: number }) {
             </span>
           )}
           {property.bedrooms && <span>{property.bedrooms} BHK</span>}
+          {!property.bedrooms && (property.extraDetails as any)?.furnishing && (
+            <span className="truncate max-w-[80px]">{(property.extraDetails as any).furnishing}</span>
+          )}
 
           {/* Activity indicators */}
           <div className="ml-auto flex items-center gap-2">

@@ -68,6 +68,13 @@ export function getPropertyArea(property: {
       return { area: raw, areaUnit: property.areaUnit || 'Sq.ft.' };
     }
   }
+
+  // Also try 'area' key — new format: [{unit, label, value}]
+  const rawAreaArr = details?.area;
+  if (Array.isArray(rawAreaArr) && rawAreaArr.length > 0 && rawAreaArr[0].value) {
+    return { area: Number(rawAreaArr[0].value), areaUnit: rawAreaArr[0].unit || property.areaUnit || 'Sq.ft.' };
+  }
+
   return { area: property.area, areaUnit: property.areaUnit || 'Sq.ft.' };
 }
 
