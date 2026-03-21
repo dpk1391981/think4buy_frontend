@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'next/navigation';
 import {
   CheckCircle, XCircle, Trash2, Star, StarOff, Power, PowerOff,
@@ -60,21 +61,35 @@ interface ActionMenuProps {
 
 function ActionMenu({ property: p, onApprove, onReject, onToggleStatus, onToggleFeatured, onDelete, loading }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setOpen(o => !o);
+  };
 
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        onClick={handleOpen}
         disabled={loading}
         className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
       >
         <MoreVertical className="w-4 h-4" />
       </button>
 
-      {open && (
+      {open && createPortal(
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-100 z-20 py-1 overflow-hidden">
+          <div className="fixed inset-0 z-[200]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed w-52 bg-white rounded-xl shadow-xl border border-gray-100 z-[201] py-1 overflow-hidden"
+            style={{ top: menuPos.top, right: menuPos.right }}
+          >
             <Link
               href={`/properties/${p.slug}`}
               target="_blank"
@@ -143,7 +158,8 @@ function ActionMenu({ property: p, onApprove, onReject, onToggleStatus, onToggle
               Delete Permanently
             </button>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
