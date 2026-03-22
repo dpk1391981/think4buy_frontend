@@ -661,7 +661,7 @@ export const homeApi = {
   getMarketCities: (limit = 12) =>
     api.get('/home/market-cities', { params: { limit } }),
 
-  getPriceSnapshot: (params?: { city?: string; state?: string; propertyType?: string; listingType?: string }) =>
+  getPriceSnapshot: (params?: { city?: string; state?: string }) =>
     api.get('/home/price-snapshot', { params }),
 
   getInsights: (params?: { city?: string; state?: string }) =>

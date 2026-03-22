@@ -11,15 +11,6 @@ import { homeApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useAppSelector } from '@/lib/store';
 
-// ─── Property-type segment tabs ───────────────────────────────────────────────
-const SEGMENT_TABS = [
-  { key: '',           label: 'All Types',       icon: '🏘️' },
-  { key: 'apartment',  label: 'Apartments',      icon: '🏢' },
-  { key: 'villa',      label: 'Villas & Houses', icon: '🏡' },
-  { key: 'commercial', label: 'Commercial',      icon: '🏪' },
-  { key: 'plot',       label: 'Plots & Land',    icon: '📐' },
-];
-
 // ─── Indian number formatter ──────────────────────────────────────────────────
 function fmtINR(n: number, decimals = 1): string {
   if (!n || n <= 0) return '0';
@@ -184,8 +175,7 @@ function LocalityTable({ localities, city, hasPsfData }: {
         </thead>
         <tbody className="divide-y divide-gray-50">
           {localities.map((loc: any) => {
-            // pricePremium is null when no circle rate OR insufficient data (not 0)
-            const premium   = loc.pricePremium;         // number | null
+            const premium   = loc.pricePremium;
             const hasCircle = loc.circleRate > 0;
             const hasRentYield = loc.rentYield !== null && loc.rentYield !== undefined;
             return (
@@ -229,7 +219,6 @@ function LocalityTable({ localities, city, hasPsfData }: {
                   )}
                 </td>
                 <td className="py-2.5 pr-2 text-right hidden sm:table-cell">
-                  {/* null = no circle rate or insufficient data */}
                   {hasCircle && premium !== null && premium !== undefined ? (
                     <span className={cn(
                       'font-semibold',
@@ -242,7 +231,6 @@ function LocalityTable({ localities, city, hasPsfData }: {
                   )}
                 </td>
                 <td className="py-2.5 pr-2 text-right font-semibold text-blue-600">
-                  {/* null = no real rent+sale data — show — not 0% */}
                   {hasRentYield ? `${(loc.rentYield as number).toFixed(1)}%` : <span className="text-gray-300">—</span>}
                 </td>
                 <td className="py-2.5 text-right">
@@ -253,38 +241,6 @@ function LocalityTable({ localities, city, hasPsfData }: {
           })}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-// ─── By-type breakdown ─────────────────────────────────────────────────────────
-function ByTypeBreakdown({ byType }: { byType: Record<string, any> }) {
-  const entries = Object.entries(byType || {}).filter(([, v]) => v.count > 0);
-  if (entries.length === 0) return null;
-
-  const TYPE_LABELS: Record<string, string> = {
-    buy: '🏠 Buy', rent: '🔑 Rent', pg: '🛏 PG',
-    commercial: '🏢 Commercial', industrial: '🏭 Industrial',
-    builder_project: '🏗 New Projects', investment: '💼 Investment',
-  };
-
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5">
-      <h3 className="font-bold text-gray-900 text-sm mb-4">By Property Type</h3>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {entries.map(([type, v]) => (
-          <div key={type} className="bg-gray-50 rounded-xl p-3">
-            <p className="text-xs font-semibold text-gray-700 mb-1">{TYPE_LABELS[type] || type}</p>
-            <p className="text-base font-black text-gray-900">
-              {v.medianPsf > 0 ? `₹${v.medianPsf.toLocaleString('en-IN')}/sqft` : '—'}
-            </p>
-            {v.avgRentPsf > 0 && (
-              <p className="text-[11px] text-emerald-600">Rent ₹{v.avgRentPsf}/sqft</p>
-            )}
-            <p className="text-[10px] text-gray-400 mt-0.5">{v.count} listings</p>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -328,7 +284,6 @@ export default function CityPriceSnapshot() {
   const [activeCity, setActiveCity] = useState<string>(() =>
     FALLBACK_CITIES.includes(reduxCity) ? reduxCity : FALLBACK_CITIES[0],
   );
-  const [activeSegment, setActiveSegment] = useState<string>('');  // '' = all types
 
   useEffect(() => {
     if (cityList.length > 0 && !cityList.includes(activeCity)) {
@@ -338,11 +293,8 @@ export default function CityPriceSnapshot() {
   }, [cityList.join(',')]); // eslint-disable-line
 
   const { data: snapRes, isLoading } = useQuery({
-    queryKey: ['price-snapshot', activeCity, activeSegment],
-    queryFn:  () => homeApi.getPriceSnapshot({
-      city:         activeCity,
-      propertyType: activeSegment || undefined,
-    }).then((r) => r.data),
+    queryKey: ['price-snapshot', activeCity],
+    queryFn:  () => homeApi.getPriceSnapshot({ city: activeCity }).then((r) => r.data),
     staleTime: 30 * 60 * 1000,
     enabled:  !!activeCity,
   });
@@ -356,10 +308,8 @@ export default function CityPriceSnapshot() {
   const localities     = snap?.localities ?? [];
   const priceTrend     = snap?.priceTrend ?? [];
   const smartInsights  = snap?.smartInsights ?? [];
-  const byType         = snap?.byType ?? {};
   const confidenceLabel = snap?.confidenceLabel as string | undefined;
   const insufficientData = snap?.insufficientData ?? false;
-  const segmentLabel   = snap?.segmentLabel ?? (activeSegment ? SEGMENT_TABS.find(s => s.key === activeSegment)?.label : 'All Types') ?? 'All Types';
   const psfCount       = snap?.psfListingCount ?? snap?.listingCount ?? 0;
   const rentCount      = snap?.rentListingCount ?? 0;
 
@@ -379,7 +329,7 @@ export default function CityPriceSnapshot() {
               {activeCity} Price Snapshot
             </h2>
             <p className="text-gray-500 text-xs sm:text-sm mt-1">
-              {segmentLabel} · Sale PSF · Rent PSF · Circle Rates · 6-month trend — from active listings
+              Sale PSF · Rent PSF · Circle Rates · 6-month trend — from active listings
             </p>
           </div>
           <Link
@@ -391,12 +341,12 @@ export default function CityPriceSnapshot() {
         </div>
 
         {/* City tabs */}
-        <div className="overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 mb-3 sm:mb-4">
+        <div className="overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 mb-5 sm:mb-6">
           <div className="flex gap-2 w-max sm:w-auto sm:flex-wrap">
             {cityList.map((city) => (
               <button
                 key={city}
-                onClick={() => { setActiveCity(city); setActiveSegment(''); }}
+                onClick={() => setActiveCity(city)}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all border',
                   activeCity === city
@@ -406,27 +356,6 @@ export default function CityPriceSnapshot() {
               >
                 <MapPin className="w-3 h-3" />
                 {city}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Property-type segment tabs */}
-        <div className="overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 mb-5 sm:mb-6">
-          <div className="flex gap-1.5 w-max sm:w-auto sm:flex-wrap">
-            {SEGMENT_TABS.map((seg) => (
-              <button
-                key={seg.key}
-                onClick={() => setActiveSegment(seg.key)}
-                className={cn(
-                  'flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap transition-all border',
-                  activeSegment === seg.key
-                    ? 'bg-gray-800 text-white border-gray-800 shadow-sm'
-                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700',
-                )}
-              >
-                <span>{seg.icon}</span>
-                {seg.label}
               </button>
             ))}
           </div>
@@ -460,8 +389,8 @@ export default function CityPriceSnapshot() {
                   ? (snap.avgPricePerSqftFormatted ?? `₹${snap.avgPricePerSqft.toLocaleString('en-IN')}`)
                   : 'No Data'}
                 sub={hasPsfData
-                  ? `Median P50 · ${psfCount} ${segmentLabel.toLowerCase()} listings`
-                  : `Insufficient listings (need 5+ ${segmentLabel.toLowerCase()})`}
+                  ? `Median P50 · ${psfCount} listings`
+                  : 'Insufficient listings (need 5+)'}
                 icon={<Home className="w-4 h-4 text-primary-500" />}
                 color="bg-primary-50 border-primary-100"
                 badge={hasPsfData
@@ -472,17 +401,15 @@ export default function CityPriceSnapshot() {
                 label="Rent / Sqft / Month"
                 value={snap.avgRentPsf > 0 ? `₹${snap.avgRentPsf}` : 'No Data'}
                 sub={snap.avgRentPsf > 0
-                  ? `${rentCount > 0 ? `${rentCount} ` : ''}${segmentLabel.toLowerCase()} rent listings`
-                  : `Need 5+ ${segmentLabel.toLowerCase()} rent listings`}
+                  ? `${rentCount > 0 ? `${rentCount} ` : ''}rent listings`
+                  : 'Need 5+ rent listings'}
                 icon={<DollarSign className="w-4 h-4 text-emerald-500" />}
                 color="bg-emerald-50 border-emerald-100"
               />
               <MetricCard
                 label="Rental Yield"
                 value={hasRentYield ? `${snap.rentYield}%` : 'No Data'}
-                sub={hasRentYield
-                  ? `Same type · ${segmentLabel} sale + rent`
-                  : `Need 5+ sale & 5+ rent (${segmentLabel.toLowerCase()})`}
+                sub={hasRentYield ? 'Sale + rent combined' : 'Need 5+ sale & 5+ rent'}
                 icon={<TrendingUp className="w-4 h-4 text-blue-500" />}
                 color="bg-blue-50 border-blue-100"
               />
@@ -495,15 +422,13 @@ export default function CityPriceSnapshot() {
               />
             </div>
 
-            {/* ── Data quality banner (show when low confidence) ── */}
+            {/* ── Data quality banner ── */}
             {insufficientData && (
               <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
                 <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-semibold">
-                    Insufficient {segmentLabel.toLowerCase()} data for {activeCity}.
-                  </span>{' '}
-                  Price insights require at least 5 approved {segmentLabel.toLowerCase()} listings.
+                  <span className="font-semibold">Insufficient data for {activeCity}.</span>{' '}
+                  Price insights require at least 5 approved listings.
                   Values will appear as more properties are listed.
                 </div>
               </div>
@@ -513,12 +438,12 @@ export default function CityPriceSnapshot() {
                 <Info className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                 <span>
                   Data confidence: <ConfidenceBadge label={confidenceLabel} />{' '}
-                  — Based on {psfCount} {segmentLabel.toLowerCase()} listings · Confidence improves with more data.
+                  — Based on {psfCount} listings · Confidence improves with more data.
                 </span>
               </div>
             )}
 
-            {/* ── Main grid: trend chart + smart insights ── */}
+            {/* ── Main grid: trend chart + locality table ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
 
               {/* Left: 6-month trend + buy vs rent stats */}
@@ -591,7 +516,7 @@ export default function CityPriceSnapshot() {
               <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-gray-900 text-sm">
-                    {segmentLabel} Localities — Price & Rental Analysis
+                    Localities — Price &amp; Rental Analysis
                   </h3>
                   <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-lg hidden sm:inline">
                     Sorted by rank score
@@ -617,7 +542,7 @@ export default function CityPriceSnapshot() {
                   <span className="flex items-center gap-1"><Minus       className="w-3 h-3 text-gray-400"  /> Stable</span>
                   <span className="flex items-center gap-1"><TrendingDown className="w-3 h-3 text-red-500"  /> Falling</span>
                   <span className="ml-auto text-[10px] flex items-center gap-1.5">
-                    {psfCount > 0 ? `${psfCount} ${segmentLabel.toLowerCase()} listings` : `${fmtINR(snap.totalListingCount, 0)} total`}
+                    {psfCount > 0 ? `${psfCount} listings` : `${fmtINR(snap.totalListingCount, 0)} total`}
                     {confidenceLabel && <ConfidenceBadge label={confidenceLabel} />}
                     {snap.lastUpdated && ` · Updated ${new Date(snap.lastUpdated).toLocaleDateString('en-IN')}`}
                   </span>
@@ -628,11 +553,6 @@ export default function CityPriceSnapshot() {
             {/* ── Smart Insights ── */}
             {smartInsights.length > 0 && (
               <SmartInsightsPanel insights={smartInsights} />
-            )}
-
-            {/* ── By-type breakdown ── */}
-            {Object.keys(byType).length > 0 && (
-              <ByTypeBreakdown byType={byType} />
             )}
 
           </div>
