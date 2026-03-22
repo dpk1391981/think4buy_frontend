@@ -197,3 +197,20 @@ export const TOP_CITIES = [
   { name: 'Hyderabad', gradient: 'from-yellow-500 to-orange-400', count: '31,700+' },
   { name: 'Chennai', gradient: 'from-indigo-500 to-blue-400', count: '22,800+' },
 ];
+
+
+/**
+ * Maps a property's type + category to the LeadPropertyType enum
+ * accepted by the backend (residential | commercial | plot | rental).
+ */
+export function toLeadPropertyType(
+  type?: string,
+  category?: string,
+): 'residential' | 'commercial' | 'plot' | 'rental' | undefined {
+  if (category === 'rent' || category === 'pg') return 'rental';
+  if (!type) return undefined;
+  if (type === 'plot') return 'plot';
+  if (type.startsWith('commercial_') || type === 'commercial') return 'commercial';
+  if (['apartment','villa','house','penthouse','studio','co_living','pg'].includes(type)) return 'residential';
+  return undefined;
+}

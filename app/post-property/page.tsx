@@ -1960,8 +1960,10 @@ function Step9Price({ form, dispatch }: any) {
 
 // ─── Step: Photos ────────────────────────────────────────────────────────────
 
-function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImages, onRemoveExisting, onSubmit, onSaveDraft, loading, savingDraft, error, isEditMode }: any) {
+function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImages, onRemoveExisting, onSubmit, onSaveDraft, loading, savingDraft, error, isEditMode, brochureFile, setBrochureFile, removeBrochure, setRemoveBrochure }: any) {
   const imageRef = useRef<HTMLInputElement>(null);
+  const brochureRef = useRef<HTMLInputElement>(null);
+  const isBuilderProject = form.mainCategory === 'builder_project';
   const imgCount = mediaFiles.filter((m: MediaFile) => m.type === 'image').length;
   const totalCount = imgCount + (existingImages?.length || 0);
 
@@ -2045,6 +2047,74 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImage
         </div>
       </div>
 
+      {/* Brochure upload — builder_project only */}
+      {isBuilderProject && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+          <h3 className="font-bold text-gray-900 text-base mb-1 flex items-center gap-2">
+            📄 Project Brochure <span className="text-xs font-normal text-gray-500">(PDF, max 10 MB)</span>
+          </h3>
+          <p className="text-sm text-gray-500 mb-4">Upload your project brochure so buyers can download it directly from the listing.</p>
+
+          <input
+            type="file"
+            ref={brochureRef}
+            accept="application/pdf,.pdf"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0] || null;
+              setBrochureFile(f);
+              setRemoveBrochure(false);
+              e.target.value = '';
+            }}
+          />
+
+          {/* Show existing brochure in edit mode */}
+          {isEditMode && form.existingBrochureUrl && !removeBrochure && !brochureFile && (
+            <div className="flex items-center gap-3 p-3 bg-white border border-amber-300 rounded-xl mb-3">
+              <span className="text-2xl">📄</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 truncate">Brochure uploaded</p>
+                <a href={form.existingBrochureUrl} target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-primary-600 hover:underline">View current brochure</a>
+              </div>
+              <button type="button" onClick={() => setRemoveBrochure(true)}
+                className="text-red-500 hover:text-red-700 text-xs font-semibold px-2 py-1 border border-red-200 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0">
+                Remove
+              </button>
+            </div>
+          )}
+
+          {/* Show newly selected brochure file */}
+          {brochureFile && (
+            <div className="flex items-center gap-3 p-3 bg-white border border-green-300 rounded-xl mb-3">
+              <span className="text-2xl">📄</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 truncate">{brochureFile.name}</p>
+                <p className="text-xs text-gray-500">{(brochureFile.size / 1024 / 1024).toFixed(2)} MB</p>
+              </div>
+              <button type="button" onClick={() => setBrochureFile(null)}
+                className="text-red-500 hover:text-red-700 text-xs font-semibold px-2 py-1 border border-red-200 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0">
+                Remove
+              </button>
+            </div>
+          )}
+
+          {/* Removed indicator */}
+          {removeBrochure && !brochureFile && (
+            <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mb-3">
+              <X className="w-4 h-4 flex-shrink-0" /> Brochure will be removed on save.
+              <button type="button" onClick={() => setRemoveBrochure(false)} className="ml-auto text-xs underline">Undo</button>
+            </div>
+          )}
+
+          <button type="button" onClick={() => brochureRef.current?.click()}
+            className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-amber-400 text-amber-700 rounded-xl text-sm font-semibold hover:bg-amber-100 hover:border-amber-500 transition-all">
+            <Plus className="w-4 h-4" />
+            {brochureFile || (isEditMode && form.existingBrochureUrl && !removeBrochure) ? 'Replace Brochure' : 'Upload Brochure'}
+          </button>
+        </div>
+      )}
+
       {/* Summary card */}
       <div className="bg-white border-2 border-gray-100 rounded-2xl p-5 shadow-sm">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -2105,6 +2175,8 @@ function PostPropertyPageInner() {
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [existingImages, setExistingImages] = useState<{ id: string; url: string; isPrimary: boolean }[]>([]);
   const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
+  const [brochureFile, setBrochureFile] = useState<File | null>(null);
+  const [removeBrochure, setRemoveBrochure] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [roleUpgrading, setRoleUpgrading] = useState(false);
@@ -2388,6 +2460,9 @@ function PostPropertyPageInner() {
         setExistingImages(
           (property.images || []).sort((a: any, b: any) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0))
         );
+        if (property.brochureUrl) {
+          dispatch(updateForm({ existingBrochureUrl: property.brochureUrl }));
+        }
         setEditingProperty({
           title: property.title,
           city: property.city,
@@ -2538,6 +2613,18 @@ function PostPropertyPageInner() {
         await propertiesApi.uploadImages(propertyId, fd);
       }
 
+      // Handle brochure (builder_project only)
+      if (form.mainCategory === 'builder_project') {
+        if (removeBrochure && form.existingBrochureUrl) {
+          await propertiesApi.deleteBrochure(propertyId);
+        }
+        if (brochureFile) {
+          const bfd = new FormData();
+          bfd.append('brochure', brochureFile);
+          await propertiesApi.uploadBrochure(propertyId, bfd);
+        }
+      }
+
       dispatch(resetForm());
       router.push(isEditMode ? `/properties/${propertySlug}?updated=1` : `/properties/${propertySlug}?posted=1`);
     } catch (err: any) {
@@ -2641,7 +2728,7 @@ function PostPropertyPageInner() {
       case 6: return <Step7Amenities {...stepProps} />;
       case 7: return <Step8Description {...stepProps} />;
       case 8: return <Step9Price {...stepProps} />;
-      case 9: return <Step10Photos {...stepProps} mediaFiles={mediaFiles} setMediaFiles={setMediaFiles} existingImages={existingImages} onRemoveExisting={handleRemoveExistingImage} onSubmit={handleSubmit} onSaveDraft={handleSaveDraftAndExit} savingDraft={savingDraft} loading={loading} error={error} isEditMode={isEditMode} />;
+      case 9: return <Step10Photos {...stepProps} mediaFiles={mediaFiles} setMediaFiles={setMediaFiles} existingImages={existingImages} onRemoveExisting={handleRemoveExistingImage} onSubmit={handleSubmit} onSaveDraft={handleSaveDraftAndExit} savingDraft={savingDraft} loading={loading} error={error} isEditMode={isEditMode} brochureFile={brochureFile} setBrochureFile={setBrochureFile} removeBrochure={removeBrochure} setRemoveBrochure={setRemoveBrochure} />;
       default: return null;
     }
   };

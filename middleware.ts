@@ -78,10 +78,25 @@ const SEO_PREFIXES = [
   'property-in',
 ];
 
+// ── File-extension cleanup ────────────────────────────────────────────────────
+// Strips known file extensions from URLs and 301-redirects to the clean path.
+// e.g. /about.php  → /about
+//      /page.html  → /page
+//      /index.php  → /  (root)
+const STRIPPED_EXTENSIONS = /\.(php|html?|asp|aspx|cfm|cgi|jsp|pl|py|rb|do|action)$/i;
+
 // ── Middleware ────────────────────────────────────────────────────────────────
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // ── 301: strip file extensions ────────────────────────────────────────────
+  if (STRIPPED_EXTENSIONS.test(pathname)) {
+    const clean = pathname.replace(STRIPPED_EXTENSIONS, '') || '/';
+    const url = request.nextUrl.clone();
+    url.pathname = clean;
+    return NextResponse.redirect(url, 301);
+  }
 
   // ── /property-in-{slug}: city-only OR city+locality (all-hyphen SEO URLs) ──
   // e.g. /property-in-delhi        → city page  (delhi is a known city)

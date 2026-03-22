@@ -34,6 +34,7 @@ import {
   MessageSquare,
   BarChart2,
   SlidersHorizontal,
+  Star,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
@@ -49,6 +50,7 @@ const NAV_GROUPS = [
     label: 'Listings',
     items: [
       { href: '/admin/properties', label: 'Properties', icon: Home },
+      { href: '/admin/featured-properties', label: 'Featured Properties', icon: Star },
       { href: '/admin/categories', label: 'Categories', icon: Tag },
       { href: '/admin/property-config', label: 'Property Config', icon: Layers },
     ],

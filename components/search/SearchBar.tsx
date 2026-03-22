@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, MapPin, Building2, Home, Loader2, TrendingUp } from 'lucide-react';
-import { propertiesApi, locationsApi } from '@/lib/api';
+import { Search, MapPin, Building2, Home, Loader2, TrendingUp, Navigation } from 'lucide-react';
+import { propertiesApi, locationsApi, smartSearchApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 interface SearchBarProps {
@@ -76,16 +76,22 @@ export default function SearchBar({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [popularCities, setPopularCities] = useState<{ id: string; cityName: string; counts: { total: number } }[]>([]);
+  const [trendingSearches, setTrendingSearches] = useState<{ query: string; count: number }[]>([]);
+  const [geoLoading, setGeoLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
 
-  // Fetch top cities once on mount
+  // Fetch top cities + trending searches once on mount
   useEffect(() => {
     locationsApi.getTopCities().then(r => {
       const raw = r.data;
       const arr: any[] = Array.isArray(raw) ? raw : raw?.cities ?? [];
       setPopularCities(arr.slice(0, 8));
+    }).catch(() => {});
+
+    smartSearchApi.getTrending(6).then(r => {
+      if (Array.isArray(r?.data)) setTrendingSearches(r.data);
     }).catch(() => {});
   }, []);
 
@@ -174,6 +180,9 @@ export default function SearchBar({
       return;
     }
 
+    // Log search for analytics (fire-and-forget)
+    smartSearchApi.logSearch({ searchQuery: q });
+
     // If it looks like a natural language query, use keyword search
     if (isKeywordSearch(q)) {
       router.push(buildSearchUrl({ keyword: q }));
@@ -182,6 +191,33 @@ export default function SearchBar({
     }
     setShowSuggestions(false);
   };
+
+  /** Geo "Near Me" search — requests browser location then searches by radius */
+  const handleNearMe = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setGeoLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeoLoading(false);
+        const { latitude, longitude } = pos.coords;
+        setQuery('Near Me');
+        smartSearchApi.logSearch({
+          searchQuery: 'Near Me',
+          latitude,
+          longitude,
+        });
+        const params = new URLSearchParams({ lat: String(latitude), lng: String(longitude), radius: '5' });
+        if (category) params.set('category', category);
+        router.push(`/properties?${params.toString()}`);
+        setShowSuggestions(false);
+      },
+      () => {
+        setGeoLoading(false);
+        alert('Could not detect your location. Please enable location access.');
+      },
+      { timeout: 8000 },
+    );
+  }, [category, router]);
 
   const handleSuggestionClick = (item: Suggestion) => {
     setShowSuggestions(false);
@@ -355,33 +391,90 @@ export default function SearchBar({
                 <div className="px-4 py-3 text-sm text-gray-500 text-center">
                   No suggestions. Press Enter to search.
                 </div>
-              ) : query.length < 2 && popularCities.length > 0 ? (
+              ) : query.length < 2 && (popularCities.length > 0 || trendingSearches.length > 0) ? (
                 <div className="py-2">
-                  <div className="px-4 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" /> Popular Cities
-                  </div>
-                  {popularCities.map((c) => (
-                    <button
-                      key={c.id}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left transition-colors"
-                      onClick={() => {
-                        setQuery(c.cityName);
-                        router.push(buildSearchUrl({ city: c.cityName }));
-                        setShowSuggestions(false);
-                      }}
-                    >
-                      <MapPin className="w-4 h-4 text-primary-400 flex-shrink-0" />
-                      <span className="text-sm text-gray-700 flex-1">{c.cityName}</span>
-                      {c.counts?.total > 0 && (
-                        <span className="text-[10px] text-gray-400 flex-shrink-0">{c.counts.total} listings</span>
-                      )}
-                    </button>
-                  ))}
+                  {/* Near Me shortcut */}
+                  <button
+                    onClick={() => { setShowSuggestions(false); handleNearMe(); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-primary-50 text-left transition-colors border-b border-gray-100"
+                  >
+                    <Navigation className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                    <span className="text-sm font-medium text-primary-700 flex-1">Search Near Me</span>
+                    <span className="text-[10px] text-primary-400">Use location</span>
+                  </button>
+
+                  {trendingSearches.length > 0 && (
+                    <>
+                      <div className="px-4 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100 flex items-center gap-1">
+                        <TrendingUp className="w-3 h-3" /> Trending Searches
+                      </div>
+                      {trendingSearches.map((t) => (
+                        <button
+                          key={t.query}
+                          className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-left transition-colors"
+                          onClick={() => {
+                            setQuery(t.query);
+                            smartSearchApi.logSearch({ searchQuery: t.query });
+                            router.push(buildSearchUrl({ keyword: t.query }));
+                            setShowSuggestions(false);
+                          }}
+                        >
+                          <TrendingUp className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                          <span className="text-sm text-gray-700 flex-1">{t.query}</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+
+                  {popularCities.length > 0 && (
+                    <>
+                      <div className="px-4 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100 flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> Popular Cities
+                      </div>
+                      {popularCities.map((c) => (
+                        <button
+                          key={c.id}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left transition-colors"
+                          onClick={() => {
+                            setQuery(c.cityName);
+                            router.push(buildSearchUrl({ city: c.cityName }));
+                            setShowSuggestions(false);
+                          }}
+                        >
+                          <MapPin className="w-4 h-4 text-primary-400 flex-shrink-0" />
+                          <span className="text-sm text-gray-700 flex-1">{c.cityName}</span>
+                          {c.counts?.total > 0 && (
+                            <span className="text-[10px] text-gray-400 flex-shrink-0">{c.counts.total} listings</span>
+                          )}
+                        </button>
+                      ))}
+                    </>
+                  )}
                 </div>
               ) : null}
             </div>
           )}
         </div>
+
+        {/* Near Me button — only on large search bar */}
+        {size === 'lg' && (
+          <>
+            <div className="h-8 w-px bg-gray-200 mx-1 flex-shrink-0" />
+            <button
+              onClick={handleNearMe}
+              disabled={geoLoading}
+              title="Search near your location"
+              className="flex items-center gap-1.5 px-3 text-sm text-primary-600 hover:text-primary-800 font-medium transition-colors flex-shrink-0 disabled:opacity-60"
+            >
+              {geoLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Navigation className="w-4 h-4" />
+              )}
+              <span className="hidden md:inline">Near Me</span>
+            </button>
+          </>
+        )}
 
         <div className="h-8 w-px bg-gray-200 mx-1 flex-shrink-0" />
 

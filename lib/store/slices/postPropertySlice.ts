@@ -86,6 +86,8 @@ export interface PostPropertyForm {
   brokerageCustom: string;
   // Step 10 — Media
   mediaCount: number;
+  // Brochure (builder_project only)
+  existingBrochureUrl: string;
 }
 
 const initialFormState: PostPropertyForm = {
@@ -127,6 +129,7 @@ const initialFormState: PostPropertyForm = {
   brokerage: '',
   brokerageCustom: '',
   mediaCount: 0,
+  existingBrochureUrl: '',
 };
 
 interface PostPropertyState {

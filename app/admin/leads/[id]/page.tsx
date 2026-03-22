@@ -2,13 +2,33 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   ArrowLeft, User, Phone, Mail, MapPin, Target, Activity,
   RefreshCw, FileText, UserCheck, PhoneCall, MessageSquare,
   Mail as MailIcon, Calendar, CheckCircle2, Handshake,
   AlertCircle, RotateCcw, Bell, Upload, Pencil, Check,
+  Building2, ExternalLink, Home, IndianRupee, Maximize2,
 } from 'lucide-react';
 import { leadsApi } from '@/lib/api';
+
+function fmtPrice(v: number) {
+  if (!v) return '—';
+  if (v >= 10_000_000) return `₹${(v / 10_000_000).toFixed(1)}Cr`;
+  if (v >= 100_000)    return `₹${(v / 100_000).toFixed(1)}L`;
+  return `₹${v.toLocaleString('en-IN')}`;
+}
+
+const PROPERTY_TYPE_LABEL: Record<string, string> = {
+  apartment: 'Apartment', villa: 'Villa', house: 'House', plot: 'Plot',
+  penthouse: 'Penthouse', studio: 'Studio', commercial_office: 'Office Space',
+  commercial_shop: 'Shop', commercial_warehouse: 'Warehouse',
+  pg: 'PG', co_living: 'Co-Living',
+};
+const CATEGORY_LABEL: Record<string, string> = {
+  buy: 'For Sale', rent: 'For Rent', pg: 'PG', commercial: 'Commercial',
+  builder_project: 'New Project', investment: 'Investment',
+};
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -281,10 +301,24 @@ export default function LeadDetailPage() {
               </div>
             )}
 
+            {lead.notes && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="text-xs text-gray-400 mb-1">Internal Notes</div>
+                <p className="text-xs text-gray-600 leading-relaxed italic">"{lead.notes}"</p>
+              </div>
+            )}
+
             {lead.assignedAgentId && (
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="text-xs text-gray-400 mb-1">Assigned Agent</div>
+                <div className="text-xs text-gray-400 mb-1">Assigned Agent ID</div>
                 <div className="font-mono text-xs text-gray-600 break-all">{lead.assignedAgentId}</div>
+              </div>
+            )}
+
+            {lead.contactUserId && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="text-xs text-gray-400 mb-1">Linked User ID</div>
+                <div className="font-mono text-xs text-gray-600 break-all">{lead.contactUserId}</div>
               </div>
             )}
           </div>
@@ -317,6 +351,110 @@ export default function LeadDetailPage() {
 
         {/* ── Right: activity log ──────────────────────────────────────────── */}
         <div className="lg:col-span-2 space-y-4">
+
+          {/* ── Property card ───────────────────────────────────────────── */}
+          {lead.property ? (
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-gray-400" /> Linked Property
+              </h3>
+              <div className="flex gap-3">
+                {/* Thumbnail */}
+                {lead.property.primaryImage ? (
+                  <img
+                    src={lead.property.primaryImage.startsWith('http')
+                      ? lead.property.primaryImage
+                      : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '')}${lead.property.primaryImage}`}
+                    alt={lead.property.title}
+                    className="w-20 h-16 object-cover rounded-lg flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-20 h-16 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Home className="w-6 h-6 text-gray-300" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900 line-clamp-2 leading-snug">
+                    {lead.property.title}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {lead.property.type && (
+                      <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+                        {PROPERTY_TYPE_LABEL[lead.property.type] || lead.property.type}
+                      </span>
+                    )}
+                    {lead.property.category && (
+                      <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">
+                        {CATEGORY_LABEL[lead.property.category] || lead.property.category}
+                      </span>
+                    )}
+                    {lead.property.status && lead.property.status !== 'active' && (
+                      <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded font-medium capitalize">
+                        {lead.property.status.replace(/_/g, ' ')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Property metrics */}
+              <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+                {lead.property.price > 0 && (
+                  <div className="flex items-center gap-1.5 text-gray-700">
+                    <IndianRupee className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                    <span className="font-semibold">{fmtPrice(Number(lead.property.price))}</span>
+                    {lead.property.priceUnit && lead.property.priceUnit !== 'total' && (
+                      <span className="text-gray-400">{lead.property.priceUnit}</span>
+                    )}
+                  </div>
+                )}
+                {lead.property.area > 0 && (
+                  <div className="flex items-center gap-1.5 text-gray-700">
+                    <Maximize2 className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                    <span>{lead.property.area} {lead.property.areaUnit || 'sqft'}</span>
+                  </div>
+                )}
+                {(lead.property.city || lead.property.locality) && (
+                  <div className="flex items-center gap-1.5 text-gray-700 col-span-2">
+                    <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                    <span>
+                      {[lead.property.locality, lead.property.city].filter(Boolean).join(', ')}
+                    </span>
+                  </div>
+                )}
+                {lead.property.bedrooms && (
+                  <div className="text-gray-600">
+                    <span className="font-semibold">{lead.property.bedrooms}</span> BHK
+                  </div>
+                )}
+                {lead.property.reraNumber && (
+                  <div className="flex items-center gap-1 text-green-700">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>RERA: {lead.property.reraNumber}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Link to property */}
+              {lead.property.slug && (
+                <Link
+                  href={`/properties/${lead.property.slug}`}
+                  target="_blank"
+                  className="mt-3 flex items-center justify-center gap-1.5 w-full border border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-300 py-2 rounded-xl text-xs font-medium transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  View Property Listing
+                </Link>
+              )}
+            </div>
+          ) : lead.propertyId ? (
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-gray-400" /> Linked Property
+              </h3>
+              <p className="text-xs text-gray-400">Property ID: <span className="font-mono text-gray-600">{lead.propertyId}</span></p>
+            </div>
+          ) : null}
 
           {/* Add note */}
           <div className="bg-white rounded-xl shadow-sm p-5">

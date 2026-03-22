@@ -36,6 +36,7 @@ export default function MarketIntelligencePage() {
   const [snapshots, setSnapshots]   = useState<Snapshot[]>([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState<string | null>(null); // city name being refreshed
+  const [refreshingCache, setRefreshingCache] = useState(false);
   const [saving, setSaving]         = useState<string | null>(null);   // id being saved
   const [toast, setToast]           = useState<{ msg: string; ok: boolean } | null>(null);
 
@@ -103,6 +104,18 @@ export default function MarketIntelligencePage() {
     }
   };
 
+  const handleRefreshCache = async () => {
+    setRefreshingCache(true);
+    try {
+      await adminApi.refreshPropertyCache();
+      showToast('Property rankings cache refreshed');
+    } catch {
+      showToast('Cache refresh failed', false);
+    } finally {
+      setRefreshingCache(false);
+    }
+  };
+
   const handleRefreshAll = async () => {
     setRefreshing('__all__');
     try {
@@ -145,14 +158,25 @@ export default function MarketIntelligencePage() {
             Pin cities to always show them; use sort order to control tab sequence.
           </p>
         </div>
-        <button
-          onClick={handleRefreshAll}
-          disabled={refreshing === '__all__'}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-60"
-        >
-          <RefreshCw className={cn('w-4 h-4', refreshing === '__all__' && 'animate-spin')} />
-          Refresh All Cities
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefreshCache}
+            disabled={refreshingCache}
+            title="Refresh Smart Pick / Trending property rankings"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-xl transition-colors disabled:opacity-60"
+          >
+            <RefreshCw className={cn('w-4 h-4', refreshingCache && 'animate-spin')} />
+            Refresh Rankings
+          </button>
+          <button
+            onClick={handleRefreshAll}
+            disabled={refreshing === '__all__'}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-60"
+          >
+            <RefreshCw className={cn('w-4 h-4', refreshing === '__all__' && 'animate-spin')} />
+            Refresh All Cities
+          </button>
+        </div>
       </div>
 
       {/* Stats bar */}

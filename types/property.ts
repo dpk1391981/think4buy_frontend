@@ -11,7 +11,7 @@ export type PropertyType =
   | 'pg'
   | 'co_living';
 
-export type PropertyCategory = 'buy' | 'rent' | 'pg' | 'commercial';
+export type PropertyCategory = 'buy' | 'rent' | 'pg' | 'commercial' | 'industrial' | 'builder_project' | 'investment';
 
 export type PropertyStatus = 'active' | 'under_deal' | 'sold' | 'rented' | 'inactive' | 'pending';
 
@@ -85,6 +85,7 @@ export interface Property {
   isVerified: boolean;
   listingPlan?: string;
   viewCount: number;
+  viewsLast7d?: number;
   reraNumber?: string;
   builderName?: string;
   propertyAge?: number;
@@ -101,6 +102,7 @@ export interface Property {
   possessionDate?: string;
   isNewProject?: boolean;
   extraDetails?: Record<string, any>;
+  brochureUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

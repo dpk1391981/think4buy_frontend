@@ -97,11 +97,53 @@ export const propertiesApi = {
     }),
   deleteImage: (propertyId: string, imageId: string) =>
     api.delete(`/properties/${propertyId}/images/${imageId}`),
+  uploadBrochure: (id: string, formData: FormData) =>
+    api.post(`/properties/${id}/brochure`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  deleteBrochure: (id: string) => api.delete(`/properties/${id}/brochure`),
   trackView: (id: string, body: { sessionId?: string; source?: string; referrer?: string; deviceType?: string }) =>
     api.post(`/properties/${id}/view`, body).catch(() => {}), // fire-and-forget, never throws
   updateStatus: (id: string, status: string, note?: string) =>
     api.patch(`/properties/${id}/status`, { status, note }),
   getStatusHistory: (id: string) => api.get(`/properties/${id}/status-history`),
+  getRecommendations: (params: {
+    propertyId?: string;
+    city?: string;
+    type?: string;
+    category?: string;
+    price?: number;
+    lat?: number;
+    lng?: number;
+    limit?: number;
+  }) => api.get('/properties/recommendations', { params }),
+};
+
+/** Smart Search — search log + behavior tracking */
+export const smartSearchApi = {
+  logSearch: (body: {
+    searchQuery: string;
+    parsedFilters?: Record<string, any>;
+    latitude?: number;
+    longitude?: number;
+    resultCount?: number;
+    sessionId?: string;
+  }) => api.post('/smart-search/log', body).catch(() => {}), // fire-and-forget
+
+  trackBehavior: (body: {
+    propertyId: string;
+    eventType: 'view' | 'long_stay' | 'wishlist' | 'contact' | 'inquiry' | 'scroll_deep' | 'image_click' | 'share';
+    duration?: number;
+    sessionId?: string;
+    contactName?: string;
+    contactPhone?: string;
+    contactEmail?: string;
+  }) => api.post('/smart-search/behavior', body).catch(() => {}),
+
+  getTrending: (limit = 8) =>
+    api.get('/smart-search/trending', { params: { limit } }),
+
+  getHistory: () => api.get('/smart-search/history'),
 };
 
 // Auth
@@ -179,6 +221,7 @@ export const adminApi = {
     api.patch(`/admin/market-snapshots/${id}`, data),
   refreshMarketSnapshot: (city?: string, all?: boolean) =>
     api.post('/home/market-snapshot/refresh', { city, all }),
+  refreshPropertyCache: () => api.post('/admin/cache/refresh'),
   // Scoring Config
   getScoringConfig: () => api.get('/admin/scoring-config'),
   setScoringConfig: (key: string, data: { value: number; description?: string }) =>
@@ -618,7 +661,7 @@ export const homeApi = {
   getMarketCities: (limit = 12) =>
     api.get('/home/market-cities', { params: { limit } }),
 
-  getPriceSnapshot: (params?: { city?: string; state?: string }) =>
+  getPriceSnapshot: (params?: { city?: string; state?: string; propertyType?: string; listingType?: string }) =>
     api.get('/home/price-snapshot', { params }),
 
   getInsights: (params?: { city?: string; state?: string }) =>

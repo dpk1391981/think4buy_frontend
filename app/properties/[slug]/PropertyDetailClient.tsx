@@ -12,12 +12,12 @@ import {
   Building2, Star, Shield, Clock, Zap, Send,
   Layers, Home, Award, ExternalLink,
   ChevronDown, ChevronUp, UserCircle, Lock, AlertTriangle,
-  Bath, Layers as FloorIcon, Car, Wind,
+  Bath, Layers as FloorIcon, Car, Wind, TrendingUp,
 } from 'lucide-react';
 import { Property } from '@/types/property';
 import {
   formatPrice, formatArea, getPropertyArea, getPropertyTypeLabel, getCategoryLabel,
-  getFurnishingLabel, getPrimaryImage, timeAgo,
+  getFurnishingLabel, getPrimaryImage, timeAgo, toLeadPropertyType,
 } from '@/lib/utils';
 import { resolveImageUrl } from '@/lib/imageUtils';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,9 @@ import { useAppDispatch } from '@/lib/store';
 import { openAuthModal } from '@/lib/store/slices/uiSlice';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import { WhatsAppIcon } from '@/components/common/PhoneRevealButton';
+import { usePropertyBehavior } from '@/hooks/usePropertyBehavior';
+import FloatingCTA from '@/components/common/FloatingCTA';
+import IntentPopup from '@/components/common/IntentPopup';
 
 const PropertyCard = dynamic(() => import('@/components/property/PropertyCard'), { ssr: false });
 
@@ -77,6 +80,9 @@ export default function PropertyDetailClient({ property }: Props) {
   const { user } = useAuth();
   const dispatch = useAppDispatch();
   const { trackPropertyView, trackPropertyInquiry } = useAnalytics();
+
+  // Smart behavior tracking — fires view, long_stay, scroll_deep events automatically
+  const { track: trackBehavior } = usePropertyBehavior({ propertyId: property.id });
 
   // Gallery
   const [activeImage, setActiveImage] = useState(0);
@@ -159,6 +165,19 @@ export default function PropertyDetailClient({ property }: Props) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: recommendations } = useQuery({
+    queryKey: ['recommendations', property.id],
+    queryFn: () => propertiesApi.getRecommendations({
+      propertyId: property.id,
+      city: property.city,
+      type: (property as any).type,
+      category: (property as any).category,
+      price: property.price ? Number(property.price) : undefined,
+    }).then(r => r.data),
+    enabled: similarVisible,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data: ownerPropsData, isLoading: ownerPropsLoading } = useQuery({
     queryKey: ['ownerProps', property.owner?.id],
     queryFn: () =>
@@ -188,7 +207,7 @@ export default function PropertyDetailClient({ property }: Props) {
     if (!user) { dispatch(openAuthModal({ mode: 'login' })); return; }
     try {
       if (isSaved) { await savedApi.unsave(property.id); setIsSaved(false); }
-      else          { await savedApi.save(property.id);   setIsSaved(true); }
+      else          { await savedApi.save(property.id);   setIsSaved(true); trackBehavior('wishlist'); }
     } catch { /* optimistic */ }
   };
 
@@ -219,44 +238,80 @@ export default function PropertyDetailClient({ property }: Props) {
     const rawEmail = overrides.contactEmail ?? (user as any)?.email ?? '';
     // Strip auto-generated placeholder emails (e.g. phone@t4bs.local)
     const contactEmail = rawEmail && !rawEmail.endsWith('@t4bs.local') ? rawEmail : undefined;
+    // Track behavior for smart lead scoring
+    trackBehavior('contact', undefined);
+
     leadsApi.capturePublic({
       source,
-      propertyId: property.id,
+      propertyId:    property.id,
       contactName,
-      contactPhone: rawPhone,
+      contactPhone:  rawPhone,
       contactEmail,
       contactUserId: (user as any)?.id ?? undefined,
-      city:  property.city  ?? undefined,
-      state: property.state ?? undefined,
+      city:          property.city     ?? undefined,
+      state:         property.state    ?? undefined,
+      locality:      property.locality ?? undefined,
+      price:         property.price    ? Number(property.price)  : undefined,
+      area:          resolvedArea      ? Number(resolvedArea)     : undefined,
+      areaUnit:      resolvedAreaUnit  ?? undefined,
+      propertyType:  toLeadPropertyType(property.type, property.category),
+      note:          `${source} via property page${property.title ? ` — ${property.title}` : ''}`,
     }).catch(() => {}); // fire-and-forget; never block UI
   };
 
-  // Inquiry
+  // Inquiry — works for both logged-in and guest users
   const handleInquiry = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true); setInquiryError('');
+
+    const cleanPhone = inquiryForm.phone.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setInquiryError('Please enter a valid 10-digit mobile number.');
+      setSubmitting(false);
+      return;
+    }
+    if (!inquiryForm.name.trim()) {
+      setInquiryError('Please enter your name.');
+      setSubmitting(false);
+      return;
+    }
+
+    const leadSource = inquiryType === 'site_visit' ? 'schedule_visit' : 'enquiry';
+
     try {
-      await inquiriesApi.create(property.id, { ...inquiryForm, type: inquiryType });
+      // Always capture lead in CRM (works for guests too — public endpoint)
+      await leadsApi.capturePublic({
+        source:        leadSource,
+        propertyId:    property.id,
+        contactName:   inquiryForm.name.trim(),
+        contactPhone:  cleanPhone,
+        contactEmail:  inquiryForm.email || undefined,
+        contactUserId: (user as any)?.id ?? undefined,
+        city:          property.city     ?? undefined,
+        state:         property.state    ?? undefined,
+        locality:      property.locality ?? undefined,
+        price:         property.price    ? Number(property.price)   : undefined,
+        area:          resolvedArea      ? Number(resolvedArea)      : undefined,
+        areaUnit:      resolvedAreaUnit  ?? undefined,
+        propertyType:  toLeadPropertyType(property.type, property.category),
+        message:       inquiryForm.message || undefined,
+        note:          `${inquiryType} inquiry via property detail page`,
+      });
+
+      // If logged in: also submit via inquiries API for full audit trail
+      if (user) {
+        try {
+          await inquiriesApi.create(property.id, { ...inquiryForm, phone: cleanPhone, type: inquiryType });
+        } catch { /* non-critical — lead already captured */ }
+      }
+
       setSubmitted(true);
       trackPropertyInquiry(property.id, { city: property.city || undefined });
-      // Also create a lead for CRM tracking
-      captureContactLead(
-        inquiryType === 'site_visit' ? 'schedule_visit' : 'enquiry',
-        {
-          contactName:  inquiryForm.name,
-          contactPhone: inquiryForm.phone,
-          contactEmail: inquiryForm.email,
-        },
-      );
+      trackBehavior('inquiry');
+
     } catch (err: any) {
-      const status  = err?.response?.status;
       const message = err?.response?.data?.message || err?.message;
-      if (status === 401) {
-        setShowInquiryModal(false);
-        dispatch(openAuthModal({ mode: 'login' }));
-      } else {
-        setInquiryError(Array.isArray(message) ? message.join(', ') : (message || 'Failed to send inquiry.'));
-      }
+      setInquiryError(Array.isArray(message) ? message.join(', ') : (message || 'Failed to send inquiry. Please try again.'));
     } finally { setSubmitting(false); }
   };
 
@@ -352,22 +407,6 @@ export default function PropertyDetailClient({ property }: Props) {
 
   // ── Inquiry Form render ─────────────────────────────────────────────────────
   const renderInquiryForm = ({ onClose, hideSubmit }: { onClose?: () => void; hideSubmit?: boolean } = {}) => {
-    if (!isLoggedIn) return (
-      <div className="text-center py-6">
-        <div className="w-14 h-14 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-3">
-          <Lock className="w-7 h-7 text-primary-500" />
-        </div>
-        <p className="font-bold text-gray-900 mb-1">Login to Contact {isAgent ? 'Agent' : 'Owner'}</p>
-        <p className="text-sm text-gray-500 mb-5">Sign in to send inquiry, schedule visit or negotiate price.</p>
-        <button type="button"
-          onClick={() => { dispatch(openAuthModal({ mode: 'login' })); if (onClose) onClose(); }}
-          className="w-full py-3.5 bg-primary-600 text-white rounded-2xl text-sm font-bold hover:bg-primary-700 transition-colors">
-          Login / Sign Up — It's Free
-        </button>
-        <p className="text-xs text-gray-400 mt-2">Details auto-filled after login.</p>
-      </div>
-    );
-
     if (submitted) return (
       <div className="text-center py-8">
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -381,14 +420,25 @@ export default function PropertyDetailClient({ property }: Props) {
       </div>
     );
 
-    const isAutoFilled = !!(user as any)?.name && !!(user as any)?.phone;
+    const isAutoFilled = !!(user as any)?.phone;
     return (
       <form id="inquiry-form" onSubmit={handleInquiry} className="space-y-3">
-        {isAutoFilled && (
+        {/* Status banner: auto-filled when logged in, prompt to login if not */}
+        {isAutoFilled ? (
           <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5">
             <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" /> Details auto-filled from your profile
           </div>
+        ) : (
+          <div className="flex items-center justify-between text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
+            <span>Enter your details below</span>
+            <button type="button"
+              onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+              className="text-primary-600 font-semibold hover:underline ml-2 flex-shrink-0">
+              Login to auto-fill →
+            </button>
+          </div>
         )}
+
         <div className="flex gap-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold">
           {(['general', 'site_visit', 'price_negotiation'] as const).map(t => (
             <button key={t} type="button" onClick={() => setInquiryType(t)}
@@ -398,15 +448,22 @@ export default function PropertyDetailClient({ property }: Props) {
             </button>
           ))}
         </div>
+
         <input type="text" placeholder="Your Name *" required value={inquiryForm.name}
           onChange={e => setInquiryForm(f => ({ ...f, name: e.target.value }))}
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white" />
-        <input type="tel" placeholder="Phone Number *" required value={inquiryForm.phone}
+          className={cn('w-full border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary-400',
+            isAutoFilled && inquiryForm.name ? 'border-green-200 bg-green-50/40' : 'border-gray-200 bg-white')} />
+
+        <input type="tel" placeholder="Mobile Number *" required value={inquiryForm.phone}
           onChange={e => setInquiryForm(f => ({ ...f, phone: e.target.value }))}
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white" />
+          maxLength={15}
+          className={cn('w-full border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary-400',
+            isAutoFilled && inquiryForm.phone ? 'border-green-200 bg-green-50/40' : 'border-gray-200 bg-white')} />
+
         <input type="email" placeholder="Email (optional)" value={inquiryForm.email}
           onChange={e => setInquiryForm(f => ({ ...f, email: e.target.value }))}
           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white" />
+
         <textarea placeholder={
             inquiryType === 'site_visit' ? 'Preferred date & time for site visit…'
             : inquiryType === 'price_negotiation' ? 'Your offer or budget…'
@@ -414,6 +471,7 @@ export default function PropertyDetailClient({ property }: Props) {
           rows={3} value={inquiryForm.message}
           onChange={e => setInquiryForm(f => ({ ...f, message: e.target.value }))}
           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary-400 resize-none bg-white" />
+
         {inquiryError && (
           <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">{inquiryError}</p>
         )}
@@ -557,7 +615,7 @@ export default function PropertyDetailClient({ property }: Props) {
               <div className="md:hidden">
                 <div className="relative aspect-[4/3] cursor-pointer select-none"
                   onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
-                  onClick={() => setShowFullscreen(true)}>
+                  onClick={() => { setShowFullscreen(true); trackBehavior('image_click'); }}>
                   <OptimizedImage src={images[activeImage]?.url} alt={images[activeImage]?.alt || property.title}
                     fill className="object-cover" priority sizes="100vw" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
@@ -727,6 +785,11 @@ export default function PropertyDetailClient({ property }: Props) {
                   {property.viewCount >= 1000
                     ? `${(property.viewCount / 1000).toFixed(1)}k`
                     : property.viewCount} views
+                  {property.viewsLast7d > 0 && (
+                    <span className="text-[10px] text-primary-400 font-normal ml-0.5">
+                      ({property.viewsLast7d} this week)
+                    </span>
+                  )}
                 </span>
                 <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {timeAgo(property.createdAt)}</span>
                 {property.reraNumber && (
@@ -749,6 +812,33 @@ export default function PropertyDetailClient({ property }: Props) {
                   {overviewSpecs.map(s => (
                     <SpecChip key={s.label} icon={s.icon} label={s.label} value={s.value} />
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Brochure Download (builder_project only) ──────────────── */}
+            {property.category === 'builder_project' && property.brochureUrl && (
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-5 shadow-sm border border-amber-200">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <span className="text-2xl">📄</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 text-sm">Project Brochure Available</p>
+                      <p className="text-xs text-gray-500">Download the official brochure for complete project details, floor plans &amp; pricing.</p>
+                    </div>
+                  </div>
+                  <a
+                    href={property.brochureUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                    className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-amber-500/30 flex-shrink-0"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Download Brochure
+                  </a>
                 </div>
               </div>
             )}
@@ -1223,6 +1313,26 @@ export default function PropertyDetailClient({ property }: Props) {
               ) : null}
             </div>
 
+            {/* ── Trending in Your Area ────────────────────────────── */}
+            {recommendations?.trending?.length > 0 && property.status === 'active' && (
+              <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-orange-500" /> Trending in {property.city}
+                  </h2>
+                  <Link href={`/properties?city=${property.city}&sortBy=trending`}
+                    className="text-sm font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1">
+                    See all <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {recommendations.trending.slice(0, 4).map((p: Property) => (
+                    <PropertyCard key={p.id} property={p} />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* ── FAQ ──────────────────────────────────────────────────── */}
             <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Frequently Asked Questions</h2>
@@ -1502,6 +1612,36 @@ export default function PropertyDetailClient({ property }: Props) {
           </div>
         </div>
       )}
+
+      {/* ── Smart Lead Widgets ──────────────────────────────────────────────── */}
+      <FloatingCTA
+        propertyId={property.id}
+        propertyTitle={property.title}
+        agentPhone={(property.owner as any)?.phone}
+        agentWhatsapp={(property.owner as any)?.whatsapp ?? (property.owner as any)?.phone}
+        city={property.city}
+        locality={property.locality}
+        price={property.price ? Number(property.price) : undefined}
+        area={resolvedArea ?? undefined}
+        areaUnit={resolvedAreaUnit ?? undefined}
+        propertyType={property.type}
+        category={property.category}
+      />
+
+      <IntentPopup
+        propertyId={property.id}
+        propertyTitle={property.title}
+        agentPhone={(property.owner as any)?.phone}
+        city={property.city}
+        locality={property.locality}
+        price={property.price ? Number(property.price) : undefined}
+        area={resolvedArea ?? undefined}
+        areaUnit={resolvedAreaUnit ?? undefined}
+        propertyType={property.type}
+        category={property.category}
+        stayTrigger={30}
+        scrollTrigger={70}
+      />
 
     </div>
   );
