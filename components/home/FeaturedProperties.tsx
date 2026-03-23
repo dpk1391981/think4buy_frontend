@@ -11,8 +11,10 @@ import {
 import OptimizedImage from '@/components/common/OptimizedImage';
 import { homeApi, propertiesApi } from '@/lib/api';
 import { cn, formatPrice, formatArea, getPropertyArea } from '@/lib/utils';
-import { useAppSelector } from '@/lib/store';
+import { useAppSelector, useAppDispatch } from '@/lib/store';
+import { addToast, openAuthModal } from '@/lib/store/slices/uiSlice';
 import { useWishlist } from '@/hooks/useWishlist';
+import { useAuth } from '@/contexts/AuthContext';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -114,7 +116,19 @@ function FeaturedCard({ property, rank }: { property: any; rank: number }) {
   const score      = Math.round(property._score ?? 0);
 
   const { isSaved, toggle } = useWishlist();
+  const { user } = useAuth();
+  const dispatch = useAppDispatch();
   const saved = isSaved(property.id);
+  const [heartAnim, setHeartAnim] = useState(false);
+
+  const handleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    if (!user) { dispatch(openAuthModal({ mode: 'login', reason: 'wishlist' })); return; }
+    setHeartAnim(true);
+    setTimeout(() => setHeartAnim(false), 450);
+    toggle(property.id);
+    dispatch(addToast({ message: saved ? 'Removed from saved' : '❤ Saved to wishlist', type: saved ? 'info' : 'success' }));
+  };
 
   return (
     <div className="group relative flex flex-col bg-white rounded-2xl border border-gray-100 hover:border-primary-200 hover:shadow-[0_8px_32px_rgba(37,99,235,0.13)] hover:-translate-y-1 transition-all duration-300">
@@ -132,22 +146,19 @@ function FeaturedCard({ property, rank }: { property: any; rank: number }) {
             sizes="(max-width:640px) 80vw, 320px"
           />
 
-          {/* Rank badge */}
-          <div className="absolute top-2.5 left-2.5 w-6 h-6 bg-black/70 backdrop-blur-sm rounded-full flex items-center justify-center text-[10px] font-black text-white shadow">
-            #{rank}
-          </div>
-
-          {/* Score pill — top right (shifted to avoid heart) */}
+          {/* Score pill — top right */}
           {score > 0 && (
-            <div className="absolute top-10 right-2.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+            <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
               <BarChart2 className="w-2.5 h-2.5" />
               {score.toFixed(0)}
             </div>
           )}
 
           {/* Gradient + price */}
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pt-8 pb-2.5">
-            <p className="text-white font-bold text-sm leading-tight">{price}</p>
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-3 pt-10 pb-3">
+            <span className="inline-flex items-center bg-emerald-500 text-white font-black text-base leading-none px-3 py-1.5 rounded-lg shadow-lg">
+              {price}
+            </span>
           </div>
 
           {/* Verified badge */}
@@ -205,13 +216,24 @@ function FeaturedCard({ property, rank }: { property: any; rank: number }) {
         </div>
       </Link>
 
-      {/* Heart / Save button — outside Link to avoid nested interactive elements */}
+      {/* Heart / Save button — top left, outside Link */}
       <button
-        onClick={() => toggle(property.id)}
-        className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-transform"
+        onClick={handleWishlist}
         aria-label={saved ? 'Remove from saved' : 'Save property'}
+        className={cn(
+          'absolute top-2.5 left-2.5 z-10 w-9 h-9 rounded-full flex items-center justify-center',
+          'transition-all duration-200 hover:scale-110 active:scale-125',
+          'shadow-lg ring-1',
+          saved
+            ? 'bg-red-500 ring-red-400/50 shadow-red-300/60'
+            : 'bg-white ring-white/70 shadow-gray-500/30 hover:ring-red-200',
+        )}
       >
-        <Heart className={`w-3.5 h-3.5 transition-colors ${saved ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-400'}`} />
+        <Heart className={cn(
+          'w-4 h-4 transition-all duration-200',
+          heartAnim && 'heart-pop',
+          saved ? 'fill-white text-white' : 'text-gray-500',
+        )} />
       </button>
     </div>
   );

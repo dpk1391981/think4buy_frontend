@@ -8,8 +8,11 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { propertiesApi } from '@/lib/api';
-import { useAppSelector } from '@/lib/store';
+import { useAppSelector, useAppDispatch } from '@/lib/store';
+import { addToast, openAuthModal } from '@/lib/store/slices/uiSlice';
 import { useWishlist } from '@/hooks/useWishlist';
+import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import { formatPrice, formatArea, getPropertyArea, getPropertyTypeLabel, getPrimaryImage } from '@/lib/utils';
 import { Property } from '@/types/property';
@@ -25,7 +28,19 @@ function ProjectCard({ property }: { property: Property }) {
   const isUC    = property.possessionStatus === 'under_construction';
 
   const { isSaved, toggle } = useWishlist();
+  const { user } = useAuth();
+  const dispatch = useAppDispatch();
   const saved = isSaved(property.id);
+  const [heartAnim, setHeartAnim] = useState(false);
+
+  const handleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    if (!user) { dispatch(openAuthModal({ mode: 'login', reason: 'wishlist' })); return; }
+    setHeartAnim(true);
+    setTimeout(() => setHeartAnim(false), 450);
+    toggle(property.id);
+    dispatch(addToast({ message: saved ? 'Removed from saved' : '❤ Saved to wishlist', type: saved ? 'info' : 'success' }));
+  };
 
   return (
     <div className="group relative flex flex-col bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 h-full">
@@ -62,13 +77,13 @@ function ProjectCard({ property }: { property: Property }) {
         </div>
 
         {/* Bottom overlay: title + price */}
-        <div className="absolute bottom-0 left-0 right-0 px-3.5 pb-3.5 pt-8">
-          <p className="text-white font-bold text-sm leading-snug line-clamp-1 drop-shadow mb-0.5">
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-3.5 pb-3.5 pt-10">
+          <p className="text-white font-bold text-sm leading-snug line-clamp-1 drop-shadow mb-1.5">
             {property.title}
           </p>
-          <p className="text-white/90 font-black text-xl leading-none drop-shadow">
+          <span className="inline-flex items-center bg-emerald-500 text-white font-black text-base leading-none px-3 py-1.5 rounded-lg shadow-lg">
             {formatPrice(property.price, property.priceUnit)}
-          </p>
+          </span>
         </div>
       </div>
 
@@ -128,11 +143,22 @@ function ProjectCard({ property }: { property: Property }) {
 
       {/* Heart / Save button */}
       <button
-        onClick={() => toggle(property.id)}
-        className="absolute top-3 right-3 z-10 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-transform"
+        onClick={handleWishlist}
         aria-label={saved ? 'Remove from saved' : 'Save property'}
+        className={cn(
+          'absolute top-3 right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center',
+          'transition-all duration-200 hover:scale-110 active:scale-125',
+          'shadow-lg ring-1',
+          saved
+            ? 'bg-red-500 ring-red-400/50 shadow-red-300/60'
+            : 'bg-white ring-white/70 shadow-gray-500/30 hover:ring-red-200',
+        )}
       >
-        <Heart className={`w-3.5 h-3.5 transition-colors ${saved ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-400'}`} />
+        <Heart className={cn(
+          'w-4 h-4 transition-all duration-200',
+          heartAnim && 'heart-pop',
+          saved ? 'fill-white text-white' : 'text-gray-500',
+        )} />
       </button>
     </div>
   );

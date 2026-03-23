@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppDispatch } from '@/lib/store';
-import { openAuthModal } from '@/lib/store/slices/uiSlice';
+import { openAuthModal, addToast } from '@/lib/store/slices/uiSlice';
 import { useAnalytics } from '@/hooks/useAnalytics';
 
 interface PropertyCardProps {
@@ -178,6 +178,7 @@ export default function PropertyCard({ property, className, listView }: Property
   const dispatch            = useAppDispatch();
   const { trackPropertyClick, trackPropertySave } = useAnalytics();
   const [showPhone, setShowPhone] = useState(false);
+  const [heartAnim, setHeartAnim] = useState(false);
 
   const primaryImage   = getPrimaryImage(property.images);
   const imageUrls      = getImageUrls(property.images, primaryImage);
@@ -210,7 +211,13 @@ export default function PropertyCard({ property, className, listView }: Property
   const handleWishlist = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
     if (!user) { dispatch(openAuthModal({ mode: 'login', reason: 'wishlist' })); return; }
+    setHeartAnim(true);
+    setTimeout(() => setHeartAnim(false), 450);
     toggle(property.id);
+    dispatch(addToast({
+      message: saved ? 'Removed from saved' : '❤ Saved to wishlist',
+      type: saved ? 'info' : 'success',
+    }));
     if (!saved)
       trackPropertySave(property.id, { city: property.city || undefined, state: property.state || undefined });
   };
@@ -272,11 +279,23 @@ export default function PropertyCard({ property, className, listView }: Property
               </div>
 
               {/* Wishlist */}
-              <button onClick={handleWishlist} className={cn(
-                'absolute top-2.5 right-2.5 w-7 h-7 rounded-full flex items-center justify-center shadow z-[3] transition-all',
-                saved ? 'bg-red-500' : 'bg-white/90 hover:bg-white',
-              )}>
-                <Heart className={cn('w-3.5 h-3.5', saved ? 'fill-white text-white' : 'text-gray-500')} />
+              <button
+                onClick={handleWishlist}
+                aria-label={saved ? 'Remove from wishlist' : 'Save to wishlist'}
+                className={cn(
+                  'absolute top-2.5 right-2.5 w-8 h-8 rounded-full flex items-center justify-center z-[3]',
+                  'transition-all duration-200 hover:scale-110 active:scale-125',
+                  'shadow-md ring-1',
+                  saved
+                    ? 'bg-red-500 ring-red-400/40 shadow-red-200'
+                    : 'bg-white ring-white/60 shadow-gray-400/40 hover:ring-red-200',
+                )}
+              >
+                <Heart className={cn(
+                  'w-3.5 h-3.5 transition-all duration-200',
+                  heartAnim && 'heart-pop',
+                  saved ? 'fill-white text-white' : 'text-gray-500 group-hover:text-red-400',
+                )} />
               </button>
 
               {/* Status overlay (under_deal / sold / rented / inactive) */}
@@ -312,18 +331,20 @@ export default function PropertyCard({ property, className, listView }: Property
 
               {/* Price + time ago */}
               <div className="flex items-start justify-between gap-2">
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="text-lg sm:text-xl font-black text-gray-900 leading-tight">
-                    {formatPrice(property.price, property.priceUnit)}
-                  </span>
-                  {pricePerSqft && (
-                    <span className="text-xs text-gray-400 font-medium">
-                      ₹{pricePerSqft.toLocaleString('en-IN')}/sqft
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center bg-emerald-600 text-white text-lg sm:text-xl font-black leading-none px-3 py-1 rounded-lg shadow-sm whitespace-nowrap">
+                      {formatPrice(property.price, property.priceUnit)}
                     </span>
-                  )}
-                  {isAgent && property.brokerage === '0' && (
-                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full">
-                      <TrendingDown className="w-2.5 h-2.5" /> Zero Brokerage
+                    {isAgent && property.brokerage === '0' && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full">
+                        <TrendingDown className="w-2.5 h-2.5" /> Zero Brokerage
+                      </span>
+                    )}
+                  </div>
+                  {pricePerSqft && (
+                    <span className="text-xs text-gray-400 font-medium pl-1">
+                      ₹{pricePerSqft.toLocaleString('en-IN')}/sqft
                     </span>
                   )}
                 </div>
@@ -551,9 +572,23 @@ export default function PropertyCard({ property, className, listView }: Property
               </span>
             )}
           </div>
-          <button onClick={handleWishlist}
-            className={cn('absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center shadow z-[3]', saved ? 'bg-red-500' : 'bg-white/90')}>
-            <Heart className={cn('w-4 h-4', saved ? 'fill-white text-white' : 'text-gray-500')} />
+          <button
+            onClick={handleWishlist}
+            aria-label={saved ? 'Remove from wishlist' : 'Save to wishlist'}
+            className={cn(
+              'absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center z-[3]',
+              'transition-all duration-200 hover:scale-110 active:scale-125',
+              'shadow-lg ring-1',
+              saved
+                ? 'bg-red-500 ring-red-400/50 shadow-red-300/60'
+                : 'bg-white ring-white/70 shadow-gray-500/30 hover:shadow-red-200/60 hover:ring-red-200',
+            )}
+          >
+            <Heart className={cn(
+              'w-4 h-4 transition-all duration-200',
+              heartAnim && 'heart-pop',
+              saved ? 'fill-white text-white' : 'text-gray-500 hover:text-red-400',
+            )} />
           </button>
 
           {/* Status overlay */}
@@ -591,23 +626,25 @@ export default function PropertyCard({ property, className, listView }: Property
       <Link href={`/properties/${property.slug}`} onClick={handleCardClick} className="block px-3 pt-2.5 pb-2">
 
         {/* Price + time */}
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
-            <span className="text-base font-black text-gray-900 leading-tight whitespace-nowrap">
-              {formatPrice(property.price, property.priceUnit)}
-            </span>
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center bg-emerald-600 text-white text-base font-black leading-none px-2.5 py-1 rounded-lg shadow-sm whitespace-nowrap">
+                {formatPrice(property.price, property.priceUnit)}
+              </span>
+              {isAgent && property.brokerage === '0' && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                  <TrendingDown className="w-2.5 h-2.5" /> 0 Brokerage
+                </span>
+              )}
+            </div>
             {pricePerSqft && (
-              <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap">
+              <span className="text-[11px] text-gray-400 font-medium pl-0.5">
                 ₹{pricePerSqft.toLocaleString('en-IN')}/sqft
               </span>
             )}
-            {isAgent && property.brokerage === '0' && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                <TrendingDown className="w-2.5 h-2.5" /> 0 Brokerage
-              </span>
-            )}
           </div>
-          <span className="text-[11px] text-gray-400 flex-shrink-0 mt-0.5">{timeAgo(property.createdAt)}</span>
+          <span className="text-[11px] text-gray-400 flex-shrink-0 mt-1">{timeAgo(property.createdAt)}</span>
         </div>
 
         {/* Title + Agent/Owner pill on same row */}

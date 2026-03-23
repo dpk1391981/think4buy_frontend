@@ -50,8 +50,19 @@ export default function OwnerProperties() {
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[300px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+        <div className="h-8 bg-gray-100 rounded-lg w-1/3 mb-4 animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <div className="h-40 bg-gray-100 animate-pulse" />
+              <div className="px-4 pt-3 pb-4 space-y-2">
+                <div className="h-4 bg-gray-100 rounded animate-pulse w-3/4" />
+                <div className="h-3 bg-gray-100 rounded animate-pulse w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -125,17 +136,22 @@ export default function OwnerProperties() {
           {filtered.map((p) => {
             const st = getStatus(p);
             return (
-              <div key={p.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                <div className="h-36 bg-gray-100 relative">
+              <Link
+                key={p.id}
+                href={`/properties/${p.slug}`}
+                className="group bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md hover:border-emerald-200 transition-all duration-200 cursor-pointer block"
+              >
+                <div className="h-40 bg-gray-100 relative overflow-hidden">
                   {p.images?.[0]?.url
-                    ? <img src={resolveImageUrl(p.images[0].url)} alt={p.title} className="w-full h-full object-cover" />
+                    ? <img src={resolveImageUrl(p.images[0].url)} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     : <div className="w-full h-full flex items-center justify-center text-gray-300 text-4xl">🏠</div>
                   }
-                  <span className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${
-                    st === 'draft'     ? 'bg-gray-100 text-gray-600' :
-                    st === 'published' ? 'bg-emerald-100 text-emerald-700' :
-                    st === 'rejected'  ? 'bg-red-100 text-red-700' :
-                    'bg-amber-100 text-amber-700'
+                  {/* Status badge */}
+                  <span className={`absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold backdrop-blur-sm ${
+                    st === 'draft'     ? 'bg-gray-500/80 text-white' :
+                    st === 'published' ? 'bg-emerald-500/90 text-white' :
+                    st === 'rejected'  ? 'bg-red-500/90 text-white' :
+                    'bg-amber-500/90 text-white'
                   }`}>
                     {st === 'draft'     ? <Clock className="w-3 h-3" /> :
                      st === 'published' ? <CheckCircle className="w-3 h-3" /> :
@@ -143,19 +159,22 @@ export default function OwnerProperties() {
                                          <Clock className="w-3 h-3" />}
                     {st === 'draft' ? 'Draft' : st === 'published' ? 'Published' : st === 'rejected' ? 'Rejected' : 'Pending'}
                   </span>
+                  {/* Price overlay on image */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-3 pt-4 pb-2">
+                    <span className="inline-flex items-center gap-1 text-white text-sm font-black">
+                      <IndianRupee className="w-3.5 h-3.5" />
+                      {(p.price / 100000).toFixed(1)}L
+                    </span>
+                  </div>
                 </div>
-                <div className="p-4">
-                  <h3 className="font-bold text-gray-900 text-sm truncate mb-1">{p.title}</h3>
-                  <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-                    <MapPin className="w-3 h-3" />
+                <div className="px-4 pt-3 pb-4">
+                  <h3 className="font-bold text-gray-900 text-sm truncate mb-1 group-hover:text-emerald-700 transition-colors">{p.title}</h3>
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <MapPin className="w-3 h-3 text-emerald-500 flex-shrink-0" />
                     {p.city}
                   </div>
-                  <div className="flex items-center gap-1 text-sm font-bold text-emerald-700">
-                    <IndianRupee className="w-3.5 h-3.5" />
-                    {(p.price / 100000).toFixed(1)}L
-                  </div>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>
