@@ -8,8 +8,8 @@ import OptimizedImage from '@/components/common/OptimizedImage';
 import {
   LayoutDashboard, Target, MapPin, Handshake,
   BadgeDollarSign, Home, MessageSquare, Building2,
-  Wallet, Crown, User, Plus,
-  MoreHorizontal, X, ExternalLink, ChevronRight,
+  Wallet, Crown, User, Plus, Heart,
+  MoreHorizontal, X, ExternalLink, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import type { MenuItem } from '@/contexts/AuthContext';
@@ -42,10 +42,11 @@ const NAV_GROUPS = [
   {
     label: 'Account',
     items: [
-      { href: '/agent/agency',       label: 'My Coverage',  icon: Building2 },
-      { href: '/agent/wallet',       label: 'Wallet',        icon: Wallet },
-      { href: '/agent/subscription', label: 'Subscription',  icon: Crown },
-      { href: '/agent/profile',      label: 'Profile',       icon: User },
+      { href: '/agent/agency',       label: 'My Coverage',      icon: Building2 },
+      { href: '/agent/wallet',       label: 'Wallet',           icon: Wallet },
+      { href: '/agent/subscription', label: 'Subscription',     icon: Crown },
+      { href: '/wishlist',           label: 'Saved Properties', icon: Heart },
+      { href: '/agent/profile',      label: 'Profile',          icon: User },
     ],
   },
 ];
@@ -62,13 +63,14 @@ const BOTTOM_TABS = [
 // ─── Mobile "More" sheet items ─────────────────────────────────────────────────
 
 const MORE_ITEMS = [
-  { href: '/agent/site-visits',  label: 'Site Visits',  icon: MapPin },
-  { href: '/agent/commissions',  label: 'Commissions',  icon: BadgeDollarSign },
-  { href: '/agent/inquiries',    label: 'Inquiries',    icon: MessageSquare },
-  { href: '/agent/agency',       label: 'My Agency',    icon: Building2 },
-  { href: '/agent/wallet',       label: 'Wallet',       icon: Wallet },
-  { href: '/agent/subscription', label: 'Subscription', icon: Crown },
-  { href: '/agent/profile',      label: 'Profile',      icon: User },
+  { href: '/agent/site-visits',  label: 'Site Visits',      icon: MapPin },
+  { href: '/agent/commissions',  label: 'Commissions',      icon: BadgeDollarSign },
+  { href: '/agent/inquiries',    label: 'Inquiries',        icon: MessageSquare },
+  { href: '/agent/agency',       label: 'My Agency',        icon: Building2 },
+  { href: '/agent/wallet',       label: 'Wallet',           icon: Wallet },
+  { href: '/agent/subscription', label: 'Subscription',     icon: Crown },
+  { href: '/wishlist',           label: 'Saved Properties', icon: Heart },
+  { href: '/agent/profile',      label: 'Profile',          icon: User },
 ];
 
 const ALL_NAV = NAV_GROUPS.flatMap(g => g.items);
@@ -80,8 +82,38 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router   = useRouter();
   const { user, loading } = useAuth();
-  const [mounted,   setMounted]   = useState(false);
-  const [moreOpen,  setMoreOpen]  = useState(false);
+  const [mounted,         setMounted]         = useState(false);
+  const [moreOpen,        setMoreOpen]        = useState(false);
+
+  // All labeled groups collapsed by default
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    new Set(NAV_GROUPS.map((g) => g.label).filter(Boolean) as string[]),
+  );
+
+  const toggleGroup = (label: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      return next;
+    });
+  };
+
+  // Auto-open the group containing the current route
+  useEffect(() => {
+    const activeGroup = NAV_GROUPS.find((g) =>
+      g.items.some((item) =>
+        (item as any).exact ? pathname === item.href : pathname.startsWith(item.href),
+      ),
+    );
+    if (activeGroup?.label) {
+      setCollapsedGroups((prev) => {
+        if (!prev.has(activeGroup.label!)) return prev;
+        const next = new Set(prev);
+        next.delete(activeGroup.label!);
+        return next;
+      });
+    }
+  }, [pathname]);
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => { setMoreOpen(false); }, [pathname]);
@@ -185,42 +217,60 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
 
         {/* Navigation */}
         <nav className="flex-1 px-3 pb-3 overflow-y-auto">
-          {NAV_GROUPS.map((group, gi) => (
-            <div key={gi} className={gi > 0 ? 'mt-5' : ''}>
-              {group.label && (
-                <div className="px-3 mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
-                    {group.label}
-                  </span>
-                </div>
-              )}
-              <div className="space-y-0.5">
-                {group.items.map((item) => {
-                  const active = isActive(item.href, (item as any).exact);
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group ${
-                        active
-                          ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${
-                        active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'
-                      }`} />
-                      <span className="truncate">{item.label}</span>
-                      {active && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-blue-300 rounded-full -ml-3" />
-                      )}
-                    </Link>
-                  );
-                })}
+          {NAV_GROUPS.map((group, gi) => {
+            const collapsed = group.label ? collapsedGroups.has(group.label) : false;
+            const hasActive = group.items.some((item) =>
+              (item as any).exact ? pathname === item.href : pathname.startsWith(item.href),
+            );
+            return (
+              <div key={gi} className={gi > 0 ? 'mt-5' : ''}>
+                {group.label && (
+                  <button
+                    onClick={() => toggleGroup(group.label!)}
+                    className={`w-full flex items-center justify-between px-3 mb-2 group/hdr rounded-lg py-1 transition-colors ${
+                      hasActive ? 'bg-blue-600/10' : 'hover:bg-slate-800/40'
+                    }`}
+                  >
+                    <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                      hasActive ? 'text-blue-400' : 'text-slate-600 group-hover/hdr:text-slate-400'
+                    }`}>
+                      {group.label}
+                    </span>
+                    <ChevronDown className={`w-3 h-3 transition-all duration-200 ${
+                      hasActive ? 'text-blue-400' : 'text-slate-600 group-hover/hdr:text-slate-400'
+                    } ${collapsed ? '-rotate-90' : ''}`} />
+                  </button>
+                )}
+                {!collapsed && (
+                  <div className="space-y-0.5">
+                    {group.items.map((item) => {
+                      const active = isActive(item.href, (item as any).exact);
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group ${
+                            active
+                              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
+                              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          }`}
+                        >
+                          <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${
+                            active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'
+                          }`} />
+                          <span className="truncate">{item.label}</span>
+                          {active && (
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-blue-300 rounded-full -ml-3" />
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Post property CTA */}

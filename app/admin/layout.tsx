@@ -15,6 +15,7 @@ import {
   LogOut,
   Shield,
   ChevronRight,
+  ChevronDown,
   Menu,
   X,
   Tag,
@@ -124,6 +125,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // All groups collapsed by default except "Listings" (Properties section)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    new Set(NAV_GROUPS.map((g) => g.label).filter((l) => l !== 'Listings')),
+  );
+
+  const toggleGroup = (label: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      return next;
+    });
+  };
+
+  // Auto-open the group that contains the currently active route
+  useEffect(() => {
+    const activeGroup = NAV_GROUPS.find((g) =>
+      g.items.some((item) =>
+        (item as any).exact ? pathname === item.href : pathname.startsWith(item.href),
+      ),
+    );
+    if (activeGroup?.label) {
+      setCollapsedGroups((prev) => {
+        if (!prev.has(activeGroup.label)) return prev;
+        const next = new Set(prev);
+        next.delete(activeGroup.label);
+        return next;
+      });
+    }
+  }, [pathname]);
+
   useEffect(() => {
     // Clear stale undefined/null tokens that may have been stored by older code
     const storedToken = localStorage.getItem('token');
@@ -190,38 +221,60 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Navigation */}
       <nav className="flex-1 py-4 px-3 space-y-4 overflow-y-auto">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label}>
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-1.5">
-              {group.label}
-            </p>
-            <div className="space-y-0.5">
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
-                      active
-                        ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                    }`}
-                  >
-                    <Icon
-                      className={`w-4.5 h-4.5 flex-shrink-0 ${active ? 'text-white' : 'text-slate-500 group-hover:text-white'}`}
-                      size={18}
-                    />
-                    <span className="flex-1">{item.label}</span>
-                    {active && <ChevronRight className="w-3.5 h-3.5 text-white/60" />}
-                  </Link>
-                );
-              })}
+        {NAV_GROUPS.map((group) => {
+          const collapsed = collapsedGroups.has(group.label);
+          const hasActive = group.items.some((item) =>
+            (item as any).exact ? pathname === item.href : pathname.startsWith(item.href),
+          );
+          return (
+            <div key={group.label}>
+              <button
+                onClick={() => toggleGroup(group.label)}
+                className={`w-full flex items-center justify-between px-3 mb-1.5 group/hdr rounded-lg py-1 transition-colors ${
+                  hasActive ? 'bg-primary-600/10' : 'hover:bg-slate-800/40'
+                }`}
+              >
+                <p className={`text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                  hasActive ? 'text-primary-400' : 'text-slate-500 group-hover/hdr:text-slate-400'
+                }`}>
+                  {group.label}
+                </p>
+                <ChevronDown
+                  className={`w-3 h-3 transition-all duration-200 ${
+                    hasActive ? 'text-primary-400' : 'text-slate-600 group-hover/hdr:text-slate-400'
+                  } ${collapsed ? '-rotate-90' : ''}`}
+                />
+              </button>
+              {!collapsed && (
+                <div className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
+                          active
+                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        <Icon
+                          className={`w-4.5 h-4.5 flex-shrink-0 ${active ? 'text-white' : 'text-slate-500 group-hover:text-white'}`}
+                          size={18}
+                        />
+                        <span className="flex-1">{item.label}</span>
+                        {active && <ChevronRight className="w-3.5 h-3.5 text-white/60" />}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* User Info */}

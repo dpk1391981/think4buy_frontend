@@ -4,8 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import OptimizedImage from '@/components/common/OptimizedImage';
-import { Flame, TrendingUp, Eye, ArrowRight, Zap, BarChart2, MessageCircle } from 'lucide-react';
+import { Flame, TrendingUp, Eye, ArrowRight, Zap, BarChart2, MessageCircle, Heart } from 'lucide-react';
 import { homeApi } from '@/lib/api';
+import { useWishlist } from '@/hooks/useWishlist';
 import { formatPrice, formatArea, getPropertyArea } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { useAppSelector } from '@/lib/store';
@@ -49,77 +50,88 @@ function TrendingCard({ property, rank }: { property: any; rank: number }) {
   const slug        = property.slug || property.id;
   const demandLevel = getDemandLevel(property);
 
+  const { isSaved, toggle } = useWishlist();
+  const saved = isSaved(property.id);
+
   return (
-    <Link
-      href={`/properties/${slug}`}
-      className="group flex-shrink-0 w-[280px] sm:w-auto relative bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-primary-200 transition-all duration-300 hover:shadow-[0_8px_32px_rgba(37,99,235,0.12)] hover:-translate-y-1"
-    >
-      {/* Image */}
-      <div className="relative h-44 bg-gray-100 overflow-hidden">
-        <OptimizedImage
-          src={img}
-          alt={property.title}
-          fill
-          className="object-cover group-hover:scale-105 transition-transform duration-500"
-          sizes="(max-width:640px) 280px, 320px"
-        />
+    <div className="group relative flex-shrink-0 w-[280px] sm:w-auto bg-white rounded-2xl border border-gray-100 hover:border-primary-200 transition-all duration-300 hover:shadow-[0_8px_32px_rgba(37,99,235,0.12)] hover:-translate-y-1">
+      <Link href={`/properties/${slug}`} className="block overflow-hidden rounded-2xl">
+        {/* Image */}
+        <div className="relative h-44 bg-gray-100 overflow-hidden">
+          <OptimizedImage
+            src={img}
+            alt={property.title}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            sizes="(max-width:640px) 280px, 320px"
+          />
 
-        {/* Rank badge */}
-        <div className="absolute top-2 left-2 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-xs font-black text-gray-800 shadow">
-          #{rank}
-        </div>
+          {/* Rank badge */}
+          <div className="absolute top-2 left-2 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-xs font-black text-gray-800 shadow">
+            #{rank}
+          </div>
 
-        {/* Demand badge */}
-        <div className="absolute top-2 right-2">
-          <DemandBadge level={demandLevel} />
-        </div>
+          {/* Demand badge (shifted right to leave room for heart) */}
+          <div className="absolute top-2 right-9">
+            <DemandBadge level={demandLevel} />
+          </div>
 
-        {/* Price tag */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-3 pt-6 pb-2">
-          <p className="text-white font-bold text-sm">{price}</p>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="p-3.5">
-        <h3 className="font-semibold text-gray-900 text-sm line-clamp-1 group-hover:text-primary-700 transition-colors mb-1">
-          {property.title}
-        </h3>
-        <p className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-          <span>📍</span>
-          <span className="line-clamp-1">{[property.locality, property.city].filter(Boolean).join(', ')}</span>
-        </p>
-
-        {/* Stats row */}
-        <div className="flex items-center gap-3 text-xs text-gray-500">
-          {area && (
-            <span className="flex items-center gap-0.5">
-              <BarChart2 className="w-3 h-3" /> {area}
-            </span>
-          )}
-          {property.bedrooms && <span>{property.bedrooms} BHK</span>}
-          {!property.bedrooms && (property.extraDetails as any)?.furnishing && (
-            <span className="truncate max-w-[80px]">{(property.extraDetails as any).furnishing}</span>
-          )}
-
-          {/* Activity indicators */}
-          <div className="ml-auto flex items-center gap-2">
-            {property.viewCount > 0 && (
-              <span className="flex items-center gap-0.5 text-orange-500 font-medium">
-                <Eye className="w-3 h-3" />
-                {property.viewCount > 999 ? `${(property.viewCount / 1000).toFixed(1)}k` : property.viewCount}
-              </span>
-            )}
-            {(property.inquiriesLast7d > 0 || property.weeklyInquiries > 0) && (
-              <span className="flex items-center gap-0.5 text-green-600 font-medium">
-                <MessageCircle className="w-3 h-3" />
-                {property.inquiriesLast7d ?? property.weeklyInquiries}
-              </span>
-            )}
+          {/* Price tag */}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-3 pt-6 pb-2">
+            <p className="text-white font-bold text-sm">{price}</p>
           </div>
         </div>
-      </div>
-    </Link>
+
+        {/* Content */}
+        <div className="p-3.5">
+          <h3 className="font-semibold text-gray-900 text-sm line-clamp-1 group-hover:text-primary-700 transition-colors mb-1">
+            {property.title}
+          </h3>
+          <p className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+            <span>📍</span>
+            <span className="line-clamp-1">{[property.locality, property.city].filter(Boolean).join(', ')}</span>
+          </p>
+
+          {/* Stats row */}
+          <div className="flex items-center gap-3 text-xs text-gray-500">
+            {area && (
+              <span className="flex items-center gap-0.5">
+                <BarChart2 className="w-3 h-3" /> {area}
+              </span>
+            )}
+            {property.bedrooms && <span>{property.bedrooms} BHK</span>}
+            {!property.bedrooms && (property.extraDetails as any)?.furnishing && (
+              <span className="truncate max-w-[80px]">{(property.extraDetails as any).furnishing}</span>
+            )}
+
+            {/* Activity indicators */}
+            <div className="ml-auto flex items-center gap-2">
+              {property.viewCount > 0 && (
+                <span className="flex items-center gap-0.5 text-orange-500 font-medium">
+                  <Eye className="w-3 h-3" />
+                  {property.viewCount > 999 ? `${(property.viewCount / 1000).toFixed(1)}k` : property.viewCount}
+                </span>
+              )}
+              {(property.inquiriesLast7d > 0 || property.weeklyInquiries > 0) && (
+                <span className="flex items-center gap-0.5 text-green-600 font-medium">
+                  <MessageCircle className="w-3 h-3" />
+                  {property.inquiriesLast7d ?? property.weeklyInquiries}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </Link>
+
+      {/* Heart / Save button */}
+      <button
+        onClick={() => toggle(property.id)}
+        className="absolute top-2 right-2 z-10 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-transform"
+        aria-label={saved ? 'Remove from saved' : 'Save property'}
+      >
+        <Heart className={`w-3.5 h-3.5 transition-colors ${saved ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-400'}`} />
+      </button>
+    </div>
   );
 }
 

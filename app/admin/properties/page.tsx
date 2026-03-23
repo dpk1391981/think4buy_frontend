@@ -31,6 +31,7 @@ const APPROVAL_BADGE: Record<string, string> = {
   pending:  'bg-yellow-100 text-yellow-700',
   approved: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
+  draft:    'bg-gray-100 text-gray-600',
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -237,8 +238,8 @@ export default function AdminPropertiesPage() {
     setDeleteId(null);
   };
 
-  // Count badges
-  const pendingCount = properties.filter(p => p.approvalStatus === 'pending').length;
+  // Count badges — drafts are not pending review
+  const pendingCount = properties.filter(p => p.approvalStatus === 'pending' && !p.isDraft).length;
 
   return (
     <div className="p-6 max-w-full">
@@ -360,8 +361,8 @@ export default function AdminPropertiesPage() {
 
                     {/* Approval status */}
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${APPROVAL_BADGE[p.approvalStatus]}`}>
-                        {p.approvalStatus}
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${p.isDraft ? APPROVAL_BADGE['draft'] : APPROVAL_BADGE[p.approvalStatus]}`}>
+                        {p.isDraft ? 'Draft' : p.approvalStatus}
                       </span>
                     </td>
 
@@ -375,8 +376,8 @@ export default function AdminPropertiesPage() {
                     {/* Actions */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        {/* Quick approve button for pending */}
-                        {p.approvalStatus === 'pending' && (
+                        {/* Quick approve button for pending (not drafts) */}
+                        {p.approvalStatus === 'pending' && !p.isDraft && (
                           <button
                             onClick={() => approve(p.id)}
                             disabled={actionLoading === p.id}

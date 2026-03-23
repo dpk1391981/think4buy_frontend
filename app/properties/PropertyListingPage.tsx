@@ -463,9 +463,6 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
                     ? <InlineLoader className="text-gray-400" />
                     : data ? <>{data.meta.total.toLocaleString('en-IN')} properties found</> : null}
                 </p>
-                {seoContent?.introContent && (
-                  <p className="text-sm text-gray-600 mt-2 max-w-2xl leading-relaxed">{seoContent.introContent}</p>
-                )}
               </div>
 
               {/* Desktop controls */}
@@ -699,8 +696,13 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
             )}
 
             {/* ── SEO content block ──────────────────────────────────── */}
-            {seoContent && (seoContent.seoContent || seoContent.faqs?.length > 0) && (
+            {seoContent && (seoContent.introContent || seoContent.seoContent || seoContent.faqs?.length > 0) && (
               <div className="mt-8 space-y-4 px-4 sm:px-0 pb-6">
+                {seoContent.introContent && (
+                  <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                    <p className="text-sm text-gray-600 leading-relaxed">{seoContent.introContent}</p>
+                  </div>
+                )}
                 {seoContent.seoContent && (
                   <div className="bg-white rounded-2xl border border-gray-100 p-5">
                     <h2 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">

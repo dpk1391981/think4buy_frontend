@@ -21,6 +21,7 @@ interface Listing {
   category: string;
   price: number;
   isActive: boolean;
+  isDraft?: boolean;
   approvalStatus: 'pending' | 'approved' | 'rejected';
   isBoosted: boolean;
   boostExpiry?: string;
@@ -29,16 +30,18 @@ interface Listing {
 }
 
 const STATUS_TABS = [
-  { label: 'All', value: '' },
-  { label: 'Active', value: 'active' },
+  { label: 'All',     value: '' },
+  { label: 'Active',  value: 'active' },
+  { label: 'Draft',   value: 'draft' },
   { label: 'Pending', value: 'pending' },
   { label: 'Inactive', value: 'inactive' },
 ];
 
 const APPROVAL_BADGE: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
+  pending:  'bg-yellow-100 text-yellow-700',
   approved: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
+  draft:    'bg-gray-100 text-gray-600',
 };
 
 export default function AgentListingsPage() {
@@ -65,7 +68,11 @@ export default function AgentListingsPage() {
     setLoading(true);
     try {
       const params: any = { page, limit: 15 };
-      if (statusFilter) params.status = statusFilter;
+      if (statusFilter === 'draft') {
+        params.isDraft = true;
+      } else if (statusFilter) {
+        params.status = statusFilter;
+      }
       const r = await agentApi.getMyListings(params);
       const data = r.data;
       // Backend returns { items, total } (or legacy { data, meta })
@@ -193,9 +200,13 @@ export default function AgentListingsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${APPROVAL_BADGE[listing.approvalStatus] || 'bg-gray-100 text-gray-600'}`}>
-                      {listing.approvalStatus}
-                    </span>
+                    {listing.isDraft ? (
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${APPROVAL_BADGE['draft']}`}>Draft</span>
+                    ) : (
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${APPROVAL_BADGE[listing.approvalStatus] || 'bg-gray-100 text-gray-600'}`}>
+                        {listing.approvalStatus}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {listing.isBoosted ? (

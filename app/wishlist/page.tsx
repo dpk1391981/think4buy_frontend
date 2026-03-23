@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Heart, Home, Trash2 } from 'lucide-react';
 import PropertyCard from '@/components/property/PropertyCard';
-import { propertiesApi } from '@/lib/api';
+import { savedApi, propertiesApi } from '@/lib/api';
 import { useWishlist } from '@/hooks/useWishlist';
 
 export default function WishlistPage() {
@@ -13,18 +13,33 @@ export default function WishlistPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const ids = getIds();
-    if (!ids.length) { setLoading(false); return; }
-
-    // Fetch each saved property
-    Promise.allSettled(ids.map((id) => propertiesApi.getAll({ id }).then((r) => r.data?.data?.[0])))
-      .then((results) => {
-        const loaded = results
-          .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value)
-          .map((r) => r.value);
-        setProperties(loaded);
+    // Try server-side saved properties first (logged-in users)
+    savedApi.getSaved({ limit: 50 })
+      .then((r) => {
+        const d = r.data;
+        const items: any[] = Array.isArray(d) ? d : d?.items ?? d?.data ?? [];
+        if (items.length > 0) {
+          setProperties(items);
+          setLoading(false);
+          return;
+        }
+        // No server items — fall back to localStorage IDs
+        return fetchFromLocalStorage();
       })
+      .catch(() => fetchFromLocalStorage())
       .finally(() => setLoading(false));
+
+    async function fetchFromLocalStorage() {
+      const ids = getIds();
+      if (!ids.length) { setLoading(false); return; }
+      const results = await Promise.allSettled(
+        ids.map((id: string) => propertiesApi.getAll({ id }).then((r: any) => r.data?.data?.[0])),
+      );
+      const loaded = results
+        .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value)
+        .map((r) => r.value);
+      setProperties(loaded);
+    }
   }, []); // eslint-disable-line
 
   const clearAll = () => {

@@ -4,11 +4,12 @@ import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   MapPin, ArrowRight, ChevronLeft, ChevronRight,
-  BedDouble, Maximize2, Building2, Sparkles, BadgeCheck, Calendar,
+  BedDouble, Maximize2, Building2, Sparkles, BadgeCheck, Calendar, Heart,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { propertiesApi } from '@/lib/api';
 import { useAppSelector } from '@/lib/store';
+import { useWishlist } from '@/hooks/useWishlist';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import { formatPrice, formatArea, getPropertyArea, getPropertyTypeLabel, getPrimaryImage } from '@/lib/utils';
 import { Property } from '@/types/property';
@@ -23,11 +24,15 @@ function ProjectCard({ property }: { property: Property }) {
   const location = [property.locality, property.city].filter(Boolean).join(', ');
   const isUC    = property.possessionStatus === 'under_construction';
 
+  const { isSaved, toggle } = useWishlist();
+  const saved = isSaved(property.id);
+
   return (
-    <Link
-      href={`/properties/${property.slug}`}
-      className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 h-full"
-    >
+    <div className="group relative flex flex-col bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 h-full">
+      <Link
+        href={`/properties/${property.slug}`}
+        className="flex flex-col flex-1 overflow-hidden rounded-2xl"
+      >
       {/* ── Image ── */}
       <div className="relative aspect-[4/3] overflow-hidden bg-gray-100 flex-shrink-0">
         <OptimizedImage
@@ -49,8 +54,8 @@ function ProjectCard({ property }: { property: Property }) {
           </span>
         </div>
 
-        {/* Top-right: property type */}
-        <div className="absolute top-3 right-3">
+        {/* Top-right: property type (shifted left to make room for heart) */}
+        <div className="absolute top-3 right-11">
           <span className="bg-white/15 backdrop-blur-md border border-white/30 text-white text-[10px] font-semibold px-2 py-1 rounded-lg">
             {getPropertyTypeLabel(property.type)}
           </span>
@@ -119,7 +124,17 @@ function ProjectCard({ property }: { property: Property }) {
           </span>
         </div>
       </div>
-    </Link>
+      </Link>
+
+      {/* Heart / Save button */}
+      <button
+        onClick={() => toggle(property.id)}
+        className="absolute top-3 right-3 z-10 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-transform"
+        aria-label={saved ? 'Remove from saved' : 'Save property'}
+      >
+        <Heart className={`w-3.5 h-3.5 transition-colors ${saved ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-400'}`} />
+      </button>
+    </div>
   );
 }
 

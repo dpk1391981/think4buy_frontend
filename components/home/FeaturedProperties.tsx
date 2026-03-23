@@ -12,6 +12,7 @@ import OptimizedImage from '@/components/common/OptimizedImage';
 import { homeApi, propertiesApi } from '@/lib/api';
 import { cn, formatPrice, formatArea, getPropertyArea } from '@/lib/utils';
 import { useAppSelector } from '@/lib/store';
+import { useWishlist } from '@/hooks/useWishlist';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -112,93 +113,107 @@ function FeaturedCard({ property, rank }: { property: any; rank: number }) {
   const isVerified = property.isVerified;
   const score      = Math.round(property._score ?? 0);
 
+  const { isSaved, toggle } = useWishlist();
+  const saved = isSaved(property.id);
+
   return (
-    <Link
-      href={`/properties/${slug}`}
-      className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-primary-200 hover:shadow-[0_8px_32px_rgba(37,99,235,0.13)] hover:-translate-y-1 transition-all duration-300"
-    >
-      {/* Image */}
-      <div className="relative h-48 bg-gray-100 overflow-hidden flex-shrink-0">
-        <OptimizedImage
-          src={imgUrl}
-          alt={property.title}
-          fill
-          className="object-cover group-hover:scale-105 transition-transform duration-500"
-          sizes="(max-width:640px) 80vw, 320px"
-        />
+    <div className="group relative flex flex-col bg-white rounded-2xl border border-gray-100 hover:border-primary-200 hover:shadow-[0_8px_32px_rgba(37,99,235,0.13)] hover:-translate-y-1 transition-all duration-300">
+      <Link
+        href={`/properties/${slug}`}
+        className="flex flex-col flex-1 overflow-hidden rounded-2xl"
+      >
+        {/* Image */}
+        <div className="relative h-48 bg-gray-100 overflow-hidden flex-shrink-0">
+          <OptimizedImage
+            src={imgUrl}
+            alt={property.title}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            sizes="(max-width:640px) 80vw, 320px"
+          />
 
-        {/* Rank badge */}
-        <div className="absolute top-2.5 left-2.5 w-6 h-6 bg-black/70 backdrop-blur-sm rounded-full flex items-center justify-center text-[10px] font-black text-white shadow">
-          #{rank}
-        </div>
-
-        {/* Score pill — top right */}
-        {score > 0 && (
-          <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
-            <BarChart2 className="w-2.5 h-2.5" />
-            {score.toFixed(0)}
+          {/* Rank badge */}
+          <div className="absolute top-2.5 left-2.5 w-6 h-6 bg-black/70 backdrop-blur-sm rounded-full flex items-center justify-center text-[10px] font-black text-white shadow">
+            #{rank}
           </div>
-        )}
 
-        {/* Gradient + price */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pt-8 pb-2.5">
-          <p className="text-white font-bold text-sm leading-tight">{price}</p>
-        </div>
-
-        {/* Verified badge */}
-        {isVerified && (
-          <div className="absolute bottom-8 right-2.5">
-            <BadgeCheck className="w-4 h-4 text-blue-400 drop-shadow" />
-          </div>
-        )}
-      </div>
-
-      {/* Card body */}
-      <div className="p-3.5 flex flex-col gap-1.5 flex-1">
-        {/* Tags */}
-        <PropertyTags property={property} />
-
-        {/* Title */}
-        <h3 className="font-semibold text-gray-900 text-sm line-clamp-1 group-hover:text-primary-700 transition-colors leading-snug">
-          {property.title}
-        </h3>
-
-        {/* Location */}
-        <p className="flex items-center gap-1 text-xs text-gray-400">
-          <MapPin className="w-3 h-3 flex-shrink-0" />
-          <span className="line-clamp-1">{[property.locality, property.city].filter(Boolean).join(', ')}</span>
-        </p>
-
-        {/* Specs row */}
-        <div className="flex items-center gap-2.5 text-xs text-gray-500 flex-wrap">
-          {area && (
-            <span className="flex items-center gap-0.5">
-              <Maximize2 className="w-3 h-3" /> {area}
-            </span>
+          {/* Score pill — top right (shifted to avoid heart) */}
+          {score > 0 && (
+            <div className="absolute top-10 right-2.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+              <BarChart2 className="w-2.5 h-2.5" />
+              {score.toFixed(0)}
+            </div>
           )}
-          {property.bedrooms && <span>{property.bedrooms} BHK</span>}
+
+          {/* Gradient + price */}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pt-8 pb-2.5">
+            <p className="text-white font-bold text-sm leading-tight">{price}</p>
+          </div>
+
+          {/* Verified badge */}
+          {isVerified && (
+            <div className="absolute bottom-8 right-2.5">
+              <BadgeCheck className="w-4 h-4 text-blue-400 drop-shadow" />
+            </div>
+          )}
         </div>
 
-        {/* Activity footer */}
-        <div className="mt-auto pt-2 border-t border-gray-50 flex items-center justify-between text-[10px] text-gray-400">
-          <div className="flex items-center gap-2">
-            {views7d > 0 && (
-              <span className="flex items-center gap-0.5 text-orange-500 font-medium">
-                <Eye className="w-3 h-3" />
-                {views7d > 999 ? `${(views7d / 1000).toFixed(1)}k` : views7d}
+        {/* Card body */}
+        <div className="p-3.5 flex flex-col gap-1.5 flex-1">
+          {/* Tags */}
+          <PropertyTags property={property} />
+
+          {/* Title */}
+          <h3 className="font-semibold text-gray-900 text-sm line-clamp-1 group-hover:text-primary-700 transition-colors leading-snug">
+            {property.title}
+          </h3>
+
+          {/* Location */}
+          <p className="flex items-center gap-1 text-xs text-gray-400">
+            <MapPin className="w-3 h-3 flex-shrink-0" />
+            <span className="line-clamp-1">{[property.locality, property.city].filter(Boolean).join(', ')}</span>
+          </p>
+
+          {/* Specs row */}
+          <div className="flex items-center gap-2.5 text-xs text-gray-500 flex-wrap">
+            {area && (
+              <span className="flex items-center gap-0.5">
+                <Maximize2 className="w-3 h-3" /> {area}
               </span>
             )}
-            {inq7d > 0 && (
-              <span className="flex items-center gap-0.5 text-green-600 font-medium">
-                <MessageCircle className="w-3 h-3" />
-                {inq7d}
-              </span>
-            )}
+            {property.bedrooms && <span>{property.bedrooms} BHK</span>}
           </div>
-          <span className="text-gray-300 font-medium capitalize">{property.type?.replace(/_/g, ' ')}</span>
+
+          {/* Activity footer */}
+          <div className="mt-auto pt-2 border-t border-gray-50 flex items-center justify-between text-[10px] text-gray-400">
+            <div className="flex items-center gap-2">
+              {views7d > 0 && (
+                <span className="flex items-center gap-0.5 text-orange-500 font-medium">
+                  <Eye className="w-3 h-3" />
+                  {views7d > 999 ? `${(views7d / 1000).toFixed(1)}k` : views7d}
+                </span>
+              )}
+              {inq7d > 0 && (
+                <span className="flex items-center gap-0.5 text-green-600 font-medium">
+                  <MessageCircle className="w-3 h-3" />
+                  {inq7d}
+                </span>
+              )}
+            </div>
+            <span className="text-gray-300 font-medium capitalize">{property.type?.replace(/_/g, ' ')}</span>
+          </div>
         </div>
-      </div>
-    </Link>
+      </Link>
+
+      {/* Heart / Save button — outside Link to avoid nested interactive elements */}
+      <button
+        onClick={() => toggle(property.id)}
+        className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-transform"
+        aria-label={saved ? 'Remove from saved' : 'Save property'}
+      >
+        <Heart className={`w-3.5 h-3.5 transition-colors ${saved ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-400'}`} />
+      </button>
+    </div>
   );
 }
 

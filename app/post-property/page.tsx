@@ -1992,7 +1992,7 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImage
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Photos</h2>
-        <p className="text-gray-500 text-sm mt-1">Add at least 3 photos — listings with more photos get 5× more inquiries</p>
+        <p className="text-gray-500 text-sm mt-1">Add at least 1 photo — listings with more photos get 5× more inquiries</p>
       </div>
 
       <input type="file" ref={imageRef} multiple accept="image/*" className="hidden" onChange={handleImages} />
@@ -2039,11 +2039,11 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImage
           )}
         </div>
         <div className="flex items-center gap-3 mt-3">
-          <div className={cn('flex items-center gap-1.5 text-sm font-medium', totalCount >= 3 ? 'text-green-600' : 'text-gray-400')}>
-            {totalCount >= 3 ? <CheckCircle2 className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
-            {totalCount}/3 minimum
+          <div className={cn('flex items-center gap-1.5 text-sm font-medium', totalCount >= 1 ? 'text-green-600' : 'text-gray-400')}>
+            {totalCount >= 1 ? <CheckCircle2 className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
+            {totalCount} photo{totalCount !== 1 ? 's' : ''} added
           </div>
-          {totalCount < 3 && <span className="text-sm text-orange-500">Need {3 - totalCount} more photo{3 - totalCount > 1 ? 's' : ''}</span>}
+          {totalCount === 0 && <span className="text-sm text-orange-500">At least 1 photo required</span>}
         </div>
       </div>
 
@@ -2145,7 +2145,13 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImage
       )}
 
       <div className="flex flex-col gap-3">
-        <button type="button" onClick={onSubmit} disabled={loading || totalCount < 3}
+        <button type="button" onClick={() => {
+          if (totalCount < 1) {
+            alert('Please add at least 1 photo before publishing your property.');
+            return;
+          }
+          onSubmit();
+        }} disabled={loading}
           className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 active:from-primary-800 active:to-primary-900 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 text-base transition-all shadow-xl shadow-primary-600/30">
           {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Saving…</> : isEditMode ? '✏️ Update Property' : '🎉 Publish Property'}
         </button>
@@ -2324,10 +2330,15 @@ function PostPropertyPageInner() {
     };
   };
 
+  // Lock flag: prevents concurrent draft creation (race condition in auto-save)
+  const draftCreatingRef = useRef(false);
+
   // Save current form state as a draft
   const saveDraft = async (silent = false) => {
     const { form: f, draftId: did, agentAgencyInfo: info } = latestRef.current;
     if (!f.mainCategory) return; // Nothing meaningful to save yet
+    // Prevent duplicate draft creation if a creation is already in-flight
+    if (!did && draftCreatingRef.current) return;
     if (!silent) setSavingDraft(true);
     dispatch(setAutoSaveStatus('saving'));
     try {
@@ -2335,6 +2346,7 @@ function PostPropertyPageInner() {
       if (did) {
         await propertiesApi.update(did, payload);
       } else {
+        draftCreatingRef.current = true;
         const { data } = await propertiesApi.create(payload);
         dispatch(setDraftId(data.id));
         if (typeof window !== 'undefined') localStorage.setItem('t4bs_draft_id', data.id);
@@ -2344,6 +2356,7 @@ function PostPropertyPageInner() {
     } catch {
       dispatch(setAutoSaveStatus('error'));
     } finally {
+      draftCreatingRef.current = false;
       if (!silent) setSavingDraft(false);
     }
   };
@@ -2513,15 +2526,19 @@ function PostPropertyPageInner() {
     // Skip Purpose step for categories with an implicit listing type (buy/rent/pg)
     if (currentStep === 0) {
       const implicit = IMPLICIT_LISTING[form.mainCategory];
-      if (implicit) { dispatch(updateForm({ listingType: implicit })); dispatch(setStep(2)); return; }
+      if (implicit) { dispatch(updateForm({ listingType: implicit })); dispatch(setStep(2)); }
+      else { dispatch(nextStep()); }
+    } else {
+      dispatch(nextStep());
     }
-    dispatch(nextStep());
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleBack = () => {
     // When going back to Category from Property Type, skip Purpose if it was auto-set
-    if (currentStep === 2 && IMPLICIT_LISTING[form.mainCategory]) { dispatch(setStep(0)); return; }
-    dispatch(prevStep());
+    if (currentStep === 2 && IMPLICIT_LISTING[form.mainCategory]) { dispatch(setStep(0)); }
+    else { dispatch(prevStep()); }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSubmit = async () => {

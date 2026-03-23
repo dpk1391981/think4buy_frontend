@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth, MenuItem } from '@/contexts/AuthContext';
 import { getMenuIcon } from '@/lib/menuIcons';
 import OptimizedImage from '@/components/common/OptimizedImage';
-import { Plus, ExternalLink, ChevronRight, MoreHorizontal, X } from 'lucide-react';
+import { Plus, ExternalLink, ChevronRight, ChevronDown, MoreHorizontal, X } from 'lucide-react';
 import NotificationBell from '@/components/notifications/NotificationBell';
 
 // ── Slug → href mapping for owner panel ───────────────────────────────────────
@@ -19,6 +19,7 @@ const OWNER_HREF: Record<string, { href: string; exact?: boolean }> = {
   messages:           { href: '/owner/messages' },
   property_analytics: { href: '/owner/analytics' },
   boost_listing:      { href: '/owner/boost' },
+  saved_properties:   { href: '/wishlist' },
   profile:            { href: '/owner/profile' },
   settings:           { href: '/owner/settings' },
 };
@@ -29,7 +30,28 @@ const FALLBACK_MENUS: MenuItem[] = [
   { name: 'My Properties',      slug: 'my_properties',      icon: 'home' },
   { name: 'Leads',              slug: 'leads',              icon: 'target' },
   { name: 'Property Analytics', slug: 'property_analytics', icon: 'trending-up' },
+  { name: 'Saved Properties',   slug: 'saved_properties',   icon: 'heart' },
   { name: 'Profile',            slug: 'profile',            icon: 'user' },
+];
+
+// Desktop sidebar nav groups (for collapsible sections)
+const OWNER_NAV_GROUPS = [
+  {
+    label: null as string | null,
+    slugs: ['dashboard'],
+  },
+  {
+    label: 'Properties',
+    slugs: ['add_property', 'my_properties', 'saved_properties'],
+  },
+  {
+    label: 'Analytics & Leads',
+    slugs: ['leads', 'property_analytics', 'boost_listing'],
+  },
+  {
+    label: 'Account',
+    slugs: ['messages', 'profile', 'settings'],
+  },
 ];
 
 const ALLOWED_ROLES = ['owner', 'seller'];
@@ -41,8 +63,43 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
   const router   = useRouter();
   const { user, menus: ctxMenus, loading } = useAuth();
 
-  const [mounted,  setMounted]  = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [mounted,         setMounted]         = useState(false);
+  const [moreOpen,        setMoreOpen]        = useState(false);
+
+  // "Properties" open by default; all other labeled groups collapsed
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    new Set(
+      OWNER_NAV_GROUPS.map((g) => g.label)
+        .filter((l): l is string => !!l && l !== 'Properties'),
+    ),
+  );
+
+  const toggleGroup = (label: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      return next;
+    });
+  };
+
+  // Auto-open the group that contains the current route
+  useEffect(() => {
+    const activeGroup = OWNER_NAV_GROUPS.find((g) =>
+      g.slugs.some((slug) => {
+        const map = OWNER_HREF[slug];
+        if (!map) return false;
+        return map.exact ? pathname === map.href : pathname.startsWith(map.href);
+      }),
+    );
+    if (activeGroup?.label) {
+      setCollapsedGroups((prev) => {
+        if (!prev.has(activeGroup.label!)) return prev;
+        const next = new Set(prev);
+        next.delete(activeGroup.label!);
+        return next;
+      });
+    }
+  }, [pathname]);
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => { setMoreOpen(false); }, [pathname]);
@@ -136,28 +193,59 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
         </Link>
 
         <nav className="flex-1 px-3 pb-3 overflow-y-auto">
-          <div className="space-y-0.5">
-            {activeMenus.map((item) => {
-              const active = isActive(item.slug);
-              const Icon   = getMenuIcon(item.slug, item.icon);
-              const href   = OWNER_HREF[item.slug]?.href ?? '/owner';
-              return (
-                <Link
-                  key={item.slug}
-                  href={href}
-                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group ${
-                    active
-                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
-                  <span className="truncate">{item.name}</span>
-                  {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-emerald-300 rounded-full -ml-3" />}
-                </Link>
-              );
-            })}
-          </div>
+          {OWNER_NAV_GROUPS.map((group, gi) => {
+            const groupItems = group.slugs
+              .map((slug) => activeMenus.find((m) => m.slug === slug))
+              .filter(Boolean) as MenuItem[];
+            if (!groupItems.length) return null;
+            const collapsed = group.label ? collapsedGroups.has(group.label) : false;
+            const hasActive = groupItems.some((item) => isActive(item.slug));
+            return (
+              <div key={gi} className={gi > 0 ? 'mt-5' : ''}>
+                {group.label && (
+                  <button
+                    onClick={() => toggleGroup(group.label!)}
+                    className={`w-full flex items-center justify-between px-3 mb-2 group/hdr rounded-lg py-1 transition-colors ${
+                      hasActive ? 'bg-emerald-600/10' : 'hover:bg-slate-800/40'
+                    }`}
+                  >
+                    <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                      hasActive ? 'text-emerald-400' : 'text-slate-600 group-hover/hdr:text-slate-400'
+                    }`}>
+                      {group.label}
+                    </span>
+                    <ChevronDown className={`w-3 h-3 transition-all duration-200 ${
+                      hasActive ? 'text-emerald-400' : 'text-slate-600 group-hover/hdr:text-slate-400'
+                    } ${collapsed ? '-rotate-90' : ''}`} />
+                  </button>
+                )}
+                {!collapsed && (
+                  <div className="space-y-0.5">
+                    {groupItems.map((item) => {
+                      const active = isActive(item.slug);
+                      const Icon   = getMenuIcon(item.slug, item.icon);
+                      const href   = OWNER_HREF[item.slug]?.href ?? '/owner';
+                      return (
+                        <Link
+                          key={item.slug}
+                          href={href}
+                          className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group ${
+                            active
+                              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
+                              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          }`}
+                        >
+                          <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                          <span className="truncate">{item.name}</span>
+                          {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-emerald-300 rounded-full -ml-3" />}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t border-slate-800/60 space-y-2">
