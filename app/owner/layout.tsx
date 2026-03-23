@@ -19,18 +19,18 @@ const OWNER_HREF: Record<string, { href: string; exact?: boolean }> = {
   messages:           { href: '/owner/messages' },
   property_analytics: { href: '/owner/analytics' },
   boost_listing:      { href: '/owner/boost' },
-  saved_properties:   { href: '/wishlist' },
+  saved_properties:   { href: '/owner/saved' },
   profile:            { href: '/owner/profile' },
   settings:           { href: '/owner/settings' },
 };
 
 const FALLBACK_MENUS: MenuItem[] = [
   { name: 'Dashboard',          slug: 'dashboard',          icon: 'layout-dashboard' },
-  { name: 'Add Property',       slug: 'add_property',       icon: 'plus-circle' },
   { name: 'My Properties',      slug: 'my_properties',      icon: 'home' },
+  { name: 'Saved Properties',   slug: 'saved_properties',   icon: 'heart' },
+  { name: 'Add Property',       slug: 'add_property',       icon: 'plus-circle' },
   { name: 'Leads',              slug: 'leads',              icon: 'target' },
   { name: 'Property Analytics', slug: 'property_analytics', icon: 'trending-up' },
-  { name: 'Saved Properties',   slug: 'saved_properties',   icon: 'heart' },
   { name: 'Profile',            slug: 'profile',            icon: 'user' },
 ];
 
@@ -132,9 +132,17 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  const activeMenus = (ctxMenus.length > 0 ? ctxMenus : FALLBACK_MENUS).filter(
-    (m) => OWNER_HREF[m.slug],
-  );
+  // Merge DB menus with fallbacks so any slug in OWNER_HREF always appears,
+  // even if the DB hasn't been patched yet on this environment.
+  const mergedMenus: MenuItem[] = ctxMenus.length > 0
+    ? (() => {
+        const seen = new Set(ctxMenus.map((m) => m.slug));
+        const extras = FALLBACK_MENUS.filter((m) => !seen.has(m.slug) && OWNER_HREF[m.slug]);
+        return [...ctxMenus, ...extras];
+      })()
+    : FALLBACK_MENUS;
+
+  const activeMenus = mergedMenus.filter((m) => OWNER_HREF[m.slug]);
 
   const bottomTabs = activeMenus.slice(0, 4);
   const moreItems  = activeMenus.slice(4);
