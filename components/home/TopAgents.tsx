@@ -210,13 +210,10 @@ function AgentCard({ agent }: { agent: Agent }) {
 
       {/* ── Main content ── */}
       <Link href={`/agents/${slug}`} className="block px-4 pt-2 pb-3 flex-1">
-        {/* Name + company + city */}
+        {/* Agency name only */}
         <h3 className="font-bold text-gray-900 text-sm leading-snug group-hover:text-primary-700 transition-colors">
           {agent.company || agent.name}
         </h3>
-        <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
-          <span className="truncate">{agent.name}</span>
-        </div>
         {(agent.city || (agent.agentExperience ?? 0) > 0) && (
           <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5 flex-wrap">
             {agent.city && (
@@ -338,9 +335,9 @@ export default function TopAgents() {
         {/* Header */}
         <div className="flex items-center justify-between mb-3 sm:mb-6 px-0">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Top Real Estate Agents</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Top Real Estate Agencies</h2>
             <p className="text-gray-500 mt-0.5 text-sm">
-              Verified RERA-certified agents {locationLabel}
+              Verified RERA-certified agencies {locationLabel}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -373,7 +370,7 @@ export default function TopAgents() {
         {/* Location indicator */}
         {mounted && (selectedCity || selectedState) && (
           <div className="flex items-center gap-2 mb-4 text-sm text-primary-700 bg-primary-50 px-3 py-2 rounded-xl w-fit">
-            <span>📍 Showing agents in <strong>{selectedCity || selectedState}</strong></span>
+            <span>📍 Showing agencies in <strong>{selectedCity || selectedState}</strong></span>
           </div>
         )}
 
@@ -404,7 +401,7 @@ export default function TopAgents() {
             href={viewAllHref}
             className="inline-flex items-center gap-2 border border-primary-200 text-primary-700 text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-primary-50 transition-colors"
           >
-            View All Agents <ArrowRight className="w-4 h-4" />
+            View All Agencies <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </div>

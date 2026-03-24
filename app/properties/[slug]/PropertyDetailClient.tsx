@@ -400,11 +400,11 @@ export default function PropertyDetailClient({ property }: Props) {
 
   // FAQ
   const faqs = [
-    { q: `What is the price of ${property.title}?`, a: `The asking price is ${formatPrice(property.price, property.priceUnit)}${pricePerSqft ? ` (₹${pricePerSqft.toLocaleString('en-IN')}/sqft)` : ''}. Contact the ${isAgent ? 'agent' : 'owner'} for best deal.` },
+    { q: `What is the price of ${property.title}?`, a: `The asking price is ${formatPrice(property.price, property.priceUnit)}${pricePerSqft ? ` (₹${pricePerSqft.toLocaleString('en-IN')}/sqft)` : ''}. Contact the ${isAgent ? 'agency' : 'owner'} for best deal.` },
     { q: `Is this property ready to move in?`, a: property.possessionStatus === 'ready_to_move' ? 'Yes, this property is ready to move in immediately.' : `Under construction.${property.possessionDate ? ` Expected possession: ${new Date(property.possessionDate).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}.` : ''}` },
     { q: `What amenities are available?`, a: property.amenities?.length ? `This property offers: ${property.amenities.slice(0, 8).map(a => a.name).join(', ')}.` : 'Contact the listing party for detailed amenity info.' },
     { q: `Is the property RERA registered?`, a: property.reraNumber ? `Yes, RERA No: ${property.reraNumber}.` : 'RERA details not available. Verify with the owner/builder.' },
-    { q: `How to schedule a site visit?`, a: `Click "Schedule Visit" or WhatsApp/call the ${isAgent ? 'agent' : 'owner'} directly from this page.` },
+    { q: `How to schedule a site visit?`, a: `Click "Schedule Visit" or WhatsApp/call the ${isAgent ? 'agency' : 'owner'} directly from this page.` },
   ];
 
   // ── Inquiry Form render ─────────────────────────────────────────────────────
@@ -415,7 +415,7 @@ export default function PropertyDetailClient({ property }: Props) {
           <CheckCircle className="w-9 h-9 text-green-600" />
         </div>
         <p className="font-bold text-gray-900 text-lg mb-1">Inquiry Sent!</p>
-        <p className="text-sm text-gray-500 mb-5">The {isAgent ? 'agent' : 'owner'} will contact you shortly.</p>
+        <p className="text-sm text-gray-500 mb-5">The {isAgent ? 'agency' : 'owner'} will contact you shortly.</p>
         {onClose && (
           <button onClick={onClose} className="px-10 py-3 bg-primary-600 text-white rounded-2xl text-sm font-bold">Done</button>
         )}
@@ -1011,7 +1011,7 @@ export default function PropertyDetailClient({ property }: Props) {
                         in {property.locality} is priced at {formatPrice(property.price, property.priceUnit)}.
                         {property.possessionStatus === 'ready_to_move' ? ' Ready to move in immediately.' : ''}
                         {property.amenities?.length ? ` Premium amenities: ${property.amenities.slice(0, 3).map(a => a.name).join(', ')}.` : ''}
-                        {' '}Contact the {isAgent ? 'agent' : 'owner'} now for the best deal.
+                        {' '}Contact the {isAgent ? 'agency' : 'owner'} now for the best deal.
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {[
@@ -1074,7 +1074,7 @@ export default function PropertyDetailClient({ property }: Props) {
             {!isInactiveListing && (
               <div className="md:hidden bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
-                  Contact {isAgent ? 'Agent' : 'Owner'}
+                  Contact {isAgent ? 'Agency' : 'Owner'}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {/* Call */}
@@ -1146,7 +1146,7 @@ export default function PropertyDetailClient({ property }: Props) {
                   )}
                 >
                   {isAgent ? <Building2 className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                  {isAgent ? 'Agent Details' : 'Owner Details'}
+                  {isAgent ? 'Agency Details' : 'Owner Details'}
                 </button>
               </div>
 
@@ -1205,10 +1205,9 @@ export default function PropertyDetailClient({ property }: Props) {
                       <h3 className="font-bold text-gray-900 text-lg leading-tight">
                         {isAgent ? (owner?.company || owner?.name) : (owner?.name || 'Owner')}
                       </h3>
-                      {isAgent && owner?.company && <p className="text-sm text-gray-500 mt-0.5">{owner.name}</p>}
                       {owner?.isVerified && (
                         <span className="inline-flex items-center gap-1 text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mt-1">
-                          <CheckCircle className="w-3 h-3" /> Verified {isAgent ? 'Agent' : 'Owner'}
+                          <CheckCircle className="w-3 h-3" /> Verified {isAgent ? 'Agency' : 'Owner'}
                         </span>
                       )}
                     </div>
@@ -1402,8 +1401,9 @@ export default function PropertyDetailClient({ property }: Props) {
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                       {isAgent
-                        ? <><Building2 className="w-5 h-5 text-violet-500" /> More by {owner?.company || owner?.name || 'this Agent'}</>
+                        ? <><Building2 className="w-5 h-5 text-violet-500" /> More by {owner?.company || owner?.name || 'this Agency'}</>
                         : <><Home className="w-5 h-5 text-emerald-500" /> More from {owner?.name || 'this Owner'}</>}
+
                     </h2>
                     <Link href={`/properties?agentId=${owner?.id}`}
                       className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1">
@@ -1528,10 +1528,9 @@ export default function PropertyDetailClient({ property }: Props) {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-gray-900 text-sm truncate">{isAgent ? (owner?.company || owner?.name) : (owner?.name || 'Owner')}</p>
-                      {isAgent && owner?.company && <p className="text-xs text-gray-500 truncate">{owner.name}</p>}
                       {owner?.isVerified && (
                         <p className="text-xs text-green-600 font-semibold flex items-center gap-1 mt-0.5">
-                          <CheckCircle className="w-3 h-3" /> Verified {isAgent ? 'Agent' : 'Owner'}
+                          <CheckCircle className="w-3 h-3" /> Verified {isAgent ? 'Agency' : 'Owner'}
                         </p>
                       )}
                     </div>
@@ -1616,8 +1615,8 @@ export default function PropertyDetailClient({ property }: Props) {
                 }
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{owner?.name || 'Property Owner'}</p>
-                <p className="text-[10px] text-gray-400 leading-tight">{isAgent ? '🏅 Verified Agent' : '🏠 Owner'}</p>
+                <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{isAgent ? (owner?.company || owner?.name || 'Agency') : (owner?.name || 'Property Owner')}</p>
+                <p className="text-[10px] text-gray-400 leading-tight">{isAgent ? '🏢 Agency' : '🏠 Owner'}</p>
               </div>
               {property.isVerified && (
                 <span className="flex-shrink-0 text-[10px] bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5 font-semibold">
@@ -1692,7 +1691,7 @@ export default function PropertyDetailClient({ property }: Props) {
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
               <div>
                 <h3 className="font-bold text-gray-900 text-base">
-                  {inquiryType === 'site_visit' ? '📅 Schedule a Visit' : inquiryType === 'price_negotiation' ? '🤝 Negotiate Price' : `Contact ${isAgent ? 'Agent' : 'Owner'}`}
+                  {inquiryType === 'site_visit' ? '📅 Schedule a Visit' : inquiryType === 'price_negotiation' ? '🤝 Negotiate Price' : `Contact ${isAgent ? 'Agency' : 'Owner'}`}
                 </h3>
                 <p className="text-xs text-gray-400 mt-0.5">{isAgent ? (owner?.company || owner?.name) : owner?.name} · {property.title.slice(0, 35)}</p>
               </div>

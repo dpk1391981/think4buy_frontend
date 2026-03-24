@@ -70,7 +70,6 @@ const STEP_META = [
   { label: 'Purpose',     desc: 'Rent or sale'         },
   { label: 'Property',    desc: 'Property type'        },
   { label: 'Location',    desc: 'Where is it?'         },
-  { label: 'Title',       desc: 'Auto-generated title' },
   { label: 'Details',     desc: 'Specifications'       },
   { label: 'Amenities',   desc: "What's included"      },
   { label: 'Description', desc: 'Tell the story'       },
@@ -818,7 +817,7 @@ function RightPanel({
               )}
             </button>
             {!canSaveDraft && (
-              <p className="mt-2 text-center text-[10px] text-gray-400">Complete 6 steps to enable drafts</p>
+              <p className="mt-2 text-center text-[10px] text-gray-400">Complete 5 steps to enable drafts</p>
             )}
             {/* Auto-save indicator */}
             {canSaveDraft && (
@@ -1633,7 +1632,21 @@ function Step6Details({ form, dispatch, config }: any) {
         <div>
           <FieldLabel required>BHK Configuration</FieldLabel>
           <div className="flex flex-wrap gap-2">
-            {BHK_OPTIONS.map(opt => (
+            {(form.propertyType === 'penthouse'
+              ? [
+                  { value: '1', label: '1 BHK' }, { value: '2', label: '2 BHK' },
+                  { value: '3', label: '3 BHK' }, { value: '4', label: '4 BHK' },
+                  { value: '5', label: '5 BHK' }, { value: '6', label: '6 BHK' },
+                  { value: '7', label: '7 BHK' }, { value: '8', label: '8 BHK' },
+                  { value: '9', label: '9 BHK' }, { value: '10', label: '10 BHK' },
+                  { value: '11', label: '11 BHK' }, { value: '12', label: '12 BHK' },
+                  { value: '13', label: '13 BHK' }, { value: '14', label: '14 BHK' },
+                  { value: '15', label: '15 BHK' }, { value: '16', label: '16 BHK' },
+                  { value: '17', label: '17 BHK' }, { value: '18', label: '18 BHK' },
+                  { value: '19', label: '19 BHK' }, { value: '20', label: '20+ BHK' },
+                ]
+              : BHK_OPTIONS
+            ).map(opt => (
               <ChoiceButton key={opt.value} label={opt.label} selected={form.bedrooms === opt.value}
                 onClick={() => dispatch(updateForm({ bedrooms: opt.value }))} />
             ))}
@@ -2199,7 +2212,7 @@ function PostPropertyPageInner() {
   // Refs so auto-save interval always reads the latest values
   const latestRef = useRef({ form, draftId, agentAgencyInfo, isEditMode: false, currentStep: 0 });
 
-  const TOTAL_STEPS = 10;
+  const TOTAL_STEPS = 9;
   const isAgent = user?.role === 'agent' || user?.role === 'seller';
   const agentProfStatus = (user as any)?.agentProfileStatus;
   const showProfPendingBanner = isAgent && agentProfStatus === 'pending';
@@ -2218,6 +2231,21 @@ function PostPropertyPageInner() {
       dispatch(updateForm({ userType: 'owner' }));
     }
   }, [user?.id]);
+
+  // Auto-generate title whenever relevant fields change (Title step removed)
+  useEffect(() => {
+    if (!form.mainCategory && !form.propertyType) return;
+    const generatedTitle = generatePropertyTitle({
+      category: form.mainCategory,
+      listingType: form.listingType || (form.mainCategory === 'pg' || form.mainCategory === 'rent' ? 'rent' : 'buy'),
+      propertyType: form.propertyType,
+      bedrooms: form.bedrooms,
+      city: form.city,
+      locality: form.locality,
+    });
+    dispatch(updateForm({ autoTitle: generatedTitle }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.mainCategory, form.listingType, form.propertyType, form.bedrooms, form.city, form.locality]);
 
   // Fetch categories once
   useEffect(() => {
@@ -2740,12 +2768,11 @@ function PostPropertyPageInner() {
       case 1: return <Step2ListingType {...stepProps} />;
       case 2: return <Step3PropertyType {...stepProps} />;
       case 3: return <Step4Location {...stepProps} />;
-      case 4: return <Step5AutoTitle {...stepProps} />;
-      case 5: return <Step6Details {...stepProps} />;
-      case 6: return <Step7Amenities {...stepProps} />;
-      case 7: return <Step8Description {...stepProps} />;
-      case 8: return <Step9Price {...stepProps} />;
-      case 9: return <Step10Photos {...stepProps} mediaFiles={mediaFiles} setMediaFiles={setMediaFiles} existingImages={existingImages} onRemoveExisting={handleRemoveExistingImage} onSubmit={handleSubmit} onSaveDraft={handleSaveDraftAndExit} savingDraft={savingDraft} loading={loading} error={error} isEditMode={isEditMode} brochureFile={brochureFile} setBrochureFile={setBrochureFile} removeBrochure={removeBrochure} setRemoveBrochure={setRemoveBrochure} />;
+      case 4: return <Step6Details {...stepProps} />;
+      case 5: return <Step7Amenities {...stepProps} />;
+      case 6: return <Step8Description {...stepProps} />;
+      case 7: return <Step9Price {...stepProps} />;
+      case 8: return <Step10Photos {...stepProps} mediaFiles={mediaFiles} setMediaFiles={setMediaFiles} existingImages={existingImages} onRemoveExisting={handleRemoveExistingImage} onSubmit={handleSubmit} onSaveDraft={handleSaveDraftAndExit} savingDraft={savingDraft} loading={loading} error={error} isEditMode={isEditMode} brochureFile={brochureFile} setBrochureFile={setBrochureFile} removeBrochure={removeBrochure} setRemoveBrochure={setRemoveBrochure} />;
       default: return null;
     }
   };
@@ -2817,7 +2844,7 @@ function PostPropertyPageInner() {
 
             {/* Form card — full bleed on mobile, rounded on sm+ */}
             <div className="bg-white rounded-none sm:rounded-3xl shadow-none sm:shadow-sm border-y sm:border border-gray-100 p-5 sm:p-8 lg:p-10 mb-4 sm:mb-6">
-              {error && currentStep < 9 && (
+              {error && currentStep < 8 && (
                 <div className="mb-5 bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-3 text-sm font-medium">
                   {error}
                 </div>
@@ -2825,8 +2852,8 @@ function PostPropertyPageInner() {
               {renderStep()}
             </div>
 
-            {/* Desktop navigation (steps 0–8) */}
-            {currentStep < 9 && (
+            {/* Desktop navigation (steps 0–7) */}
+            {currentStep < 8 && (
               <div className="hidden lg:block space-y-3">
                 <div className="flex items-center gap-3">
                   {currentStep > 0 && (
@@ -2837,15 +2864,15 @@ function PostPropertyPageInner() {
                   )}
                   <button type="button" onClick={handleNext}
                     className="flex-1 flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-primary-600/25 text-base">
-                    {currentStep === 8 ? 'Next: Add Photos' : 'Continue'}
+                    {currentStep === 7 ? 'Next: Add Photos' : 'Continue'}
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Desktop back link (step 9) */}
-            {currentStep === 9 && (
+            {/* Desktop back link (step 8 — photos) */}
+            {currentStep === 8 && (
               <div className="hidden lg:flex justify-center">
                 <button type="button" onClick={handleBack}
                   className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm font-semibold transition-colors">
@@ -2854,8 +2881,8 @@ function PostPropertyPageInner() {
               </div>
             )}
 
-            {/* Mobile back link (step 9) + spacer for sticky nav */}
-            {currentStep === 9 && (
+            {/* Mobile back link (step 8) + spacer for sticky nav */}
+            {currentStep === 8 && (
               <div className="lg:hidden flex justify-center mt-4 mb-28">
                 <button type="button" onClick={handleBack}
                   className="flex items-center gap-2 text-gray-500 text-sm font-semibold py-3 px-5 rounded-2xl border border-gray-200 bg-white">
@@ -2865,14 +2892,14 @@ function PostPropertyPageInner() {
             )}
 
             {/* Mobile spacer — prevents content hiding behind sticky nav */}
-            {currentStep < 9 && <div className="h-36 lg:hidden" />}
+            {currentStep < 8 && <div className="h-36 lg:hidden" />}
           </main>
 
           {/* Right — drafts + pending + save draft (desktop only) */}
           <RightPanel
             onSaveDraft={handleSaveDraftAndExit}
             savingDraft={savingDraft}
-            canSaveDraft={currentStep >= 5}
+            canSaveDraft={currentStep >= 4}
             autoSaveStatus={autoSaveStatus}
             lastSaved={lastSaved}
             userDrafts={userDrafts}
@@ -2885,7 +2912,7 @@ function PostPropertyPageInner() {
       </div>
 
       {/* ── Mobile sticky bottom navigation ─────────────────────────────── */}
-      {currentStep < 9 && (
+      {currentStep < 8 && (
         <div
           className="fixed inset-x-0 bottom-0 z-[60] lg:hidden bg-white border-t border-gray-200"
           style={{ boxShadow: '0 -4px 24px rgba(0,0,0,0.10)', paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
@@ -2909,7 +2936,7 @@ function PostPropertyPageInner() {
             {/* Save draft + auto-save status row */}
             {!isEditMode && (
               <div className="flex items-center justify-between h-8">
-                {currentStep >= 5 ? (
+                {currentStep >= 4 ? (
                   <button type="button" onClick={handleSaveDraftAndExit} disabled={savingDraft}
                     className="flex items-center gap-1.5 h-8 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold disabled:opacity-50 active:bg-amber-100 transition-colors">
                     {savingDraft
@@ -2922,7 +2949,7 @@ function PostPropertyPageInner() {
                     <Save className="w-3.5 h-3.5" />
                     Save Draft
                     <span className="text-[10px] bg-gray-200 text-gray-400 px-1.5 py-0.5 rounded-full ml-0.5">
-                      step {5 - currentStep + 1} more
+                      step {4 - currentStep} more
                     </span>
                   </div>
                 )}

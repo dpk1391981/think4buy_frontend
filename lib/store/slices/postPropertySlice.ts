@@ -156,7 +156,7 @@ interface PostPropertyState {
 
 const initialState: PostPropertyState = {
   currentStep: 0,
-  totalSteps: 11,
+  totalSteps: 9,
   form: initialFormState,
   isSubmitting: false,
   submitError: '',

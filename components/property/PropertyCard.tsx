@@ -442,7 +442,7 @@ export default function PropertyCard({ property, className, listView }: Property
                       <CheckCircle className="w-3 h-3 text-emerald-500 flex-shrink-0" />
                     )}
                   </p>
-                  <p className="text-[10px] text-gray-400">{isAgent ? 'Real Estate Agent' : 'Owner'}</p>
+                  <p className="text-[10px] text-gray-400">{isAgent ? 'Real Estate Agency' : 'Owner'}</p>
                 </div>
               </div>
               {property.viewCount > 0 && (
@@ -479,7 +479,7 @@ export default function PropertyCard({ property, className, listView }: Property
                     )}
                   </p>
                   <p className="text-[10px] text-gray-400 mt-0.5">
-                    {isAgent ? 'Registered Agent' : 'Property Owner'}
+                    {isAgent ? 'Registered Agency' : 'Property Owner'}
                   </p>
                   {isAgent && property.brokerage === 'no_brokerage' && (
                     <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full mt-1">
