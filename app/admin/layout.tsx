@@ -36,6 +36,7 @@ import {
   BarChart2,
   SlidersHorizontal,
   Star,
+  Wrench,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
@@ -97,9 +98,10 @@ const NAV_GROUPS = [
   {
     label: 'CRM',
     items: [
-      { href: '/admin/leads', label: 'Leads', icon: Target },
-      { href: '/admin/deals', label: 'Deals', icon: Handshake },
-      { href: '/admin/commissions', label: 'Commissions', icon: IndianRupee },
+      { href: '/admin/leads',         label: 'Leads',         icon: Target },
+      { href: '/admin/service-leads', label: 'Service Leads', icon: Wrench },
+      { href: '/admin/deals',         label: 'Deals',         icon: Handshake },
+      { href: '/admin/commissions',   label: 'Commissions',   icon: IndianRupee },
     ],
   },
   {

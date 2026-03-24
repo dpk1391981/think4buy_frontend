@@ -209,7 +209,40 @@ export const inquiriesApi = {
 
 // Services
 export const servicesApi = {
-  getAll: () => api.get('/services'),
+  getAll:    () => api.get('/services'),
+  getBySlug: (slug: string) => api.get(`/services/${slug}`),
+};
+
+// Service Leads
+export const serviceLeadsApi = {
+  /** Public — no auth required */
+  create: (data: {
+    serviceId: string;
+    name: string;
+    phone: string;
+    email?: string;
+    location?: string;
+    interest?: string;
+    message?: string;
+    source?: string;
+  }) => api.post('/service-leads', data),
+
+  /** Admin */
+  getAll: (params?: {
+    serviceId?: string;
+    status?: string;
+    location?: string;
+    from?: string;
+    to?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get('/admin/service-leads', { params }),
+
+  getStats: () => api.get('/admin/service-leads/stats'),
+  getOne:   (id: string) => api.get(`/admin/service-leads/${id}`),
+  update:   (id: string, data: { status?: string; adminNote?: string }) =>
+    api.put(`/admin/service-leads/${id}`, data),
 };
 
 // Admin
