@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 import './globals.css';
 import Header from '@/components/layout/Header';
 import ConditionalFooter from '@/components/layout/ConditionalFooter';
@@ -11,6 +12,8 @@ import AuthModal from '@/components/auth/AuthModal';
 import MobileGuestLoginPrompt from '@/components/auth/MobileGuestLoginPrompt';
 import OnboardingEnforcer from '@/components/auth/OnboardingEnforcer';
 import ToastNotification from '@/components/common/ToastNotification';
+
+const HomeStickySearch = dynamic(() => import('@/components/home/HomeStickySearch'), { ssr: false });
 
 const APP_NAME = 'Think4BuySale';
 const APP_URL  = process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com';
@@ -96,6 +99,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AuthProvider>
               <WishlistProvider>
               <Header />
+              <HomeStickySearch />
               <main className="min-h-screen pb-safe-nav lg:pb-0">{children}</main>
               <ConditionalFooter />
               <MobileBottomNav />

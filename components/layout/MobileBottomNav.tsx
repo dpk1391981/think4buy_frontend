@@ -21,8 +21,12 @@ export default function MobileBottomNav() {
   const { user } = useAuth();
   const dispatch = useAppDispatch();
 
-  // Hide on admin/agent panel pages — those layouts have their own mobile nav
-  if (pathname.startsWith('/admin') || pathname === '/agent' || pathname.startsWith('/agent/')) return null;
+  // Hide on admin/agent/owner panel pages — those layouts have their own mobile nav
+  if (
+    pathname.startsWith('/admin') ||
+    pathname === '/agent' || pathname.startsWith('/agent/') ||
+    pathname === '/owner' || pathname.startsWith('/owner/')
+  ) return null;
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 safe-bottom">

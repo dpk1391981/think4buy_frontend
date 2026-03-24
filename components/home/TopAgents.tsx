@@ -217,10 +217,20 @@ function AgentCard({ agent }: { agent: Agent }) {
         <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
           <span className="truncate">{agent.name}</span>
         </div>
-        {agent.city && (
-          <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
-            <MapPin className="w-3 h-3 flex-shrink-0" />
-            <span>{agent.city}{agent.state ? `, ${agent.state}` : ''}</span>
+        {(agent.city || (agent.agentExperience ?? 0) > 0) && (
+          <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5 flex-wrap">
+            {agent.city && (
+              <>
+                <MapPin className="w-3 h-3 flex-shrink-0" />
+                <span>{agent.city}{agent.state ? `, ${agent.state}` : ''}</span>
+              </>
+            )}
+            {(agent.agentExperience ?? 0) > 0 && (
+              <>
+                {agent.city && <span className="text-gray-200">·</span>}
+                <span className="font-semibold text-gray-500">{agent.agentExperience}+ yrs exp</span>
+              </>
+            )}
           </div>
         )}
 
@@ -229,14 +239,6 @@ function AgentCard({ agent }: { agent: Agent }) {
           className="flex items-center gap-3 mt-3 pt-3"
           style={{ borderTop: `1px solid ${T ? T.divider : '#f3f4f6'}` }}
         >
-          {(agent.agentExperience ?? 0) > 0 && (
-            <div className="text-center">
-              <div className="text-sm font-black" style={{ color: T ? T.statColor : '#111827' }}>
-                {agent.agentExperience}+
-              </div>
-              <div className="text-[10px] text-gray-400 leading-none mt-0.5">Yrs Exp</div>
-            </div>
-          )}
           {(agent.totalDeals ?? 0) > 0 && (
             <div className="text-center">
               <div className="text-sm font-black" style={{ color: T ? T.statColor : '#111827' }}>

@@ -35,8 +35,7 @@ const AIInsightsSection  = dynamic(() => import('@/components/home/AIInsightsSec
 const TestimonialsSection = dynamic(() => import('@/components/home/TestimonialsSection'), { ssr: true  });
 
 // Non-critical / purely decorative sections — defer to client
-const StatsBar         = dynamic(() => import('@/components/home/StatsBar'),         { ssr: false });
-const HomeStickySearch = dynamic(() => import('@/components/home/HomeStickySearch'), { ssr: false });
+const StatsBar = dynamic(() => import('@/components/home/StatsBar'), { ssr: false });
 
 export const metadata: Metadata = {
   title: 'Think4BuySale – Buy, Rent & Sell Properties in India',
@@ -78,9 +77,6 @@ const WHY_US = [
 export default function HomePage() {
   return (
     <>
-      {/* ─── Sticky search bar (appears on scroll) ────────────────────────────── */}
-      <HomeStickySearch />
-
       {/* ══════════════════════════════════════════════════════════════════════════
           HERO SECTION — Premium, high-conversion above-the-fold
       ══════════════════════════════════════════════════════════════════════════ */}
@@ -195,24 +191,14 @@ export default function HomePage() {
       </section>
 
       {/* ══════════════════════════════════════════════════════════════════════════
-          🔥 TRENDING NOW  — NEW
+          🔥 TRENDING NOW
       ══════════════════════════════════════════════════════════════════════════ */}
       <TrendingProperties />
 
       {/* ══════════════════════════════════════════════════════════════════════════
-          FEATURED / RECOMMENDED PROPERTIES (Personalized by location & tabs)
+          FEATURED / RECOMMENDED PROPERTIES
       ══════════════════════════════════════════════════════════════════════════ */}
       <FeaturedProperties />
-
-      {/* ══════════════════════════════════════════════════════════════════════════
-          ⚖️ PROPERTY COMPARISON WIDGET — NEW
-      ══════════════════════════════════════════════════════════════════════════ */}
-      <PropertyComparison />
-
-      {/* ══════════════════════════════════════════════════════════════════════════
-          📊 CITY PRICE SNAPSHOT — NEW
-      ══════════════════════════════════════════════════════════════════════════ */}
-      <CityPriceSnapshot />
 
       {/* ══════════════════════════════════════════════════════════════════════════
           LATEST LISTINGS / TOP CATEGORIES
@@ -220,24 +206,14 @@ export default function HomePage() {
       <TopCategories />
 
       {/* ══════════════════════════════════════════════════════════════════════════
-          TOP RESIDENTIAL CITIES
-      ══════════════════════════════════════════════════════════════════════════ */}
-      <TopCitiesSection />
-
-      {/* ══════════════════════════════════════════════════════════════════════════
-          DYNAMIC LOCATION SELECTOR
-      ══════════════════════════════════════════════════════════════════════════ */}
-      <HomeLocationSelector />
-
-      {/* ══════════════════════════════════════════════════════════════════════════
-          🧠 AI INSIGHTS — NEW
-      ══════════════════════════════════════════════════════════════════════════ */}
-      <AIInsightsSection />
-
-      {/* ══════════════════════════════════════════════════════════════════════════
-          NEW PROJECTS / BUILDERS
+          NEW PROJECTS / TOP RESIDENTIAL
       ══════════════════════════════════════════════════════════════════════════ */}
       <TopNewProjects />
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          ⚖️ PROPERTY COMPARISON WIDGET
+      ══════════════════════════════════════════════════════════════════════════ */}
+      <PropertyComparison />
 
       {/* ══════════════════════════════════════════════════════════════════════════
           VERIFIED AGENTS
@@ -245,7 +221,27 @@ export default function HomePage() {
       <TopAgents />
 
       {/* ══════════════════════════════════════════════════════════════════════════
-          💬 TESTIMONIALS — NEW
+          TOP RESIDENTIAL CITIES
+      ══════════════════════════════════════════════════════════════════════════ */}
+      <TopCitiesSection />
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          📊 CITY PRICE SNAPSHOT
+      ══════════════════════════════════════════════════════════════════════════ */}
+      <CityPriceSnapshot />
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          🧠 AI / SMART INSIGHTS
+      ══════════════════════════════════════════════════════════════════════════ */}
+      <AIInsightsSection />
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          DYNAMIC LOCATION SELECTOR
+      ══════════════════════════════════════════════════════════════════════════ */}
+      <HomeLocationSelector />
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          💬 TESTIMONIALS
       ══════════════════════════════════════════════════════════════════════════ */}
       <TestimonialsSection />
 
