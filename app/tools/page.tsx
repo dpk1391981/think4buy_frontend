@@ -1033,10 +1033,10 @@ export default function ToolsPage() {
                     ? 'border-violet-600 text-violet-700'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}>
-                {tab === 'Calculators'   && <Calculator size={15} />}
-                {tab === 'Price Predictor' && <Zap size={15} />}
-                {tab === 'Price Trends'  && <TrendingUp size={15} />}
-                {tab === 'Insights'      && <BarChart2 size={15} />}
+                {tab === 'Calculators' && <Calculator size={15} />}
+                {(tab as string) === 'Price Predictor' && <Zap size={15} />}
+                {(tab as string) === 'Price Trends'  && <TrendingUp size={15} />}
+                {(tab as string) === 'Insights'      && <BarChart2 size={15} />}
                 {tab}
               </button>
             ))}
