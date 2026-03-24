@@ -744,18 +744,19 @@ export const toolsApi = {
     api.get('/tools/roi', { params }),
   areaConvert: (params: { value: number; from: string; to: string }) =>
     api.get('/tools/area-convert', { params }),
-  predict: (params: { city: string; propertyType?: string; bhk?: number; area?: number }) =>
+  predict: (params: { city: string; locality?: string; propertyType?: string; bhk?: number; area?: number }) =>
     api.get('/tools/predict', { params }),
 };
 
 export const insightsApi = {
-  priceTrends: (params: { city: string; propertyType?: string; listingType?: string }) =>
+  priceTrends: (params: { city: string; locality?: string; propertyType?: string; listingType?: string }) =>
     api.get('/insights/price-trends', { params }),
   demand: (params?: { city?: string }) =>
     api.get('/insights/demand', { params }),
   marketCards: (params?: { city?: string; state?: string }) =>
     api.get('/insights/market-cards', { params }),
   cities: () => api.get('/insights/cities'),
+  localities: (city: string) => api.get('/insights/localities', { params: { city } }),
 };
 
 // ─── Articles API ─────────────────────────────────────────────────────────────

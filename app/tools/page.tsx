@@ -411,27 +411,50 @@ const TREND_COLORS: Record<string, string> = {
 };
 
 function PricePredictor() {
-  const [city,    setCity]    = useState('');
-  const [type,    setType]    = useState('apartment');
-  const [bhk,     setBhk]     = useState('2');
-  const [area,    setArea]    = useState('1000');
-  const [loading, setLoading] = useState(false);
-  const [result,  setResult]  = useState<any>(null);
-  const [error,   setError]   = useState('');
+  const [city,       setCity]       = useState('');
+  const [locality,   setLocality]   = useState('');
+  const [type,       setType]       = useState('apartment');
+  const [bhk,        setBhk]        = useState('2');
+  const [area,       setArea]       = useState('1000');
+  const [loading,    setLoading]    = useState(false);
+  const [result,     setResult]     = useState<any>(null);
+  const [error,      setError]      = useState('');
+  const [cities,     setCities]     = useState<string[]>([]);
+  const [localities, setLocalities] = useState<string[]>([]);
+  const [locLoading, setLocLoading] = useState(false);
+
+  // Load city list on mount
+  useEffect(() => {
+    insightsApi.cities().then(res => {
+      setCities((res.data?.data ?? []).map((c: any) => c.city).filter(Boolean));
+    }).catch(() => {});
+  }, []);
+
+  // Load localities when city changes
+  useEffect(() => {
+    if (!city.trim()) { setLocalities([]); setLocality(''); return; }
+    setLocLoading(true);
+    insightsApi.localities(city.trim()).then(res => {
+      setLocalities(res.data?.data ?? []);
+    }).catch(() => setLocalities([])).finally(() => setLocLoading(false));
+    setLocality('');
+    setResult(null);
+  }, [city]);
 
   const predict = async () => {
-    if (!city.trim()) { setError('Please enter a city name'); return; }
+    if (!city.trim()) { setError('Please select a city'); return; }
     setError('');
     setLoading(true);
     try {
       const res = await toolsApi.predict({
         city: city.trim(),
+        locality: locality || undefined,
         propertyType: type,
         bhk: parseInt(bhk, 10),
         area: parseFloat(area),
       });
       setResult(res.data?.data);
-      if (!res.data?.data?.hasData) setError(res.data?.data?.error || 'No data for this location');
+      if (!res.data?.data?.hasData) setError(res.data?.data?.error || 'No data for this location yet');
     } catch {
       setError('Could not fetch prediction. Please try again.');
     } finally {
@@ -441,13 +464,37 @@ function PricePredictor() {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {/* City */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-          <input value={city} onChange={e => setCity(e.target.value)}
+          <input list="pred-city-list" value={city} onChange={e => setCity(e.target.value)}
             placeholder="e.g. Mumbai"
             className="w-full border border-gray-200 rounded-xl py-2.5 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400" />
+          <datalist id="pred-city-list">{cities.map(c => <option key={c} value={c} />)}</datalist>
         </div>
+
+        {/* Locality */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+            Locality
+            {locLoading && <Loader2 size={12} className="animate-spin text-violet-400" />}
+          </label>
+          {localities.length > 0 ? (
+            <select value={locality} onChange={e => setLocality(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl py-2.5 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400">
+              <option value="">All Localities (City Average)</option>
+              {localities.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+          ) : (
+            <input value={locality} onChange={e => setLocality(e.target.value)}
+              placeholder={city ? 'No locality data yet' : 'Select city first'}
+              disabled={!city}
+              className="w-full border border-gray-200 rounded-xl py-2.5 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 disabled:bg-gray-50 disabled:text-gray-400" />
+          )}
+        </div>
+
+        {/* Property Type */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Property Type</label>
           <select value={type} onChange={e => setType(e.target.value)}
@@ -457,6 +504,8 @@ function PricePredictor() {
             ))}
           </select>
         </div>
+
+        {/* BHK */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">BHK</label>
           <select value={bhk} onChange={e => setBhk(e.target.value)}
@@ -464,18 +513,36 @@ function PricePredictor() {
             {['1', '2', '3', '4', '5'].map(b => <option key={b} value={b}>{b} BHK</option>)}
           </select>
         </div>
-        <Input label="Area (Sq. Ft)" value={area} onChange={setArea} suffix="sq.ft" min={1} />
+
+        {/* Area */}
+        <div className="col-span-2 sm:col-span-2">
+          <Input label="Carpet Area (Sq. Ft)" value={area} onChange={setArea} suffix="sq.ft" min={1} />
+        </div>
       </div>
-      <button onClick={predict} disabled={loading}
+
+      <button onClick={predict} disabled={loading || !city.trim()}
         className="w-full sm:w-auto flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-8 py-3 rounded-xl transition-colors disabled:opacity-50">
         {loading ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
         Predict Price
       </button>
+
       {error && <p className="text-sm text-red-600 flex items-center gap-1"><Info size={14} />{error}</p>}
+
       {result?.hasData && (
         <div className="space-y-4">
           <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-2xl p-5 border border-violet-100">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
+            {/* Location badge */}
+            <div className="flex items-center gap-2 mb-4">
+              <MapPin size={14} className="text-violet-500" />
+              <span className="text-sm font-medium text-violet-700">
+                {result.localityUsed ? `${result.localityUsed}, ${city}` : city}
+              </span>
+              {result.localityUsed && (
+                <span className="text-xs bg-violet-100 text-violet-600 px-2 py-0.5 rounded-full">Locality-level data</span>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-4">
               <div>
                 <div className="text-xs text-gray-500 mb-1">Estimated Price</div>
                 <div className="text-3xl font-bold text-violet-700">{fmt(result.estimatedPrice)}</div>
@@ -497,11 +564,18 @@ function PricePredictor() {
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
               <div className="bg-white rounded-xl p-3">
-                <div className="text-xs text-gray-500">Avg PSF (City)</div>
+                <div className="text-xs text-gray-500">City Avg PSF</div>
                 <div className="font-semibold">₹{fmtNum(result.avgPsfCity)}/sqft</div>
               </div>
+              {result.avgPsfLocality && (
+                <div className="bg-violet-100 rounded-xl p-3">
+                  <div className="text-xs text-violet-600">Locality PSF</div>
+                  <div className="font-semibold text-violet-800">₹{fmtNum(result.avgPsfLocality)}/sqft</div>
+                </div>
+              )}
               <div className="bg-white rounded-xl p-3">
                 <div className="text-xs text-gray-500">Applied PSF</div>
                 <div className="font-semibold">₹{fmtNum(result.psfUsed)}/sqft</div>
@@ -510,9 +584,18 @@ function PricePredictor() {
                 <div className="text-xs text-gray-500">Active Listings</div>
                 <div className="font-semibold">{fmtNum(result.listingCount || 0)}</div>
               </div>
+              {result.rentYield != null && (
+                <div className="bg-white rounded-xl p-3">
+                  <div className="text-xs text-gray-500">Rental Yield</div>
+                  <div className="font-semibold text-green-700">{Number(result.rentYield).toFixed(2)}%</div>
+                </div>
+              )}
             </div>
           </div>
-          <p className="text-xs text-gray-400 flex items-start gap-1"><Info size={12} className="mt-0.5 shrink-0" />{result.dataSource}. Prices vary significantly based on floor, view, amenities, and negotiation. Consult a local agent for accurate valuation.</p>
+          <p className="text-xs text-gray-400 flex items-start gap-1">
+            <Info size={12} className="mt-0.5 shrink-0" />
+            {result.dataSource}. Prices vary based on floor, view, amenities & negotiation. Consult a local agent for accurate valuation.
+          </p>
         </div>
       )}
     </div>
@@ -524,12 +607,15 @@ function PricePredictor() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 function PriceTrendsTab() {
-  const [city,    setCity]    = useState('');
-  const [type,    setType]    = useState('');
-  const [listing, setListing] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [data,    setData]    = useState<any>(null);
-  const [cities,  setCities]  = useState<string[]>([]);
+  const [city,       setCity]       = useState('');
+  const [locality,   setLocality]   = useState('');
+  const [type,       setType]       = useState('');
+  const [listing,    setListing]    = useState('');
+  const [loading,    setLoading]    = useState(false);
+  const [data,       setData]       = useState<any>(null);
+  const [cities,     setCities]     = useState<string[]>([]);
+  const [localities, setLocalities] = useState<string[]>([]);
+  const [locLoading, setLocLoading] = useState(false);
 
   useEffect(() => {
     insightsApi.cities().then(res => {
@@ -537,11 +623,27 @@ function PriceTrendsTab() {
     }).catch(() => {});
   }, []);
 
+  // Load localities when city changes
+  useEffect(() => {
+    if (!city.trim()) { setLocalities([]); setLocality(''); return; }
+    setLocLoading(true);
+    insightsApi.localities(city.trim()).then(res => {
+      setLocalities(res.data?.data ?? []);
+    }).catch(() => setLocalities([])).finally(() => setLocLoading(false));
+    setLocality('');
+    setData(null);
+  }, [city]);
+
   const load = async () => {
     if (!city.trim()) return;
     setLoading(true);
     try {
-      const res = await insightsApi.priceTrends({ city: city.trim(), propertyType: type || undefined, listingType: listing || undefined });
+      const res = await insightsApi.priceTrends({
+        city: city.trim(),
+        locality: locality || undefined,
+        propertyType: type || undefined,
+        listingType: listing || undefined,
+      });
       setData(res.data?.data);
     } catch {
       setData(null);
@@ -552,17 +654,38 @@ function PriceTrendsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-3">
-        <div className="flex-1 min-w-[160px]">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 items-end">
+        {/* City */}
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-          <input list="city-list" value={city} onChange={e => setCity(e.target.value)}
+          <input list="trend-city-list" value={city} onChange={e => setCity(e.target.value)}
             placeholder="Enter city..."
             className="w-full border border-gray-200 rounded-xl py-2.5 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400" />
-          <datalist id="city-list">
-            {cities.map(c => <option key={c} value={c} />)}
-          </datalist>
+          <datalist id="trend-city-list">{cities.map(c => <option key={c} value={c} />)}</datalist>
         </div>
-        <div className="min-w-[140px]">
+
+        {/* Locality */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+            Locality
+            {locLoading && <Loader2 size={12} className="animate-spin text-violet-400" />}
+          </label>
+          {localities.length > 0 ? (
+            <select value={locality} onChange={e => setLocality(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl py-2.5 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400">
+              <option value="">All Localities</option>
+              {localities.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+          ) : (
+            <input value={locality} onChange={e => setLocality(e.target.value)}
+              placeholder={city ? 'Type locality...' : 'Select city first'}
+              disabled={!city}
+              className="w-full border border-gray-200 rounded-xl py-2.5 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 disabled:bg-gray-50 disabled:text-gray-400" />
+          )}
+        </div>
+
+        {/* Property Type */}
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Property Type</label>
           <select value={type} onChange={e => setType(e.target.value)}
             className="w-full border border-gray-200 rounded-xl py-2.5 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400">
@@ -570,7 +693,9 @@ function PriceTrendsTab() {
             {['apartment', 'villa', 'plot', 'commercial'].map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
           </select>
         </div>
-        <div className="min-w-[120px]">
+
+        {/* Listing Type */}
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Listing Type</label>
           <select value={listing} onChange={e => setListing(e.target.value)}
             className="w-full border border-gray-200 rounded-xl py-2.5 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400">
@@ -579,9 +704,11 @@ function PriceTrendsTab() {
             <option value="rent">Rent</option>
           </select>
         </div>
-        <div className="flex items-end">
+
+        {/* Button */}
+        <div>
           <button onClick={load} disabled={loading || !city}
-            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50 text-sm">
+            className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50 text-sm">
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
             Show Trends
           </button>
@@ -593,13 +720,30 @@ function PriceTrendsTab() {
       {data && !loading && (
         data.hasData ? (
           <div className="space-y-6">
+            {/* Location indicator */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <MapPin size={14} className="text-violet-500" />
+              <span className="text-sm font-semibold text-gray-800">{data.locality ? `${data.locality}, ` : ''}{data.city}</span>
+              {data.locality && <span className="text-xs bg-violet-100 text-violet-600 px-2 py-0.5 rounded-full">Locality data</span>}
+              {data.dataQuality && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CONFIDENCE_COLORS[data.dataQuality] ?? ''}`}>
+                  {data.dataQuality} confidence
+                </span>
+              )}
+              {data.updatedAt && (
+                <span className="text-xs text-gray-400 ml-auto">
+                  Updated {new Date(data.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                </span>
+              )}
+            </div>
+
             {/* KPI row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 { label: 'Avg PSF', value: `₹${fmtNum(Math.round(Number(data.avgPsf)))}`, sub: 'per sq.ft' },
-                { label: 'Trend', value: `${data.trend === 'up' ? '↑' : data.trend === 'down' ? '↓' : '→'} ${Number(data.trendPct).toFixed(1)}%`, sub: data.trend },
-                { label: 'Avg Rent', value: `₹${fmtNum(Math.round(Number(data.avgMonthlyRent)))}`, sub: 'per month' },
-                { label: 'Rental Yield', value: `${Number(data.rentYield).toFixed(2)}%`, sub: 'gross annual' },
+                { label: 'Market Trend', value: `${data.trend === 'up' ? '↑' : data.trend === 'down' ? '↓' : '→'} ${Number(data.trendPct || 0).toFixed(1)}%`, sub: data.trend },
+                { label: 'Avg Rent', value: data.avgMonthlyRent ? `₹${fmtNum(Math.round(Number(data.avgMonthlyRent)))}` : '—', sub: 'per month' },
+                { label: 'Rental Yield', value: data.rentYield ? `${Number(data.rentYield).toFixed(2)}%` : '—', sub: 'gross annual' },
               ].map(kpi => (
                 <div key={kpi.label} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
                   <div className="text-xs text-gray-500 mb-1">{kpi.label}</div>
@@ -682,28 +826,69 @@ function PriceTrendsTab() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 function InsightsTab() {
+  const [city,    setCity]    = useState('');
   const [demand,  setDemand]  = useState<any>(null);
   const [cards,   setCards]   = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cities,  setCities]  = useState<string[]>([]);
 
   useEffect(() => {
-    Promise.all([
-      insightsApi.demand(),
-      insightsApi.marketCards(),
-    ]).then(([d, c]) => {
-      setDemand(d.data?.data);
-      setCards(c.data?.data ?? []);
-    }).catch(() => {}).finally(() => setLoading(false));
+    insightsApi.cities().then(res => {
+      setCities((res.data?.data ?? []).map((c: any) => c.city).filter(Boolean));
+    }).catch(() => {});
   }, []);
 
-  if (loading) return <div className="flex justify-center py-16"><Loader2 className="animate-spin text-violet-500" size={32} /></div>;
+  const fetchInsights = useCallback(async (filterCity?: string) => {
+    setLoading(true);
+    try {
+      const [d, c] = await Promise.all([
+        insightsApi.demand(filterCity ? { city: filterCity } : undefined),
+        insightsApi.marketCards(filterCity ? { city: filterCity } : undefined),
+      ]);
+      setDemand(d.data?.data);
+      setCards(c.data?.data ?? []);
+    } catch {
+      // retain previous data
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void fetchInsights(); }, [fetchInsights]);
+
+  const handleCityChange = (newCity: string) => {
+    setCity(newCity);
+    void fetchInsights(newCity || undefined);
+  };
+
+  if (loading && !demand && !cards.length) return <div className="flex justify-center py-16"><Loader2 className="animate-spin text-violet-500" size={32} /></div>;
 
   return (
     <div className="space-y-8">
+      {/* City filter */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[180px] max-w-xs">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input list="ins-city-list" value={city} onChange={e => handleCityChange(e.target.value)}
+              placeholder="Filter by city (all cities by default)..."
+              className="w-full border border-gray-200 rounded-xl py-2.5 pl-9 pr-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400" />
+            <datalist id="ins-city-list">{cities.map(c => <option key={c} value={c} />)}</datalist>
+          </div>
+        </div>
+        {city && (
+          <button onClick={() => handleCityChange('')}
+            className="text-xs text-violet-600 hover:text-violet-800 font-medium px-3 py-2 rounded-lg bg-violet-50">
+            Clear filter ×
+          </button>
+        )}
+        {loading && <Loader2 size={16} className="animate-spin text-violet-400" />}
+      </div>
+
       {/* Market Cards */}
       {cards.length > 0 && (
         <div>
-          <h3 className="font-bold text-gray-900 text-lg mb-4 flex items-center gap-2"><TrendingUp size={18} className="text-violet-500" />Market Insights</h3>
+          <h3 className="font-bold text-gray-900 text-lg mb-4 flex items-center gap-2"><TrendingUp size={18} className="text-violet-500" />Market Insights{city && ` — ${city}`}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {cards.map((card, i) => (
               <div key={i} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">

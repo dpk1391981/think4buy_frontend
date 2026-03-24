@@ -4,7 +4,6 @@ import './globals.css';
 import Header from '@/components/layout/Header';
 import ConditionalFooter from '@/components/layout/ConditionalFooter';
 import MobileBottomNav from '@/components/layout/MobileBottomNav';
-import InsightFloatingCTA from '@/components/common/InsightFloatingCTA';
 import QueryProvider from '@/components/providers/QueryProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { WishlistProvider } from '@/contexts/WishlistContext';
@@ -104,7 +103,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <main className="min-h-screen pb-safe-nav lg:pb-0">{children}</main>
               <ConditionalFooter />
               <MobileBottomNav />
-              <InsightFloatingCTA />
               <OnboardingEnforcer />
               <MobileGuestLoginPrompt />
               <AuthModal />

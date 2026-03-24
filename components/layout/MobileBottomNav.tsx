@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, Heart, User, Plus } from 'lucide-react';
+import { Home, Search, BarChart2, User, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppDispatch } from '@/lib/store';
@@ -12,7 +12,7 @@ const navItems = [
   { icon: Home, label: 'Home', href: '/' },
   { icon: Search, label: 'Search', href: '/properties' },
   { icon: Plus, label: 'Post', href: '/post-property', isPrimary: true },
-  { icon: Heart, label: 'Saved', href: '/dashboard/saved' },
+  { icon: BarChart2, label: 'Insights', href: '/tools' },
   { icon: User, label: 'Account', href: '/profile' },
 ];
 
