@@ -12,7 +12,7 @@ const navItems = [
   { icon: Home, label: 'Home', href: '/' },
   { icon: Search, label: 'Search', href: '/properties' },
   { icon: Plus, label: 'Post', href: '/post-property', isPrimary: true },
-  { icon: BarChart2, label: 'Insights', href: '/tools' },
+  { icon: BarChart2, label: 'Tools', href: '/tools' },
   { icon: User, label: 'Account', href: '/profile' },
 ];
 
