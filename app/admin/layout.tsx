@@ -92,6 +92,7 @@ const NAV_GROUPS = [
       { href: '/admin/countries', label: 'Countries', icon: Globe },
       { href: '/admin/locations', label: 'States & Cities', icon: MapPin },
       { href: '/admin/market-intelligence', label: 'Market Intelligence', icon: BarChart2 },
+      { href: '/admin/tools-insights', label: 'Tools & Insights', icon: Wrench },
       { href: '/admin/scoring-config', label: 'Scoring Config', icon: SlidersHorizontal },
     ],
   },

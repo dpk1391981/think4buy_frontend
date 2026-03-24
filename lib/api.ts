@@ -734,6 +734,30 @@ export const agentFeedbackApi = {
     api.get(`/agent-feedback/${agentId}/has-reviewed`),
 };
 
+// ─── Tools & Insights API ──────────────────────────────────────────────────────
+export const toolsApi = {
+  emi: (params: { principal: number; rate: number; tenure: number }) =>
+    api.get('/tools/emi', { params }),
+  priceCalc: (params: { area: number; pricePerSqft: number }) =>
+    api.get('/tools/price-calc', { params }),
+  roi: (params: { price: number; rent: number; appreciation: number; years?: string }) =>
+    api.get('/tools/roi', { params }),
+  areaConvert: (params: { value: number; from: string; to: string }) =>
+    api.get('/tools/area-convert', { params }),
+  predict: (params: { city: string; propertyType?: string; bhk?: number; area?: number }) =>
+    api.get('/tools/predict', { params }),
+};
+
+export const insightsApi = {
+  priceTrends: (params: { city: string; propertyType?: string; listingType?: string }) =>
+    api.get('/insights/price-trends', { params }),
+  demand: (params?: { city?: string }) =>
+    api.get('/insights/demand', { params }),
+  marketCards: (params?: { city?: string; state?: string }) =>
+    api.get('/insights/market-cards', { params }),
+  cities: () => api.get('/insights/cities'),
+};
+
 // ─── Articles API ─────────────────────────────────────────────────────────────
 export const articlesApi = {
   // Public

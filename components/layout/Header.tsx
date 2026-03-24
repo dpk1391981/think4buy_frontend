@@ -810,6 +810,7 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
 const NAV_LINKS: { key: string; label: string; href: string; defaultOn: boolean }[] = [
   { key: 'nav_agents_enabled',      label: 'Agents',       href: '/agents',       defaultOn: true  },
   { key: 'nav_services_enabled',    label: 'Services',     href: '/services',     defaultOn: true  },
+  { key: 'nav_tools_enabled',       label: 'Tools',        href: '/tools',        defaultOn: true  },
   { key: 'nav_new_projects_enabled',label: 'New Projects', href: '/new-projects', defaultOn: true  },
   { key: 'nav_articles_enabled',    label: 'Articles',     href: '/articles',     defaultOn: false },
 ];
