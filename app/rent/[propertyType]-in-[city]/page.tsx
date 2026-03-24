@@ -66,34 +66,8 @@ export default function RentPropertyTypeInCityPage({ params }: { params: Params 
   const typeLabel = bhk ? `${bhk} BHK Apartments` : typeInfo?.plural || 'Properties';
 
   return (
-    <>
-      <Suspense fallback={<div className="min-h-screen bg-gray-50 pt-16" />}>
-        <PropertyListingPage searchParams={searchParams} />
-      </Suspense>
-
-      {/* SEO Content Block */}
-      <section className="bg-white border-t border-gray-100 py-12">
-        <div className="container-max max-w-4xl">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            {typeLabel} for Rent in {city}
-          </h2>
-          <div className="prose prose-gray max-w-none text-sm leading-relaxed space-y-4 text-gray-600">
-            <p>
-              Find the best {typeLabel.toLowerCase()} for rent in {city} on Think4BuySale.
-              Our listings are verified with real photos, exact locations, and direct owner/agent contact.
-              Filter by budget, furnishing, locality, and more.
-            </p>
-            <h3 className="text-lg font-semibold text-gray-800 mt-6">Renting Tips for {city}</h3>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>Check the locality's proximity to your workplace and daily commute routes</li>
-              <li>Compare furnished vs. unfurnished options based on your move-in timeline</li>
-              <li>Verify the rental agreement before signing — look for maintenance clauses</li>
-              <li>Check for security deposit terms (typically 2-3 months)</li>
-              <li>Inspect utilities, parking, and society amenities in person</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-    </>
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 pt-16" />}>
+      <PropertyListingPage searchParams={searchParams} />
+    </Suspense>
   );
 }

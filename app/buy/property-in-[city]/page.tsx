@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import PropertyListingPage from '@/app/properties/PropertyListingPage';
-import CityPageContent from '@/components/seo/CityPageContent';
+import ConditionalCityContent from '@/components/seo/ConditionalCityContent';
 import { getCityData } from '@/lib/seo/cityData';
 
 type Params = { city: string };
@@ -39,7 +39,7 @@ export default function BuyPropertyInCityPage({ params }: { params: Params }) {
       <Suspense fallback={<div className="min-h-screen bg-gray-50 pt-16" />}>
         <PropertyListingPage searchParams={{ category: 'buy', city, propertyType: 'apartment' }} />
       </Suspense>
-      <CityPageContent citySlug={params.city} cityName={city} variant="flats-for-sale" />
+      <ConditionalCityContent citySlug={params.city} cityName={city} variant="flats-for-sale" />
     </>
   );
 }

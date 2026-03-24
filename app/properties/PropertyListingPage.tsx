@@ -749,56 +749,67 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
               <AgentsSection locality={locality} city={city} state={stateParam} />
             )}
 
-            {/* ── SEO content block ──────────────────────────────────── */}
-            {seoContent && (seoContent.introContent || seoContent.seoContent || seoContent.faqs?.length > 0) && (
-              <div className="mt-8 space-y-4 px-4 sm:px-0 pb-6">
-                {seoContent.introContent && (
-                  <div className="bg-white rounded-2xl border border-gray-100 p-5">
-                    <p className="text-sm text-gray-600 leading-relaxed">{seoContent.introContent}</p>
-                  </div>
-                )}
-                {seoContent.seoContent && (
-                  <div className="bg-white rounded-2xl border border-gray-100 p-5">
-                    <h2 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-primary-500" />
-                      About Properties in {seoContent.name}
-                    </h2>
-                    <div
-                      className="prose prose-sm max-w-none text-gray-600 leading-relaxed [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-gray-800 [&_h3]:text-sm [&_h3]:font-semibold [&_p]:mb-3 [&_ul]:pl-4 [&_ul]:list-disc [&_li]:mb-1"
-                      dangerouslySetInnerHTML={{ __html: seoContent.seoContent }}
-                    />
-                  </div>
-                )}
-                {seoContent.faqs?.length > 0 && (
-                  <div className="bg-white rounded-2xl border border-gray-100 p-5">
-                    <h2 className="text-base font-bold text-gray-900 mb-4">Frequently Asked Questions</h2>
-                    <div className="space-y-2">
-                      {seoContent.faqs.map((faq, i) => (
-                        <div key={i} className="border border-gray-100 rounded-xl overflow-hidden">
-                          <button
-                            type="button"
-                            onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-                          >
-                            <span className="text-sm font-medium text-gray-900">{faq.question}</span>
-                            <ChevronDown className={cn('w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200', openFaq === i && 'rotate-180')} />
-                          </button>
-                          {openFaq === i && (
-                            <div className="px-4 pb-4 pt-3 text-sm text-gray-600 leading-relaxed border-t border-gray-50">
-                              {faq.answer}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
           </div>
         </div>
       </div>
+
+      {/* ── SEO content block — full-width below main grid ───────────────────── */}
+      {seoContent && (seoContent.introContent || seoContent.seoContent || (seoContent.faqs?.length ?? 0) > 0) && (
+        <section className="bg-white border-t border-gray-100 py-10 sm:py-14">
+          <div className="container-max max-w-4xl px-4 sm:px-6">
+            <div className="mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+                {seoContent.h1 || `Properties in ${seoContent.name}`}
+              </h2>
+              <div className="w-14 h-1 bg-primary-500 rounded" />
+            </div>
+
+            <div className="space-y-6 text-sm text-gray-600 leading-relaxed">
+              {seoContent.introContent && (
+                <p>{seoContent.introContent}</p>
+              )}
+
+              {seoContent.seoContent && (
+                <div>
+                  <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-primary-500" />
+                    About Properties in {seoContent.name}
+                  </h3>
+                  <div
+                    className="prose prose-gray max-w-none text-sm leading-relaxed text-gray-600 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-gray-800 [&_h2]:mt-5 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-gray-700 [&_h3]:mt-4 [&_p]:mb-3 [&_ul]:pl-5 [&_ul]:list-disc [&_li]:mb-1"
+                    dangerouslySetInnerHTML={{ __html: seoContent.seoContent }}
+                  />
+                </div>
+              )}
+
+              {(seoContent.faqs?.length ?? 0) > 0 && (
+                <div>
+                  <h3 className="text-base font-semibold text-gray-800 mb-4">Frequently Asked Questions</h3>
+                  <div className="space-y-2">
+                    {seoContent.faqs.map((faq, i) => (
+                      <div key={i} className="border border-gray-100 rounded-xl overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                          className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                        >
+                          <span className="text-sm font-medium text-gray-900">{faq.question}</span>
+                          <ChevronDown className={cn('w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200', openFaq === i && 'rotate-180')} />
+                        </button>
+                        {openFaq === i && (
+                          <div className="px-4 pb-4 pt-3 text-sm text-gray-600 leading-relaxed border-t border-gray-50">
+                            {faq.answer}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Mobile Filter Sheet ──────────────────────────────────────────── */}
       <MobileFilterSheet
