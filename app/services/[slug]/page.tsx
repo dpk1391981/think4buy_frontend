@@ -241,7 +241,7 @@ export default function ServiceDetailPage({ params }: { params: Params }) {
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
               <h3 className="font-bold text-gray-900 mb-1">Get a Free Callback</h3>
               <p className="text-gray-500 text-sm mb-5">Our experts will call you within 30 minutes</p>
-              <ServiceLeadForm />
+              <ServiceLeadForm serviceId={params.slug} serviceName={service.name} />
               <p className="text-xs text-gray-400 text-center mt-3">
                 Free consultation — no spam, no pressure
               </p>
