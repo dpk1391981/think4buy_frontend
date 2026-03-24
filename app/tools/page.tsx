@@ -1092,64 +1092,7 @@ export default function ToolsPage() {
           </div>
         )}
 
-        {/* ── Price Predictor ── */}
-        {activeTab === 'Price Predictor' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <div className="flex items-start gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
-                  <Zap size={20} className="text-violet-600" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Property Price Estimator</h2>
-                  <p className="text-sm text-gray-500">Get an estimated price range based on real listing data for your city, property type, and configuration.</p>
-                </div>
-              </div>
-              <PricePredictor />
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800 flex items-start gap-2">
-              <Info size={16} className="shrink-0 mt-0.5" />
-              <p>Price predictions are estimates based on active listing data. Actual market prices depend on floor, view, builder reputation, possession date, and negotiation. Always consult a local real estate expert before making investment decisions.</p>
-            </div>
-          </div>
-        )}
-
-        {/* ── Price Trends ── */}
-        {activeTab === 'Price Trends' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <div className="flex items-start gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
-                  <TrendingUp size={20} className="text-violet-600" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Price Trends</h2>
-                  <p className="text-sm text-gray-500">6-month price trend, locality breakdown, rental yield — all from real listing data.</p>
-                </div>
-              </div>
-              <PriceTrendsTab />
-            </div>
-          </div>
-        )}
-
-        {/* ── Insights ── */}
-        {activeTab === 'Insights' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <div className="flex items-start gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
-                  <BarChart2 size={20} className="text-violet-600" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Market Insights &amp; Demand Analysis</h2>
-                  <p className="text-sm text-gray-500">Real-time search trends, demand patterns, and market intelligence from our platform.</p>
-                </div>
-              </div>
-              <InsightsTab />
-            </div>
-          </div>
-        )}
+        {/* ── Price Predictor, Price Trends, Insights — hidden for now ── */}
       </div>
 
       {/* Bottom CTA */}
