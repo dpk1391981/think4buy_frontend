@@ -3,94 +3,103 @@ import type { NextRequest } from 'next/server';
 import { KNOWN_CITY_SLUGS } from '@/lib/city-slugs';
 
 /**
- * Route protection middleware.
- * Runs at the edge BEFORE any page is rendered — prevents private pages from
- * flashing to unauthenticated users entirely.
+ * Middleware — runs at the Edge before any page renders.
+ *
+ * URL CONVENTION:
+ *   ALL listing/SEO pages use the flat hyphen pattern as canonical:
+ *     ✅  /flats-for-sale-in-noida
+ *     ❌  /flats-for-sale-in/noida  (slash form → 301 redirect)
+ *
+ * NON-LISTING pages that still use directory routes (agents, prices) are
+ * rewritten internally from hyphen → slash so Next.js can find them.
  *
  * Auth detection uses the `t4bs_auth` presence cookie (set by AuthContext on
- * login/refresh, cleared on logout). It is NOT a security token — real
- * authentication is enforced by the backend JWT on every API call.
- * The `rt` (HTTP-only refresh token) cookie is also accepted as a fallback
- * for the new auth flow.
- *
- * Route categories:
- *   PRIVATE_ROUTES  — any authenticated user required
- *   AGENT_ROUTES    — agent/owner/admin only (client-side role check still enforced)
- *   ADMIN_ROUTES    — admin only (client-side role check still enforced)
- *   GUEST_ONLY      — redirect logged-in users away (login/register pages)
+ * login/refresh). NOT a security token — real auth is enforced by the backend.
  */
 
-// ── Route definitions ─────────────────────────────────────────────────────────
+// ── Private routes ────────────────────────────────────────────────────────────
 
 const PRIVATE_PREFIXES = [
   '/dashboard',
   '/profile',
   '/my-listings',
-  '/agent/',   // NOTE: trailing slash so /agents/* (public) is NOT blocked
+  '/agent/',
   '/owner',
   '/buyer',
   '/admin',
 ];
 
-
-/** Pages guests should not see once logged in (redirect to home) */
 const GUEST_ONLY_PREFIXES = [
   '/auth/login',
   '/auth/register',
 ];
 
+// ── File-extension cleanup ─────────────────────────────────────────────────────
+
+const STRIPPED_EXTENSIONS = /\.(php|html?|asp|aspx|cfm|cgi|jsp|pl|py|rb|do|action)$/i;
+
 // ── Matcher ───────────────────────────────────────────────────────────────────
 
 export const config = {
   matcher: [
-    /*
-     * Match all paths except:
-     *  - _next/static  (static files)
-     *  - _next/image   (image optimisation)
-     *  - favicon.ico
-     *  - /api/         (API routes — backend handles their own auth)
-     *  - /uploads/     (static media)
-     */
     '/((?!_next/static|_next/image|favicon.ico|api/|uploads/).*)',
   ],
 };
 
-// ── SEO URL rewrites ──────────────────────────────────────────────────────────
-// URLs like /property-for-rent-in-mumbai → internal /property-for-rent-in/mumbai
-// The external slug stays intact (canonical tags preserve the SEO URL).
+// ── 301 redirect map: slash-pattern → canonical hyphen-pattern ────────────────
+//
+// Any URL with a slash separator that was ever indexed or linked will be
+// permanently redirected to its canonical hyphen equivalent.
+//
+// Format: [regex, replacement-string-builder]
+// The first capture group is the city/slug after the route prefix.
 
-const SEO_PREFIXES = [
-  'property-for-sale-in',
-  'property-for-rent-in',
-  'flats-for-sale-in',
-  'flats-for-rent-in',
-  'villas-for-sale-in',
-  'plots-for-sale-in',
-  'commercial-property-in',
-  'office-space-for-rent-in',
-  'new-projects-in',
-  'pg-in',
-  'property-agents-in',
-  // State & city landing pages
-  // /properties-in-delhi     → /properties-in/delhi
-  // /property-in-mumbai      → /property-in/mumbai
-  'properties-in',
-  'property-in',
+const SLASH_TO_HYPHEN: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
+  // ── Listing pages (same prefix, just add dash) ─────────────────────────────
+  [/^\/property-for-sale-in\/([^/]+)\/?$/, m => `/property-for-sale-in-${m[1]}`],
+  [/^\/property-for-rent-in\/([^/]+)\/?$/, m => `/property-for-rent-in-${m[1]}`],
+  [/^\/flats-for-sale-in\/([^/]+)\/?$/, m => `/flats-for-sale-in-${m[1]}`],
+  [/^\/flats-for-rent-in\/([^/]+)\/?$/, m => `/flats-for-rent-in-${m[1]}`],
+  [/^\/villas-for-sale-in\/([^/]+)\/?$/, m => `/villas-for-sale-in-${m[1]}`],
+  [/^\/plots-for-sale-in\/([^/]+)\/?$/, m => `/plots-for-sale-in-${m[1]}`],
+  [/^\/commercial-property-in\/([^/]+)\/?$/, m => `/commercial-property-in-${m[1]}`],
+  [/^\/office-space-for-rent-in\/([^/]+)\/?$/, m => `/office-space-for-rent-in-${m[1]}`],
+  [/^\/new-projects-in\/([^/]+)\/?$/, m => `/new-projects-in-${m[1]}`],
+  [/^\/pg-in\/([^/]+)\/?$/, m => `/pg-in-${m[1]}`],
+  [/^\/property-in\/([^/]+)\/?$/, m => `/property-in-${m[1]}`],
+  // ── Listing pages with prefix change ──────────────────────────────────────
+  [/^\/new-projects\/([^/]+)\/?$/, m => `/new-projects-in-${m[1]}`],
+  [/^\/flats-for-sale\/([^/]+)\/?$/, m => `/flats-for-sale-in-${m[1]}`],
+  [/^\/flats-for-rent\/([^/]+)\/?$/, m => `/flats-for-rent-in-${m[1]}`],
+  // ── /buy/* and /rent/* sub-routes ─────────────────────────────────────────
+  [/^\/buy\/property-in-([^/]+)\/?$/, m => `/property-for-sale-in-${m[1]}`],
+  [/^\/rent\/property-in-([^/]+)\/?$/, m => `/property-for-rent-in-${m[1]}`],
+  [/^\/buy\/([^/]+)-in-([^/]+)\/?$/, m => `/${m[1]}-for-sale-in-${m[2]}`],
+  [/^\/rent\/([^/]+)-in-([^/]+)\/?$/, m => `/${m[1]}-for-rent-in-${m[2]}`],
+  // ── Non-listing slash pages (agents, prices) → canonical hyphen ────────────
+  [/^\/property-agents-in\/([^/]+)\/?$/, m => `/property-agents-in-${m[1]}`],
+  [/^\/property-prices-in\/([^/]+)\/?$/, m => `/property-prices-in-${m[1]}`],
+  // ── Legacy /properties-in/state → /properties-in-state ───────────────────
+  [/^\/properties-in\/([^/]+)\/?$/, m => `/properties-in-${m[1]}`],
 ];
 
-// ── File-extension cleanup ────────────────────────────────────────────────────
-// Strips known file extensions from URLs and 301-redirects to the clean path.
-// e.g. /about.php  → /about
-//      /page.html  → /page
-//      /index.php  → /  (root)
-const STRIPPED_EXTENSIONS = /\.(php|html?|asp|aspx|cfm|cgi|jsp|pl|py|rb|do|action)$/i;
+// ── Internal rewrites: hyphen URL → directory route (for non-listing pages) ───
+//
+// These pages still live in directory-based Next.js routes because they have
+// rich page logic (agents search, price charts, etc.).
+// The middleware rewrites the canonical hyphen URL internally before routing.
+
+const HYPHEN_TO_SLASH_REWRITES: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
+  [/^\/property-agents-in-([^/]+)$/, m => `/property-agents-in/${m[1]}`],
+  [/^\/property-prices-in-([^/]+)$/, m => `/property-prices-in/${m[1]}`],
+];
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // ── 301: strip file extensions ────────────────────────────────────────────
+  // ── 1. Strip file extensions (301) ────────────────────────────────────────
   if (STRIPPED_EXTENSIONS.test(pathname)) {
     const clean = pathname.replace(STRIPPED_EXTENSIONS, '') || '/';
     const url = request.nextUrl.clone();
@@ -98,15 +107,27 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 301);
   }
 
-  // ── /property-in-{slug}: city-only OR city+locality (all-hyphen SEO URLs) ──
-  // e.g. /property-in-delhi        → city page  (delhi is a known city)
-  // e.g. /property-in-delhi-dwarka → locality page (delhi known, dwarka is locality)
-  // e.g. /property-in-navi-mumbai  → city page  (navi-mumbai is a known compound city)
-  const propInSlugMatch = pathname.match(/^\/property-in-([a-z0-9][a-z0-9-]*)$/);
-  if (propInSlugMatch) {
-    const slug = propInSlugMatch[1];
+  // ── 2. Slash → hyphen: 301 redirects for all listing & page URLs ──────────
+  for (const [re, build] of SLASH_TO_HYPHEN) {
+    const m = pathname.match(re);
+    if (m) {
+      const url = request.nextUrl.clone();
+      url.pathname = build(m);
+      url.search = '';
+      return NextResponse.redirect(url, 301);
+    }
+  }
 
-    // 301: legacy ?locality= query → clean all-hyphen URL
+  // ── 3. Handle /property-in-{slug}: city-only OR city+locality ────────────
+  //   /property-in-delhi         → city page
+  //   /property-in-delhi-dwarka  → locality page (delhi known city, dwarka locality)
+  //   /property-in-navi-mumbai   → city page (compound city slug)
+  //   Redirect legacy ?locality= query → clean hyphen URL
+  const propInMatch = pathname.match(/^\/property-in-([a-z0-9][a-z0-9-]*)$/);
+  if (propInMatch) {
+    const slug = propInMatch[1];
+
+    // 301: ?locality=Dwarka → /property-in-delhi-dwarka
     const localityParam = request.nextUrl.searchParams.get('locality');
     if (localityParam) {
       const localitySlug = localityParam.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -116,64 +137,33 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(url, 301);
     }
 
-    // If slug is a known city → standard city-page rewrite (handled by SEO loop below)
-    if (KNOWN_CITY_SLUGS.has(slug)) {
-      // fall through to the SEO prefix loop
-    } else {
-      // Unknown slug: try to split as {city}-{locality} — longest matching city prefix wins
+    // If compound slug — split into city + locality using KNOWN_CITY_SLUGS
+    if (!KNOWN_CITY_SLUGS.has(slug)) {
       const parts = slug.split('-');
       for (let i = parts.length - 1; i >= 1; i--) {
         const citySlug     = parts.slice(0, i).join('-');
         const localitySlug = parts.slice(i).join('-');
         if (KNOWN_CITY_SLUGS.has(citySlug)) {
-          // Rewrite internally to /property-in/[city]/[locality] route
-          const url = request.nextUrl.clone();
-          url.pathname = `/property-in/${citySlug}/${localitySlug}`;
-          return NextResponse.rewrite(url);
+          // Stays on the same hyphen URL — catch-all handles it
+          // We just pass through (no rewrite needed for catch-all)
+          break;
         }
       }
-      // No match found — fall through and treat as a city page as-is
     }
+    // Falls through — catch-all `[...slug]/page.tsx` handles the hyphen URL
   }
 
-  // ── 301: /property-in-{city}/{locality} (slash form) → canonical all-hyphen ──
-  // Backward compat: redirects any slash-separated locality URLs to the clean form.
-  const localitySlashMatch = pathname.match(/^\/property-in-([a-z0-9-]+)\/([a-z0-9-]+)$/);
-  if (localitySlashMatch) {
-    const url = request.nextUrl.clone();
-    url.pathname = `/property-in-${localitySlashMatch[1]}-${localitySlashMatch[2]}`;
-    url.search = '';
-    return NextResponse.redirect(url, 301);
-  }
-
-  // ── 301: /properties-in/state → /properties-in-state (canonical hyphen form) ──
-  if (/^\/properties-in\/[^/]+$/.test(pathname)) {
-    const slug = pathname.replace('/properties-in/', '');
-    const url  = request.nextUrl.clone();
-    url.pathname = `/properties-in-${slug}`;
-    return NextResponse.redirect(url, 301);
-  }
-
-  // ── 301: /property-in/city → /property-in-city (canonical hyphen form) ────────
-  if (/^\/property-in\/[^/]+$/.test(pathname)) {
-    const slug = pathname.replace('/property-in/', '');
-    const url  = request.nextUrl.clone();
-    url.pathname = `/property-in-${slug}`;
-    return NextResponse.redirect(url, 301);
-  }
-
-  // ── SEO URL rewrite: /prefix-in-city → /prefix-in/city ─────────────────
-  for (const prefix of SEO_PREFIXES) {
-    const match = pathname.match(new RegExp(`^\\/(${prefix})-([^/]+)$`));
-    if (match) {
+  // ── 4. Hyphen → slash internal rewrites (non-listing pages only) ──────────
+  for (const [re, build] of HYPHEN_TO_SLASH_REWRITES) {
+    const m = pathname.match(re);
+    if (m) {
       const url = request.nextUrl.clone();
-      url.pathname = `/${match[1]}/${match[2]}`;
+      url.pathname = build(m);
       return NextResponse.rewrite(url);
     }
   }
 
-  // ── Agent profile rewrite: /agents/name-in-city → /agents/name/city ────
-  // Matches /agents/amit-verma-in-mumbai but NOT /agents (listing page)
+  // ── 5. Agent profile: /agents/amit-verma-in-mumbai → /agents/amit-verma/mumbai
   const agentMatch = pathname.match(/^\/agents\/([a-z0-9-]+)-in-([a-z0-9-]+)$/);
   if (agentMatch) {
     const url = request.nextUrl.clone();
@@ -181,50 +171,44 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
+  // ── 6. Auth guards ────────────────────────────────────────────────────────
 
-  // Auth detected by presence cookie (set by AuthContext) OR HTTP-only rt cookie
   const isAuthed =
     request.cookies.get('t4bs_auth')?.value === '1' ||
     !!request.cookies.get('rt')?.value;
 
-  // ── /post-property → guest landing for unauthenticated users ──────────
-  const isPostProperty = pathname.startsWith('/post-property');
+  // /post-property → guest landing for unauthenticated users
+  const isPostProperty      = pathname.startsWith('/post-property');
   const isPostPropertyGuest = pathname.startsWith('/post-property/guest');
 
   if (isPostProperty && !isPostPropertyGuest && !isAuthed) {
-    const guestUrl = request.nextUrl.clone();
-    guestUrl.pathname = '/post-property/guest';
-    guestUrl.search = '';
-    return NextResponse.redirect(guestUrl);
+    const url = request.nextUrl.clone();
+    url.pathname = '/post-property/guest';
+    url.search = '';
+    return NextResponse.redirect(url);
   }
 
-  // Logged-in users hitting /post-property/guest → redirect to the actual form
   if (isPostPropertyGuest && isAuthed) {
-    const formUrl = request.nextUrl.clone();
-    formUrl.pathname = '/post-property';
-    formUrl.search = '';
-    return NextResponse.redirect(formUrl);
+    const url = request.nextUrl.clone();
+    url.pathname = '/post-property';
+    url.search = '';
+    return NextResponse.redirect(url);
   }
 
-  // ── Protect private routes ──────────────────────────────────────────────
-  const isPrivate = PRIVATE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-
-  if (isPrivate && !isAuthed) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = '/auth/login';
-    // Preserve the intended destination so we can redirect back after login
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
+  // Protect private routes
+  if (PRIVATE_PREFIXES.some(p => pathname.startsWith(p)) && !isAuthed) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/auth/login';
+    url.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(url);
   }
 
-  // ── Redirect logged-in users away from auth pages ──────────────────────
-  const isGuestOnly = GUEST_ONLY_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-
-  if (isGuestOnly && isAuthed) {
-    const homeUrl = request.nextUrl.clone();
-    homeUrl.pathname = '/';
-    homeUrl.search = '';
-    return NextResponse.redirect(homeUrl);
+  // Redirect logged-in users away from auth pages
+  if (GUEST_ONLY_PREFIXES.some(p => pathname.startsWith(p)) && isAuthed) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/';
+    url.search = '';
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
