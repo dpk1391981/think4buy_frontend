@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, MapPin, Building2, Home, Loader2, TrendingUp, Navigation } from 'lucide-react';
+import { Search, MapPin, Building2, Home, Loader2, TrendingUp, Navigation, X } from 'lucide-react';
 import { propertiesApi, locationsApi, smartSearchApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -61,6 +61,12 @@ function SuggestionTypeBadge({ type }: { type: string }) {
   );
 }
 
+interface FilterChip {
+  key: string;
+  label: string;
+  value: string;
+}
+
 export default function SearchBar({
   initialCity = '',
   initialSearch = '',
@@ -73,8 +79,10 @@ export default function SearchBar({
   const [query, setQuery] = useState(initialKeyword || initialCity || initialSearch);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [activeChips, setActiveChips] = useState<FilterChip[]>([]);
   const [popularCities, setPopularCities] = useState<{ id: string; cityName: string; counts: { total: number } }[]>([]);
   const [trendingSearches, setTrendingSearches] = useState<{ query: string; count: number }[]>([]);
   const [geoLoading, setGeoLoading] = useState(false);
@@ -157,16 +165,17 @@ export default function SearchBar({
     debounceRef.current = setTimeout(() => fetchSuggestions(val), 280);
   };
 
-  // Determine if query looks like NLP (has space = complex query)
-  const isKeywordSearch = (q: string) => /\s/.test(q.trim());
-
   const buildSearchUrl = (params: Record<string, string>) => {
     const urlParams = new URLSearchParams(params);
     if (category) urlParams.set('category', category);
     return `/properties?${urlParams.toString()}`;
   };
 
-  const handleSearch = (overrideParams?: Record<string, string>) => {
+  /**
+   * Main search handler — routes through centralized smart search API.
+   * The backend parses the NLP query and returns structured filters + redirect URL.
+   */
+  const handleSearch = useCallback(async (overrideParams?: Record<string, string>) => {
     if (overrideParams) {
       router.push(buildSearchUrl(overrideParams));
       setShowSuggestions(false);
@@ -180,17 +189,32 @@ export default function SearchBar({
       return;
     }
 
-    // Log search for analytics (fire-and-forget)
-    smartSearchApi.logSearch({ searchQuery: q });
-
-    // If it looks like a natural language query, use keyword search
-    if (isKeywordSearch(q)) {
-      router.push(buildSearchUrl({ keyword: q }));
-    } else {
-      router.push(buildSearchUrl({ city: q }));
-    }
+    setSearching(true);
     setShowSuggestions(false);
-  };
+
+    try {
+      // Call centralized smart search API — parses NLP and returns structured filters
+      const res = await smartSearchApi.parse(q, category || undefined);
+      const { redirectUrl, chips, filters } = res.data;
+
+      setActiveChips(chips);
+
+      // If category override exists, inject it
+      if (category && !filters.category) {
+        const url = new URL(redirectUrl, 'http://x');
+        url.searchParams.set('category', category);
+        router.push(`/properties?${url.searchParams.toString()}`);
+      } else {
+        router.push(redirectUrl);
+      }
+    } catch {
+      // Fallback: simple city or keyword search
+      router.push(buildSearchUrl(/\s/.test(q) ? { keyword: q } : { city: q }));
+    } finally {
+      setSearching(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, category, router]);
 
   /** Geo "Near Me" search — requests browser location then searches by radius */
   const handleNearMe = useCallback(() => {
@@ -272,6 +296,33 @@ export default function SearchBar({
 
   return (
     <div className={cn('w-full', className)}>
+      {/* Active Filter Chips */}
+      {activeChips.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {activeChips.map((chip) => (
+            <span
+              key={chip.key}
+              className="inline-flex items-center gap-1 bg-white/90 text-primary-700 text-xs font-semibold px-3 py-1 rounded-full border border-primary-200 shadow-sm"
+            >
+              {chip.label}
+              <button
+                onClick={() => setActiveChips((prev) => prev.filter((c) => c.key !== chip.key))}
+                className="ml-1 hover:text-red-500 transition-colors"
+                aria-label={`Remove ${chip.label} filter`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+          <button
+            onClick={() => { setActiveChips([]); setQuery(''); }}
+            className="text-xs text-white/70 hover:text-white underline"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
       {/* Category Tabs */}
       {size === 'lg' && (
         <div className="flex gap-1 mb-3">
@@ -412,11 +463,16 @@ export default function SearchBar({
                         <button
                           key={t.query}
                           className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-left transition-colors"
-                          onClick={() => {
+                          onClick={async () => {
                             setQuery(t.query);
-                            smartSearchApi.logSearch({ searchQuery: t.query });
-                            router.push(buildSearchUrl({ keyword: t.query }));
                             setShowSuggestions(false);
+                            try {
+                              const res = await smartSearchApi.parse(t.query, category || undefined);
+                              setActiveChips(res.data.chips);
+                              router.push(res.data.redirectUrl);
+                            } catch {
+                              router.push(buildSearchUrl({ keyword: t.query }));
+                            }
                           }}
                         >
                           <TrendingUp className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
@@ -480,14 +536,20 @@ export default function SearchBar({
 
         <button
           onClick={() => handleSearch()}
+          disabled={searching}
           className={cn(
-            'bg-primary-600 hover:bg-primary-700 text-white font-semibold flex items-center gap-2 transition-colors flex-shrink-0 rounded-r-xl',
+            'bg-primary-600 hover:bg-primary-700 text-white font-semibold flex items-center gap-2 transition-colors flex-shrink-0 rounded-r-xl disabled:opacity-70',
             size === 'lg' ? 'px-6 md:px-8 h-full' : 'px-5 h-full',
           )}
           aria-label="Search properties"
         >
-          <Search className="w-5 h-5" />
-          <span className={cn(size === 'sm' ? 'hidden' : 'hidden sm:inline')}>Search</span>
+          {searching
+            ? <Loader2 className="w-5 h-5 animate-spin" />
+            : <Search className="w-5 h-5" />
+          }
+          <span className={cn(size === 'sm' ? 'hidden' : 'hidden sm:inline')}>
+            {searching ? 'Searching...' : 'Search'}
+          </span>
         </button>
       </div>
     </div>

@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { useSearchParams } from 'next/navigation';
 import {
   CheckCircle, XCircle, Trash2, Star, StarOff, Power, PowerOff,
-  Search, ExternalLink, Pencil, MoreVertical, Crown, CrownIcon
+  Search, ExternalLink, Pencil, MoreVertical, Crown, CrownIcon, RotateCcw
 } from 'lucide-react';
 import Link from 'next/link';
 import { adminApi } from '@/lib/api';
@@ -54,6 +54,7 @@ interface ActionMenuProps {
   property: any;
   onApprove: () => void;
   onReject: () => void;
+  onReactivate: () => void;
   onToggleStatus: () => void;
   onToggleFeatured: () => void;
   onTogglePremium: () => void;
@@ -61,7 +62,7 @@ interface ActionMenuProps {
   loading: boolean;
 }
 
-function ActionMenu({ property: p, onApprove, onReject, onToggleStatus, onToggleFeatured, onTogglePremium, onDelete, loading }: ActionMenuProps) {
+function ActionMenu({ property: p, onApprove, onReject, onReactivate, onToggleStatus, onToggleFeatured, onTogglePremium, onDelete, loading }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -120,6 +121,15 @@ function ActionMenu({ property: p, onApprove, onReject, onToggleStatus, onToggle
               >
                 <CheckCircle className="w-4 h-4" />
                 Approve Listing
+              </button>
+            )}
+            {p.approvalStatus === 'rejected' && (
+              <button
+                onClick={() => { onReactivate(); setOpen(false); }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-blue-700 hover:bg-blue-50 transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reactivate (set Pending)
               </button>
             )}
             {p.approvalStatus !== 'rejected' && (
@@ -221,6 +231,7 @@ export default function AdminPropertiesPage() {
   };
 
   const approve = (id: string) => withLoading(id, () => adminApi.approveProperty(id));
+  const reactivate = (id: string) => withLoading(id, () => adminApi.reactivateProperty(id));
   const toggleStatus = (id: string) => withLoading(id, () => adminApi.togglePropertyStatus(id));
   const toggleFeatured = (id: string) => withLoading(id, () => adminApi.togglePropertyFeatured(id));
   const togglePremium = (id: string) => withLoading(id, () => adminApi.togglePropertyPremium(id));
@@ -393,6 +404,7 @@ export default function AdminPropertiesPage() {
                           loading={actionLoading === p.id}
                           onApprove={() => approve(p.id)}
                           onReject={() => { setRejectId(p.id); setRejectReason(''); }}
+                          onReactivate={() => reactivate(p.id)}
                           onToggleStatus={() => toggleStatus(p.id)}
                           onToggleFeatured={() => toggleFeatured(p.id)}
                           onTogglePremium={() => togglePremium(p.id)}

@@ -33,6 +33,7 @@ import { WhatsAppIcon } from '@/components/common/PhoneRevealButton';
 import { usePropertyBehavior } from '@/hooks/usePropertyBehavior';
 import FloatingCTA from '@/components/common/FloatingCTA';
 import IntentPopup from '@/components/common/IntentPopup';
+const GlobalSearchBar = dynamic(() => import('@/components/search/GlobalSearchBar'), { ssr: false });
 const PropertyCard = dynamic(() => import('@/components/property/PropertyCard'), { ssr: false });
 
 // ── Amenity icons ─────────────────────────────────────────────────────────────
@@ -496,6 +497,16 @@ export default function PropertyDetailClient({ property }: Props) {
   // ── RENDER ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 pt-16 pb-32 lg:pb-0">
+
+      {/* ── Sticky search bar ─────────────────────────────────────────────────── */}
+      <div className="sticky top-16 z-30">
+        <GlobalSearchBar
+          variant="compact"
+          initialCity={(property as any).city || ''}
+          initialCategory={(property as any).category || ''}
+        />
+      </div>
+
       {/* ── Fullscreen Gallery ─────────────────────────────────────────────── */}
       {showFullscreen && (
         <div className="fixed inset-0 z-[60] bg-black flex flex-col">

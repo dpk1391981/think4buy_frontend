@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search, MapPin, Loader2, X, LocateFixed, Navigation } from 'lucide-react';
 import { locationsApi } from '@/lib/api';
 import { detectLocation } from '@/lib/geolocation';
+import { parseSearchQuery } from '@/lib/parseSearchQuery';
 import { cn } from '@/lib/utils';
 
 export default function HomeStickySearch() {
@@ -46,11 +47,25 @@ export default function HomeStickySearch() {
   };
 
   const doSearch = useCallback((city?: string, locality?: string) => {
-    const c = city || q.trim();
-    if (!c) return;
+    if (!city && !q.trim()) return;
     const p = new URLSearchParams({ category: 'buy' });
-    p.set('city', c);
-    if (locality) p.set('locality', locality);
+
+    if (city) {
+      // Suggestion selected — use directly
+      p.set('city', city);
+      if (locality) p.set('locality', locality);
+    } else {
+      // Free-text — parse to extract city, BHK, type
+      const parsed = parseSearchQuery(q.trim());
+      if (parsed.city)     p.set('city', parsed.city);
+      if (locality)        p.set('locality', locality);
+      if (parsed.bedrooms) p.set('bedrooms', parsed.bedrooms);
+      if (parsed.type)     p.set('type', parsed.type);
+      if (parsed.keyword)  p.set('keyword', parsed.keyword);
+      // Fallback: nothing parsed → use as keyword
+      if (!parsed.city && !parsed.bedrooms && !parsed.type) p.set('keyword', q.trim());
+    }
+
     router.push(`/properties?${p}`);
     setShowSugg(false);
   }, [q, router]);

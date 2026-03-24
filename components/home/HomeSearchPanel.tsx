@@ -8,8 +8,9 @@ import {
   ArrowLeft, ChevronRight, SlidersHorizontal, TrendingUp,
   ChevronDown, BedDouble, IndianRupee, CheckCircle2, Sliders, LocateFixed,
 } from 'lucide-react';
-import { locationsApi, propertyConfigApi } from '@/lib/api';
+import { locationsApi, propertyConfigApi, smartSearchApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { parseSearchQuery } from '@/lib/parseSearchQuery';
 const CITY_GRADIENTS = [
   'from-blue-500 to-cyan-400',
   'from-orange-500 to-red-400',
@@ -577,6 +578,7 @@ function DesktopPropertySearch({
   category: string; types: PropType[];
   onSearch: (params: Record<string, string>) => void;
 }) {
+  const router = useRouter();
   const [q, setQ]           = useState('');
   const [suggs, setSuggs]   = useState<any[]>([]);
   const [busy, setBusy]     = useState(false);
@@ -637,10 +639,49 @@ function DesktopPropertySearch({
     return p;
   };
 
-  const search = useCallback((city?: string, locality?: string) => {
-    onSearch(buildParams(city || q.trim(), locality));
+  const search = useCallback(async (city?: string, locality?: string) => {
     setShowSugg(false);
-  }, [q, type, bhk, budget, more, onSearch]);
+    if (city) {
+      // User selected a location suggestion — city is resolved, use directly
+      onSearch(buildParams(city, locality));
+      return;
+    }
+
+    const rawQ = q.trim();
+
+    // If there are UI-selected filters but no text, just search with filters
+    if (!rawQ) {
+      onSearch(buildParams());
+      return;
+    }
+
+    // Smart backend NLP search
+    try {
+      const res = await smartSearchApi.parse(rawQ, category || undefined);
+      const url = new URL(res.data.redirectUrl, 'http://x');
+
+      // Inject UI-selected filters on top of NLP result
+      if (bhk.length)       url.searchParams.set('bedrooms', bhk.join(','));
+      if (budget?.min)      url.searchParams.set('minPrice', String(budget.min));
+      if (budget?.max)      url.searchParams.set('maxPrice', String(budget.max));
+      if (type)             url.searchParams.set('type', type);
+      if (more.possession)  url.searchParams.set('possessionStatus', more.possession);
+      if (more.furnishing)  url.searchParams.set('furnishingStatus', more.furnishing);
+      if (more.postedBy)    url.searchParams.set('listedBy', more.postedBy);
+      if (category && !res.data.filters?.category) url.searchParams.set('category', category);
+
+      router.push(`/properties?${url.searchParams.toString()}`);
+    } catch {
+      // Fallback: frontend parser
+      const parsed = parseSearchQuery(rawQ);
+      const params = buildParams(parsed.city, locality);
+      if (parsed.bedrooms && !bhk.length) params.bedrooms = parsed.bedrooms;
+      if (parsed.type && !type)           params.type     = parsed.type;
+      if (parsed.keyword)                 params.keyword  = parsed.keyword;
+      if (!parsed.city && !parsed.bedrooms && !parsed.type) params.keyword = rawQ;
+      onSearch(params);
+    }
+  }, [q, type, bhk, budget, more, category, onSearch, router]);
 
   const handleDetect = async () => {
     setDetecting(true);
@@ -687,7 +728,7 @@ function DesktopPropertySearch({
                 deb.current = setTimeout(() => fetchLocs(e.target.value), 280);
               }}
               onFocus={() => setShowSugg(true)}
-              onKeyDown={e => e.key === 'Enter' && search()}
+              onKeyDown={e => { if (e.key === 'Enter') search(); }}
               className="flex-1 text-base md:text-lg text-gray-800 placeholder-gray-400 outline-none bg-transparent font-medium min-w-0"
             />
             {/* GPS detect button */}
@@ -936,33 +977,67 @@ function MobileSearch({
     setCat(v); setBhk([]); setBudget(null); setType('');
   };
 
-  const go = (city?: string, locality?: string, state?: string) => {
-    const c = city || query.trim();
+  const go = async (city?: string, locality?: string, state?: string) => {
+    onClose();
+
     if (isAgent) {
       const p = new URLSearchParams();
-      if (c) p.set('city', c);
+      if (city)  p.set('city', city || '');
       if (state) p.set('state', state);
       router.push(`/agents?${p}`);
-    } else if (isNewProject) {
-      const p = new URLSearchParams({ isNewProject: 'true' });
-      if (c)           p.set('city', c);
-      if (locality)    p.set('locality', locality);
-      if (budget?.min) p.set('minPrice', String(budget.min));
-      if (budget?.max) p.set('maxPrice', String(budget.max));
-      if (type)        p.set('type', type);
-      router.push(`/properties?${p}`);
-    } else {
-      const p = new URLSearchParams();
-      if (cat)           p.set('category', cat);
-      if (c)             p.set('city', c);
-      if (locality)      p.set('locality', locality);
-      if (bhk.length)    p.set('bedrooms', bhk.join(','));
-      if (budget?.min)   p.set('minPrice', String(budget.min));
-      if (budget?.max)   p.set('maxPrice', String(budget.max));
-      if (type)          p.set('type', type);
-      router.push(`/properties?${p}`);
+      return;
     }
-    onClose();
+
+    // If city came from a suggestion click, skip smart search
+    if (city) {
+      const p = new URLSearchParams();
+      if (isNewProject) p.set('isNewProject', 'true'); else if (cat) p.set('category', cat);
+      p.set('city', city);
+      if (locality)     p.set('locality', locality);
+      if (bhk.length)   p.set('bedrooms', bhk.join(','));
+      if (budget?.min)  p.set('minPrice', String(budget.min));
+      if (budget?.max)  p.set('maxPrice', String(budget.max));
+      if (type)         p.set('type', type);
+      router.push(`/properties?${p}`);
+      return;
+    }
+
+    // Free-text: use smart search API
+    const rawQ = query.trim();
+    if (!rawQ && !bhk.length) {
+      const p = new URLSearchParams();
+      if (isNewProject) p.set('isNewProject', 'true'); else if (cat) p.set('category', cat);
+      router.push(`/properties?${p}`);
+      return;
+    }
+
+    if (rawQ) {
+      try {
+        const res = await smartSearchApi.parse(rawQ, isNewProject ? undefined : cat || undefined);
+        const url = new URL(res.data.redirectUrl, 'http://x');
+        if (isNewProject)  url.searchParams.set('isNewProject', 'true');
+        else if (cat && !res.data.filters?.category) url.searchParams.set('category', cat);
+        if (bhk.length)   url.searchParams.set('bedrooms', bhk.join(','));
+        if (budget?.min)  url.searchParams.set('minPrice', String(budget.min));
+        if (budget?.max)  url.searchParams.set('maxPrice', String(budget.max));
+        if (type)         url.searchParams.set('type', type);
+        router.push(`/properties?${url.searchParams.toString()}`);
+        return;
+      } catch { /* fall through to parseSearchQuery */ }
+    }
+
+    // Fallback: frontend parser
+    const parsed = parseSearchQuery(rawQ);
+    const p = new URLSearchParams();
+    if (isNewProject) p.set('isNewProject', 'true'); else if (cat) p.set('category', cat);
+    if (parsed.city) p.set('city', parsed.city);
+    const finalBedrooms = bhk.length ? bhk.join(',') : parsed.bedrooms;
+    if (finalBedrooms)     p.set('bedrooms', finalBedrooms);
+    if (budget?.min)       p.set('minPrice', String(budget.min));
+    if (budget?.max)       p.set('maxPrice', String(budget.max));
+    if (type || parsed.type) p.set('type', type || parsed.type!);
+    if (!parsed.city && rawQ) p.set('keyword', rawQ);
+    router.push(`/properties?${p}`);
   };
 
   const handleDetect = async () => {

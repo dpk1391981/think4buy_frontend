@@ -119,8 +119,23 @@ export const propertiesApi = {
   }) => api.get('/properties/recommendations', { params }),
 };
 
-/** Smart Search — search log + behavior tracking */
+/** Smart Search — centralized NLP search + behavior tracking */
 export const smartSearchApi = {
+  /**
+   * GLOBAL SMART SEARCH — parse natural language query.
+   * Returns structured filters, redirect URL, and filter chips.
+   * Use this for ALL search bar submissions across the platform.
+   */
+  parse: (query: string, category?: string): Promise<{
+    data: {
+      filters: Record<string, string>;
+      redirectUrl: string;
+      chips: { key: string; label: string; value: string }[];
+      nearbySearch: boolean;
+      parsed: Record<string, any>;
+    };
+  }> => api.post('/smart-search', { query, category }),
+
   logSearch: (body: {
     searchQuery: string;
     parsedFilters?: Record<string, any>;
@@ -270,6 +285,7 @@ export const adminApi = {
   togglePropertyStatus: (id: string) => api.patch(`/admin/properties/${id}/toggle-status`),
   togglePropertyFeatured: (id: string) => api.patch(`/admin/properties/${id}/toggle-featured`),
   togglePropertyPremium: (id: string) => api.patch(`/admin/properties/${id}/toggle-premium`),
+  reactivateProperty: (id: string) => api.patch(`/admin/properties/${id}/reactivate`),
   // Agents
   getAgents: (params?: Record<string, any>) => api.get('/admin/agents', { params }),
   getAgent: (id: string) => api.get(`/admin/agents/${id}`),

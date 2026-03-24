@@ -13,7 +13,7 @@ import MobileGuestLoginPrompt from '@/components/auth/MobileGuestLoginPrompt';
 import OnboardingEnforcer from '@/components/auth/OnboardingEnforcer';
 import ToastNotification from '@/components/common/ToastNotification';
 
-const HomeStickySearch = dynamic(() => import('@/components/home/HomeStickySearch'), { ssr: false });
+const GlobalSearchBar = dynamic(() => import('@/components/search/GlobalSearchBar'), { ssr: false });
 
 const APP_NAME = 'Think4BuySale';
 const APP_URL  = process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com';
@@ -99,7 +99,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AuthProvider>
               <WishlistProvider>
               <Header />
-              <HomeStickySearch />
+              <GlobalSearchBar asSticky variant="compact" />
               <main className="min-h-screen pb-safe-nav lg:pb-0">{children}</main>
               <ConditionalFooter />
               <MobileBottomNav />

@@ -7,7 +7,7 @@ import {
   MapPin, Home, Map, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import PropertyCard from '@/components/property/PropertyCard';
-import SearchBar from '@/components/search/SearchBar';
+import GlobalSearchBar from '@/components/search/GlobalSearchBar';
 import AgentsSection from '@/components/property/AgentsSection';
 import { propertiesApi, propertyConfigApi, locationsApi } from '@/lib/api';
 import { useAnalytics } from '@/hooks/useAnalytics';
@@ -286,26 +286,13 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
       ═══════════════════════════════════════════════════════════════════════ */}
       <div className="sticky top-16 z-30 bg-white shadow-sm border-b border-gray-100">
 
-        {/* Search bar ─────────────────────────────────────────────────────── */}
-        {/* Mobile: compact tap-to-edit input */}
-        <div className="sm:hidden px-3 py-2">
-          <SearchBar
-            size="sm"
-            initialCity={city}
-            initialSearch={search}
-            initialKeyword={keyword}
-          />
-        </div>
-        {/* Desktop: full search bar */}
-        <div className="hidden sm:block container-max py-3">
-          <SearchBar
-            size="sm"
-            initialCity={city}
-            initialSearch={search}
-            initialKeyword={keyword}
-            className="max-w-xl"
-          />
-        </div>
+        {/* Search bar — unified GlobalSearchBar (smart NLP, same UI as global sticky) */}
+        <GlobalSearchBar
+          variant="compact"
+          initialCategory={category}
+          initialCity={city}
+          initialKeyword={keyword || search}
+        />
 
         {/* Mobile toolbar: Filter + Sort + Quick chips  (hidden on lg+) ────── */}
         <div className="lg:hidden border-t border-gray-100">
