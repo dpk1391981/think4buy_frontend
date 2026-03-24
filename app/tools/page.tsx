@@ -21,7 +21,7 @@ function fmtNum(n: number) {
   return n.toLocaleString('en-IN');
 }
 
-const TABS = ['Calculators', 'Price Predictor', 'Price Trends', 'Insights'] as const;
+const TABS = ['Calculators'] as const; // 'Price Predictor', 'Price Trends', 'Insights' — hidden for now
 type Tab = typeof TABS[number];
 
 // ── Mini SVG Line Chart ───────────────────────────────────────────────────────
