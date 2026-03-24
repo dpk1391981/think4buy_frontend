@@ -33,6 +33,7 @@ import { WhatsAppIcon } from '@/components/common/PhoneRevealButton';
 import { usePropertyBehavior } from '@/hooks/usePropertyBehavior';
 import FloatingCTA from '@/components/common/FloatingCTA';
 import IntentPopup from '@/components/common/IntentPopup';
+const HomeStickySearch = dynamic(() => import('@/components/home/HomeStickySearch'), { ssr: false });
 
 const PropertyCard = dynamic(() => import('@/components/property/PropertyCard'), { ssr: false });
 
@@ -115,8 +116,11 @@ export default function PropertyDetailClient({ property }: Props) {
   // Agent/Property detail tab
   const [activeTab, setActiveTab] = useState<'property' | 'agent'>('property');
 
-  // About section tabs
+  // About section tabs (legacy — kept for More Info sub-tab)
   const [aboutTab, setAboutTab] = useState<'about' | 'more_info'>('about');
+
+  // New 3-tab info section
+  const [infoTab, setInfoTab] = useState<'overview' | 'about' | 'amenities'>('overview');
 
   const images = property.images?.length
     ? property.images.map((img) => ({ ...img, url: resolveImageUrl(img.url) }))
@@ -494,7 +498,7 @@ export default function PropertyDetailClient({ property }: Props) {
   // ── RENDER ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 pt-16 pb-32 lg:pb-0">
-
+      <HomeStickySearch />
       {/* ── Fullscreen Gallery ─────────────────────────────────────────────── */}
       {showFullscreen && (
         <div className="fixed inset-0 z-[60] bg-black flex flex-col">
@@ -744,42 +748,84 @@ export default function PropertyDetailClient({ property }: Props) {
 
             {/* ── Price + Title block ────────────────────────────────────── */}
             <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  {/* Category + type badges */}
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <span className="text-[10px] font-bold bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full uppercase tracking-wide">
-                      {getCategoryLabel(property.category)}
-                    </span>
-                    <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full uppercase tracking-wide">
-                      {getPropertyTypeLabel(property.type)}
-                    </span>
-                    {property.possessionStatus === 'ready_to_move' && (
-                      <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                        ✓ Ready to Move
-                      </span>
-                    )}
-                  </div>
-                  <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-2 leading-tight">{property.title}</h1>
-                  <div className="flex items-start gap-1.5 text-gray-500 text-sm">
-                    <MapPin className="w-4 h-4 text-primary-500 flex-shrink-0 mt-0.5" />
-                    <span>{[property.society, property.locality, property.city, property.state].filter(Boolean).join(', ')}{property.pincode ? ` – ${property.pincode}` : ''}</span>
-                  </div>
-                </div>
+
+              {/* Category + type badges */}
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <span className="text-[10px] font-bold bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                  {getCategoryLabel(property.category)}
+                </span>
+                <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                  {getPropertyTypeLabel(property.type)}
+                </span>
+                {property.possessionStatus === 'ready_to_move' && (
+                  <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                    ✓ Ready to Move
+                  </span>
+                )}
+              </div>
+
+              {/* Title + Location */}
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-1.5 leading-tight">{property.title}</h1>
+              <div className="flex items-start gap-1.5 text-gray-500 text-sm mb-4">
+                <MapPin className="w-4 h-4 text-primary-500 flex-shrink-0 mt-0.5" />
+                <span>{[property.society, property.locality, property.city, property.state].filter(Boolean).join(', ')}{property.pincode ? ` – ${property.pincode}` : ''}</span>
+              </div>
+
+              {/* ── KEY METRICS — Price · Area · Price/sqft ─────────────── */}
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+
                 {/* Price */}
-                <div className="text-right flex-shrink-0">
-                  <p className="text-2xl md:text-3xl font-black text-gray-900">
+                <div className="flex flex-col gap-0.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-3 sm:px-4">
+                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Price</p>
+                  <p className="text-base sm:text-xl font-black text-emerald-800 leading-tight">
                     {formatPrice(property.price, property.priceUnit)}
                   </p>
-                  {pricePerSqft && <p className="text-sm text-gray-400 mt-0.5">₹{pricePerSqft.toLocaleString('en-IN')}/sqft</p>}
-                  {isAgent && property.brokerage && (
-                    <p className="text-xs text-orange-600 font-medium mt-0.5">Brokerage: {property.brokerage}</p>
+                  {property.priceUnit === 'per month' && (
+                    <p className="text-[10px] text-emerald-500 font-medium">per month</p>
+                  )}
+                </div>
+
+                {/* Area */}
+                <div className="flex flex-col gap-0.5 bg-blue-50 border border-blue-200 rounded-xl px-3 py-3 sm:px-4">
+                  <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{areaLabel}</p>
+                  {resolvedArea ? (
+                    <>
+                      <p className="text-base sm:text-xl font-black text-blue-800 leading-tight">
+                        {resolvedArea.toLocaleString('en-IN')}
+                      </p>
+                      <p className="text-[10px] text-blue-500 font-medium">{resolvedAreaUnit ?? 'sqft'}</p>
+                    </>
+                  ) : (
+                    <p className="text-sm font-semibold text-blue-400 italic mt-1">N/A</p>
+                  )}
+                </div>
+
+                {/* Price / sqft */}
+                <div className={cn(
+                  'flex flex-col gap-0.5 rounded-xl px-3 py-3 sm:px-4',
+                  pricePerSqft
+                    ? 'bg-violet-50 border border-violet-200'
+                    : 'bg-gray-50 border border-gray-200',
+                )}>
+                  <p className={cn(
+                    'text-[10px] font-bold uppercase tracking-widest',
+                    pricePerSqft ? 'text-violet-600' : 'text-gray-400',
+                  )}>Price/sqft</p>
+                  {pricePerSqft ? (
+                    <>
+                      <p className="text-base sm:text-xl font-black text-violet-800 leading-tight">
+                        ₹{pricePerSqft.toLocaleString('en-IN')}
+                      </p>
+                      <p className="text-[10px] text-violet-500 font-medium">per sqft</p>
+                    </>
+                  ) : (
+                    <p className="text-sm font-semibold text-gray-400 italic mt-1">N/A</p>
                   )}
                 </div>
               </div>
 
               {/* Stats row */}
-              <div className="flex items-center gap-3 text-xs text-gray-400 pt-3 mt-3 border-t border-gray-100 flex-wrap">
+              <div className="flex items-center gap-3 text-xs text-gray-400 pt-3 border-t border-gray-100 flex-wrap">
                 <span className="flex items-center gap-1 font-semibold bg-primary-50 text-primary-600 px-2.5 py-1 rounded-full">
                   <Eye className="w-3.5 h-3.5" />
                   {property.viewCount >= 1000
@@ -802,137 +848,230 @@ export default function PropertyDetailClient({ property }: Props) {
               </div>
             </div>
 
-            {/* ── Overview Specs (chip row) ─────────────────────────────── */}
-            {overviewSpecs.length > 0 && (
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <h2 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-primary-500" /> Overview
-                </h2>
-                <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
-                  {overviewSpecs.map(s => (
-                    <SpecChip key={s.label} icon={s.icon} label={s.label} value={s.value} />
+            {/* ── Overview / About / Amenities — 3-tab section ─────────── */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+
+              {/* Tab bar — pill switcher, NO sticky (avoids overflow-hidden clip bug) */}
+              <div className="px-4 pt-4 pb-0 border-b border-gray-100">
+                <div className="flex bg-gray-100 p-1 rounded-xl">
+                  {(
+                    [
+                      { id: 'overview',  label: 'Overview',   emoji: '⚡' },
+                      { id: 'about',     label: 'About',      emoji: '📋' },
+                      { id: 'amenities', label: 'Amenities',  emoji: '🏊' },
+                    ] as const
+                  ).map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setInfoTab(tab.id)}
+                      className={cn(
+                        'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs sm:text-sm font-semibold transition-all',
+                        infoTab === tab.id
+                          ? 'bg-white text-primary-700 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700',
+                      )}
+                    >
+                      <span className="text-sm">{tab.emoji}</span>
+                      <span>{tab.label}</span>
+                    </button>
                   ))}
                 </div>
               </div>
-            )}
 
-            {/* ── Brochure Download (builder_project only) ──────────────── */}
-            {property.category === 'builder_project' && property.brochureUrl && (
-              <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-5 shadow-sm border border-amber-200">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <span className="text-2xl">📄</span>
+              {/* ── Tab: Overview ─────────────────────────────────────────── */}
+              {infoTab === 'overview' && (
+                <div className="p-5 md:p-6">
+
+                  {/* Spec chips — horizontal scroll */}
+                  {overviewSpecs.length > 0 ? (
+                    <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+                      {overviewSpecs.map(s => (
+                        <SpecChip key={s.label} icon={s.icon} label={s.label} value={s.value} />
+                      ))}
                     </div>
-                    <div>
-                      <p className="font-bold text-gray-900 text-sm">Project Brochure Available</p>
-                      <p className="text-xs text-gray-500">Download the official brochure for complete project details, floor plans &amp; pricing.</p>
-                    </div>
-                  </div>
-                  <a
-                    href={property.brochureUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download
-                    className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-amber-500/30 flex-shrink-0"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Download Brochure
-                  </a>
-                </div>
-              </div>
-            )}
+                  ) : (
+                    <p className="text-sm text-gray-400 italic mb-2">No spec details available.</p>
+                  )}
 
-            {/* ── About This Property (tabbed) ──────────────────────────── */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              {/* Header + tabs */}
-              <div className="flex items-center justify-between px-5 pt-4 pb-0 gap-3">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 flex-shrink-0">
-                  <Layers className="w-5 h-5 text-primary-500" /> About
-                </h2>
-                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs">
-                  <button
-                    onClick={() => setAboutTab('about')}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg font-medium transition-all',
-                      aboutTab === 'about' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
-                    )}
-                  >
-                    About
-                  </button>
-                  <button
-                    onClick={() => setAboutTab('more_info')}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg font-medium transition-all',
-                      aboutTab === 'more_info' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
-                    )}
-                  >
-                    More Info
-                  </button>
-                </div>
-              </div>
-
-              {/* Tab content */}
-              <div className="p-5 md:p-6 pt-4">
-                {aboutTab === 'about' ? (
-                  property.description ? (
-                    <>
-                      <div
-                        className="text-gray-600 leading-relaxed text-sm md:text-base whitespace-pre-line overflow-hidden transition-[max-height] duration-300 ease-in-out"
-                        style={{ maxHeight: descExpanded ? '9999px' : '8rem' }}
-                      >
-                        {property.description}
+                  {/* Brokerage banner */}
+                  {isAgent && property.brokerage && (() => {
+                    const BROKERAGE_LABELS: Record<string, string> = {
+                      no_brokerage: '🎉 Zero Brokerage',
+                      negotiable:   '🤝 Negotiable',
+                      '10_days':    '10 Days Rent',
+                      '15_days':    '15 Days Rent',
+                      '1_month':    '1 Month Rent',
+                      '2_months':   '2 Months Rent',
+                      '0.5_percent':'0.5%',
+                      '1_percent':  '1%',
+                      '2_percent':  '2%',
+                      custom:       'Custom',
+                    };
+                    const isZero = property.brokerage === 'no_brokerage';
+                    const label  = BROKERAGE_LABELS[property.brokerage] ?? property.brokerage;
+                    return (
+                      <div className={`mt-4 flex items-center gap-3 p-4 rounded-xl border ${isZero ? 'bg-teal-50 border-teal-200' : 'bg-orange-50 border-orange-200'}`}>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isZero ? 'bg-teal-100' : 'bg-orange-100'}`}>
+                          <TrendingUp className={`w-5 h-5 ${isZero ? 'text-teal-600' : 'text-orange-600'}`} />
+                        </div>
+                        <div>
+                          <p className={`text-[11px] font-bold uppercase tracking-widest mb-0.5 ${isZero ? 'text-teal-600' : 'text-orange-600'}`}>Brokerage</p>
+                          <p className={`text-base font-black ${isZero ? 'text-teal-900' : 'text-orange-900'}`}>{label}</p>
+                        </div>
                       </div>
-                      {property.description.length > 200 && (
-                        <button
-                          onClick={() => setDescExpanded(v => !v)}
-                          className="mt-2 text-primary-600 text-sm font-semibold flex items-center gap-1 hover:text-primary-700 active:opacity-70"
+                    );
+                  })()}
+
+                  {/* Brochure (builder projects) */}
+                  {property.category === 'builder_project' && property.brochureUrl && (
+                    <div className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-200 flex items-center justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <span className="text-xl">📄</span>
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-sm">Project Brochure</p>
+                          <p className="text-xs text-gray-500">Floor plans &amp; pricing inside</p>
+                        </div>
+                      </div>
+                      <a
+                        href={property.brochureUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download
+                        className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-amber-500/30 flex-shrink-0 active:scale-95"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Download
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Tab: About ────────────────────────────────────────────── */}
+              {infoTab === 'about' && (
+                <div className="p-5 md:p-6">
+
+                  {/* Description / More Info sub-toggle */}
+                  <div className="flex gap-1 bg-gray-100 p-1 rounded-xl text-xs mb-4 w-fit">
+                    <button
+                      type="button"
+                      onClick={() => setAboutTab('about')}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg font-semibold transition-all',
+                        aboutTab === 'about' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
+                      )}
+                    >
+                      Description
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAboutTab('more_info')}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg font-semibold transition-all',
+                        aboutTab === 'more_info' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
+                      )}
+                    >
+                      More Info
+                    </button>
+                  </div>
+
+                  {aboutTab === 'about' ? (
+                    property.description ? (
+                      <>
+                        <div
+                          className="text-gray-600 leading-relaxed text-sm md:text-base whitespace-pre-line overflow-hidden transition-[max-height] duration-300 ease-in-out"
+                          style={{ maxHeight: descExpanded ? '9999px' : '8rem' }}
                         >
-                          {descExpanded
-                            ? <><ChevronUp className="w-4 h-4" /> Read less</>
-                            : <><ChevronDown className="w-4 h-4" /> Read more</>}
+                          {property.description}
+                        </div>
+                        {property.description.length > 200 && (
+                          <button
+                            onClick={() => setDescExpanded(v => !v)}
+                            className="mt-2 text-primary-600 text-sm font-semibold flex items-center gap-1 hover:text-primary-700 active:opacity-70"
+                          >
+                            {descExpanded
+                              ? <><ChevronUp className="w-4 h-4" /> Read less</>
+                              : <><ChevronDown className="w-4 h-4" /> Read more</>}
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">No description provided for this property.</p>
+                    )
+                  ) : (
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900 mb-2">
+                        {property.bedrooms ? `${property.bedrooms} BHK ` : ''}
+                        {getPropertyTypeLabel(property.type)} for {property.category === 'buy' ? 'Sale' : property.category === 'rent' ? 'Rent' : getCategoryLabel(property.category)} in {property.locality}, {property.city}
+                      </h3>
+                      <p className="text-sm text-gray-600 leading-relaxed mb-3">
+                        {property.city} is one of the most sought-after real estate destinations.
+                        This {property.bedrooms ? `${property.bedrooms} BHK ` : ''}{getPropertyTypeLabel(property.type).toLowerCase()}
+                        {resolvedArea ? ` of ${formatArea(resolvedArea, resolvedAreaUnit)} ` : ' '}
+                        in {property.locality} is priced at {formatPrice(property.price, property.priceUnit)}.
+                        {property.possessionStatus === 'ready_to_move' ? ' Ready to move in immediately.' : ''}
+                        {property.amenities?.length ? ` Premium amenities: ${property.amenities.slice(0, 3).map(a => a.name).join(', ')}.` : ''}
+                        {' '}Contact the {isAgent ? 'agent' : 'owner'} now for the best deal.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          `${property.category === 'buy' ? 'Buy' : 'Rent'} property in ${property.city}`,
+                          `${property.bedrooms ? property.bedrooms + ' BHK ' : ''}${getPropertyTypeLabel(property.type)} ${property.city}`,
+                          `${getPropertyTypeLabel(property.type)} in ${property.locality}`,
+                          `Real estate ${property.city}`,
+                        ].map((tag, i) => (
+                          <Link
+                            key={i}
+                            href={`/properties?city=${property.city}&type=${property.type}&category=${property.category}`}
+                            className="text-xs bg-primary-50 text-primary-700 px-3 py-1 rounded-full border border-primary-200 hover:bg-primary-100 transition-colors font-medium"
+                          >
+                            {tag}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Tab: Amenities & Features ─────────────────────────────── */}
+              {infoTab === 'amenities' && (
+                <div className="p-5 md:p-6">
+                  {property.amenities?.length > 0 ? (
+                    <>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        {(amenitiesExpanded ? property.amenities : property.amenities.slice(0, 9)).map(a => (
+                          <div key={a.id} className="flex items-center gap-2.5 p-3 bg-green-50 rounded-xl border border-green-100">
+                            <span className="text-base flex-shrink-0">{getAmenityIcon(a.name)}</span>
+                            <span className="text-sm text-gray-700 font-medium leading-tight">{a.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {property.amenities.length > 9 && (
+                        <button
+                          onClick={() => setAmenitiesExpanded(v => !v)}
+                          className="mt-3 text-primary-600 text-sm font-semibold flex items-center gap-1 hover:text-primary-700"
+                        >
+                          {amenitiesExpanded
+                            ? <><ChevronUp className="w-4 h-4" /> Show less</>
+                            : <><ChevronDown className="w-4 h-4" /> View all {property.amenities.length} amenities</>}
                         </button>
                       )}
                     </>
                   ) : (
-                    <p className="text-sm text-gray-400 italic">No description provided for this property.</p>
-                  )
-                ) : (
-                  /* More Info tab — SEO / property overview */
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900 mb-2">
-                      {property.bedrooms ? `${property.bedrooms} BHK ` : ''}
-                      {getPropertyTypeLabel(property.type)} for {property.category === 'buy' ? 'Sale' : property.category === 'rent' ? 'Rent' : getCategoryLabel(property.category)} in {property.locality}, {property.city}
-                    </h3>
-                    <p className="text-sm text-gray-600 leading-relaxed mb-3">
-                      {property.city} is one of the most sought-after real estate destinations.
-                      This {property.bedrooms ? `${property.bedrooms} BHK ` : ''}{getPropertyTypeLabel(property.type).toLowerCase()}
-                      {resolvedArea ? ` of ${formatArea(resolvedArea, resolvedAreaUnit)} ` : ' '}
-                      in {property.locality} is priced at {formatPrice(property.price, property.priceUnit)}.
-                      {property.possessionStatus === 'ready_to_move' ? ' Ready to move in immediately.' : ''}
-                      {property.amenities?.length ? ` Premium amenities: ${property.amenities.slice(0, 3).map(a => a.name).join(', ')}.` : ''}
-                      {' '}Contact the {isAgent ? 'agent' : 'owner'} now for the best deal.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        `${property.category === 'buy' ? 'Buy' : 'Rent'} property in ${property.city}`,
-                        `${property.bedrooms ? property.bedrooms + ' BHK ' : ''}${getPropertyTypeLabel(property.type)} ${property.city}`,
-                        `${getPropertyTypeLabel(property.type)} in ${property.locality}`,
-                        `Real estate ${property.city}`,
-                      ].map((tag, i) => (
-                        <Link
-                          key={i}
-                          href={`/properties?city=${property.city}&type=${property.type}&category=${property.category}`}
-                          className="text-xs bg-primary-50 text-primary-700 px-3 py-1 rounded-full border border-primary-200 hover:bg-primary-100 transition-colors font-medium"
-                        >
-                          {tag}
-                        </Link>
-                      ))}
+                    <div className="text-center py-8">
+                      <span className="text-4xl mb-3 block">🏡</span>
+                      <p className="text-sm font-medium text-gray-500">No amenities listed</p>
+                      <p className="text-xs text-gray-400 mt-1">Contact the owner for more details</p>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
+
 
             {/* ── Mobile Contact Buttons ────────────────────────────────── */}
             {!isInactiveListing && (
@@ -982,30 +1121,6 @@ export default function PropertyDetailClient({ property }: Props) {
               </div>
             )}
 
-            {/* ── Amenities ─────────────────────────────────────────────── */}
-            {property.amenities?.length > 0 && (
-              <div className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-gray-100">
-                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Award className="w-5 h-5 text-primary-500" /> Amenities & Features
-                </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  {(amenitiesExpanded ? property.amenities : property.amenities.slice(0, 9)).map(a => (
-                    <div key={a.id} className="flex items-center gap-2.5 p-3 bg-green-50 rounded-xl border border-green-100">
-                      <span className="text-base flex-shrink-0">{getAmenityIcon(a.name)}</span>
-                      <span className="text-sm text-gray-700 font-medium leading-tight">{a.name}</span>
-                    </div>
-                  ))}
-                </div>
-                {property.amenities.length > 9 && (
-                  <button onClick={() => setAmenitiesExpanded(v => !v)}
-                    className="mt-3 text-primary-600 text-sm font-semibold flex items-center gap-1 hover:text-primary-700">
-                    {amenitiesExpanded
-                      ? <><ChevronUp className="w-4 h-4" /> Show less</>
-                      : <><ChevronDown className="w-4 h-4" /> View all {property.amenities.length} amenities</>}
-                  </button>
-                )}
-              </div>
-            )}
 
             {/* ── Property Details / Agent Details Tabs ─────────────────── */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

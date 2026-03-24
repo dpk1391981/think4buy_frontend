@@ -55,7 +55,7 @@ const FILTER_LABELS: Record<string, string> = {
   agentId: 'Agent', amenityIds: 'Amenities', listedBy: 'Posted By',
   builderName: 'Builder', isVerified: 'Verified', isNewProject: 'New Project',
   keyword: 'Search', search: 'Search', locality: 'Locality', pincode: 'Pincode',
-  isTrending: 'Trending', topAgent: 'Top Agent',
+  isTrending: 'Trending', topAgent: 'Top Agent', zeroBrokerage: 'Zero Brokerage',
 };
 
 function formatFilterValue(key: string, value: string): string {
@@ -76,8 +76,9 @@ function formatFilterValue(key: string, value: string): string {
   if (key === 'isVerified')   return 'Verified';
   if (key === 'isNewProject') return 'New Project';
   if (key === 'isTrending')   return 'Trending';
-  if (key === 'topAgent')     return 'Top Agent';
-  if (key === 'amenityIds')   return `${value.split(',').length} Amenities`;
+  if (key === 'topAgent')       return 'Top Agent';
+  if (key === 'zeroBrokerage')  return 'Zero Brokerage';
+  if (key === 'amenityIds')     return `${value.split(',').length} Amenities`;
   return value;
 }
 
@@ -235,11 +236,20 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
     router.push(`/properties?${params.toString()}`, { scroll: false });
   };
 
-  const topAgentActive = urlSearchParams.get('topAgent') === 'true';
+  const topAgentActive       = urlSearchParams.get('topAgent')      === 'true';
+  const ownerFilterActive    = urlSearchParams.get('listedBy')      === 'owner';
+  const zeroBrokerageActive  = urlSearchParams.get('zeroBrokerage') === 'true';
 
   const toggleBoolFilter = (key: string, active: boolean) => {
     const params = new URLSearchParams(urlSearchParams.toString());
     if (active) { params.delete(key); } else { params.set(key, 'true'); }
+    params.set('page', '1');
+    router.push(`/properties?${params.toString()}`, { scroll: false });
+  };
+
+  const toggleOwnerFilter = () => {
+    const params = new URLSearchParams(urlSearchParams.toString());
+    if (ownerFilterActive) { params.delete('listedBy'); } else { params.set('listedBy', 'owner'); }
     params.set('page', '1');
     router.push(`/properties?${params.toString()}`, { scroll: false });
   };
@@ -354,6 +364,28 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
               )}
             >
               🔥 Trending
+            </button>
+            <button
+              onClick={toggleOwnerFilter}
+              className={cn(
+                'flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold h-7 px-3 rounded-full border-2 transition-all active:scale-95',
+                ownerFilterActive
+                  ? 'bg-amber-500 text-white border-amber-500 shadow-sm shadow-amber-400/40'
+                  : 'bg-white text-gray-600 border-gray-200',
+              )}
+            >
+              👤 Owner
+            </button>
+            <button
+              onClick={() => toggleBoolFilter('zeroBrokerage', zeroBrokerageActive)}
+              className={cn(
+                'flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold h-7 px-3 rounded-full border-2 transition-all active:scale-95',
+                zeroBrokerageActive
+                  ? 'bg-teal-600 text-white border-teal-600 shadow-sm shadow-teal-500/30'
+                  : 'bg-white text-gray-600 border-gray-200',
+              )}
+            >
+              🚫 Zero Brokerage
             </button>
             <button
               onClick={() => toggleBoolFilter('topAgent', topAgentActive)}
@@ -496,6 +528,28 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
                   )}
                 >
                   🔥 Trending
+                </button>
+                <button
+                  onClick={toggleOwnerFilter}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors',
+                    ownerFilterActive
+                      ? 'bg-amber-500 text-white border-amber-500'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-amber-400 hover:text-amber-600',
+                  )}
+                >
+                  👤 Owner
+                </button>
+                <button
+                  onClick={() => toggleBoolFilter('zeroBrokerage', zeroBrokerageActive)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors',
+                    zeroBrokerageActive
+                      ? 'bg-teal-600 text-white border-teal-600'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-teal-400 hover:text-teal-600',
+                  )}
+                >
+                  🚫 Zero Brokerage
                 </button>
                 <button
                   onClick={() => toggleBoolFilter('topAgent', topAgentActive)}

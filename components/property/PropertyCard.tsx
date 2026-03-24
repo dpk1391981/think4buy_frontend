@@ -336,7 +336,7 @@ export default function PropertyCard({ property, className, listView }: Property
                     <span className="inline-flex items-center bg-emerald-600 text-white text-lg sm:text-xl font-black leading-none px-3 py-1 rounded-lg shadow-sm whitespace-nowrap">
                       {formatPrice(property.price, property.priceUnit)}
                     </span>
-                    {isAgent && property.brokerage === '0' && (
+                    {isAgent && property.brokerage === 'no_brokerage' && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full">
                         <TrendingDown className="w-2.5 h-2.5" /> Zero Brokerage
                       </span>
@@ -481,7 +481,7 @@ export default function PropertyCard({ property, className, listView }: Property
                   <p className="text-[10px] text-gray-400 mt-0.5">
                     {isAgent ? 'Registered Agent' : 'Property Owner'}
                   </p>
-                  {isAgent && property.brokerage === '0' && (
+                  {isAgent && property.brokerage === 'no_brokerage' && (
                     <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full mt-1">
                       <TrendingDown className="w-2 h-2" /> Zero Brokerage
                     </span>
@@ -632,7 +632,7 @@ export default function PropertyCard({ property, className, listView }: Property
               <span className="inline-flex items-center bg-emerald-600 text-white text-base font-black leading-none px-2.5 py-1 rounded-lg shadow-sm whitespace-nowrap">
                 {formatPrice(property.price, property.priceUnit)}
               </span>
-              {isAgent && property.brokerage === '0' && (
+              {isAgent && property.brokerage === 'no_brokerage' && (
                 <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                   <TrendingDown className="w-2.5 h-2.5" /> 0 Brokerage
                 </span>

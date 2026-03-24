@@ -4,10 +4,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import OptimizedImage from '@/components/common/OptimizedImage';
-import { Flame, TrendingUp, Eye, ArrowRight, Zap, BarChart2, MessageCircle, Heart } from 'lucide-react';
+import { Flame, TrendingUp, Eye, ArrowRight, Zap, BarChart2, MessageCircle, Heart, Clock } from 'lucide-react';
 import { homeApi } from '@/lib/api';
 import { useWishlist } from '@/hooks/useWishlist';
-import { formatPrice, formatArea, getPropertyArea } from '@/lib/utils';
+import { formatPrice, formatArea, getPropertyArea, timeAgo } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { useAppSelector, useAppDispatch } from '@/lib/store';
 import { addToast } from '@/lib/store/slices/uiSlice';
@@ -132,6 +132,14 @@ function TrendingCard({ property, rank }: { property: any; rank: number }) {
               )}
             </div>
           </div>
+
+          {/* Post time */}
+          {property.createdAt && (
+            <p className="flex items-center gap-1 text-[10px] text-gray-400 mt-1">
+              <Clock className="w-2.5 h-2.5" />
+              {timeAgo(property.createdAt)}
+            </p>
+          )}
         </div>
       </Link>
 

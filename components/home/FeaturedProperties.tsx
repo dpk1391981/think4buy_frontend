@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import { homeApi, propertiesApi } from '@/lib/api';
-import { cn, formatPrice, formatArea, getPropertyArea } from '@/lib/utils';
+import { cn, formatPrice, formatArea, getPropertyArea, timeAgo } from '@/lib/utils';
 import { useAppSelector, useAppDispatch } from '@/lib/store';
 import { addToast, openAuthModal } from '@/lib/store/slices/uiSlice';
 import { useWishlist } from '@/hooks/useWishlist';
@@ -208,6 +208,12 @@ function FeaturedCard({ property, rank }: { property: any; rank: number }) {
                 <span className="flex items-center gap-0.5 text-green-600 font-medium">
                   <MessageCircle className="w-3 h-3" />
                   {inq7d}
+                </span>
+              )}
+              {property.createdAt && (
+                <span className="flex items-center gap-0.5">
+                  <Clock className="w-2.5 h-2.5" />
+                  {timeAgo(property.createdAt)}
                 </span>
               )}
             </div>
