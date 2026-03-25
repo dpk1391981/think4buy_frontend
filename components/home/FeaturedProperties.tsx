@@ -109,8 +109,8 @@ function FeaturedCard({ property, rank }: { property: any; rank: number }) {
   const slug   = property.slug || property.id;
   const imgUrl = property.images?.[0]?.url;
 
-  const views7d = property._viewsLast7d ?? property.viewsLast7d ?? 0;
-  const inq7d   = property._inqLast7d   ?? property.inquiriesLast7d ?? 0;
+  const totalViews = property.viewCount ?? 0;
+  const inq7d      = property._inqLast7d ?? property.inquiriesLast7d ?? 0;
 
   const isVerified = property.isVerified;
   const score      = Math.round(property._score ?? 0);
@@ -198,10 +198,10 @@ function FeaturedCard({ property, rank }: { property: any; rank: number }) {
           {/* Activity footer */}
           <div className="mt-auto pt-2 border-t border-gray-50 flex items-center justify-between text-[10px] text-gray-400">
             <div className="flex items-center gap-2">
-              {views7d > 0 && (
+              {totalViews > 0 && (
                 <span className="flex items-center gap-0.5 text-orange-500 font-medium">
                   <Eye className="w-3 h-3" />
-                  {views7d > 999 ? `${(views7d / 1000).toFixed(1)}k` : views7d}
+                  {totalViews >= 1000 ? `${(totalViews / 1000).toFixed(1)}k` : totalViews}
                 </span>
               )}
               {inq7d > 0 && (
