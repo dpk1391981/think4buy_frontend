@@ -772,11 +772,23 @@ export default function PropertyDetailClient({ property }: Props) {
                 )}
               </div>
 
-              {/* Title + Location */}
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-1.5 leading-tight">{property.title}</h1>
+              {/* Title */}
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900 leading-tight mb-2">{property.title}</h1>
+
+              {/* Society / Building badge — prominent, only when set */}
+              {property.society && (
+                <div className="flex items-center gap-2 mb-2.5">
+                  <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 text-sm font-semibold px-3 py-1.5 rounded-xl max-w-full truncate">
+                    <Building2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                    <span className="truncate">{property.society}</span>
+                  </span>
+                </div>
+              )}
+
+              {/* Address — locality · city · state · pincode (society stripped out) */}
               <div className="flex items-start gap-1.5 text-gray-500 text-sm mb-4">
                 <MapPin className="w-4 h-4 text-primary-500 flex-shrink-0 mt-0.5" />
-                <span>{[property.society, property.locality, property.city, property.state].filter(Boolean).join(', ')}{property.pincode ? ` – ${property.pincode}` : ''}</span>
+                <span>{[property.locality, property.city, property.state].filter(Boolean).join(', ')}{property.pincode ? ` – ${property.pincode}` : ''}</span>
               </div>
 
               {/* ── KEY METRICS — Price · Area · Price/sqft ─────────────── */}

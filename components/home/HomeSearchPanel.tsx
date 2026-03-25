@@ -675,9 +675,11 @@ function DesktopPropertySearch({
       // Fallback: frontend parser
       const parsed = parseSearchQuery(rawQ);
       const params = buildParams(parsed.city, locality);
-      if (parsed.bedrooms && !bhk.length) params.bedrooms = parsed.bedrooms;
-      if (parsed.type && !type)           params.type     = parsed.type;
-      if (parsed.keyword)                 params.keyword  = parsed.keyword;
+      if (parsed.bedrooms && !bhk.length) params.bedrooms  = parsed.bedrooms;
+      if (parsed.type && !type)           params.type      = parsed.type;
+      if (parsed.minPrice && !budget?.min) params.minPrice = String(parsed.minPrice);
+      if (parsed.maxPrice && !budget?.max) params.maxPrice = String(parsed.maxPrice);
+      if (parsed.keyword)                 params.keyword   = parsed.keyword;
       if (!parsed.city && !parsed.bedrooms && !parsed.type) params.keyword = rawQ;
       onSearch(params);
     }
@@ -1004,7 +1006,9 @@ function MobileSearch({
 
     // Free-text: use smart search API
     const rawQ = query.trim();
-    if (!rawQ && !bhk.length) {
+
+    // Only skip straight to /properties when there is truly NOTHING selected
+    if (!rawQ && !bhk.length && !type && !budget) {
       const p = new URLSearchParams();
       if (isNewProject) p.set('isNewProject', 'true'); else if (cat) p.set('category', cat);
       router.push(`/properties?${p}`);
@@ -1026,17 +1030,20 @@ function MobileSearch({
       } catch { /* fall through to parseSearchQuery */ }
     }
 
-    // Fallback: frontend parser
+    // Fallback / filters-only path: frontend parser
     const parsed = parseSearchQuery(rawQ);
     const p = new URLSearchParams();
     if (isNewProject) p.set('isNewProject', 'true'); else if (cat) p.set('category', cat);
     if (parsed.city) p.set('city', parsed.city);
     const finalBedrooms = bhk.length ? bhk.join(',') : parsed.bedrooms;
-    if (finalBedrooms)     p.set('bedrooms', finalBedrooms);
-    if (budget?.min)       p.set('minPrice', String(budget.min));
-    if (budget?.max)       p.set('maxPrice', String(budget.max));
-    if (type || parsed.type) p.set('type', type || parsed.type!);
-    if (!parsed.city && rawQ) p.set('keyword', rawQ);
+    if (finalBedrooms)             p.set('bedrooms', finalBedrooms);
+    // UI-selected budget wins over parsed price
+    const minP = budget?.min || parsed.minPrice;
+    const maxP = budget?.max || parsed.maxPrice;
+    if (minP) p.set('minPrice', String(minP));
+    if (maxP) p.set('maxPrice', String(maxP));
+    if (type || parsed.type)       p.set('type', type || parsed.type!);
+    if (!parsed.city && rawQ)      p.set('keyword', rawQ);
     router.push(`/properties?${p}`);
   };
 

@@ -48,22 +48,36 @@ export default function HomeStickySearch() {
 
   const doSearch = useCallback((city?: string, locality?: string) => {
     if (!city && !q.trim()) return;
-    const p = new URLSearchParams({ category: 'buy' });
+    const p = new URLSearchParams();
 
     if (city) {
-      // Suggestion selected — use directly
+      // Suggestion selected — city resolved directly, no category override
       p.set('city', city);
       if (locality) p.set('locality', locality);
+      // Still parse the typed query for any extra filters the user may have typed
+      if (q.trim()) {
+        const parsed = parseSearchQuery(q.trim());
+        if (parsed.category) p.set('category', parsed.category);
+        if (parsed.bedrooms) p.set('bedrooms', parsed.bedrooms);
+        if (parsed.type)     p.set('type', parsed.type);
+        if (parsed.minPrice) p.set('minPrice', String(parsed.minPrice));
+        if (parsed.maxPrice) p.set('maxPrice', String(parsed.maxPrice));
+      }
     } else {
-      // Free-text — parse to extract city, BHK, type
+      // Free-text — parse to extract all filters
       const parsed = parseSearchQuery(q.trim());
+      if (parsed.category) p.set('category', parsed.category);
       if (parsed.city)     p.set('city', parsed.city);
       if (locality)        p.set('locality', locality);
       if (parsed.bedrooms) p.set('bedrooms', parsed.bedrooms);
       if (parsed.type)     p.set('type', parsed.type);
+      if (parsed.minPrice) p.set('minPrice', String(parsed.minPrice));
+      if (parsed.maxPrice) p.set('maxPrice', String(parsed.maxPrice));
       if (parsed.keyword)  p.set('keyword', parsed.keyword);
-      // Fallback: nothing parsed → use as keyword
-      if (!parsed.city && !parsed.bedrooms && !parsed.type) p.set('keyword', q.trim());
+      // Fallback: nothing structural parsed → treat whole string as keyword
+      if (!parsed.city && !parsed.bedrooms && !parsed.type && !parsed.category) {
+        p.set('keyword', q.trim());
+      }
     }
 
     router.push(`/properties?${p}`);

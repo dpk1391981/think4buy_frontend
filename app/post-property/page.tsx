@@ -1476,20 +1476,29 @@ function Step4Location({ form, dispatch }: any) {
           )}
         </div>
 
+        {/* Society / Building — right after locality for logical order */}
+        <div>
+          <FieldLabel>
+            Society / Building
+            <span className="ml-1.5 text-[10px] font-semibold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+              Recommended
+            </span>
+          </FieldLabel>
+          <Input value={form.society || ''}
+            onChange={(e: any) => dispatch(updateForm({ society: e.target.value }))}
+            placeholder="e.g., Prestige Shantiniketan, DLF Cyber City" />
+          <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+            <Building2 className="w-3 h-3 flex-shrink-0" />
+            Helps buyers search by society name and boosts your listing visibility.
+          </p>
+        </div>
+
         {/* Pincode */}
         <div>
           <FieldLabel>Pincode</FieldLabel>
           <Input value={form.pincode}
             onChange={(e: any) => dispatch(updateForm({ pincode: e.target.value.replace(/\D/g, '') }))}
             placeholder="110001" maxLength={6} />
-        </div>
-
-        {/* Society — always visible */}
-        <div>
-          <FieldLabel>{isAgent ? 'Society / Complex (optional)' : 'Society / Building'}</FieldLabel>
-          <Input value={form.society || ''}
-            onChange={(e: any) => dispatch(updateForm({ society: e.target.value }))}
-            placeholder="e.g., Prestige Shantiniketan" />
         </div>
 
         {/* Full Address — Owner only */}

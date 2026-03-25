@@ -385,15 +385,21 @@ function SearchModal({
       }
       const res = await smartSearchApi.parse(q, category || undefined);
       const url = new URL(res.data.redirectUrl, 'http://x');
+      // UI-selected category always wins unless smart search returned one
       if (category && !res.data.filters?.category) url.searchParams.set('category', category);
       router.push(`/properties?${url.searchParams.toString()}`);
     } catch {
+      // Fallback: local NLP parser — uses all fields including price & category
       const parsed = parseSearchQuery(query.trim());
       const p = new URLSearchParams();
-      if (category) p.set('category', category);
-      if (parsed.city) p.set('city', parsed.city);
-      if (parsed.bedrooms) p.set('bedrooms', parsed.bedrooms);
-      if (parsed.type) p.set('type', parsed.type);
+      // UI category tab takes priority; fall back to parsed category
+      const resolvedCat = category || parsed.category;
+      if (resolvedCat)     p.set('category',  resolvedCat);
+      if (parsed.city)     p.set('city',      parsed.city);
+      if (parsed.bedrooms) p.set('bedrooms',  parsed.bedrooms);
+      if (parsed.type)     p.set('type',      parsed.type);
+      if (parsed.minPrice) p.set('minPrice',  String(parsed.minPrice));
+      if (parsed.maxPrice) p.set('maxPrice',  String(parsed.maxPrice));
       if (!parsed.city && query.trim()) p.set('keyword', query.trim());
       router.push(`/properties?${p.toString()}`);
     } finally { setSearching(false); }
@@ -432,16 +438,26 @@ function SearchModal({
     finally { setGeoLoading(false); }
   };
 
-  const handleTrending = async (q: string) => {
-    setQuery(q);
+  const handleTrending = async (tq: string) => {
+    setQuery(tq);
     handleClose();
     try {
-      const res = await smartSearchApi.parse(q, category || undefined);
+      const res = await smartSearchApi.parse(tq, category || undefined);
       const url = new URL(res.data.redirectUrl, 'http://x');
       if (category) url.searchParams.set('category', category);
       router.push(`/properties?${url.searchParams.toString()}`);
     } catch {
-      router.push(`/properties?keyword=${encodeURIComponent(q)}`);
+      const parsed = parseSearchQuery(tq);
+      const p = new URLSearchParams();
+      const resolvedCat = category || parsed.category;
+      if (resolvedCat)     p.set('category', resolvedCat);
+      if (parsed.city)     p.set('city',     parsed.city);
+      if (parsed.bedrooms) p.set('bedrooms', parsed.bedrooms);
+      if (parsed.type)     p.set('type',     parsed.type);
+      if (parsed.minPrice) p.set('minPrice', String(parsed.minPrice));
+      if (parsed.maxPrice) p.set('maxPrice', String(parsed.maxPrice));
+      p.set('keyword', tq);
+      router.push(`/properties?${p.toString()}`);
     }
   };
 
