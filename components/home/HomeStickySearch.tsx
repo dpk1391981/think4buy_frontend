@@ -3,9 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, MapPin, Loader2, X, LocateFixed, Navigation } from 'lucide-react';
-import { locationsApi } from '@/lib/api';
+import { locationsApi, smartSearchApi } from '@/lib/api';
 import { detectLocation } from '@/lib/geolocation';
-import { parseSearchQuery } from '@/lib/parseSearchQuery';
 import { cn } from '@/lib/utils';
 
 export default function HomeStickySearch() {
@@ -46,42 +45,26 @@ export default function HomeStickySearch() {
     } catch { setSuggs([]); } finally { setBusy(false); }
   };
 
-  const doSearch = useCallback((city?: string, locality?: string) => {
+  const doSearch = useCallback(async (city?: string, locality?: string) => {
     if (!city && !q.trim()) return;
-    const p = new URLSearchParams();
+    setShowSugg(false);
 
+    // Location suggestion clicked — city/locality already resolved, navigate immediately
     if (city) {
-      // Suggestion selected — city resolved directly, no category override
+      const p = new URLSearchParams();
       p.set('city', city);
       if (locality) p.set('locality', locality);
-      // Still parse the typed query for any extra filters the user may have typed
-      if (q.trim()) {
-        const parsed = parseSearchQuery(q.trim());
-        if (parsed.category) p.set('category', parsed.category);
-        if (parsed.bedrooms) p.set('bedrooms', parsed.bedrooms);
-        if (parsed.type)     p.set('type', parsed.type);
-        if (parsed.minPrice) p.set('minPrice', String(parsed.minPrice));
-        if (parsed.maxPrice) p.set('maxPrice', String(parsed.maxPrice));
-      }
-    } else {
-      // Free-text — parse to extract all filters
-      const parsed = parseSearchQuery(q.trim());
-      if (parsed.category) p.set('category', parsed.category);
-      if (parsed.city)     p.set('city', parsed.city);
-      if (locality)        p.set('locality', locality);
-      if (parsed.bedrooms) p.set('bedrooms', parsed.bedrooms);
-      if (parsed.type)     p.set('type', parsed.type);
-      if (parsed.minPrice) p.set('minPrice', String(parsed.minPrice));
-      if (parsed.maxPrice) p.set('maxPrice', String(parsed.maxPrice));
-      if (parsed.keyword)  p.set('keyword', parsed.keyword);
-      // Fallback: nothing structural parsed → treat whole string as keyword
-      if (!parsed.city && !parsed.bedrooms && !parsed.type && !parsed.category) {
-        p.set('keyword', q.trim());
-      }
+      router.push(`/properties?${p}`);
+      return;
     }
 
-    router.push(`/properties?${p}`);
-    setShowSugg(false);
+    // Free-text — delegate entirely to BE smart search (logs analytics too)
+    try {
+      const res = await smartSearchApi.parse(q.trim());
+      router.push(`/properties?${new URLSearchParams(res.data.filters).toString()}`);
+    } catch {
+      router.push(`/properties?keyword=${encodeURIComponent(q.trim())}`);
+    }
   }, [q, router]);
 
   const handleDetect = async () => {

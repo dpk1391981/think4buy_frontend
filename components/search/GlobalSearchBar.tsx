@@ -21,7 +21,6 @@ import {
   Building2, Home, LocateFixed, ChevronRight,
 } from 'lucide-react';
 import { locationsApi, propertiesApi, smartSearchApi, propertyConfigApi } from '@/lib/api';
-import { parseSearchQuery } from '@/lib/parseSearchQuery';
 import { cn } from '@/lib/utils';
 import { detectLocation } from '@/lib/geolocation';
 
@@ -389,18 +388,10 @@ function SearchModal({
       if (category && !res.data.filters?.category) url.searchParams.set('category', category);
       router.push(`/properties?${url.searchParams.toString()}`);
     } catch {
-      // Fallback: local NLP parser — uses all fields including price & category
-      const parsed = parseSearchQuery(query.trim());
+      // BE unavailable — keyword fallback
       const p = new URLSearchParams();
-      // UI category tab takes priority; fall back to parsed category
-      const resolvedCat = category || parsed.category;
-      if (resolvedCat)     p.set('category',  resolvedCat);
-      if (parsed.city)     p.set('city',      parsed.city);
-      if (parsed.bedrooms) p.set('bedrooms',  parsed.bedrooms);
-      if (parsed.type)     p.set('type',      parsed.type);
-      if (parsed.minPrice) p.set('minPrice',  String(parsed.minPrice));
-      if (parsed.maxPrice) p.set('maxPrice',  String(parsed.maxPrice));
-      if (!parsed.city && query.trim()) p.set('keyword', query.trim());
+      if (category) p.set('category', category);
+      p.set('keyword', query.trim());
       router.push(`/properties?${p.toString()}`);
     } finally { setSearching(false); }
   }, [query, category, router, handleClose]);
@@ -447,15 +438,8 @@ function SearchModal({
       if (category) url.searchParams.set('category', category);
       router.push(`/properties?${url.searchParams.toString()}`);
     } catch {
-      const parsed = parseSearchQuery(tq);
       const p = new URLSearchParams();
-      const resolvedCat = category || parsed.category;
-      if (resolvedCat)     p.set('category', resolvedCat);
-      if (parsed.city)     p.set('city',     parsed.city);
-      if (parsed.bedrooms) p.set('bedrooms', parsed.bedrooms);
-      if (parsed.type)     p.set('type',     parsed.type);
-      if (parsed.minPrice) p.set('minPrice', String(parsed.minPrice));
-      if (parsed.maxPrice) p.set('maxPrice', String(parsed.maxPrice));
+      if (category) p.set('category', category);
       p.set('keyword', tq);
       router.push(`/properties?${p.toString()}`);
     }

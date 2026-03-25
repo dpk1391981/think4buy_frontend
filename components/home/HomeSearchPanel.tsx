@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { locationsApi, propertyConfigApi, smartSearchApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { parseSearchQuery } from '@/lib/parseSearchQuery';
 const CITY_GRADIENTS = [
   'from-blue-500 to-cyan-400',
   'from-orange-500 to-red-400',
@@ -672,16 +671,8 @@ function DesktopPropertySearch({
 
       router.push(`/properties?${url.searchParams.toString()}`);
     } catch {
-      // Fallback: frontend parser
-      const parsed = parseSearchQuery(rawQ);
-      const params = buildParams(parsed.city, locality);
-      if (parsed.bedrooms && !bhk.length) params.bedrooms  = parsed.bedrooms;
-      if (parsed.type && !type)           params.type      = parsed.type;
-      if (parsed.minPrice && !budget?.min) params.minPrice = String(parsed.minPrice);
-      if (parsed.maxPrice && !budget?.max) params.maxPrice = String(parsed.maxPrice);
-      if (parsed.keyword)                 params.keyword   = parsed.keyword;
-      if (!parsed.city && !parsed.bedrooms && !parsed.type) params.keyword = rawQ;
-      onSearch(params);
+      // BE unavailable — keyword fallback (preserves UI-selected filters)
+      onSearch({ ...buildParams(), keyword: rawQ });
     }
   }, [q, type, bhk, budget, more, category, onSearch, router]);
 
@@ -1021,30 +1012,25 @@ function MobileSearch({
         const url = new URL(res.data.redirectUrl, 'http://x');
         if (isNewProject)  url.searchParams.set('isNewProject', 'true');
         else if (cat && !res.data.filters?.category) url.searchParams.set('category', cat);
+        // UI-selected filters override parsed ones
         if (bhk.length)   url.searchParams.set('bedrooms', bhk.join(','));
         if (budget?.min)  url.searchParams.set('minPrice', String(budget.min));
         if (budget?.max)  url.searchParams.set('maxPrice', String(budget.max));
         if (type)         url.searchParams.set('type', type);
         router.push(`/properties?${url.searchParams.toString()}`);
         return;
-      } catch { /* fall through to parseSearchQuery */ }
+      } catch {
+        // BE unavailable — keyword fallback (keep UI-selected filters)
+        const p = new URLSearchParams();
+        if (isNewProject) p.set('isNewProject', 'true'); else if (cat) p.set('category', cat);
+        if (bhk.length)  p.set('bedrooms', bhk.join(','));
+        if (budget?.min) p.set('minPrice', String(budget.min));
+        if (budget?.max) p.set('maxPrice', String(budget.max));
+        if (type)        p.set('type', type);
+        p.set('keyword', rawQ);
+        router.push(`/properties?${p}`);
+      }
     }
-
-    // Fallback / filters-only path: frontend parser
-    const parsed = parseSearchQuery(rawQ);
-    const p = new URLSearchParams();
-    if (isNewProject) p.set('isNewProject', 'true'); else if (cat) p.set('category', cat);
-    if (parsed.city) p.set('city', parsed.city);
-    const finalBedrooms = bhk.length ? bhk.join(',') : parsed.bedrooms;
-    if (finalBedrooms)             p.set('bedrooms', finalBedrooms);
-    // UI-selected budget wins over parsed price
-    const minP = budget?.min || parsed.minPrice;
-    const maxP = budget?.max || parsed.maxPrice;
-    if (minP) p.set('minPrice', String(minP));
-    if (maxP) p.set('maxPrice', String(maxP));
-    if (type || parsed.type)       p.set('type', type || parsed.type!);
-    if (!parsed.city && rawQ)      p.set('keyword', rawQ);
-    router.push(`/properties?${p}`);
   };
 
   const handleDetect = async () => {
