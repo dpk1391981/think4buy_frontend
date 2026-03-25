@@ -39,6 +39,8 @@ export interface ListingPageParams {
   category?: string;
   city?: string;
   locality?: string;
+  /** Property type slug — e.g. 'apartment', 'villa', 'plot' */
+  type?: string;
 }
 
 /**
@@ -69,24 +71,46 @@ export async function resolveListingPageSeo(params: ListingPageParams): Promise<
 // ── URL slug parser ────────────────────────────────────────────────────────────
 
 /**
- * Prefix → category mapping for all listing URL patterns.
+ * Prefix → category + optional type mapping for all listing URL patterns.
  * Order matters: longer/more-specific prefixes must come first.
  */
-const LISTING_PREFIXES: Array<{ prefix: string; category: string }> = [
+const LISTING_PREFIXES: Array<{ prefix: string; category: string; type?: string }> = [
+  // Full-form: category + type (most specific first)
   { prefix: 'property-for-sale-in',      category: 'buy' },
   { prefix: 'property-for-rent-in',      category: 'rent' },
-  { prefix: 'flats-for-sale-in',         category: 'buy' },
-  { prefix: 'flats-for-rent-in',         category: 'rent' },
-  { prefix: 'villas-for-sale-in',        category: 'buy' },
-  { prefix: 'plots-for-sale-in',         category: 'buy' },
-  { prefix: 'office-space-for-rent-in',  category: 'commercial' },
+  { prefix: 'flats-for-sale-in',         category: 'buy',        type: 'apartment' },
+  { prefix: 'flats-for-rent-in',         category: 'rent',       type: 'apartment' },
+  { prefix: 'villas-for-sale-in',        category: 'buy',        type: 'villa' },
+  { prefix: 'plots-for-sale-in',         category: 'buy',        type: 'plot' },
+  { prefix: 'office-space-for-rent-in',  category: 'commercial', type: 'commercial_office' },
   { prefix: 'commercial-property-in',    category: 'commercial' },
   { prefix: 'new-projects-in',           category: 'builder_project' },
-  { prefix: 'pg-in',                     category: 'pg' },
+  { prefix: 'pg-in',                     category: 'pg',         type: 'pg' },
   { prefix: 'buy-property-in',           category: 'buy' },
   { prefix: 'rent-property-in',          category: 'rent' },
   { prefix: 'properties-in',             category: '' },
   { prefix: 'property-in',               category: '' },
+  // Short-form: type-in-city (footer SEO links — no category implied)
+  { prefix: 'apartments-in',             category: '',           type: 'apartment' },
+  { prefix: 'apartment-in',              category: '',           type: 'apartment' },
+  { prefix: 'flats-in',                  category: '',           type: 'apartment' },
+  { prefix: 'flat-in',                   category: '',           type: 'apartment' },
+  { prefix: 'villas-in',                 category: '',           type: 'villa' },
+  { prefix: 'villa-in',                  category: '',           type: 'villa' },
+  { prefix: 'plots-in',                  category: '',           type: 'plot' },
+  { prefix: 'plot-in',                   category: '',           type: 'plot' },
+  { prefix: 'houses-in',                 category: '',           type: 'house' },
+  { prefix: 'house-in',                  category: '',           type: 'house' },
+  { prefix: 'studios-in',               category: '',           type: 'studio' },
+  { prefix: 'studio-in',                category: '',           type: 'studio' },
+  { prefix: 'penthouses-in',            category: '',           type: 'penthouse' },
+  { prefix: 'penthouse-in',             category: '',           type: 'penthouse' },
+  { prefix: 'farmhouses-in',            category: '',           type: 'farm_house' },
+  { prefix: 'farmhouse-in',             category: '',           type: 'farm_house' },
+  { prefix: 'offices-in',               category: 'commercial', type: 'commercial_office' },
+  { prefix: 'office-in',                category: 'commercial', type: 'commercial_office' },
+  { prefix: 'shops-in',                 category: 'commercial', type: 'commercial_shop' },
+  { prefix: 'shop-in',                  category: 'commercial', type: 'commercial_shop' },
 ];
 
 /**
@@ -135,7 +159,7 @@ function splitCityLocality(rest: string): { city: string; locality?: string } {
 export function parseListingSlug(slug: string): ListingPageParams {
   const s = slug.toLowerCase().trim().replace(/^\//, '');
 
-  for (const { prefix, category } of LISTING_PREFIXES) {
+  for (const { prefix, category, type } of LISTING_PREFIXES) {
     const prefixWithDash = prefix + '-';
     if (!s.startsWith(prefixWithDash)) continue;
 
@@ -148,10 +172,35 @@ export function parseListingSlug(slug: string): ListingPageParams {
       category: category || undefined,
       city,
       locality,
+      type: type || undefined,
     };
   }
 
   return {};
+}
+
+/**
+ * Call the smart search API server-side to extract property listing filters from a URL slug.
+ * Used by the catch-all route so ANY admin-configured footer URL is decoded correctly —
+ * not just the patterns listed in LISTING_PREFIXES.
+ *
+ * e.g. "flat in noida"  → { type: 'apartment', city: 'Noida' }
+ *      "2bhk flat noida sector 62" → { bedrooms: '2', type: 'apartment', city: 'Noida', locality: 'sector 62' }
+ */
+export async function parseSlugToFilters(slugText: string): Promise<Record<string, string>> {
+  try {
+    const res = await fetch(`${API_BASE}/smart-search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: slugText }),
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return {};
+    const data = await res.json();
+    return (data.filters as Record<string, string>) ?? {};
+  } catch {
+    return {};
+  }
 }
 
 /**

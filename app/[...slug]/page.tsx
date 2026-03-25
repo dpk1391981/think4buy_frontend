@@ -25,6 +25,7 @@ import JsonLd, { buildBreadcrumbSchema } from '@/components/seo/JsonLd';
 import {
   resolveListingPageSeo,
   parseListingSlug,
+  parseSlugToFilters,
   buildFaqSchema,
   type SeoPageConfig,
 } from '@/lib/seo/listingPageSeo';
@@ -50,7 +51,7 @@ function buildSlug(parts: string[]): string {
 async function getSeoConfig(slugParts: string[]): Promise<SeoPageConfig | null> {
   const slug = buildSlug(slugParts);
   const parsed = parseListingSlug(slug);
-  if (!parsed.category && !parsed.city && !parsed.locality) return null;
+  if (!parsed.category && !parsed.city && !parsed.locality && !parsed.type) return null;
   return resolveListingPageSeo(parsed);
 }
 
@@ -106,11 +107,15 @@ export default async function ProgrammaticSeoListingPage({ params }: Props) {
   const schemas: Record<string, unknown>[] = [buildBreadcrumbSchema(breadcrumbs)];
   if (config.faqJson?.length) schemas.push(buildFaqSchema(config.faqJson));
 
-  // Property listing search params
-  const listingParams: Record<string, string> = {};
-  if (context.categorySlug) listingParams.category = context.categorySlug;
-  if (cityName)             listingParams.city      = cityName;
-  if (localityName)         listingParams.locality  = localityName;
+  // Property listing search params — derived from smart search so ANY admin URL works.
+  // e.g. "flat-in-noida" → { type: 'apartment', city: 'Noida' }
+  //      "2bhk-villa-gurgaon-sector-56" → { bedrooms: '2', type: 'villa', city: 'Gurgaon', locality: 'sector 56' }
+  const smartFilters = await parseSlugToFilters(params.slug.join(' '));
+  const listingParams: Record<string, string> = { ...smartFilters };
+  // Fill in gaps from SEO context (smart search might not extract category from type-only slugs)
+  if (!listingParams.category && context.categorySlug) listingParams.category = context.categorySlug;
+  if (!listingParams.city     && cityName)             listingParams.city      = cityName;
+  if (!listingParams.locality && localityName)         listingParams.locality  = localityName;
 
   return (
     <>
