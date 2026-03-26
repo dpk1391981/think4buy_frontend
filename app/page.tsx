@@ -101,32 +101,32 @@ export default function HomePage() {
                 <div className="w-4 h-4 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center">
                   <Sparkles className="w-2.5 h-2.5 text-white" />
                 </div>
-                AI-Powered · India&apos;s #1 Real Estate Platform
+                AI-Powered · India&apos;s #1 Property Decision Engine
               </div>
 
               {/* Headline */}
               <h1 className="text-2xl sm:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-white leading-tight mb-3 sm:mb-4">
-                Find Your Perfect
+                Buy, Rent or Sell —
                 <span className="block bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                  Dream Property
+                  Make the Right Move
                 </span>
               </h1>
 
               {/* Sub-text — desktop only */}
               <p className="hidden sm:block text-base lg:text-lg text-blue-100/75 mb-4 lg:mb-5 max-w-xl leading-relaxed">
-                50,000+ verified properties across India. AI-powered recommendations, smart comparison tools, and real-time market insights.
+                Smart search, verified agents, and real-time insights — so you decide with confidence, not guesswork.
               </p>
               <p className="sm:hidden text-xs text-blue-100/60 mb-1">
-                50,000+ verified properties · AI-Powered · India
+                50K+ verified listings · AI-Matched · India
               </p>
 
               {/* Trust pills — desktop */}
               <div className="hidden sm:flex flex-wrap gap-4 lg:gap-5">
                 {[
-                  { icon: '✓',  text: 'Verified Listings'  },
-                  { icon: '🏙️', text: '100+ Cities'         },
-                  { icon: '🤝', text: 'Zero Brokerage'      },
-                  { icon: '⭐', text: '10K+ Happy Buyers'   },
+                  { icon: '✓',  text: '50K+ Verified Listings' },
+                  { icon: '🧠', text: 'AI-Matched Properties'  },
+                  { icon: '🤝', text: 'Trusted, Rated Agents'  },
+                  { icon: '⚡', text: 'Decisions in Minutes'   },
                 ].map(({ icon, text }) => (
                   <span key={text} className="flex items-center gap-1.5 text-sm text-blue-100/80 font-medium">
                     <span className="text-green-400 font-bold">{icon}</span>{text}

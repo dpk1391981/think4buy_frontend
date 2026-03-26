@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { CallButton, WhatsAppButton, WhatsAppIcon } from '@/components/common/PhoneRevealButton';
 import { resolveImageSrc } from '@/components/common/OptimizedImage';
+import BrokerTransparencyBadge from '@/components/agent/BrokerTransparencyBadge';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -441,6 +442,13 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
                 <span><b className="text-gray-900">{agent.activeListingsCount ?? agent.agentUsedQuota ?? 0}</b> active listings</span>
               </div>
             </div>
+
+          {/* Transparency badge — compact strip */}
+          <BrokerTransparencyBadge
+            agentUserId={agent.id}
+            variant="card"
+            className="mt-2"
+          />
 
           </div>
         </Link>

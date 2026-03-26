@@ -37,6 +37,7 @@ import {
   SlidersHorizontal,
   Star,
   Wrench,
+  Database,
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
@@ -84,6 +85,12 @@ const NAV_GROUPS = [
     items: [
       { href: '/admin/seo/footer-links', label: 'Footer SEO Links', icon: Link2 },
       { href: '/admin/seo/config', label: 'SEO Config', icon: Settings },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { href: '/admin/storage-settings', label: 'Storage & Watermark', icon: Database },
     ],
   },
   {

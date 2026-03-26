@@ -26,8 +26,11 @@ const nextConfig = {
       // API server (vtechxhub hosted backend)
       { protocol: 'https', hostname: 'reales-api.vtechxhub.com', pathname: '/uploads/**' },
       { protocol: 'https', hostname: '*.vtechxhub.com', pathname: '/uploads/**' },
-      // Common CDN / storage providers
+      // S3 storage — all regions and bucket-hosted URLs
+      // e.g. https://my-bucket.s3.ap-south-1.amazonaws.com/...
       { protocol: 'https', hostname: '**.amazonaws.com' },
+      // S3 path-style: https://s3.region.amazonaws.com/bucket/...
+      { protocol: 'https', hostname: 's3.*.amazonaws.com' },
       { protocol: 'https', hostname: '**.cloudinary.com' },
       { protocol: 'https', hostname: '**.imagekit.io' },
       { protocol: 'https', hostname: 'images.unsplash.com' },

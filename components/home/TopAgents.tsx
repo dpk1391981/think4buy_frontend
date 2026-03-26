@@ -9,6 +9,7 @@ import { usersApi } from '@/lib/api';
 import { useAppSelector } from '@/lib/store';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import { AgentCardSkeleton } from '@/components/skeleton';
+import BrokerTransparencyBadge from '@/components/agent/BrokerTransparencyBadge';
 
 interface Agent {
   id: string;
@@ -255,6 +256,11 @@ function AgentCard({ agent }: { agent: Agent }) {
           )}
         </div>
       </Link>
+
+      {/* Transparency badge */}
+      <div className="px-4 pb-2">
+        <BrokerTransparencyBadge agentUserId={agent.id} variant="card" />
+      </div>
 
       {/* ── Actions ── */}
       <div className="px-4 pb-4 flex gap-2 flex-shrink-0">

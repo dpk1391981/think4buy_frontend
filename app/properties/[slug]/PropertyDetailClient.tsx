@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -519,8 +518,8 @@ export default function PropertyDetailClient({ property }: Props) {
           </div>
           <div className="flex-1 flex items-center justify-center relative" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             <div className="relative w-full h-full">
-              <Image src={images[activeImage]?.url} alt={images[activeImage]?.alt || property.title}
-                fill className="object-contain" sizes="100vw" />
+              <OptimizedImage src={images[activeImage]?.url} alt={images[activeImage]?.alt || property.title}
+                fill className="object-contain" objectFit="contain" sizes="100vw" blurDataURL={false} />
             </div>
             {images.length > 1 && (
               <>
@@ -541,7 +540,7 @@ export default function PropertyDetailClient({ property }: Props) {
                 <button key={i} onClick={() => setActiveImage(i)}
                   className={cn('relative w-14 h-10 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all',
                     activeImage === i ? 'border-primary-400' : 'border-transparent opacity-50')}>
-                  <Image src={img.url} alt="" fill className="object-cover" sizes="56px" />
+                  <OptimizedImage src={img.url} alt="" fill className="object-cover" sizes="56px" blurDataURL={false} />
                 </button>
               ))}
             </div>
@@ -724,7 +723,7 @@ export default function PropertyDetailClient({ property }: Props) {
                           <div key={i}
                             className="relative cursor-pointer group overflow-hidden"
                             onClick={() => { setActiveImage(i); setShowFullscreen(true); }}>
-                            <Image src={img.url} alt={img.alt || ''} fill className="object-cover group-hover:scale-105 transition-transform duration-300" sizes="220px" />
+                            <OptimizedImage src={img.url} alt={img.alt || ''} fill className="object-cover group-hover:scale-105 transition-transform duration-300" sizes="220px" blurDataURL={false} />
                             {isLast && remaining > 0 && (
                               <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1">
                                 <span className="text-white font-black text-2xl">+{remaining}</span>

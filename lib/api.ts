@@ -312,6 +312,10 @@ export const adminApi = {
   createCountry: (data: any) => api.post('/admin/countries', data),
   updateCountry: (id: string, data: any) => api.patch(`/admin/countries/${id}`, data),
   deleteCountry: (id: string) => api.delete(`/admin/countries/${id}`),
+  // Storage & Watermark
+  getStorageConfig: () => api.get('/admin/storage-config'),
+  saveStorageConfig: (data: Record<string, string>) => api.post('/admin/storage-config', data),
+  testS3Connection: () => api.post('/admin/storage-config/test-s3'),
 };
 
 // Wallet APIs
@@ -577,6 +581,10 @@ export const agencyApi = {
   adminApproveCoverage: (id: string) => api.patch(`/agency/admin/coverage/${id}/approve`),
   adminDeactivateCoverage: (id: string) => api.patch(`/agency/admin/coverage/${id}/deactivate`),
   adminRemoveCoverage: (id: string) => api.delete(`/agency/admin/coverage/${id}`),
+  // Broker Transparency
+  getTransparencyProfile: (userId: string) => api.get(`/agency/agent/${userId}/transparency-profile`),
+  adminUpdateTrustSignals: (profileId: string, data: { complaintCount?: number; avgResponseHours?: number | null }) =>
+    api.patch(`/agency/admin/agent-profiles/${profileId}/trust-signals`, data),
 };
 
 // Subscription (Agent)

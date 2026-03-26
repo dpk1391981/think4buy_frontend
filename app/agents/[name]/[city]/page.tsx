@@ -10,6 +10,7 @@ import AgentContactForm from '@/components/agent/AgentContactForm';
 import AgentListings from '@/components/agent/AgentListings';
 import AgentAnalyticsTracker from '@/components/agent/AgentAnalyticsTracker';
 import AgentFeedbackSection from '@/components/agent/AgentFeedbackSection';
+import BrokerTransparencyBadge from '@/components/agent/BrokerTransparencyBadge';
 import AgentCallCTA from '@/components/agent/AgentCallCTA';
 import AgentAvatar from '@/components/agent/AgentAvatar';
 import { resolveImageUrl } from '@/lib/imageUtils';
@@ -464,6 +465,9 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
 
               {/* Active Listings */}
               <AgentListings agentId={agent.id} agentName={agent.name} initialTotal={listingCount} />
+
+              {/* Broker Transparency Profile */}
+              <BrokerTransparencyBadge agentUserId={agent.id} variant="full" />
 
               {/* Reviews & Ratings */}
               <AgentFeedbackSection agentId={agent.id} />

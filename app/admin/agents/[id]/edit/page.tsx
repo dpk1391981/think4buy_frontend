@@ -70,6 +70,11 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
   const [addingCov, setAddingCov] = useState(false);
   const [covError, setCovError] = useState('');
 
+  // Trust signals
+  const [trustForm, setTrustForm] = useState({ complaintCount: '0', avgResponseHours: '' });
+  const [savingTrust, setSavingTrust] = useState(false);
+  const [trustSaved, setTrustSaved] = useState(false);
+
   const [form, setForm] = useState({
     name:            '',
     email:           '',
@@ -116,6 +121,10 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
         agencyApi.adminListCoverage({ agentProfileId: profile.id })
           .then(r => setCoverageLocations(r.data?.items || r.data || []))
           .catch(() => {});
+        setTrustForm({
+          complaintCount:  String(profile.complaintCount  ?? 0),
+          avgResponseHours: profile.avgResponseHours != null ? String(profile.avgResponseHours) : '',
+        });
       }
     }).catch(() => setError('Failed to load agent data'))
       .finally(() => setFetching(false));
@@ -210,6 +219,19 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
     } catch {
       setCovError('Failed to remove coverage area.');
     }
+  }
+
+  async function saveTrustSignals() {
+    if (!agentProfileId) return;
+    setSavingTrust(true);
+    try {
+      await agencyApi.adminUpdateTrustSignals(agentProfileId, {
+        complaintCount:  parseInt(trustForm.complaintCount) || 0,
+        avgResponseHours: trustForm.avgResponseHours ? parseInt(trustForm.avgResponseHours) : null,
+      });
+      setTrustSaved(true);
+      setTimeout(() => setTrustSaved(false), 3000);
+    } catch { /* ignore */ } finally { setSavingTrust(false); }
   }
 
   async function submit(e: React.FormEvent) {
@@ -566,6 +588,52 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
             <span className="text-sm text-gray-500">free listings</span>
           </div>
         </div>
+
+        {/* Trust Signals */}
+        {agentProfileId && (
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <h2 className="font-semibold text-gray-800 mb-1">Broker Transparency Signals</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              These signals appear on the agent's public trust profile. Complaints are always shown — do not suppress.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Complaint Count</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={trustForm.complaintCount}
+                  onChange={e => setTrustForm(f => ({ ...f, complaintCount: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-[10px] text-gray-400 mt-1">Verified complaints. Shown publicly. Cannot hide if &gt; 0.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Avg Response Time (hours)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={trustForm.avgResponseHours}
+                  onChange={e => setTrustForm(f => ({ ...f, avgResponseHours: e.target.value }))}
+                  placeholder="e.g. 2"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-[10px] text-gray-400 mt-1">Leave blank if unknown.</p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={saveTrustSignals}
+                disabled={savingTrust}
+                className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
+              >
+                {savingTrust ? 'Saving…' : 'Save Trust Signals'}
+              </button>
+              {trustSaved && <span className="text-xs text-green-600 font-medium">✓ Saved</span>}
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
