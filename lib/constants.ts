@@ -209,7 +209,7 @@ export function generatePropertyTitle(params: {
   const { listingType, propertyType, bedrooms, city, locality } = params;
 
   const typeLabels: Record<string, string> = {
-    apartment: 'Apartment', villa: 'Villa', house: 'Independent House',
+    apartment: 'Apartment', flat: 'Flat', villa: 'Villa', house: 'Independent House',
     builder_floor: 'Builder Floor', penthouse: 'Penthouse', studio: 'Studio',
     farm_house: 'Farm House', plot: 'Residential Plot', land: 'Land',
     pg: 'PG Accommodation', co_living: 'Co-Living Space',
@@ -219,7 +219,7 @@ export function generatePropertyTitle(params: {
   };
 
   const parts: string[] = [];
-  if (bedrooms && ['apartment', 'villa', 'house', 'builder_floor', 'penthouse'].includes(propertyType)) {
+  if (bedrooms && ['apartment', 'flat', 'villa', 'house', 'builder_floor', 'penthouse'].includes(propertyType)) {
     parts.push(`${bedrooms} BHK`);
   }
   parts.push(typeLabels[propertyType] || propertyType);
