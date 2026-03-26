@@ -80,17 +80,16 @@ function useFilterData(category: string) {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
+    Promise.allSettled([
       propertyConfigApi.getListingFilters(category),
       propertyConfigApi.getTypesBySlug(category),
       propertiesApi.getAmenities(),
     ])
       .then(([f, t, a]) => {
-        setFilters(f.data || []);
-        setPropTypes((t.data || []).map((x: any) => ({ value: x.slug, label: x.name })));
-        setAmenities(a.data || []);
+        if (f.status === 'fulfilled') setFilters(f.value.data || []);
+        if (t.status === 'fulfilled') setPropTypes((t.value.data || []).map((x: any) => ({ value: x.slug, label: x.name })));
+        if (a.status === 'fulfilled') setAmenities(a.value.data || []);
       })
-      .catch(() => {})
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);

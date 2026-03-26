@@ -11,6 +11,7 @@ export interface PropCategory {
   description: string;
   status: boolean;
   sortOrder: number;
+  totalListings?: number;
 }
 
 export interface PropTypeOption {
@@ -23,7 +24,7 @@ export interface PropTypeOption {
   categoryId: string;
 }
 
-// Module-level cache so repeated mounts don't re-fetch
+// Module-level cache so repeated mounts don't re-fetch (reset on page load)
 let categoriesCache: PropCategory[] | null = null;
 const typesCache: Record<string, PropTypeOption[]> = {};
 

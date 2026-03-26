@@ -6,6 +6,13 @@ import { TrendingUp, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import { usePropertyCategories, getCategoryHref } from '@/hooks/usePropertyCategories';
 import { cn } from '@/lib/utils';
 
+function formatCount(n: number): string {
+  if (n >= 10_000_000) return `${(n / 1_000_000).toFixed(1)}Cr`;
+  if (n >= 100_000)    return `${(n / 100_000).toFixed(1)}L`;
+  if (n >= 1_000)      return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
 // Gradient palette — cycles for any number of categories
 const GRADIENTS = [
   { gradient: 'from-blue-500 to-blue-700',     bgLight: 'bg-blue-50',    textColor: 'text-blue-700'    },
@@ -36,7 +43,8 @@ function SkeletonCard() {
 
 export default function TopCategories() {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { categories, loading } = usePropertyCategories();
+  const { categories: allCategories, loading } = usePropertyCategories();
+  const categories = allCategories.filter(c => (c.totalListings ?? 0) > 0);
 
   const scroll = (dir: 'left' | 'right') => {
     scrollRef.current?.scrollBy({ left: dir === 'right' ? 320 : -320, behavior: 'smooth' });
@@ -129,9 +137,9 @@ export default function TopCategories() {
                           <h3 className="font-bold text-gray-900 text-xs sm:text-sm leading-tight line-clamp-1 group-hover:text-primary-700 transition-colors">
                             {cat.name}
                           </h3>
-                          {cat.description && (
-                            <p className={cn('text-[11px] font-semibold mt-0.5 line-clamp-1', style.textColor)}>
-                              {cat.description}
+                          {(cat.totalListings ?? 0) > 0 && (
+                            <p className={cn('text-[11px] font-semibold mt-0.5', style.textColor)}>
+                              {formatCount(cat.totalListings!)} listings
                             </p>
                           )}
                         </div>

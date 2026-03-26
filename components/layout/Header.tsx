@@ -838,7 +838,7 @@ export default function Header() {
       ref={headerRef}
       className={cn(
         'fixed top-0 left-0 right-0 z-50 transition-shadow duration-300 bg-white',
-        scrolled ? 'shadow-md' : 'border-b border-gray-100'
+        scrolled ? 'shadow-md' : 'border-b border-gray-100',
       )}
     >
       {/* Admin mode banner */}
@@ -852,6 +852,7 @@ export default function Header() {
           </Link>
         </div>
       )}
+
       {/* ─── Mobile Header ────────────────────────────────────────────────── */}
       <div className="lg:hidden flex items-center justify-between h-14 px-4 gap-2">
         {/* Logo */}
@@ -980,8 +981,7 @@ export default function Header() {
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Post Property</span>
-                <span className="badge-free text-[10px] px-1.5 py-0.5 rounded-full leading-none">
-                  {/* <s>₹99</s> */}&nbsp;FREE</span>
+                <span className="badge-free text-[10px] px-1.5 py-0.5 rounded-full leading-none">&nbsp;FREE</span>
               </Link>
             </div>
           </div>

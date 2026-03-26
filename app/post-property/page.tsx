@@ -2605,9 +2605,9 @@ function PostPropertyPageInner() {
       const payload: any = {
         title: effectiveTitle,
         description: form.description || effectiveTitle + '. Contact for details.',
-        category: form.mainCategory,
+        category: form.mainCategory || 'buy',
         listingType: form.listingType || undefined,
-        type: form.propertyType,
+        type: form.propertyType || 'apartment',
         city: form.city, cityId: form.cityId || undefined,
         state: form.state, stateId: form.stateId || undefined,
         locality: form.locality || form.city,
