@@ -317,7 +317,10 @@ export default function PropertyDetailClient({ property }: Props) {
     } finally { setSubmitting(false); }
   };
 
+  const isActiveListing = property.status === 'active';
+
   const openInquiryModal = (type: InquiryType = 'general') => {
+    if (!isActiveListing) return;
     setInquiryType(type); setShowInquiryModal(true);
   };
 
@@ -1700,8 +1703,8 @@ export default function PropertyDetailClient({ property }: Props) {
         </div>
       )}
 
-      {/* ── Inquiry Modal ─────────────────────────────────────────────────────── */}
-      {showInquiryModal && (
+      {/* ── Inquiry Modal — only for active listings ──────────────────────────── */}
+      {showInquiryModal && isActiveListing && (
         <div className="fixed inset-0 z-[60] flex flex-col justify-end md:justify-center md:items-center md:p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={() => setShowInquiryModal(false)} />
           <div className="relative bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full md:max-w-lg max-h-[88dvh] flex flex-col">

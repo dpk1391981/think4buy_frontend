@@ -2206,6 +2206,7 @@ function PostPropertyPageInner() {
   const [brochureFile, setBrochureFile] = useState<File | null>(null);
   const [removeBrochure, setRemoveBrochure] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [roleUpgrading, setRoleUpgrading] = useState(false);
   const [agentAgencyInfo, setAgentAgencyInfo] = useState<{ agencyId: string; agentProfileId: string } | null>(null);
@@ -2680,7 +2681,10 @@ function PostPropertyPageInner() {
       }
 
       dispatch(resetForm());
-      router.push(isEditMode ? `/properties/${propertySlug}?updated=1` : `/properties/${propertySlug}?posted=1`);
+      setSubmitSuccess(true);
+      setTimeout(() => {
+        router.push(isEditMode ? `/properties/${propertySlug}?updated=1` : `/properties/${propertySlug}?posted=1`);
+      }, 2200);
     } catch (err: any) {
       setError(err.response?.data?.message || (isEditMode ? 'Failed to update property.' : 'Failed to post property. Please try again.'));
     } finally {
@@ -2791,6 +2795,29 @@ function PostPropertyPageInner() {
     : autoSaveStatus === 'saved' && lastSaved && Math.round((Date.now() - lastSaved) / 60000) < 1
     ? 'Saved just now'
     : null;
+
+  if (submitSuccess) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-xl max-w-sm w-full p-8 text-center animate-in fade-in zoom-in-95 duration-300">
+          <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
+            <CheckCircle2 className="w-10 h-10 text-green-500" />
+          </div>
+          <h2 className="text-2xl font-black text-gray-900 mb-2">
+            {isEditMode ? 'Property Updated!' : 'Property Submitted!'}
+          </h2>
+          <p className="text-sm text-gray-500 leading-relaxed mb-2">
+            {isEditMode
+              ? 'Your changes have been saved successfully.'
+              : 'Your property has been submitted for review. You will be notified once it is approved.'}
+          </p>
+          <p className="text-xs text-gray-400 flex items-center justify-center gap-1.5">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Redirecting to your listing…
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pt-14 md:pt-16">
