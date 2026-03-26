@@ -312,8 +312,16 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2.5 mb-1.5">
-                  <h1 className="text-2xl md:text-3xl font-extrabold text-white">{agent.name}</h1>
+                {/* Agency name — primary heading */}
+                <div className="flex flex-wrap items-center gap-2.5 mb-1">
+                  <h1 className="text-2xl md:text-3xl font-extrabold text-white flex items-center gap-2">
+                    {agent.company ? (
+                      <>
+                        <Building2 className="w-6 h-6 opacity-75 flex-shrink-0" />
+                        {agent.company}
+                      </>
+                    ) : agent.name}
+                  </h1>
                   {isPremium && (
                     <span
                       className="inline-flex items-center gap-1 text-xs font-black px-3 py-1 rounded-full border"
@@ -329,16 +337,20 @@ export default async function AgentProfilePage({ params }: { params: Params }) {
                   )}
                 </div>
 
+                {/* Agent name — secondary, under agency */}
+                {agent.company && (
+                  <p className={`text-sm font-semibold mb-2 flex items-center gap-1.5 ${tier.subTextCls}`}>
+                    <Users className="w-3.5 h-3.5 opacity-70" />
+                    {agent.name}
+                  </p>
+                )}
+
                 {/* Tier tagline */}
                 {isPremium && TIER_TAGLINE[tickKey] && (
                   <p className={`text-xs font-semibold mb-2 flex items-center gap-1 ${tier.subTextCls}`}>
                     <Sparkles className="w-3.5 h-3.5" />
                     {TIER_TAGLINE[tickKey]}
                   </p>
-                )}
-
-                {agent.company && (
-                  <p className={`font-medium mb-2 ${tier.subTextCls}`}>{agent.company}</p>
                 )}
 
                 <div className={`flex flex-wrap items-center gap-4 text-sm mb-4 ${tier.subTextCls}`}>
