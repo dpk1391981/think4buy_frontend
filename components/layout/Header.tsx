@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Home, User, LogOut, Settings, Heart, MapPin, Building2, TrendingUp, Search, X, Plus, Menu, Shield } from 'lucide-react';
+import { ChevronDown, Home, User, LogOut, Settings, Heart, MapPin, Search, X, Plus, Menu, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
@@ -11,72 +11,8 @@ import { openAuthModal, setSelectedCity, loadCityFromLS, saveCityToLS } from '@/
 import { locationsApi } from '@/lib/api';
 import { resolveImageSrc } from '@/components/common/OptimizedImage';
 import { detectLocation } from '@/lib/geolocation';
+import { usePropertyCategories, usePropertyTypes, getCategoryHref } from '@/hooks/usePropertyCategories';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface MegaSection {
-  heading: string;
-  icon: React.ReactNode;
-  href: string;
-  links: { label: string; href: string }[];
-}
-
-// ─── Mega menu content ────────────────────────────────────────────────────────
-
-const MEGA_SECTIONS: MegaSection[] = [
-  {
-    heading: 'Buy',
-    icon: <Home className="w-4 h-4" />,
-    href: '/buy',
-    links: [
-      { label: 'Apartments / Flats', href: '/buy?type=apartment' },
-      { label: 'Independent Houses', href: '/buy?type=house' },
-      { label: 'Villas', href: '/buy?type=villa' },
-      { label: 'Builder Floors', href: '/buy?type=builder_floor' },
-      { label: 'Plots / Land', href: '/buy?type=plot' },
-      { label: 'Farmhouse', href: '/buy?type=farm_house' },
-    ],
-  },
-  {
-    heading: 'Rent',
-    icon: <Building2 className="w-4 h-4" />,
-    href: '/rent',
-    links: [
-      { label: 'Apartments / Flats', href: '/rent?type=apartment' },
-      { label: 'Independent Houses', href: '/rent?type=house' },
-      { label: 'Villas', href: '/rent?type=villa' },
-      { label: 'PG / Co-Living', href: '/pg' },
-      { label: 'Studio Apartments', href: '/rent?type=studio' },
-      { label: 'Furnished Homes', href: '/rent?furnishingStatus=fully_furnished' },
-    ],
-  },
-  {
-    heading: 'Commercial',
-    icon: <TrendingUp className="w-4 h-4" />,
-    href: '/commercial',
-    links: [
-      { label: 'Office Space — Buy', href: '/commercial?type=commercial_office&category=buy' },
-      { label: 'Office Space — Rent', href: '/commercial?type=commercial_office&category=rent' },
-      { label: 'Shop / Showroom', href: '/commercial?type=commercial_shop' },
-      { label: 'Warehouse', href: '/commercial?type=commercial_warehouse' },
-      { label: 'Industrial / Factory', href: '/commercial?type=factory' },
-      { label: 'Co-working Space', href: '/commercial?type=co_working' },
-    ],
-  },
-  {
-    heading: 'New Projects',
-    icon: <Search className="w-4 h-4" />,
-    href: '/new-projects',
-    links: [
-      { label: 'New Launches', href: '/new-projects' },
-      { label: 'Under Construction', href: '/new-projects?status=under_construction' },
-      { label: 'Ready to Move', href: '/new-projects?status=ready_to_move' },
-      { label: 'Township Projects', href: '/new-projects?type=township' },
-      { label: 'Luxury Projects', href: '/new-projects?type=luxury' },
-      { label: 'Affordable Projects', href: '/new-projects?type=affordable' },
-    ],
-  },
-];
 
 // ─── City Selector ────────────────────────────────────────────────────────────
 
@@ -353,85 +289,94 @@ function buildUrl(href: string, citySlug: string): string {
   return href;
 }
 
+// ─── Category section with lazy-loaded types ──────────────────────────────────
+
+function CategorySection({
+  cat, citySlug, onClose,
+}: {
+  cat: { id: string; name: string; slug: string; icon: string };
+  citySlug: string;
+  onClose: () => void;
+}) {
+  const { types } = usePropertyTypes(cat.slug);
+  const catHref = buildUrl(getCategoryHref(cat.slug), citySlug);
+
+  return (
+    <div className="px-4 py-4">
+      <Link
+        href={catHref}
+        onClick={onClose}
+        className="flex items-center gap-2 text-primary-600 font-bold text-sm mb-3 hover:text-primary-700 transition-colors group"
+      >
+        <span className="w-6 h-6 bg-primary-100 rounded-md flex items-center justify-center text-sm group-hover:bg-primary-200 transition-colors">
+          {cat.icon || '🏠'}
+        </span>
+        {cat.name}
+      </Link>
+      <ul className="space-y-2">
+        {types.slice(0, 6).map((t) => {
+          const typeHref = buildUrl(`${getCategoryHref(cat.slug)}?type=${t.slug}`, citySlug)
+            || `/properties?category=${cat.slug}&type=${t.slug}`;
+          return (
+            <li key={t.id}>
+              <Link
+                href={typeHref}
+                onClick={onClose}
+                className="text-xs text-gray-600 hover:text-primary-600 hover:translate-x-0.5 transition-all inline-block leading-relaxed"
+              >
+                {t.name}
+              </Link>
+            </li>
+          );
+        })}
+        {types.length === 0 && (
+          <li>
+            <Link href={catHref} onClick={onClose} className="text-xs text-gray-400 italic">
+              View all →
+            </Link>
+          </li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
 // ─── Properties Mega Dropdown ─────────────────────────────────────────────────
 
 function PropertiesMega({ onClose }: { onClose: () => void }) {
   const selectedCity = useAppSelector((s) => s.ui.selectedCity);
   const citySlug     = selectedCity ? toSlug(selectedCity) : '';
+  const { categories } = usePropertyCategories();
 
   const u = (href: string) => buildUrl(href, citySlug);
 
-  const viewAllHref  = citySlug ? `/property-in-${citySlug}` : '/properties';
-  const headerLabel  = selectedCity ? `Browse Properties in ${selectedCity}` : 'Browse Properties';
+  const viewAllHref = citySlug ? `/property-in-${citySlug}` : '/properties';
+  const headerLabel = selectedCity ? `Browse Properties in ${selectedCity}` : 'Browse Properties';
 
-  const dynamicSections = MEGA_SECTIONS.map(sec => ({
-    ...sec,
-    href:  u(sec.href),
-    links: sec.links.map(l => ({ ...l, href: u(l.href) })),
-  }));
-
-  const quickLinks = [
-    { label: '🏠 Ready to Move', href: u('/buy?possessionStatus=ready_to_move') },
-    { label: '💰 Under 50L',     href: u('/buy?maxPrice=5000000') },
-    { label: '🛏 3BHK Flats',    href: u('/buy?type=apartment&bedrooms=3') },
-    { label: '🏢 PG / Hostel',   href: u('/pg') },
-  ];
+  // Show up to 4 categories in the mega menu columns
+  const visibleCats = categories.slice(0, 4);
 
   return (
     <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden w-[720px] max-w-[calc(100vw-2rem)]">
       <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-3 flex items-center justify-between">
         <span className="text-white font-semibold text-sm">{headerLabel}</span>
-        <Link
-          href={viewAllHref}
-          onClick={onClose}
-          className="text-primary-100 hover:text-white text-xs underline underline-offset-2 transition-colors"
-        >
+        <Link href={viewAllHref} onClick={onClose} className="text-primary-100 hover:text-white text-xs underline underline-offset-2 transition-colors">
           View all →
         </Link>
       </div>
 
-      <div className="grid grid-cols-4 divide-x divide-gray-100 p-2">
-        {dynamicSections.map((section) => (
-          <div key={section.heading} className="px-4 py-4">
-            <Link
-              href={section.href}
-              onClick={onClose}
-              className="flex items-center gap-2 text-primary-600 font-bold text-sm mb-3 hover:text-primary-700 transition-colors group"
-            >
-              <span className="w-6 h-6 bg-primary-100 rounded-md flex items-center justify-center group-hover:bg-primary-200 transition-colors">
-                {section.icon}
-              </span>
-              {section.heading}
-            </Link>
-            <ul className="space-y-2">
-              {section.links.map((link) => (
-                <li key={link.label}>
-                  <Link
-                    href={link.href}
-                    onClick={onClose}
-                    className="text-xs text-gray-600 hover:text-primary-600 hover:translate-x-0.5 transition-all inline-block leading-relaxed"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+      <div className={`grid divide-x divide-gray-100 p-2`} style={{ gridTemplateColumns: `repeat(${Math.max(visibleCats.length, 1)}, 1fr)` }}>
+        {visibleCats.map((cat) => (
+          <CategorySection key={cat.id} cat={cat} citySlug={citySlug} onClose={onClose} />
         ))}
       </div>
 
-      <div className="border-t border-gray-100 bg-gray-50 px-6 py-3 flex items-center gap-6">
+      <div className="border-t border-gray-100 bg-gray-50 px-6 py-3 flex items-center gap-4 flex-wrap">
         <span className="text-xs text-gray-400 font-medium">Quick:</span>
-        {quickLinks.map((q) => (
-          <Link
-            key={q.label}
-            href={q.href}
-            onClick={onClose}
-            className="text-xs text-primary-600 hover:text-primary-700 hover:underline transition-colors whitespace-nowrap"
-          >
-            {q.label}
-          </Link>
-        ))}
+        <Link href={u('/buy?possessionStatus=ready_to_move')} onClick={onClose} className="text-xs text-primary-600 hover:text-primary-700 hover:underline transition-colors whitespace-nowrap">🏠 Ready to Move</Link>
+        <Link href={u('/buy?maxPrice=5000000')} onClick={onClose} className="text-xs text-primary-600 hover:text-primary-700 hover:underline transition-colors whitespace-nowrap">💰 Under 50L</Link>
+        <Link href={u('/buy?type=apartment&bedrooms=3')} onClick={onClose} className="text-xs text-primary-600 hover:text-primary-700 hover:underline transition-colors whitespace-nowrap">🛏 3BHK Flats</Link>
+        <Link href={u('/pg')} onClick={onClose} className="text-xs text-primary-600 hover:text-primary-700 hover:underline transition-colors whitespace-nowrap">🏢 PG / Hostel</Link>
       </div>
     </div>
   );

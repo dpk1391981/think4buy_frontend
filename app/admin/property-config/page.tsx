@@ -18,6 +18,7 @@ interface PropCategory {
 interface PropType {
   id: string; name: string; slug: string; icon: string;
   status: boolean; sortOrder: number; categoryId: string;
+  aliasOf?: string | null;
   category?: { id: string; name: string };
 }
 interface Amenity {
@@ -261,7 +262,7 @@ function PropertyTypesTab() {
   const [delId, setDelId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showIconPicker, setShowIconPicker] = useState(false);
-  const EMPTY = { name: '', slug: '', icon: '🏙️', categoryId: '', status: true, sortOrder: 0 };
+  const EMPTY = { name: '', slug: '', icon: '🏙️', categoryId: '', status: true, sortOrder: 0, aliasOf: '' };
   const [form, setForm] = useState(EMPTY);
 
   const load = useCallback(async () => {
@@ -277,15 +278,16 @@ function PropertyTypesTab() {
 
   const genSlug = (n: string) => n.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '_').trim();
   const openAdd = () => { setEditing(null); setForm({ ...EMPTY, sortOrder: types.length + 1 }); setShowModal(true); };
-  const openEdit = (t: PropType) => { setEditing(t); setForm({ name: t.name, slug: t.slug, icon: t.icon, categoryId: t.categoryId, status: t.status, sortOrder: t.sortOrder }); setShowModal(true); };
+  const openEdit = (t: PropType) => { setEditing(t); setForm({ name: t.name, slug: t.slug, icon: t.icon, categoryId: t.categoryId, status: t.status, sortOrder: t.sortOrder, aliasOf: t.aliasOf ?? '' }); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setEditing(null); setShowIconPicker(false); };
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.slug.trim() || !form.categoryId) return;
     setSaving(true);
     try {
-      if (editing) { await propConfigAdminApi.updateType(editing.id, form); toast('Type updated'); }
-      else { await propConfigAdminApi.createType(form); toast('Type created'); }
+      const payload = { ...form, aliasOf: form.aliasOf?.trim() || null };
+      if (editing) { await propConfigAdminApi.updateType(editing.id, payload); toast('Type updated'); }
+      else { await propConfigAdminApi.createType(payload); toast('Type created'); }
       await load(); closeModal();
     } catch (e: any) { toast(e?.response?.data?.message || 'Error', false); }
     finally { setSaving(false); }
@@ -362,7 +364,10 @@ function PropertyTypesTab() {
                             </div>
                           </td>
                           <td className="px-4 py-3 hidden md:table-cell">
-                            <code className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">{t.slug}</code>
+                            <div className="flex flex-col gap-0.5">
+                              <code className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">{t.slug}</code>
+                              {t.aliasOf && <span className="text-xs text-amber-600">alias of: {t.aliasOf}</span>}
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-center">
                             <button onClick={() => handleToggle(t)} className={cn('inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium', t.status ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200')}>
@@ -422,6 +427,11 @@ function PropertyTypesTab() {
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Slug *</label>
                 <input type="text" value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/\s/g, '_') }))} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400 font-mono" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Alias Of (Slug)</label>
+                <input type="text" value={form.aliasOf} onChange={e => setForm(f => ({ ...f, aliasOf: e.target.value.toLowerCase().replace(/\s/g, '_') }))} placeholder="e.g. apartment (leave blank if standalone)" className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400 font-mono" />
+                <p className="text-xs text-gray-400 mt-1">Set to group this type with another. e.g. flat → apartment</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

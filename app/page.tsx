@@ -15,6 +15,7 @@ import {
 import HomeSearchPanel from '@/components/home/HomeSearchPanel';
 import HeroVisual from '@/components/home/HeroVisual';
 import JsonLd, { buildWebSiteSchema, buildOrganizationSchema } from '@/components/seo/JsonLd';
+import CategoryGrid from '@/components/home/CategoryGrid';
 
 // ─── Above-the-fold: import directly ─────────────────────────────────────────
 import FeaturedProperties from '@/components/home/FeaturedProperties';
@@ -58,14 +59,6 @@ const QUICK_LINKS = [
   { label: 'Plots in Hyderabad', href: '/properties?category=buy&type=plot&city=Hyderabad' },
 ];
 
-const PROPERTY_CATEGORIES = [
-  { icon: '🏠', label: 'Buy',           sublabel: 'Apartments, Villas, Plots',    href: '/buy',         gradient: 'from-blue-500 to-blue-700'     },
-  { icon: '🔑', label: 'Rent',          sublabel: 'Flats, Houses, PG',            href: '/rent',        gradient: 'from-emerald-500 to-emerald-700' },
-  { icon: '🏢', label: 'Commercial',    sublabel: 'Office, Shop, Warehouse',       href: '/commercial',  gradient: 'from-orange-500 to-orange-700'  },
-  { icon: '🛏️', label: 'PG / Co-Living',sublabel: 'Single, Double, Triple',       href: '/pg',          gradient: 'from-purple-500 to-purple-700'  },
-  { icon: '🏗️', label: 'New Projects',  sublabel: 'Builder Floors, Societies',     href: '/new-projects',gradient: 'from-pink-500 to-rose-600'      },
-  { icon: '📐', label: 'Plot / Land',   sublabel: 'Residential, Commercial',       href: '/buy?type=plot',gradient: 'from-teal-500 to-teal-700'     },
-];
 
 const WHY_US = [
   { icon: Shield,         title: 'Verified Listings',  desc: 'All properties verified by our expert team.',          color: 'bg-blue-50 text-blue-600'   },
@@ -255,21 +248,7 @@ export default function HomePage() {
             <p className="text-gray-500 mt-1 text-sm sm:mt-2">Browse properties by category</p>
           </div>
 
-          <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3 md:gap-4">
-            {PROPERTY_CATEGORIES.map((cat) => (
-              <Link
-                key={cat.label}
-                href={cat.href}
-                className="group relative overflow-hidden rounded-2xl p-2.5 sm:p-5 flex flex-col items-center text-center transition-all duration-300 active:scale-95 bg-white border border-gray-100 hover:border-primary-100 hover:shadow-card-hover"
-              >
-                <div className={`w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br ${cat.gradient} rounded-xl flex items-center justify-center mb-1.5 sm:mb-3 text-lg sm:text-2xl shadow-lg group-hover:scale-110 transition-transform`}>
-                  {cat.icon}
-                </div>
-                <span className="font-bold text-xs sm:text-sm text-gray-900 leading-tight">{cat.label}</span>
-                <span className="text-xs text-gray-500 hidden sm:block mt-1 leading-tight">{cat.sublabel}</span>
-              </Link>
-            ))}
-          </div>
+          <CategoryGrid />
         </div>
       </section>
 

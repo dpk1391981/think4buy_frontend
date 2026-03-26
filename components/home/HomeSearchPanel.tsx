@@ -1030,6 +1030,15 @@ function MobileSearch({
         p.set('keyword', rawQ);
         router.push(`/properties?${p}`);
       }
+    } else {
+      // No text but filters (BHK/type/budget) are selected
+      const p = new URLSearchParams();
+      if (isNewProject) p.set('isNewProject', 'true'); else if (cat) p.set('category', cat);
+      if (bhk.length)  p.set('bedrooms', bhk.join(','));
+      if (budget?.min) p.set('minPrice', String(budget.min));
+      if (budget?.max) p.set('maxPrice', String(budget.max));
+      if (type)        p.set('type', type);
+      router.push(`/properties?${p}`);
     }
   };
 
