@@ -456,7 +456,7 @@ function UserMenu({ compact = false }: { compact?: boolean }) {
   const handleLogout = () => {
     logout();
     setOpen(false);
-    router.push('/');
+    window.location.href = '/';
   };
 
   const initials = user?.name
@@ -634,7 +634,7 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
   const handleLogout = () => {
     logout();
     onClose();
-    router.push('/');
+    window.location.href = '/';
   };
 
   const initials = user?.name

@@ -13,6 +13,10 @@ import MobileGuestLoginPrompt from '@/components/auth/MobileGuestLoginPrompt';
 import OnboardingEnforcer from '@/components/auth/OnboardingEnforcer';
 import ToastNotification from '@/components/common/ToastNotification';
 import CookieConsentWrapper from '@/components/consent/CookieConsentWrapper';
+import AuthProgressBar from '@/components/auth/AuthProgressBar';
+import AuthLoadingOverlay from '@/components/auth/AuthLoadingOverlay';
+import AuthSessionLoader from '@/components/auth/AuthSessionLoader';
+import AuthSessionExpiredToast from '@/components/auth/AuthSessionExpiredToast';
 
 const GlobalSearchBar = dynamic(() => import('@/components/search/GlobalSearchBar'), { ssr: false });
 
@@ -109,6 +113,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <MobileGuestLoginPrompt />
               <AuthModal />
               <ToastNotification />
+              {/* Auth UX — order matters: progress bar is topmost (z-300),
+                  login overlay above session loader (z-200 > z-150) */}
+              <AuthProgressBar />
+              <AuthLoadingOverlay />
+              <AuthSessionLoader />
+              <AuthSessionExpiredToast />
               </CookieConsentWrapper>
               </WishlistProvider>
             </AuthProvider>

@@ -13,7 +13,7 @@ type Step = 'phone' | 'otp';
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { login, setLoginLoading } = useAuth();
 
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
@@ -59,21 +59,23 @@ function LoginForm() {
     setLoading(true); setError('');
     try {
       const { data } = await authApi.verifyOtp(phone, otp);
+      // Show full-screen loader before triggering navigation
+      setLoginLoading(true);
       login(data.token, data.user, data.menus);
       const redirect = searchParams.get('redirect') || '';
       if (data.isNewUser) {
         router.replace(`/auth/onboarding?redirect=${encodeURIComponent(redirect || '/')}`);
-      } else if (redirect && redirect !== '/') {
+      } else if (redirect && redirect !== '/' && redirect.startsWith('/')) {
+        // Only redirect to internal paths (prevent open-redirect)
         router.replace(redirect);
       } else {
-        // Role-based redirect for existing users
         const role = data.user?.role;
-        if (role === 'admin') router.replace('/admin');
-        else if (role === 'agent') router.replace('/agent');
-        else if (role === 'owner' || role === 'seller') router.replace('/owner');
-        else router.replace('/buyer');
+        if      (role === 'admin')                      router.replace('/admin');
+        else if (role === 'agent')                      router.replace('/post-property');
+        else                                            router.replace('/');
       }
     } catch (err: any) {
+      setLoginLoading(false);
       setError(err.response?.data?.message || 'Invalid OTP. Try again.');
       setOtp('');
     } finally { setLoading(false); }

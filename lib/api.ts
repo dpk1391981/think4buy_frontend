@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { authEvents } from '@/lib/authEvents';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
@@ -19,55 +20,77 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// 401 auto-refresh: try /auth/refresh (uses HTTP-only `rt` cookie) once, then give up
-let isRefreshing = false;
-let refreshQueue: Array<(token: string) => void> = [];
+// ── 401 auto-refresh — Promise-based lock ──────────────────────────────────
+//
+// WHY a Promise lock instead of a boolean flag:
+//   With a boolean flag, `isRefreshing = false` runs in the `finally` block
+//   synchronously the moment `return api(original)` is called — BEFORE the
+//   retry request resolves. Any concurrent 401 during that window starts a
+//   fresh refresh, which fails (refresh token was already rotated) and logs
+//   the user out.
+//
+// With a Promise lock:
+//   - All concurrent 401s await the SAME refresh Promise.
+//   - `refreshPromise = null` only fires after the whole chain settles.
+//   - Zero timing windows where a second refresh can sneak in.
+
+let refreshPromise: Promise<string> | null = null;
 
 api.interceptors.response.use(
   (res) => res,
-  async (error) => {
+  (error) => {
     const original = error.config;
-    if (
+
+    const shouldRefresh =
       error.response?.status === 401 &&
       !original._retry &&
       typeof window !== 'undefined' &&
       !original.url?.includes('/auth/refresh') &&
       !original.url?.includes('/auth/login') &&
-      !original.url?.includes('/auth/otp')
-    ) {
-      original._retry = true;
+      !original.url?.includes('/auth/otp');
 
-      if (isRefreshing) {
-        return new Promise((resolve) => {
-          refreshQueue.push((token) => {
-            original.headers.Authorization = `Bearer ${token}`;
-            resolve(api(original));
-          });
-        });
-      }
+    if (!shouldRefresh) return Promise.reject(error);
 
-      isRefreshing = true;
-      try {
-        const { data } = await api.post('/auth/refresh', {}, { withCredentials: true });
-        const newToken = data.token || data.accessToken;
-        if (newToken) {
+    // Mark so we never retry the same request twice
+    original._retry = true;
+
+    // Start exactly one refresh — all concurrent callers share the promise
+    if (!refreshPromise) {
+      authEvents.emit('refresh-start');
+
+      refreshPromise = api
+        .post('/auth/refresh', {}, { withCredentials: true })
+        .then(({ data }) => {
+          const newToken: string = data.token || data.accessToken;
+          if (!newToken) throw new Error('no-token');
           localStorage.setItem('token', newToken);
-          api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
-          refreshQueue.forEach((cb) => cb(newToken));
-          refreshQueue = [];
-          original.headers.Authorization = `Bearer ${newToken}`;
-          return api(original);
-        }
-      } catch {
-        // Refresh failed — clear auth and let the page handle redirect
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
-      } finally {
-        isRefreshing = false;
-      }
+          api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+          authEvents.emit('refresh-end');
+          return newToken;
+        })
+        .catch((refreshErr) => {
+          // Permanent failure — clear all auth state
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('menus');
+          document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
+          authEvents.emit('auth-fail');
+          throw refreshErr;
+        })
+        .finally(() => {
+          // Reset only after the entire chain settles —
+          // not during it (that was the original bug)
+          refreshPromise = null;
+        });
     }
-    return Promise.reject(error);
+
+    // All concurrent 401s piggyback on the same refresh promise
+    return refreshPromise
+      .then((newToken) => {
+        original.headers['Authorization'] = `Bearer ${newToken}`;
+        return api(original);
+      })
+      .catch(() => Promise.reject(error));
   },
 );
 

@@ -195,10 +195,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Protect private routes
+  // Protect private routes — pass intended path as ?redirect= for post-login return
   if (PRIVATE_PREFIXES.some(p => pathname.startsWith(p)) && !isAuthed) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';
+    // Only store the path (never full URL) to prevent open-redirect attacks
     url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }

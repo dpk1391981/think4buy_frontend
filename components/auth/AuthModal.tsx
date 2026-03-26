@@ -38,7 +38,7 @@ export default function AuthModal() {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const { authModalOpen, authModalReason, authModalRedirectTo } = useAppSelector((s) => s.ui);
-  const { login } = useAuth();
+  const { login, setLoginLoading } = useAuth();
   const reasonConfig = REASON_CONFIG[authModalReason] ?? REASON_CONFIG.general;
 
   const [step, setStep] = useState<Step>('phone');
@@ -118,13 +118,22 @@ export default function AuthModal() {
     setLoading(true); setError('');
     try {
       const { data } = await authApi.verifyOtp(phone, otp);
-      login(data.token, data.user);
+      // Set full-screen loader BEFORE calling login() + router.push()
+      // so the transition is covered from the first frame.
+      setLoginLoading(true);
+      login(data.token, data.user, data.menus);
       dispatch(closeAuthModal());
+
       if (data.isNewUser) {
         const next = authModalRedirectTo ? `?redirect=${encodeURIComponent(authModalRedirectTo)}` : '';
         router.push(`/auth/onboarding${next}`);
       } else if (authModalRedirectTo) {
         router.push(authModalRedirectTo);
+      } else {
+        const role = data.user?.role;
+        if      (role === 'admin')                      router.push('/admin');
+        else if (role === 'agent')                      router.push('/post-property');
+        else                                            router.push('/');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid OTP. Try again.');
