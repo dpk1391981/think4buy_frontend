@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { X, Phone, RefreshCw, Shield, CheckCircle, Loader2, Heart, Home, BookOpen } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,8 +35,9 @@ const REASON_CONFIG: Record<AuthModalReason, { icon: React.ReactNode; title: str
 type Step = 'phone' | 'otp';
 
 export default function AuthModal() {
-  const dispatch = useAppDispatch();
-  const router = useRouter();
+  const dispatch  = useAppDispatch();
+  const router    = useRouter();
+  const pathname  = usePathname();
   const { authModalOpen, authModalReason, authModalRedirectTo } = useAppSelector((s) => s.ui);
   const { login, setLoginLoading } = useAuth();
   const reasonConfig = REASON_CONFIG[authModalReason] ?? REASON_CONFIG.general;
@@ -129,11 +130,15 @@ export default function AuthModal() {
         router.push(`/auth/onboarding${next}`);
       } else if (authModalRedirectTo) {
         router.push(authModalRedirectTo);
+      } else if (pathname === '/post-property/guest') {
+        // User logged in via the header modal while on the guest post-property page —
+        // always send them to the actual form regardless of role.
+        router.push('/post-property');
       } else {
         const role = data.user?.role;
-        if      (role === 'admin')                      router.push('/admin');
-        else if (role === 'agent')                      router.push('/post-property');
-        else                                            router.push('/');
+        if      (role === 'admin')  router.push('/admin');
+        else if (role === 'agent')  router.push('/post-property');
+        else                        router.push('/');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid OTP. Try again.');
