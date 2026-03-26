@@ -12,6 +12,7 @@ import AuthModal from '@/components/auth/AuthModal';
 import MobileGuestLoginPrompt from '@/components/auth/MobileGuestLoginPrompt';
 import OnboardingEnforcer from '@/components/auth/OnboardingEnforcer';
 import ToastNotification from '@/components/common/ToastNotification';
+import CookieConsentWrapper from '@/components/consent/CookieConsentWrapper';
 
 const GlobalSearchBar = dynamic(() => import('@/components/search/GlobalSearchBar'), { ssr: false });
 
@@ -98,6 +99,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <QueryProvider>
             <AuthProvider>
               <WishlistProvider>
+              <CookieConsentWrapper>
               <Header />
               <GlobalSearchBar asSticky variant="compact" />
               <main className="min-h-screen pb-safe-nav lg:pb-0">{children}</main>
@@ -107,6 +109,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <MobileGuestLoginPrompt />
               <AuthModal />
               <ToastNotification />
+              </CookieConsentWrapper>
               </WishlistProvider>
             </AuthProvider>
           </QueryProvider>

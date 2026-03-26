@@ -786,6 +786,35 @@ export const insightsApi = {
 };
 
 // ─── Articles API ─────────────────────────────────────────────────────────────
+/** Cookie consent — save to DB and retrieve across devices. */
+export const consentApi = {
+  /**
+   * Persist consent decision to the database.
+   * Works for both logged-in users and anonymous sessions.
+   * Fire-and-forget: never throws.
+   */
+  save: (payload: {
+    sessionId?: string;
+    personalization: boolean;
+    analytics: boolean;
+    marketing: boolean;
+    source?: 'banner' | 'modal' | 'settings';
+    consentVersion?: string;
+  }) =>
+    api.post('/consent', payload).catch(() => {}),
+
+  /**
+   * Load stored consent for the current user or session.
+   * Returns null if no record found (first visit).
+   * Used to sync preferences when user logs in on a new device.
+   */
+  getMe: (sessionId?: string) =>
+    api.get('/consent/me', { params: sessionId ? { sessionId } : undefined }).catch(() => ({ data: null })),
+
+  /** Admin: consent acceptance stats. */
+  getStats: () => api.get('/consent/stats'),
+};
+
 export const articlesApi = {
   // Public
   getPublished: (params?: { page?: number; limit?: number; category?: string; search?: string; featured?: boolean }) =>

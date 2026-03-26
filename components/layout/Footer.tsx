@@ -5,6 +5,7 @@ import {
   Smartphone, Download,
 } from 'lucide-react';
 import FooterSeoLinks from './FooterSeoLinks';
+import CookieSettingsLink from '@/components/consent/CookieSettingsLink';
 
 // ── Static data ───────────────────────────────────────────────────────────────
 
@@ -200,16 +201,17 @@ export default function Footer() {
         <div className="container-max py-4">
           <nav aria-label="Secondary footer navigation">
             <ul className="flex flex-wrap gap-x-4 gap-y-2 justify-center text-xs text-gray-500">
-              {SECONDARY_LINKS.map((link, i) => (
+              {SECONDARY_LINKS.map((link) => (
                 <li key={link.label} className="flex items-center gap-4">
                   <Link href={link.href} className="hover:text-gray-300 transition-colors">
                     {link.label}
                   </Link>
-                  {i < SECONDARY_LINKS.length - 1 && (
-                    <span className="text-gray-700 select-none">|</span>
-                  )}
+                  <span className="text-gray-700 select-none">|</span>
                 </li>
               ))}
+              <li>
+                <CookieSettingsLink />
+              </li>
             </ul>
           </nav>
         </div>

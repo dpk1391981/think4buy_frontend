@@ -2,6 +2,7 @@
 
 import { useCallback, useRef } from 'react';
 import { homeApi, propertiesApi } from '@/lib/api';
+import { useCookieConsent } from '@/contexts/CookieConsentContext';
 
 type DeviceType = 'mobile' | 'desktop' | 'tablet';
 type Source = 'home_page' | 'search' | 'recommendation' | 'direct' | 'category';
@@ -42,6 +43,7 @@ function getSessionId(): string {
  */
 export function useAnalytics() {
   const sessionId = useRef(getSessionId());
+  const { preferences } = useCookieConsent();
 
   const track = useCallback((
     eventType: string,
@@ -49,6 +51,9 @@ export function useAnalytics() {
     entityId?: string,
     opts: TrackOptions = {},
   ) => {
+    // Respect analytics consent — skip all tracking if user has not opted in
+    if (!preferences.analytics) return;
+
     const userId = typeof window !== 'undefined'
       ? localStorage.getItem('userId') || undefined
       : undefined;
@@ -73,6 +78,7 @@ export function useAnalytics() {
      * Also fires a generic analytics event for dashboard stats.
      */
     trackPropertyView: (propertyId: string, opts?: TrackOptions & { propertyType?: string }) => {
+      if (!preferences.analytics) return;
       // 1. Unique-view endpoint (handles dedup on the server)
       propertiesApi.trackView(propertyId, {
         sessionId:  sessionId.current,
