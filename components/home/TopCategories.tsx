@@ -1,55 +1,24 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef } from 'react';
 import Link from 'next/link';
-import { TrendingUp, ArrowRight, ChevronLeft, ChevronRight, Flame } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { useAppSelector } from '@/lib/store';
-import { homeApi } from '@/lib/api';
+import { TrendingUp, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { usePropertyCategories, getCategoryHref } from '@/hooks/usePropertyCategories';
 import { cn } from '@/lib/utils';
 
-// ─── Category metadata (icon + gradient) ─────────────────────────────────────
-
-const CAT_STYLE: Record<string, { gradient: string; bgLight: string; textColor: string }> = {
-  apartment:            { gradient: 'from-blue-500 to-blue-700',     bgLight: 'bg-blue-50',    textColor: 'text-blue-700'   },
-  villa:                { gradient: 'from-emerald-500 to-teal-600',  bgLight: 'bg-emerald-50', textColor: 'text-emerald-700'},
-  plot:                 { gradient: 'from-amber-500 to-orange-600',  bgLight: 'bg-amber-50',   textColor: 'text-amber-700'  },
-  house:                { gradient: 'from-orange-500 to-red-500',    bgLight: 'bg-orange-50',  textColor: 'text-orange-700' },
-  penthouse:            { gradient: 'from-violet-500 to-purple-700', bgLight: 'bg-violet-50',  textColor: 'text-violet-700' },
-  studio:               { gradient: 'from-pink-500 to-rose-600',     bgLight: 'bg-pink-50',    textColor: 'text-pink-700'   },
-  commercial_office:    { gradient: 'from-sky-500 to-cyan-600',      bgLight: 'bg-sky-50',     textColor: 'text-sky-700'    },
-  commercial_shop:      { gradient: 'from-indigo-500 to-indigo-700', bgLight: 'bg-indigo-50',  textColor: 'text-indigo-700' },
-  commercial_warehouse: { gradient: 'from-gray-500 to-gray-700',     bgLight: 'bg-gray-50',    textColor: 'text-gray-700'   },
-  pg:                   { gradient: 'from-purple-500 to-purple-700', bgLight: 'bg-purple-50',  textColor: 'text-purple-700' },
-  co_living:            { gradient: 'from-teal-500 to-emerald-600',  bgLight: 'bg-teal-50',    textColor: 'text-teal-700'   },
-  builder_floor:        { gradient: 'from-lime-500 to-green-600',    bgLight: 'bg-lime-50',    textColor: 'text-lime-700'   },
-  farm_house:           { gradient: 'from-green-500 to-teal-600',    bgLight: 'bg-green-50',   textColor: 'text-green-700'  },
-  land:                 { gradient: 'from-yellow-500 to-amber-600',  bgLight: 'bg-yellow-50',  textColor: 'text-yellow-700' },
-  showroom:             { gradient: 'from-red-500 to-rose-600',      bgLight: 'bg-red-50',     textColor: 'text-red-700'    },
-  industrial_shed:      { gradient: 'from-slate-500 to-slate-700',   bgLight: 'bg-slate-50',   textColor: 'text-slate-700'  },
-  factory:              { gradient: 'from-zinc-500 to-zinc-700',     bgLight: 'bg-zinc-50',    textColor: 'text-zinc-700'   },
-};
-
-const DEFAULT_STYLE = { gradient: 'from-primary-500 to-primary-700', bgLight: 'bg-primary-50', textColor: 'text-primary-700' };
-
-// ─── Category href builder ────────────────────────────────────────────────────
-
-function buildCategoryHref(
-  propertyType: string,
-  city?: string,
-  state?: string,
-): string {
-  // Pass only `type` — do NOT add a `category` filter.
-  // Properties of the same type can be posted under different categories
-  // (e.g. a warehouse listed as "buy"). Adding category here causes the
-  // listing page to show 0 results when the DB data doesn't match.
-  const params = new URLSearchParams({ type: propertyType });
-  if (city)  params.set('city',  city);
-  if (state) params.set('state', state);
-  return `/properties?${params.toString()}`;
-}
-
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+// Gradient palette — cycles for any number of categories
+const GRADIENTS = [
+  { gradient: 'from-blue-500 to-blue-700',     bgLight: 'bg-blue-50',    textColor: 'text-blue-700'    },
+  { gradient: 'from-emerald-500 to-teal-600',  bgLight: 'bg-emerald-50', textColor: 'text-emerald-700' },
+  { gradient: 'from-orange-500 to-red-500',    bgLight: 'bg-orange-50',  textColor: 'text-orange-700'  },
+  { gradient: 'from-purple-500 to-purple-700', bgLight: 'bg-purple-50',  textColor: 'text-purple-700'  },
+  { gradient: 'from-pink-500 to-rose-600',     bgLight: 'bg-pink-50',    textColor: 'text-pink-700'    },
+  { gradient: 'from-sky-500 to-cyan-600',      bgLight: 'bg-sky-50',     textColor: 'text-sky-700'     },
+  { gradient: 'from-amber-500 to-orange-600',  bgLight: 'bg-amber-50',   textColor: 'text-amber-700'   },
+  { gradient: 'from-indigo-500 to-indigo-700', bgLight: 'bg-indigo-50',  textColor: 'text-indigo-700'  },
+  { gradient: 'from-teal-500 to-emerald-600',  bgLight: 'bg-teal-50',    textColor: 'text-teal-700'    },
+  { gradient: 'from-lime-500 to-green-600',    bgLight: 'bg-lime-50',    textColor: 'text-lime-700'    },
+];
 
 function SkeletonCard() {
   return (
@@ -65,120 +34,16 @@ function SkeletonCard() {
   );
 }
 
-// ─── Category Card ────────────────────────────────────────────────────────────
-
-interface CategoryItem {
-  propertyType:  string;
-  label:         string;
-  icon:          string;
-  totalListings: number;
-  totalViews:    number;
-  totalSearches: number;
-  score:         number;
-  rank:          number;
-  isTrending:    boolean;
-  trendingScore: number;
-}
-
-function CategoryCard({ cat, city, state }: { cat: CategoryItem; city?: string; state?: string }) {
-  const style  = CAT_STYLE[cat.propertyType] || DEFAULT_STYLE;
-  const href   = buildCategoryHref(cat.propertyType, city, state);
-  const listFmt = cat.totalListings >= 1000
-    ? `${(cat.totalListings / 1000).toFixed(1)}K`
-    : cat.totalListings > 0 ? `${cat.totalListings}` : null;
-
-  return (
-    <Link
-      href={href}
-      className="group flex-shrink-0 w-[140px] sm:w-[160px] snap-start block focus:outline-none"
-    >
-      <div className="relative bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-
-        {/* Trending ribbon */}
-        {cat.isTrending && (
-          <div className="absolute top-2 left-2 z-10 flex items-center gap-0.5 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow">
-            <Flame className="w-2.5 h-2.5" />
-            HOT
-          </div>
-        )}
-
-        {/* Rank badge */}
-        {cat.rank <= 3 && (
-          <div className="absolute top-2 right-2 z-10 w-5 h-5 rounded-full bg-amber-400 text-white text-[9px] font-black flex items-center justify-center shadow">
-            #{cat.rank}
-          </div>
-        )}
-
-        {/* Icon area — gradient square */}
-        <div
-          className={cn(
-            'aspect-square flex items-center justify-center bg-gradient-to-br',
-            style.gradient,
-            'group-hover:scale-105 transition-transform duration-500',
-          )}
-        >
-          <span className="text-4xl sm:text-5xl drop-shadow-md select-none filter brightness-110">
-            {cat.icon}
-          </span>
-        </div>
-
-        {/* Info */}
-        <div className="p-3 text-center">
-          <h3 className="font-bold text-gray-900 text-xs sm:text-sm leading-tight line-clamp-1 group-hover:text-primary-700 transition-colors">
-            {cat.label}
-          </h3>
-          {listFmt && (
-            <p className={cn('text-[11px] font-semibold mt-0.5', style.textColor)}>
-              {listFmt}+ listings
-            </p>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-// ─── Main Section ─────────────────────────────────────────────────────────────
-
 export default function TopCategories() {
-  const scrollRef    = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
-  const selectedCity    = useAppSelector(s => s.ui.selectedCity);
-  const selectedState   = useAppSelector(s => s.ui.selectedState);
-  const selectedCountry = useAppSelector(s => s.ui.selectedCountry);
-
-  useEffect(() => { setMounted(true); }, []);
-
-  // Defer location-dependent text until after hydration to avoid server/client mismatch
-  const locationLabel = mounted
-    ? (selectedCity
-        ? `in ${selectedCity}`
-        : selectedState ? `in ${selectedState}`
-        : selectedCountry ? `in ${selectedCountry}`
-        : 'across India')
-    : 'across India';
-
-  const { data: categories = [], isLoading } = useQuery<CategoryItem[]>({
-    queryKey: ['top-categories', selectedCountry, selectedState, selectedCity],
-    queryFn: () =>
-      homeApi
-        .getTopCategories({
-          country: selectedCountry || undefined,
-          state:   selectedState   || undefined,
-          city:    selectedCity    || undefined,
-          limit:   14,
-        })
-        .then(r => r.data?.data || []),
-    staleTime: 10 * 60 * 1000,
-  });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { categories, loading } = usePropertyCategories();
 
   const scroll = (dir: 'left' | 'right') => {
     scrollRef.current?.scrollBy({ left: dir === 'right' ? 320 : -320, behavior: 'smooth' });
   };
 
-  const trendingCount = categories.filter(c => c.isTrending).length;
-
-  if (!isLoading && categories.length === 0) return null;
+  // Don't render if no categories and not loading
+  if (!loading && categories.length === 0) return null;
 
   return (
     <section className="py-5 sm:py-14 bg-gray-50">
@@ -190,20 +55,14 @@ export default function TopCategories() {
             <div className="flex items-center gap-2 mb-1.5">
               <TrendingUp className="w-4 h-4 text-primary-600" />
               <span className="text-xs font-semibold text-primary-600 uppercase tracking-wide">
-                Popularity Ranked
+                Browse by Category
               </span>
-              {trendingCount > 0 && (
-                <span className="inline-flex items-center gap-0.5 bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  <Flame className="w-2.5 h-2.5" />
-                  {trendingCount} Trending
-                </span>
-              )}
             </div>
             <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 leading-tight">
-              Top Categories {locationLabel}
+              Top Categories across India
             </h2>
             <p className="text-gray-500 mt-1 text-sm">
-              Ranked by listings, views &amp; searches
+              Find your perfect property by category
             </p>
           </div>
 
@@ -226,7 +85,7 @@ export default function TopCategories() {
               </button>
             </div>
             <Link
-              href={`/properties${selectedCity ? `?city=${encodeURIComponent(selectedCity)}` : selectedState ? `?state=${encodeURIComponent(selectedState)}` : ''}`}
+              href="/properties"
               className="flex items-center gap-1.5 text-primary-600 hover:text-primary-700 font-medium text-sm"
             >
               View All <ArrowRight className="w-4 h-4" />
@@ -240,16 +99,46 @@ export default function TopCategories() {
             ref={scrollRef}
             className="flex gap-3 sm:gap-4 overflow-x-auto no-scrollbar px-4 sm:px-0 snap-x snap-mandatory pb-2"
           >
-            {isLoading
-              ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
-              : categories.map(cat => (
-                  <CategoryCard
-                    key={cat.propertyType}
-                    cat={cat}
-                    city={selectedCity || undefined}
-                    state={selectedState || undefined}
-                  />
-                ))
+            {loading
+              ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+              : categories.map((cat, i) => {
+                  const style = GRADIENTS[i % GRADIENTS.length];
+                  const href  = getCategoryHref(cat.slug);
+                  return (
+                    <Link
+                      key={cat.id}
+                      href={href}
+                      className="group flex-shrink-0 w-[140px] sm:w-[160px] snap-start block focus:outline-none"
+                    >
+                      <div className="relative bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                        {/* Icon area */}
+                        <div
+                          className={cn(
+                            'aspect-square flex items-center justify-center bg-gradient-to-br',
+                            style.gradient,
+                            'group-hover:scale-105 transition-transform duration-500',
+                          )}
+                        >
+                          <span className="text-4xl sm:text-5xl drop-shadow-md select-none filter brightness-110">
+                            {cat.icon || '🏠'}
+                          </span>
+                        </div>
+
+                        {/* Info */}
+                        <div className="p-3 text-center">
+                          <h3 className="font-bold text-gray-900 text-xs sm:text-sm leading-tight line-clamp-1 group-hover:text-primary-700 transition-colors">
+                            {cat.name}
+                          </h3>
+                          {cat.description && (
+                            <p className={cn('text-[11px] font-semibold mt-0.5 line-clamp-1', style.textColor)}>
+                              {cat.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })
             }
           </div>
         </div>
@@ -264,24 +153,23 @@ export default function TopCategories() {
           </Link>
         </div>
 
-        {/* ── Stats strip — desktop only ── */}
-        {!isLoading && categories.length > 0 && (
-          <div className="hidden sm:flex items-center gap-6 mt-6 pt-5 border-t border-gray-100">
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Most Active:</p>
-            {categories.slice(0, 5).map((cat, i) => {
-              const style = CAT_STYLE[cat.propertyType] || DEFAULT_STYLE;
+        {/* ── Bottom strip — desktop only ── */}
+        {!loading && categories.length > 0 && (
+          <div className="hidden sm:flex items-center gap-3 mt-6 pt-5 border-t border-gray-100 flex-wrap">
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Quick Links:</p>
+            {categories.map((cat, i) => {
+              const style = GRADIENTS[i % GRADIENTS.length];
               return (
                 <Link
-                  key={cat.propertyType}
-                  href={buildCategoryHref(cat.propertyType, selectedCity || undefined, selectedState || undefined)}
+                  key={cat.id}
+                  href={getCategoryHref(cat.slug)}
                   className={cn(
                     'flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors',
                     style.bgLight, style.textColor, 'border-current/20 hover:opacity-80',
                   )}
                 >
-                  <span>{cat.icon}</span>
-                  {cat.label}
-                  {cat.isTrending && <Flame className="w-3 h-3 text-red-500" />}
+                  <span>{cat.icon || '🏠'}</span>
+                  {cat.name}
                 </Link>
               );
             })}
