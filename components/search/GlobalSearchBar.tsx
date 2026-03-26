@@ -15,7 +15,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Search, MapPin, Loader2, X, Navigation, TrendingUp,
   Building2, Home, LocateFixed, ChevronRight,
@@ -638,6 +638,8 @@ function SearchModal({
 
 // ── Main GlobalSearchBar export ───────────────────────────────────────────────
 
+const HIDDEN_PATH_PREFIXES = ['/admin', '/dashboard', '/buyer', '/owner', '/agent'];
+
 export default function GlobalSearchBar({
   variant = 'compact',
   asSticky = false,
@@ -646,8 +648,13 @@ export default function GlobalSearchBar({
   initialKeyword = '',
   className,
 }: GlobalSearchBarProps) {
+  const pathname = usePathname();
   const [modalOpen, setModalOpen] = useState(false);
   const [stickyVisible, setStickyVisible] = useState(false);
+
+  if (HIDDEN_PATH_PREFIXES.some(prefix => pathname?.startsWith(prefix))) {
+    return null;
+  }
 
   // Sticky scroll listener
   useEffect(() => {
