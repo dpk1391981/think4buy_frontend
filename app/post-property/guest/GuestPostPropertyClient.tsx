@@ -49,14 +49,15 @@ export default function GuestPostPropertyPage() {
   const [agencyPhone,   setAgencyPhone]   = useState('');
   const [agencyAddress, setAgencyAddress] = useState('');
 
-  // Redirect once the AuthContext confirms the user is logged in.
-  // Using `user` as the trigger (not a fixed timer) means we navigate
-  // the instant the state is ready — no unnecessary wait.
+  // Redirect once auth state is confirmed.
+  // Use hard navigation (window.location) so the browser sends a fresh request
+  // through Next.js middleware — guaranteeing the t4bs_auth cookie is read
+  // and the middleware allows /post-property instead of bouncing back here.
   useEffect(() => {
     if (step === 'success' && user) {
-      router.replace('/post-property');
+      window.location.href = '/post-property';
     }
-  }, [step, user, router]);
+  }, [step, user]);
 
   const startTimer = () => {
     setTimer(30);

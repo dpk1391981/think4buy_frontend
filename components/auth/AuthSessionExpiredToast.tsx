@@ -1,20 +1,32 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import { authEvents } from '@/lib/authEvents';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
- * Shows a non-intrusive banner when the session expires (refresh token invalid).
- * Does NOT redirect — the middleware handles route protection on the next navigation.
+ * Shows a non-intrusive banner ONLY when a previously authenticated user's
+ * session expires mid-session (refresh token invalid).
+ *
+ * Does NOT show on initial load with no token — that is a normal unauthenticated
+ * state, not a session expiry.
  */
 export default function AuthSessionExpiredToast() {
+  const { user }      = useAuth();
+  const wasAuthed     = useRef(false);
   const [visible, setVisible] = useState(false);
+
+  // Track whether the user was ever authenticated in this session
+  useEffect(() => {
+    if (user) wasAuthed.current = true;
+  }, [user]);
 
   useEffect(() => {
     return authEvents.on('auth-fail', () => {
+      // Only show if user had an active session — not on cold load failures
+      if (!wasAuthed.current) return;
       setVisible(true);
-      // Auto-dismiss after 6 s
       setTimeout(() => setVisible(false), 6000);
     });
   }, []);
