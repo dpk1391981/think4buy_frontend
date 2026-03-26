@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * GlobalSearchBar — Unified search component for all pages.
+ * GlobalSearchBar — Smart Intent-Driven Search (Hero Feature).
  *
  * Variants:
  *   hero    — shown inside homepage hero (transparent background strip)
@@ -9,20 +9,29 @@
  *
  * asSticky={true} — adds scroll-triggered fixed positioning (layout.tsx)
  *
- * Clicking the bar on BOTH desktop and mobile opens a full-screen SearchModal.
- * All categories are loaded from the backend; no static filter arrays.
+ * Features:
+ *  • Natural language parsing with instant intent-preview chips
+ *  • Real-time suggestions (cities, localities, builders, projects)
+ *  • Search history for logged-in users
+ *  • Quick lifestyle tags (Near Metro, Parking, etc.)
+ *  • "Did you mean?" city correction from backend
+ *  • Trending searches + Popular cities fallback
+ *  • Near-me geolocation
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   Search, MapPin, Loader2, X, Navigation, TrendingUp,
-  Building2, Home, LocateFixed, ChevronRight,
+  Building2, Home, LocateFixed, ChevronRight, History, Sparkles,
+  AlertCircle,
 } from 'lucide-react';
 import { locationsApi, propertiesApi, smartSearchApi, propertyConfigApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { detectLocation } from '@/lib/geolocation';
+import { useAuth } from '@/contexts/AuthContext';
+import { parseSearchHint, formatHintChips, QUICK_TAGS } from '@/lib/searchParser';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -136,28 +145,108 @@ function useCategoryTabs() {
   return { tabs, loading };
 }
 
+// ── Intent Preview Strip ───────────────────────────────────────────────────────
+// Shows parsed understanding of the user's natural language query in real time.
+
+function IntentPreview({ query }: { query: string }) {
+  const chips = useMemo(() => {
+    if (!query || query.length < 4) return [];
+    return formatHintChips(parseSearchHint(query));
+  }, [query]);
+
+  if (chips.length === 0) return null;
+
+  return (
+    <div className="px-5 pt-1 pb-3 flex items-start gap-2">
+      <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+        <Sparkles className="w-3.5 h-3.5 text-primary-400" />
+        <span className="text-[10px] font-bold text-primary-400 uppercase tracking-wide">Detected</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {chips.map((chip, i) => (
+          <span
+            key={i}
+            className="inline-flex items-center px-2.5 py-1 rounded-full bg-primary-50 border border-primary-100 text-primary-700 text-xs font-semibold"
+          >
+            {chip}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Quick Tags Row ─────────────────────────────────────────────────────────────
+// Lifestyle tags the user can tap to quickly append to their query.
+
+function QuickTagsRow({
+  query,
+  onTagClick,
+}: {
+  query: string;
+  onTagClick: (append: string) => void;
+}) {
+  // Filter out tags already present in the query
+  const visibleTags = QUICK_TAGS.filter(t => !query.toLowerCase().includes(t.append));
+  if (visibleTags.length === 0) return null;
+
+  return (
+    <div className="px-5 pb-4">
+      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Quick Filters</p>
+      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-0.5">
+        {visibleTags.map(tag => (
+          <button
+            key={tag.label}
+            onClick={() => onTagClick(tag.append)}
+            className="flex-shrink-0 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-xs font-semibold text-gray-600 hover:border-primary-400 hover:text-primary-700 hover:bg-primary-50 transition-all"
+          >
+            {tag.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Suggestions list ───────────────────────────────────────────────────────────
 
 function SuggestionsList({
-  suggestions, popularCities, trendingSearches, query, loading,
-  onSuggClick, onCityClick, onTrendingClick, onNearMe, geoLoading,
+  suggestions, popularCities, trendingSearches, recentSearches, query, loading,
+  onSuggClick, onCityClick, onTrendingClick, onHistoryClick, onNearMe, geoLoading,
+  didYouMean, onDidYouMeanClick,
 }: {
   suggestions: Suggestion[];
   popularCities: any[];
   trendingSearches: any[];
+  recentSearches: string[];
   query: string;
   loading: boolean;
   onSuggClick: (s: Suggestion) => void;
   onCityClick: (cityName: string) => void;
   onTrendingClick: (q: string) => void;
+  onHistoryClick: (q: string) => void;
   onNearMe: () => void;
   geoLoading: boolean;
+  didYouMean?: string;
+  onDidYouMeanClick: (city: string) => void;
 }) {
   if (suggestions.length > 0) {
     const groups = ['city', 'locality', 'project', 'builder'] as const;
     const GROUP_LABELS = { city: 'Cities', locality: 'Localities', project: 'Projects', builder: 'Builders' };
     return (
       <>
+        {/* Did you mean */}
+        {didYouMean && (
+          <button
+            onClick={() => onDidYouMeanClick(didYouMean)}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-amber-50 border-b border-amber-100 text-left hover:bg-amber-100 transition-colors"
+          >
+            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+            <span className="text-sm text-gray-700">
+              Did you mean <span className="font-semibold text-primary-600">{didYouMean}</span>?
+            </span>
+          </button>
+        )}
         {groups.map(gType => {
           const grp = suggestions.filter(s => s.type === gType);
           if (!grp.length) return null;
@@ -218,6 +307,30 @@ function SuggestionsList({
         </div>
       </button>
 
+      {/* Recent searches (logged-in users) */}
+      {recentSearches.length > 0 && (
+        <>
+          <div className="px-5 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-1.5">
+            <History className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Recent Searches</span>
+          </div>
+          {recentSearches.map((q, idx) => (
+            <button
+              key={idx}
+              onClick={() => onHistoryClick(q)}
+              className="w-full flex items-center gap-4 px-5 py-3 border-b border-gray-50 hover:bg-gray-50 active:bg-gray-100 text-left transition-colors"
+            >
+              <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <History className="w-3.5 h-3.5 text-gray-400" />
+              </div>
+              <span className="text-sm text-gray-700 flex-1 truncate">{q}</span>
+              <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+            </button>
+          ))}
+        </>
+      )}
+
+      {/* Trending searches */}
       {trendingSearches.length > 0 && (
         <>
           <div className="px-5 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-1.5">
@@ -239,6 +352,7 @@ function SuggestionsList({
         </>
       )}
 
+      {/* Popular cities */}
       {popularCities.length > 0 && (
         <>
           <div className="px-5 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-1.5">
@@ -283,6 +397,7 @@ function SearchModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const debRef   = useRef<NodeJS.Timeout>();
   const [mounted, setMounted]     = useState(false);
@@ -297,7 +412,9 @@ function SearchModal({
   const [searching, setSearching]         = useState(false);
   const [popularCities, setPopularCities] = useState<any[]>([]);
   const [trendingSearches, setTrendingSearches] = useState<any[]>([]);
+  const [recentSearches, setRecentSearches]     = useState<string[]>([]);
   const [geoLoading, setGeoLoading]       = useState(false);
+  const [didYouMean, setDidYouMean]       = useState<string | undefined>();
 
   // Mount + animate in
   useEffect(() => {
@@ -335,7 +452,16 @@ function SearchModal({
     smartSearchApi.getTrending(5).then(r => {
       if (Array.isArray(r?.data)) setTrendingSearches(r.data);
     }).catch(() => {});
-  }, []);
+    // Search history for logged-in users
+    if (user) {
+      smartSearchApi.getHistory().then(r => {
+        const logs: any[] = Array.isArray(r?.data) ? r.data : [];
+        const seen = new Set<string>();
+        const queries = logs.map((l: any) => l.searchQuery as string).filter(q => q && !seen.has(q) && seen.add(q)).slice(0, 5);
+        setRecentSearches(queries);
+      }).catch(() => {});
+    }
+  }, [user]);
 
   const fetchSugg = useCallback(async (val: string) => {
     if (!val.trim() || val.length < 2) { setSuggestions([]); return; }
@@ -369,6 +495,7 @@ function SearchModal({
 
   const handleChange = (val: string) => {
     setQuery(val);
+    setDidYouMean(undefined);
     clearTimeout(debRef.current);
     debRef.current = setTimeout(() => fetchSugg(val), 260);
   };
@@ -383,6 +510,8 @@ function SearchModal({
         return;
       }
       const res = await smartSearchApi.parse(q, category || undefined);
+      // Surface "did you mean" (though modal is closing, it fires for analytics)
+      if (res.data.didYouMean) setDidYouMean(res.data.didYouMean);
       const url = new URL(res.data.redirectUrl, 'http://x');
       // UI-selected category always wins unless smart search returned one
       if (category && !res.data.filters?.category) url.searchParams.set('category', category);
@@ -445,7 +574,21 @@ function SearchModal({
     }
   };
 
-  const activeCat = categoryTabs.find(c => c.value === category) ?? categoryTabs[0];
+  const handleQuickTag = (append: string) => {
+    const newQuery = query.trim() ? `${query.trim()} ${append}` : append;
+    setQuery(newQuery);
+    inputRef.current?.focus();
+    clearTimeout(debRef.current);
+    debRef.current = setTimeout(() => fetchSugg(newQuery), 260);
+  };
+
+  const handleDidYouMean = (city: string) => {
+    setDidYouMean(undefined);
+    const p = new URLSearchParams();
+    if (category) p.set('category', category);
+    p.set('city', city);
+    go(`/properties?${p.toString()}`);
+  };
 
   if (!mounted) return null;
 
@@ -508,7 +651,7 @@ function SearchModal({
           <div className="flex items-start justify-between px-6 pt-5 pb-1 sm:pt-6">
             <div>
               <p className="text-primary-200 text-[10px] font-bold uppercase tracking-[0.18em] mb-1">
-                Think4BuySale
+                Smart Search
               </p>
               <h2 className="text-white text-xl font-bold leading-snug">
                 Where do you want<br className="hidden sm:block" /> to search?
@@ -553,7 +696,7 @@ function SearchModal({
         <div className="bg-white flex flex-col" style={{ maxHeight: 'calc(90vh - 160px)' }}>
 
           {/* Search input */}
-          <div className="px-5 pt-5 pb-3">
+          <div className="px-5 pt-5 pb-2">
             <div className={cn(
               'flex items-center gap-3 bg-gray-50 rounded-2xl border-2 transition-all duration-150 px-4',
               'focus-within:bg-white focus-within:border-primary-500 focus-within:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]',
@@ -567,7 +710,7 @@ function SearchModal({
                 onChange={e => handleChange(e.target.value)}
                 onFocus={() => { if (query.length >= 2) fetchSugg(query); }}
                 onKeyDown={e => { if (e.key === 'Enter') buildAndGo(); }}
-                placeholder='City, locality, or "2 BHK flat in Noida"…'
+                placeholder='Try "2BHK in Noida under 60L near metro"…'
                 className="flex-1 py-4 text-[15px] text-gray-800 outline-none bg-transparent placeholder-gray-400 font-medium min-w-0"
                 autoComplete="off"
               />
@@ -575,7 +718,7 @@ function SearchModal({
                 ? <Loader2 className="w-4 h-4 text-primary-400 animate-spin flex-shrink-0" />
                 : query
                   ? <button
-                      onClick={() => { setQuery(''); setSuggestions([]); inputRef.current?.focus(); }}
+                      onClick={() => { setQuery(''); setSuggestions([]); setDidYouMean(undefined); inputRef.current?.focus(); }}
                       className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center flex-shrink-0 transition-colors"
                     ><X className="w-3.5 h-3.5 text-gray-500" /></button>
                   : null
@@ -583,8 +726,11 @@ function SearchModal({
             </div>
           </div>
 
+          {/* Intent preview — shows parsed chips when user types NL query */}
+          <IntentPreview query={query} />
+
           {/* Action buttons */}
-          <div className="flex gap-2.5 px-5 pb-4">
+          <div className="flex gap-2.5 px-5 pb-3">
             <button
               onClick={handleNearMe}
               disabled={geoLoading}
@@ -608,6 +754,11 @@ function SearchModal({
             </button>
           </div>
 
+          {/* Quick lifestyle tags */}
+          {!query && (
+            <QuickTagsRow query={query} onTagClick={handleQuickTag} />
+          )}
+
           {/* Divider */}
           <div className="h-px bg-gray-100" />
 
@@ -617,13 +768,17 @@ function SearchModal({
               suggestions={suggestions}
               popularCities={popularCities}
               trendingSearches={trendingSearches}
+              recentSearches={recentSearches}
               query={query}
               loading={loadingSugg}
               onSuggClick={handleSuggClick}
               onCityClick={name => handleSuggClick({ type: 'city', label: name, value: name })}
               onTrendingClick={handleTrending}
+              onHistoryClick={q => { setQuery(q); inputRef.current?.focus(); fetchSugg(q); }}
               onNearMe={handleNearMe}
               geoLoading={geoLoading}
+              didYouMean={didYouMean}
+              onDidYouMeanClick={handleDidYouMean}
             />
           </div>
 
@@ -636,9 +791,10 @@ function SearchModal({
   );
 }
 
-// ── Main GlobalSearchBar export ───────────────────────────────────────────────
-
+// ── Hidden path prefixes (GlobalSearchBar not shown on these routes) ──────────
 const HIDDEN_PATH_PREFIXES = ['/admin', '/dashboard', '/buyer', '/owner', '/agent'];
+
+// ── Main GlobalSearchBar export ───────────────────────────────────────────────
 
 export default function GlobalSearchBar({
   variant = 'compact',
@@ -652,9 +808,7 @@ export default function GlobalSearchBar({
   const [modalOpen, setModalOpen] = useState(false);
   const [stickyVisible, setStickyVisible] = useState(false);
 
-  if (HIDDEN_PATH_PREFIXES.some(prefix => pathname?.startsWith(prefix))) {
-    return null;
-  }
+  const hidden = HIDDEN_PATH_PREFIXES.some(prefix => pathname?.startsWith(prefix));
 
   // Sticky scroll listener
   useEffect(() => {
@@ -664,6 +818,8 @@ export default function GlobalSearchBar({
     onScroll();
     return () => window.removeEventListener('scroll', onScroll);
   }, [asSticky]);
+
+  if (hidden) return null;
 
   const stickyClasses = asSticky
     ? cn(
@@ -710,7 +866,7 @@ export default function GlobalSearchBar({
               variant === 'hero' ? 'text-base md:text-lg' : 'text-sm',
             )}>
               {displayText || (variant === 'hero'
-                ? 'Search city, locality, or try "2 BHK in Mumbai under 50L"...'
+                ? 'Try "2BHK in Noida under 60L near metro"…'
                 : 'Search city, locality, project...'
               )}
             </span>

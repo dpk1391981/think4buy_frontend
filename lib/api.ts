@@ -133,6 +133,8 @@ export const smartSearchApi = {
       chips: { key: string; label: string; value: string }[];
       nearbySearch: boolean;
       parsed: Record<string, any>;
+      /** Suggested city name correction when user's input was unrecognised */
+      didYouMean?: string;
     };
   }> => api.post('/smart-search', { query, category }),
 
