@@ -56,6 +56,7 @@ export default function AdminUsersPage() {
         page,
         limit: 15,
         search: search || undefined,
+        role: roleFilter !== 'all' ? roleFilter : undefined,
       });
       setWallets(r.data?.wallets || r.data?.items || []);
       setTotal(r.data?.total || 0);
@@ -64,14 +65,13 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, roleFilter]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const filteredWallets =
-    roleFilter === 'all' ? wallets : wallets.filter((w) => w.user?.role === roleFilter);
+  const filteredWallets = wallets;
 
   const ROLE_COLORS: Record<string, string> = {
     super_admin: 'bg-red-100 text-red-700',
@@ -126,7 +126,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  const ROLES = ['all', 'admin', 'agent', 'seller', 'buyer'];
+  const ROLES = ['all', 'super_admin', 'admin', 'broker', 'agent', 'owner', 'seller', 'buyer'];
 
   const statCards = [
     {
@@ -177,7 +177,7 @@ export default function AdminUsersPage() {
         <div className="flex flex-wrap gap-3 items-center">
           <input
             type="text"
-            placeholder="Search by name or email..."
+            placeholder="Search by name, email or mobile..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -189,7 +189,7 @@ export default function AdminUsersPage() {
             {ROLES.map((r) => (
               <button
                 key={r}
-                onClick={() => setRoleFilter(r)}
+                onClick={() => { setRoleFilter(r); setPage(1); }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
                   roleFilter === r
                     ? 'bg-blue-600 text-white'
