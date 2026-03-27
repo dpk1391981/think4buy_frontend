@@ -122,12 +122,6 @@ export default async function ProgrammaticSeoListingPage({ params }: Props) {
     <>
       <JsonLd schema={schemas} />
 
-      {config.h1Title && (
-        <div className="container-max max-w-5xl pt-6 pb-2">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{config.h1Title}</h1>
-        </div>
-      )}
-
       {/* Property listings — always rendered from property DB */}
       <Suspense fallback={<div className="min-h-screen bg-gray-50 pt-4" />}>
         <PropertyListingPage searchParams={listingParams} />

@@ -15,60 +15,59 @@ interface Props {
   config: SeoPageConfig;
 }
 
-/**
- * Detects whether a string contains any HTML tags.
- * Used to decide whether to render via dangerouslySetInnerHTML or as plain text.
- */
+/** True if the string contains at least one HTML tag. */
 function containsHtml(str: string): boolean {
   return /<[a-z][\s\S]*>/i.test(str);
 }
 
 /**
- * Renders a string that may contain HTML or plain text.
- * If it contains HTML tags, uses dangerouslySetInnerHTML.
- * Otherwise renders as plain text inside a <p>.
+ * Render a string that may be HTML or plain text.
+ * If HTML tags are detected → dangerouslySetInnerHTML (parses & renders tags).
+ * Otherwise → plain paragraph.
  */
 function HtmlOrText({ content, className }: { content: string; className?: string }) {
   if (containsHtml(content)) {
-    return (
-      <div
-        className={className}
-        dangerouslySetInnerHTML={{ __html: content }}
-      />
-    );
+    return <div className={className} dangerouslySetInnerHTML={{ __html: content }} />;
   }
   return <p className={className}>{content}</p>;
 }
 
+const proseBase = [
+  'prose prose-gray max-w-none',
+  'prose-headings:text-gray-900 prose-headings:font-bold',
+  'prose-h2:text-xl prose-h3:text-lg',
+  'prose-p:text-gray-600 prose-p:leading-relaxed prose-p:my-3',
+  'prose-strong:text-gray-800 prose-strong:font-semibold',
+  'prose-em:text-gray-700',
+  'prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline',
+  'prose-ul:text-gray-600 prose-ol:text-gray-600 prose-li:my-1',
+].join(' ');
+
 export default function DbSeoContent({ config }: Props) {
+  const hasH1     = !!config.h1Title?.trim();
   const hasIntro  = !!config.introContent?.trim();
   const hasBottom = !!config.bottomContent?.trim();
   const hasFaqs   = !!config.faqJson?.length;
   const hasLinks  = !!config.internalLinks?.length;
 
-  if (!hasIntro && !hasBottom && !hasFaqs && !hasLinks) return null;
+  if (!hasH1 && !hasIntro && !hasBottom && !hasFaqs && !hasLinks) return null;
 
   return (
     <section className="bg-white border-t border-gray-100 py-14" aria-label="Property information">
       <div className="container-max max-w-5xl space-y-12">
 
-        {/* ── Intro Content ────────────────────────────────────────────────── */}
-        {hasIntro && (
+        {/* ── H1 Title + Intro ─────────────────────────────────────────────── */}
+        {(hasH1 || hasIntro) && (
           <div>
+            {hasH1 && (
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
+                {config.h1Title}
+              </h1>
+            )}
             <div className="w-16 h-1 bg-primary-500 rounded mb-6" />
-            <HtmlOrText
-              content={config.introContent!}
-              className={[
-                'prose prose-gray max-w-none',
-                'prose-headings:text-gray-900 prose-headings:font-bold',
-                'prose-h2:text-xl prose-h3:text-lg',
-                'prose-p:text-gray-600 prose-p:leading-relaxed prose-p:my-3',
-                'prose-strong:text-gray-800 prose-strong:font-semibold',
-                'prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline',
-                'prose-ul:text-gray-600 prose-ol:text-gray-600',
-                'prose-li:my-1',
-              ].join(' ')}
-            />
+            {hasIntro && (
+              <HtmlOrText content={config.introContent!} className={proseBase} />
+            )}
           </div>
         )}
 
@@ -104,17 +103,12 @@ export default function DbSeoContent({ config }: Props) {
                   className="group bg-gray-50 border border-gray-100 rounded-xl overflow-hidden"
                 >
                   <summary className="px-5 py-4 cursor-pointer text-sm font-semibold text-gray-800 hover:text-primary-700 flex items-center justify-between list-none">
-                    {/* Question may contain HTML (e.g. <strong>) */}
-                    {containsHtml(faq.question) ? (
-                      <span dangerouslySetInnerHTML={{ __html: faq.question }} />
-                    ) : (
-                      <span>{faq.question}</span>
-                    )}
-                    <span className="text-gray-400 group-open:rotate-180 transition-transform text-lg leading-none ml-3 flex-shrink-0">
-                      ↓
-                    </span>
+                    {containsHtml(faq.question)
+                      ? <span dangerouslySetInnerHTML={{ __html: faq.question }} />
+                      : <span>{faq.question}</span>
+                    }
+                    <span className="text-gray-400 group-open:rotate-180 transition-transform text-lg leading-none ml-3 flex-shrink-0">↓</span>
                   </summary>
-                  {/* Answer may contain HTML */}
                   <div className="px-5 pb-4 border-t border-gray-100 pt-3">
                     <HtmlOrText
                       content={faq.answer}
