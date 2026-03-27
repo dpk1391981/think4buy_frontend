@@ -13,6 +13,7 @@ import {
   Wallet,
   TrendingUp,
   ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
@@ -149,9 +150,13 @@ const SkeletonCard = () => (
   <div className="h-32 bg-gray-200 rounded-2xl animate-pulse" />
 );
 
+type CacheStatus = 'idle' | 'loading' | 'success' | 'error';
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cacheStatus, setCacheStatus] = useState<CacheStatus>('idle');
+  const [cacheMsg, setCacheMsg] = useState('');
 
   useEffect(() => {
     adminApi
@@ -160,6 +165,21 @@ export default function AdminDashboard() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleGlobalCacheRefresh() {
+    setCacheStatus('loading');
+    setCacheMsg('');
+    try {
+      const res = await adminApi.globalCacheRefresh();
+      setCacheMsg(res.data?.message ?? 'All caches refreshed');
+      setCacheStatus('success');
+    } catch {
+      setCacheMsg('Cache refresh failed. Try again.');
+      setCacheStatus('error');
+    } finally {
+      setTimeout(() => setCacheStatus('idle'), 6000);
+    }
+  }
 
   if (loading) {
     return (
@@ -219,6 +239,34 @@ export default function AdminDashboard() {
               Manage Users
             </Link>
           </div>
+        </div>
+      </div>
+
+      {/* Global Cache Refresh */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="font-bold text-gray-900 flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-primary-600" />
+              Global Cache Refresh
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Rebuilds all server caches: property rankings, hot scores, agents, projects, locations, categories &amp; market snapshots.
+            </p>
+            {cacheMsg && (
+              <p className={`text-xs mt-2 font-medium ${cacheStatus === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                {cacheMsg}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={handleGlobalCacheRefresh}
+            disabled={cacheStatus === 'loading'}
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-400 text-white text-sm font-semibold rounded-xl transition-colors whitespace-nowrap"
+          >
+            <RefreshCw className={`w-4 h-4 ${cacheStatus === 'loading' ? 'animate-spin' : ''}`} />
+            {cacheStatus === 'loading' ? 'Refreshing...' : 'Refresh All Caches'}
+          </button>
         </div>
       </div>
 

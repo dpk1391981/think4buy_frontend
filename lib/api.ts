@@ -295,6 +295,7 @@ export const adminApi = {
   refreshMarketSnapshot: (city?: string, all?: boolean) =>
     api.post('/home/market-snapshot/refresh', { city, all }),
   refreshPropertyCache: () => api.post('/admin/cache/refresh'),
+  globalCacheRefresh: () => api.post('/admin/cache/refresh-all'),
   // Scoring Config
   getScoringConfig: () => api.get('/admin/scoring-config'),
   setScoringConfig: (key: string, data: { value: number; description?: string }) =>
