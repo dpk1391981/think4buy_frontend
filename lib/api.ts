@@ -368,7 +368,7 @@ export const adminUsersApi = {
 
 // Admin Wallet
 export const adminWalletApi = {
-  getAllWallets: (params?: { page?: number; limit?: number; search?: string }) =>
+  getAllWallets: (params?: { page?: number; limit?: number; search?: string; role?: string }) =>
     api.get('/admin/wallets', { params }),
   topUp: (userId: string, amount: number, description?: string) =>
     api.post(`/admin/wallets/${userId}/top-up`, { amount, description }),
