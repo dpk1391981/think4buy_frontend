@@ -97,10 +97,16 @@ export function getPropertyTypeLabel(type: string): string {
     penthouse: 'Penthouse',
     studio: 'Studio',
     commercial_office: 'Office Space',
-    commercial_shop: 'Shop',
+    commercial_shop: 'Shop / Retail',
     commercial_warehouse: 'Warehouse',
     pg: 'PG',
     co_living: 'Co-Living',
+    builder_floor: 'Builder Floor',
+    farm_house: 'Farm House',
+    showroom: 'Showroom',
+    factory: 'Factory',
+    industrial_shed: 'Industrial Shed',
+    land: 'Land',
   };
   return labels[type] || type;
 }
@@ -119,8 +125,11 @@ export function getCategoryLabel(category: string): string {
   const labels: Record<string, string> = {
     buy: 'For Sale',
     rent: 'For Rent',
-    pg: 'PG',
+    pg: 'PG / Co-living',
     commercial: 'Commercial',
+    industrial: 'Industrial',
+    builder_project: 'Builder Project',
+    investment: 'Investment',
   };
   return labels[category] || category;
 }

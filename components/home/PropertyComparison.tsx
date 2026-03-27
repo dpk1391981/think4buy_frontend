@@ -8,7 +8,7 @@ import {
   GitCompare, X, Check, Minus, ChevronDown, ArrowRight, Plus, CheckCircle2,
 } from 'lucide-react';
 import { homeApi, propertiesApi } from '@/lib/api';
-import { formatPrice, formatArea } from '@/lib/utils';
+import { formatPrice, formatArea, getPropertyTypeLabel } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { useAppSelector } from '@/lib/store';
 
@@ -42,7 +42,7 @@ function getCellValue(p: any, key: string): string | null {
     case 'bathrooms':
       return p.bathrooms ? `${p.bathrooms}` : null;
     case 'type':
-      return p.type ? p.type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null;
+      return p.type ? getPropertyTypeLabel(p.type) : null;
     case 'furnishingStatus':
       return p.furnishingStatus ? p.furnishingStatus.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null;
     case 'possessionStatus':

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import { homeApi, propertiesApi } from '@/lib/api';
-import { cn, formatPrice, formatArea, getPropertyArea, timeAgo } from '@/lib/utils';
+import { cn, formatPrice, formatArea, getPropertyArea, timeAgo, getPropertyTypeLabel, getCategoryLabel } from '@/lib/utils';
 import { useAppSelector, useAppDispatch } from '@/lib/store';
 import { addToast, openAuthModal } from '@/lib/store/slices/uiSlice';
 import { useWishlist } from '@/hooks/useWishlist';
@@ -217,7 +217,7 @@ function FeaturedCard({ property, rank }: { property: any; rank: number }) {
                 </span>
               )}
             </div>
-            <span className="text-gray-300 font-medium capitalize">{property.type?.replace(/_/g, ' ')}</span>
+            <span className="text-gray-300 font-medium capitalize">{getPropertyTypeLabel(property.type)}</span>
           </div>
         </div>
       </Link>

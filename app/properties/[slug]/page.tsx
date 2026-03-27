@@ -4,6 +4,7 @@ import PropertyDetailClient from './PropertyDetailClient';
 import { propertiesApi } from '@/lib/api';
 import JsonLd, { buildRealEstateListingSchema, buildBreadcrumbSchema } from '@/components/seo/JsonLd';
 import { resolveImageUrl } from '@/lib/imageUtils';
+import { getPropertyTypeLabel, getCategoryLabel } from '@/lib/utils';
 
 interface Props {
   params: { slug: string };
@@ -39,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = property.metaTitle || `${property.title} | ${property.city}`;
   const description =
     property.metaDescription ||
-    `${property.bedrooms ? property.bedrooms + ' BHK ' : ''}${property.type} for ${property.category === 'buy' ? 'sale' : 'rent'} in ${property.locality}, ${property.city}. ${property.area ? property.area + ' sqft. ' : ''}Contact now.`;
+    `${property.bedrooms ? property.bedrooms + ' BHK ' : ''}${getPropertyTypeLabel(property.type)} for ${getCategoryLabel(property.category)} in ${property.locality}, ${property.city}. ${property.area ? property.area + ' sqft. ' : ''}Contact now.`;
 
   // Property detail pages are noindex by default to avoid thin-content SEO penalties.
   // Admin can enable indexing per-property via the allowIndexing flag.
