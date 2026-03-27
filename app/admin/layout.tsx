@@ -282,7 +282,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <div className="space-y-0.5">
                   {visibleItems.map((item) => {
                     const Icon = item.icon;
-                    const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                    const active = (item as any).exact ? pathname === item.href : pathname.startsWith(item.href);
                     return (
                       <Link
                         key={item.href}
