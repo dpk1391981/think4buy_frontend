@@ -107,6 +107,7 @@ export function getPropertyTypeLabel(type: string): string {
     factory: 'Factory',
     industrial_shed: 'Industrial Shed',
     land: 'Land',
+    flat: 'Flat',
   };
   return labels[type] || type;
 }

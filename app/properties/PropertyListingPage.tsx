@@ -202,6 +202,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
     co_living: 'Co-Living', builder_floor: 'Builder Floors',
     farm_house: 'Farm Houses', land: 'Land', showroom: 'Showrooms',
     industrial_shed: 'Industrial Sheds', factory: 'Factories',
+    flat: 'Flats',
   };
 
   const effectiveSlug = isNewProject ? 'new_projects' : category;

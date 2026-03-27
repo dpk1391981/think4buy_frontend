@@ -345,6 +345,7 @@ export default function PropertyDetailClient({ property }: Props) {
   const edFurnishing: string | null = !property.furnishingStatus && ed?.furnishing ? String(ed.furnishing) : null;
   const edFloorNumber: string | null = property.floorNumber == null && ed?.floor_number != null ? String(ed.floor_number) : null;
   const edTotalFloors: string | null = !property.totalFloors && ed?.floor ? String(ed.floor) : null;
+  const edProjectName: string | null = ed?.project_name ? String(ed.project_name) : null;
 
   // Key overview specs
   const overviewSpecs = [
@@ -369,6 +370,9 @@ export default function PropertyDetailClient({ property }: Props) {
     { label: 'Property Age',  value: property.propertyAge ? `${property.propertyAge} yr${property.propertyAge > 1 ? 's' : ''}` : null },
     { label: 'Property Type', value: getPropertyTypeLabel(property.type) },
     { label: 'RERA No.',      value: property.reraNumber || null },
+    { label: 'Builder Name',  value: property.builderName || null },
+    { label: 'Project Name',  value: edProjectName },
+    { label: 'Society',       value: property.society || null },
   ].filter(s => s.value);
 
   // Extra dynamic fields from extraDetails
@@ -380,6 +384,8 @@ export default function PropertyDetailClient({ property }: Props) {
       if (key === 'carpet_area' || key === 'area') continue;
       // floor_number and furnishing are already shown via baseSpecs fallbacks
       if (key === 'floor_number' || key === 'furnishing') continue;
+      // project_name shown as highlighted badge and in specs
+      if (key === 'project_name') continue;
       const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
       if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
         if ('label' in val[0]) {
@@ -777,13 +783,27 @@ export default function PropertyDetailClient({ property }: Props) {
               {/* Title */}
               <h1 className="text-xl md:text-2xl font-bold text-gray-900 leading-tight mb-2">{property.title}</h1>
 
-              {/* Society / Building badge — prominent, only when set */}
-              {property.society && (
-                <div className="flex items-center gap-2 mb-2.5">
-                  <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 text-sm font-semibold px-3 py-1.5 rounded-xl max-w-full truncate">
-                    <Building2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                    <span className="truncate">{property.society}</span>
-                  </span>
+              {/* Society / Project / Builder badges — prominent, only when set */}
+              {(property.society || property.builderName || edProjectName) && (
+                <div className="flex flex-wrap items-center gap-2 mb-2.5">
+                  {property.society && (
+                    <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 text-sm font-semibold px-3 py-1.5 rounded-xl truncate max-w-full">
+                      <Building2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <span className="truncate">{property.society}</span>
+                    </span>
+                  )}
+                  {edProjectName && (
+                    <span className="inline-flex items-center gap-1.5 bg-violet-50 border border-violet-200 text-violet-800 text-sm font-semibold px-3 py-1.5 rounded-xl truncate max-w-full">
+                      <Layers className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
+                      <span className="truncate">{edProjectName}</span>
+                    </span>
+                  )}
+                  {property.builderName && (
+                    <span className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-800 text-sm font-semibold px-3 py-1.5 rounded-xl truncate max-w-full">
+                      <Award className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                      <span className="truncate">{property.builderName}</span>
+                    </span>
+                  )}
                 </div>
               )}
 
