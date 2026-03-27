@@ -446,9 +446,10 @@ function UserMenu({ compact = false }: { compact?: boolean }) {
             <div className="text-xs text-gray-400 truncate">{user?.phone || user?.email}</div>
           </div>
 
-          {user?.role === 'admin' && (
+          {(user?.isSuperAdmin || user?.role === 'admin' || user?.role === 'super_admin') && (
             <Link href="/admin" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-              <Settings className="w-4 h-4 text-orange-400" /> Admin Panel
+              <Settings className="w-4 h-4 text-orange-400" />
+              {user?.isSuperAdmin ? 'Super Admin Panel' : 'Admin Panel'}
             </Link>
           )}
           {user?.role === 'agent' && (
@@ -586,15 +587,17 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
     ? user.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
     : 'U';
 
+  const isAdmin = user?.isSuperAdmin || user?.role === 'admin' || user?.role === 'super_admin';
+
   const dashHref =
-    user?.role === 'admin'  ? '/admin'  :
-    user?.role === 'agent'  ? '/agent'  :
+    isAdmin                ? '/admin'  :
+    user?.role === 'agent' || user?.role === 'broker' ? '/agent'  :
     user?.role === 'owner' || user?.role === 'seller' ? '/owner' :
     '/buyer';
 
   const dashLabel =
-    user?.role === 'admin'  ? 'Admin Panel'      :
-    user?.role === 'agent'  ? 'Agent Dashboard'  :
+    isAdmin                ? (user?.isSuperAdmin ? 'Super Admin Panel' : 'Admin Panel') :
+    user?.role === 'agent' || user?.role === 'broker' ? 'Agent Dashboard'  :
     user?.role === 'owner' || user?.role === 'seller' ? 'Owner Dashboard' :
     'Buyer Dashboard';
 
@@ -706,7 +709,7 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
               href={
                 user?.role === 'buyer' ? '/buyer/profile' :
                 (user?.role === 'owner' || user?.role === 'seller') ? '/owner/profile' :
-                user?.role === 'admin' ? '/admin' :
+                isAdmin ? '/admin' :
                 '/agent/profile'
               }
               onClick={onClose}
@@ -842,13 +845,15 @@ export default function Header() {
       )}
     >
       {/* Admin mode banner */}
-      {user?.role === 'admin' && (
-        <div className="bg-red-600 text-white text-xs flex items-center justify-center gap-3 px-4 py-1.5">
+      {(user?.isSuperAdmin || user?.role === 'admin' || user?.role === 'super_admin') && (
+        <div className={`${user?.isSuperAdmin ? 'bg-gradient-to-r from-red-700 to-red-600' : 'bg-red-600'} text-white text-xs flex items-center justify-center gap-3 px-4 py-1.5`}>
           <Shield className="w-3.5 h-3.5 flex-shrink-0" />
-          <span className="font-semibold">Admin Mode</span>
-          <span className="hidden sm:inline text-red-200">— You are browsing as administrator</span>
+          <span className="font-semibold">{user?.isSuperAdmin ? 'Super Admin Mode' : 'Admin Mode'}</span>
+          <span className="hidden sm:inline text-red-200">
+            {user?.isSuperAdmin ? '— Full system access · Root authority' : '— You are browsing as administrator'}
+          </span>
           <Link href="/admin" className="ml-2 bg-white/20 hover:bg-white/30 text-white font-semibold px-2.5 py-0.5 rounded-full text-[11px] transition-colors">
-            Admin Panel →
+            {user?.isSuperAdmin ? 'Super Admin Panel →' : 'Admin Panel →'}
           </Link>
         </div>
       )}

@@ -70,7 +70,8 @@ function LoginForm() {
         router.replace(redirect);
       } else {
         const role = data.user?.role;
-        if      (role === 'admin')                      router.replace('/admin');
+        const isAdminLevel = data.user?.isSuperAdmin || role === 'admin' || role === 'super_admin';
+        if      (isAdminLevel)                          router.replace('/admin');
         else if (role === 'agent')                      router.replace('/post-property');
         else                                            router.replace('/');
       }

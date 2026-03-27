@@ -136,7 +136,8 @@ export default function AuthModal() {
         router.push('/post-property');
       } else {
         const role = data.user?.role;
-        if      (role === 'admin')  router.push('/admin');
+        const isAdminLevel = data.user?.isSuperAdmin || role === 'admin' || role === 'super_admin';
+        if      (isAdminLevel)      router.push('/admin');
         else if (role === 'agent')  router.push('/post-property');
         else                        router.push('/');
       }

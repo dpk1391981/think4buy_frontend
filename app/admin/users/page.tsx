@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { adminWalletApi } from '@/lib/api';
+import { adminWalletApi, adminUsersApi } from '@/lib/api';
 import { resolveImageSrc } from '@/components/common/OptimizedImage';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface WalletEntry {
   id: string;
@@ -22,7 +23,12 @@ interface WalletEntry {
   };
 }
 
+const ALL_ROLES = ['buyer', 'owner', 'agent', 'broker', 'admin', 'super_admin'];
+
 export default function AdminUsersPage() {
+  const { user: authUser } = useAuth();
+  const isSuperAdmin = authUser?.isSuperAdmin || authUser?.role === 'super_admin';
+
   const [wallets, setWallets] = useState<WalletEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -36,6 +42,12 @@ export default function AdminUsersPage() {
   const [topUpDesc, setTopUpDesc] = useState('');
   const [topUpLoading, setTopUpLoading] = useState(false);
   const [topUpError, setTopUpError] = useState('');
+
+  // Change role modal state
+  const [roleModal, setRoleModal] = useState<WalletEntry | null>(null);
+  const [selectedRole, setSelectedRole] = useState('');
+  const [roleLoading, setRoleLoading] = useState(false);
+  const [roleError, setRoleError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,8 +74,11 @@ export default function AdminUsersPage() {
     roleFilter === 'all' ? wallets : wallets.filter((w) => w.user?.role === roleFilter);
 
   const ROLE_COLORS: Record<string, string> = {
+    super_admin: 'bg-red-100 text-red-700',
     admin: 'bg-purple-100 text-purple-700',
+    broker: 'bg-indigo-100 text-indigo-700',
     agent: 'bg-blue-100 text-blue-700',
+    owner: 'bg-green-100 text-green-700',
     seller: 'bg-green-100 text-green-700',
     buyer: 'bg-gray-100 text-gray-600',
   };
@@ -93,6 +108,21 @@ export default function AdminUsersPage() {
       setTopUpError(e?.response?.data?.message || 'Failed to add tokens');
     } finally {
       setTopUpLoading(false);
+    }
+  }
+
+  async function handleChangeRole() {
+    if (!roleModal || !selectedRole) return;
+    setRoleLoading(true);
+    setRoleError('');
+    try {
+      await adminUsersApi.changeRole(roleModal.user.id, selectedRole);
+      setRoleModal(null);
+      load();
+    } catch (e: any) {
+      setRoleError(e?.response?.data?.message || 'Failed to change role');
+    } finally {
+      setRoleLoading(false);
     }
   }
 
@@ -266,17 +296,31 @@ export default function AdminUsersPage() {
 
                       {/* Actions */}
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => {
-                            setTopUpModal(entry);
-                            setTopUpAmount('');
-                            setTopUpDesc('');
-                            setTopUpError('');
-                          }}
-                          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg transition-colors"
-                        >
-                          + Tokens
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setTopUpModal(entry);
+                              setTopUpAmount('');
+                              setTopUpDesc('');
+                              setTopUpError('');
+                            }}
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg transition-colors"
+                          >
+                            + Tokens
+                          </button>
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => {
+                                setRoleModal(entry);
+                                setSelectedRole(entry.user.role);
+                                setRoleError('');
+                              }}
+                              className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold rounded-lg transition-colors"
+                            >
+                              Change Role
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -361,6 +405,63 @@ export default function AdminUsersPage() {
                 className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-50"
               >
                 {topUpLoading ? 'Adding...' : 'Add Tokens'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Role Modal */}
+      {roleModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Change Role</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Updating role for{' '}
+              <span className="font-semibold text-gray-700">{roleModal.user.name}</span>
+            </p>
+
+            <div className="mb-4">
+              <p className="text-xs text-gray-500 mb-1">Current Role</p>
+              <span
+                className={`inline-flex px-2 py-1 rounded-lg text-xs font-semibold capitalize ${
+                  ROLE_COLORS[roleModal.user.role] || 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {roleModal.user.role}
+              </span>
+            </div>
+
+            {roleError && (
+              <p className="text-sm text-red-600 bg-red-50 rounded-xl p-2 mb-3">{roleError}</p>
+            )}
+
+            <label className="block text-xs text-gray-500 mb-1">New Role</label>
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-purple-500 capitalize"
+            >
+              {ALL_ROLES.map((r) => (
+                <option key={r} value={r} className="capitalize">
+                  {r.replace('_', ' ')}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setRoleModal(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleChangeRole}
+                disabled={roleLoading || selectedRole === roleModal.user.role}
+                className="flex-1 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-bold hover:bg-purple-700 disabled:opacity-50"
+              >
+                {roleLoading ? 'Saving...' : 'Update Role'}
               </button>
             </div>
           </div>
