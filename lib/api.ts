@@ -360,6 +360,12 @@ export const statesApi = {
   getCities: (stateId: string) => api.get(`/locations/states/${stateId}/cities`),
 };
 
+// Admin Users
+export const adminUsersApi = {
+  changeRole: (userId: string, role: string) =>
+    api.patch(`/admin/users/${userId}/role`, { role }),
+};
+
 // Admin Wallet
 export const adminWalletApi = {
   getAllWallets: (params?: { page?: number; limit?: number; search?: string }) =>
@@ -852,4 +858,38 @@ export const articlesApi = {
   adminCreate: (data: any) => api.post('/articles/admin', data),
   adminUpdate: (id: string, data: any) => api.patch(`/articles/admin/${id}`, data),
   adminDelete: (id: string) => api.delete(`/articles/admin/${id}`),
+};
+
+// ── RBAC API ─────────────────────────────────────────────────────────────────
+export const rbacApi = {
+  // Current user's permissions
+  myPermissions: () => api.get('/rbac/my-permissions'),
+
+  // Roles
+  getRoles: () => api.get('/rbac/roles'),
+  getRole:  (id: string) => api.get(`/rbac/roles/${id}`),
+  createRole: (data: { name: string; displayName: string; description?: string; level?: number }) =>
+    api.post('/rbac/roles', data),
+  updateRole: (id: string, data: { displayName?: string; description?: string; isActive?: boolean; level?: number }) =>
+    api.patch(`/rbac/roles/${id}`, data),
+  deleteRole: (id: string) => api.delete(`/rbac/roles/${id}`),
+  setRolePermissions: (roleId: string, permissionIds: string[]) =>
+    api.put(`/rbac/roles/${roleId}/permissions`, { permissionIds }),
+
+  // Permissions
+  getPermissions: () => api.get('/rbac/permissions'),
+  createPermission: (data: { key: string; name: string; module: string; description?: string }) =>
+    api.post('/rbac/permissions', data),
+  updatePermission: (id: string, data: { name?: string; description?: string; isActive?: boolean }) =>
+    api.patch(`/rbac/permissions/${id}`, data),
+  deletePermission: (id: string) => api.delete(`/rbac/permissions/${id}`),
+
+  // User ↔ Role
+  assignRole: (userId: string, roleId: string) =>
+    api.post(`/rbac/users/${userId}/role`, { roleId }),
+  removeRole: (userId: string) => api.delete(`/rbac/users/${userId}/role`),
+
+  // Audit Logs
+  getAuditLogs: (params?: { actorId?: string; action?: string; resource?: string; page?: number; limit?: number }) =>
+    api.get('/rbac/audit-logs', { params }),
 };

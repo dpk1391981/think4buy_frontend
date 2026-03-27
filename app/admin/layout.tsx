@@ -38,92 +38,101 @@ import {
   Star,
   Wrench,
   Database,
+  ShieldCheck,
+  ClipboardList,
 } from 'lucide-react';
-import { authApi } from '@/lib/api';
 import NotificationBell from '@/components/notifications/NotificationBell';
+import { useAuth } from '@/contexts/AuthContext';
 
 const NAV_GROUPS = [
   {
     label: 'Overview',
     items: [
-      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true, slug: 'admin_dashboard' },
     ],
   },
   {
     label: 'Listings',
     items: [
-      { href: '/admin/properties', label: 'Properties', icon: Home },
-      { href: '/admin/featured-properties', label: 'Featured Properties', icon: Star },
-      { href: '/admin/categories', label: 'Categories', icon: Tag },
-      { href: '/admin/property-config', label: 'Property Config', icon: Layers },
+      { href: '/admin/properties',         label: 'Properties',          icon: Home,    slug: 'admin_properties'          },
+      { href: '/admin/featured-properties', label: 'Featured Properties', icon: Star,    slug: 'admin_featured_properties' },
+      { href: '/admin/categories',          label: 'Categories',          icon: Tag,     slug: 'admin_categories'          },
+      { href: '/admin/property-config',     label: 'Property Config',     icon: Layers,  slug: 'admin_property_config'     },
     ],
   },
   {
     label: 'Agents',
     items: [
-      { href: '/admin/agents', label: 'Agents', icon: UserCheck },
-      { href: '/admin/premium-slots',   label: 'Premium Slots',    icon: Zap },
-      { href: '/admin/agent-coverage',  label: 'Agent Coverage', icon: Gem },
+      { href: '/admin/agents',         label: 'Agents',         icon: UserCheck, slug: 'admin_agents'         },
+      { href: '/admin/premium-slots',  label: 'Premium Slots',  icon: Zap,       slug: 'admin_premium_slots'  },
+      { href: '/admin/agent-coverage', label: 'Agent Coverage', icon: Gem,       slug: 'admin_agent_coverage' },
     ],
   },
   {
     label: 'Users',
     items: [
-      { href: '/admin/users', label: 'All Users', icon: Users },
+      { href: '/admin/users', label: 'All Users', icon: Users, slug: 'admin_users' },
     ],
   },
   {
     label: 'Content',
     items: [
-      { href: '/admin/articles', label: 'Articles', icon: BookOpen },
-      { href: '/admin/menu', label: 'Menu', icon: Navigation },
-      { href: '/admin/role-menus', label: 'Role Menus', icon: LayoutGrid },
+      { href: '/admin/articles', label: 'Articles', icon: BookOpen,  slug: 'admin_articles' },
+      { href: '/admin/menu',     label: 'Menu',     icon: Navigation, slug: 'admin_menu'     },
     ],
   },
   {
     label: 'SEO',
     items: [
-      { href: '/admin/seo/footer-links', label: 'Footer SEO Links', icon: Link2 },
-      { href: '/admin/seo/config', label: 'SEO Config', icon: Settings },
+      { href: '/admin/seo/footer-links', label: 'Footer SEO Links', icon: Link2,    slug: 'admin_seo_footer_links' },
+      { href: '/admin/seo/config',       label: 'SEO Config',       icon: Settings, slug: 'admin_seo_config'       },
     ],
   },
   {
     label: 'System',
     items: [
-      { href: '/admin/storage-settings', label: 'Storage & Watermark', icon: Database },
+      { href: '/admin/storage-settings', label: 'Storage & Watermark', icon: Database, slug: 'admin_storage_settings' },
+    ],
+  },
+  {
+    label: 'Security & RBAC',
+    items: [
+      { href: '/admin/roles',      label: 'Roles & Permissions', icon: ShieldCheck,  slug: 'admin_roles'      },
+      { href: '/admin/role-menus', label: 'Role Menus',          icon: LayoutGrid,   slug: 'admin_role_menus' },
+      { href: '/admin/audit-logs', label: 'Audit Logs',          icon: ClipboardList, slug: 'admin_audit_logs' },
     ],
   },
   {
     label: 'Locations',
     items: [
-      { href: '/admin/countries', label: 'Countries', icon: Globe },
-      { href: '/admin/locations', label: 'States & Cities', icon: MapPin },
-      { href: '/admin/market-intelligence', label: 'Market Intelligence', icon: BarChart2 },
-      { href: '/admin/tools-insights', label: 'Tools & Insights', icon: Wrench },
-      { href: '/admin/scoring-config', label: 'Scoring Config', icon: SlidersHorizontal },
+      { href: '/admin/countries',           label: 'Countries',           icon: Globe,             slug: 'admin_countries'           },
+      { href: '/admin/locations',           label: 'States & Cities',     icon: MapPin,            slug: 'admin_locations'           },
+      { href: '/admin/market-intelligence', label: 'Market Intelligence', icon: BarChart2,         slug: 'admin_market_intelligence' },
+      { href: '/admin/tools-insights',      label: 'Tools & Insights',    icon: Wrench,            slug: 'admin_tools_insights'      },
+      { href: '/admin/scoring-config',      label: 'Scoring Config',      icon: SlidersHorizontal, slug: 'admin_scoring_config'      },
     ],
   },
   {
     label: 'CRM',
     items: [
-      { href: '/admin/leads',         label: 'Leads',         icon: Target },
-      { href: '/admin/service-leads', label: 'Service Leads', icon: Wrench },
-      { href: '/admin/deals',         label: 'Deals',         icon: Handshake },
-      { href: '/admin/commissions',   label: 'Commissions',   icon: IndianRupee },
+      { href: '/admin/leads',         label: 'Leads',         icon: Target,      slug: 'admin_leads'         },
+      { href: '/admin/service-leads', label: 'Service Leads', icon: Wrench,      slug: 'admin_service_leads' },
+      { href: '/admin/deals',         label: 'Deals',         icon: Handshake,   slug: 'admin_deals'         },
+      { href: '/admin/commissions',   label: 'Commissions',   icon: IndianRupee, slug: 'admin_commissions'   },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { href: '/admin/wallets', label: 'Wallets', icon: Wallet },
-      { href: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
-      { href: '/admin/payments', label: 'Payments', icon: Receipt },
+      { href: '/admin/wallets',       label: 'Wallets',       icon: Wallet,   slug: 'admin_wallets'       },
+      { href: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard, slug: 'admin_subscriptions' },
+      { href: '/admin/payments',      label: 'Payments',      icon: Receipt,  slug: 'admin_payments'      },
     ],
   },
   {
     label: 'Messaging',
     items: [
-      { href: '/admin/messaging', label: 'Messaging Centre', icon: MessageSquare },
+      { href: '/admin/messaging', label: 'Messaging Centre', icon: MessageSquare, slug: 'admin_messaging' },
     ],
   },
 ];
@@ -131,9 +140,9 @@ const NAV_GROUPS = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [allowedSlugs, setAllowedSlugs] = useState<Set<string> | null>(null);
 
   // All groups collapsed by default except "Listings" (Properties section)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
@@ -152,7 +161,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     const activeGroup = NAV_GROUPS.find((g) =>
       g.items.some((item) =>
-        (item as any).exact ? pathname === item.href : pathname.startsWith(item.href),
+        (item as any).exact ? pathname === item.href : pathname.startsWith(item.href)
       ),
     );
     if (activeGroup?.label) {
@@ -165,34 +174,40 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [pathname]);
 
+  // Fetch menu permissions for the current user's role
   useEffect(() => {
-    // Clear stale undefined/null tokens that may have been stored by older code
-    const storedToken = localStorage.getItem('token');
-    if (!storedToken || storedToken === 'undefined' || storedToken === 'null') {
-      localStorage.removeItem('token');
+    if (!user) return;
+    import('@/lib/api').then(({ api }) => {
+      api.get('/menus/me').then((res) => {
+        const slugs: string[] = (res.data || []).map((m: any) => m.slug);
+        setAllowedSlugs(new Set(slugs));
+      }).catch(() => setAllowedSlugs(new Set()));
+    });
+  }, [user?.role]);
+
+  // Gate: wait for AuthContext to resolve, then check admin access
+  useEffect(() => {
+    console.log('==========authLoading==========================');
+    console.log(authLoading);
+    console.log('====================================');
+    if (authLoading) return; // still resolving
+
+    if (!user) {
+      // Not logged in
+      document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
       router.replace('/auth/login?redirect=/admin');
       return;
     }
 
-    authApi
-      .getProfile()
-      .then((r) => {
-        if (r.data.role !== 'admin') {
-          router.replace('/');
-        } else {
-          setUser(r.data);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
-        router.replace('/auth/login?redirect=/admin');
-      });
-  }, [router]);
+    const isAdminLevel = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+    if (!isAdminLevel) {
+      router.replace('/');
+    }
+  }, [authLoading, user, router]);
 
-  if (loading) {
+  const isAdminLevel = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin');
+
+  if (authLoading || !isAdminLevel) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
         <div className="flex flex-col items-center gap-3">
@@ -232,8 +247,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Navigation */}
       <nav className="flex-1 py-4 px-3 space-y-4 overflow-y-auto">
         {NAV_GROUPS.map((group) => {
+          // Filter items by DB menu permissions (super_admin sees all if no permissions loaded yet)
+          const visibleItems = allowedSlugs === null
+            ? group.items
+            : group.items.filter((item) => {
+                const slug = (item as any).slug;
+                return !slug || allowedSlugs.has(slug);
+              });
+          if (visibleItems.length === 0) return null;
           const collapsed = collapsedGroups.has(group.label);
-          const hasActive = group.items.some((item) =>
+          const hasActive = visibleItems.some((item) =>
             (item as any).exact ? pathname === item.href : pathname.startsWith(item.href),
           );
           return (
@@ -257,7 +280,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </button>
               {!collapsed && (
                 <div className="space-y-0.5">
-                  {group.items.map((item) => {
+                  {visibleItems.map((item) => {
                     const Icon = item.icon;
                     const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
                     return (
@@ -294,8 +317,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {userInitials}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-white truncate">{user?.name}</div>
-            <div className="text-[10px] text-slate-400 truncate">{user?.email}</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-medium text-white truncate">{user?.name}</span>
+              {user?.isSuperAdmin && (
+                <span className="flex-shrink-0 text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+                  Root
+                </span>
+              )}
+            </div>
+            <div className="text-[10px] text-slate-400 truncate">
+              {user?.isSuperAdmin ? 'Super Admin' : user?.role === 'admin' ? 'Administrator' : user?.role}
+            </div>
           </div>
         </div>
         <div className="mt-2 space-y-1">
@@ -308,9 +340,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
           <button
             onClick={() => {
-              localStorage.removeItem('token');
-              localStorage.removeItem('user');
-              document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
+              logout();
               router.push('/auth/login');
             }}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-red-400 hover:bg-red-950/30 transition-all"

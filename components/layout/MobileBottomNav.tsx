@@ -74,8 +74,9 @@ export default function MobileBottomNav() {
 
           // Account item: open auth modal if not logged in
           if (label === 'Account') {
+            const isAdmin = user?.isSuperAdmin || user?.role === 'admin' || user?.role === 'super_admin';
             const accountHref = user
-              ? (user.role === 'admin' ? '/admin' : user.role === 'buyer' ? '/dashboard' : '/agent')
+              ? (isAdmin ? '/admin' : user.role === 'buyer' ? '/dashboard' : '/agent')
               : null;
 
             if (!user) {

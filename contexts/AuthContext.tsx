@@ -17,6 +17,8 @@ interface AuthUser {
   email: string;
   phone?: string;
   role: string;
+  isSuperAdmin?: boolean;
+  systemRoleId?: string | null;
   avatar?: string;
   pendingAvatar?: string;
   city?: string;
