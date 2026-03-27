@@ -14,7 +14,7 @@ import { KNOWN_CITY_SLUGS } from '@/lib/city-slugs';
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 export interface SeoPageConfig {
-  source: 'category_locality' | 'category_city' | 'locality' | 'city' | 'category';
+  source: 'footer_link' | 'category_locality' | 'category_city' | 'locality' | 'city' | 'category';
   h1Title: string | null;
   metaTitle: string | null;
   metaDescription: string | null;
@@ -48,11 +48,14 @@ export interface ListingPageParams {
  * Must be called server-side (RSC / generateMetadata).
  * Returns null if no config found (page should noindex or 404).
  */
-export async function resolveListingPageSeo(params: ListingPageParams): Promise<SeoPageConfig | null> {
+export async function resolveListingPageSeo(
+  params: ListingPageParams & { urlSlug?: string },
+): Promise<SeoPageConfig | null> {
   const qs = new URLSearchParams();
   if (params.category) qs.set('category', params.category);
   if (params.city) qs.set('city', params.city);
   if (params.locality) qs.set('locality', params.locality);
+  if (params.urlSlug) qs.set('url', params.urlSlug);
 
   const url = `${API_BASE}/seo/listing-page?${qs.toString()}`;
 

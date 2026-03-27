@@ -51,8 +51,9 @@ function buildSlug(parts: string[]): string {
 async function getSeoConfig(slugParts: string[]): Promise<SeoPageConfig | null> {
   const slug = buildSlug(slugParts);
   const parsed = parseListingSlug(slug);
-  if (!parsed.category && !parsed.city && !parsed.locality && !parsed.type) return null;
-  return resolveListingPageSeo(parsed);
+  // Always pass the raw slug so the backend can match footer-link SEO (Priority 0)
+  // even when the URL pattern isn't in LISTING_PREFIXES.
+  return resolveListingPageSeo({ ...parsed, urlSlug: slug });
 }
 
 // ── generateMetadata ──────────────────────────────────────────────────────────
