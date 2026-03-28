@@ -299,7 +299,7 @@ export default function GlobalHelpWidget() {
                 </p>
               </div>
               <button
-                onClick={() => { setOpen(false); dispatch(openAuthModal()); }}
+                onClick={() => { setOpen(false); dispatch(openAuthModal({ mode: 'login' })); }}
                 className="flex items-center gap-2 px-5 py-2 rounded-full bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
               >
                 <LogIn size={15} /> Log In / Sign Up
