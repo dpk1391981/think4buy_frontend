@@ -127,6 +127,11 @@ function CheckoutInner() {
     if (!loaded) throw new Error('Failed to load Razorpay. Check your internet connection and try again.');
 
     return new Promise<void>((resolve, reject) => {
+      // Guard against ondismiss overriding a payment.failed or handler outcome.
+      // Razorpay fires ondismiss AFTER payment.failed when the modal auto-closes,
+      // which would otherwise reset state back to 'idle'.
+      let settled = false;
+
       const rzp = new window.Razorpay({
         key:         payload.key,
         amount:      payload.amount,
@@ -137,6 +142,7 @@ function CheckoutInner() {
         theme:       { color: '#2563EB' },
 
         handler: async (response: any) => {
+          settled = true;
           setState('verifying');
           try {
             await paymentApi.verifyPayment({
@@ -152,22 +158,31 @@ function CheckoutInner() {
             resolve();
           } catch (e: any) {
             setState('failed');
-            setError(e?.response?.data?.message ?? 'Payment verification failed');
+            setError(e?.response?.data?.message ?? 'Payment verification failed. Please contact support.');
             reject(e);
           }
         },
 
         modal: {
           ondismiss: () => {
-            setState('idle');
-            resolve();
+            // Only reset to idle if no payment outcome has been determined yet.
+            // If payment.failed or the handler already ran, keep the current state.
+            if (!settled) {
+              setState('idle');
+              resolve();
+            }
           },
         },
       });
 
       rzp.on('payment.failed', (response: any) => {
+        settled = true;
         setState('failed');
-        setError(`Payment failed: ${response.error.description}`);
+        const reason = response?.error?.description
+          ?? response?.error?.reason
+          ?? response?.error?.code
+          ?? 'Payment was declined. Please try a different payment method.';
+        setError(`Payment failed: ${reason}`);
         resolve();
       });
 

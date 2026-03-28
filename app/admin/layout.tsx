@@ -40,6 +40,8 @@ import {
   Database,
   ShieldCheck,
   ClipboardList,
+  MonitorPlay,
+  ToggleLeft,
 } from 'lucide-react';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import { useAuth } from '@/contexts/AuthContext';
@@ -91,7 +93,9 @@ const NAV_GROUPS = [
   {
     label: 'System',
     items: [
-      { href: '/admin/storage-settings', label: 'Storage & Watermark', icon: Database, slug: 'admin_storage_settings' },
+      { href: '/admin/storage-settings',  label: 'Storage & Watermark', icon: Database,    slug: 'admin_storage_settings'  },
+      { href: '/admin/system-config',     label: 'Feature Toggles',     icon: ToggleLeft,  slug: 'admin_system_config'     },
+      { href: '/admin/media-processing',  label: 'Media Queue',         icon: MonitorPlay, slug: 'admin_media_processing'  },
     ],
   },
   {
@@ -319,14 +323,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-medium text-white truncate">{user?.name}</span>
-              {user?.isSuperAdmin && (
+              {(user?.isSuperAdmin || user?.role === 'super_admin') && (
                 <span className="flex-shrink-0 text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wide">
                   Root
                 </span>
               )}
             </div>
             <div className="text-[10px] text-slate-400 truncate">
-              {user?.isSuperAdmin ? 'Super Admin' : user?.role === 'admin' ? 'Administrator' : user?.role}
+              {(user?.isSuperAdmin || user?.role === 'super_admin') ? 'Super Admin' : user?.role === 'admin' ? 'Administrator' : user?.role}
             </div>
           </div>
         </div>
