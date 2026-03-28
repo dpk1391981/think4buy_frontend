@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { subscriptionApi, walletApi, paymentApi } from '@/lib/api';
+import { subscriptionApi, walletApi, paymentApi, authApi } from '@/lib/api';
 
 interface Plan {
   id: string;
@@ -35,6 +35,14 @@ interface SubscriptionHistory {
   tokensDeducted: number;
 }
 
+// ── Tier hierarchy ────────────────────────────────────────────────────────────
+const PLAN_TIER: Record<string, number> = {
+  basic: 0, premium: 1, featured: 2, enterprise: 3,
+};
+const BADGE_TIER: Record<string, number> = {
+  none: -1, verified: 0, bronze: 1, silver: 2, gold: 3,
+};
+
 const PLAN_STYLES: Record<string, { border: string; badge: string; highlight: boolean }> = {
   basic:      { border: 'border-gray-200',   badge: 'bg-gray-100 text-gray-700',     highlight: false },
   premium:    { border: 'border-blue-300',   badge: 'bg-blue-100 text-blue-700',     highlight: false },
@@ -44,6 +52,10 @@ const PLAN_STYLES: Record<string, { border: string; badge: string; highlight: bo
 
 const PLAN_ICONS: Record<string, string> = {
   basic: '🥉', premium: '🥈', featured: '🥇', enterprise: '🚀',
+};
+
+const BADGE_ICONS: Record<string, string> = {
+  none: '', verified: '✓', bronze: '🥉', silver: '🥈', gold: '🥇',
 };
 
 function FeatureList({ features }: { features: string[] | Record<string, any> | null }) {
@@ -79,6 +91,7 @@ export default function AgentSubscriptionPage() {
   const [walletBalance, setWalletBalance] = useState(0);
   const [quotaUsed, setQuotaUsed] = useState(0);
   const [quotaTotal, setQuotaTotal] = useState(0);
+  const [agentTick, setAgentTick] = useState<string>('none');
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [paymentEnabled, setPaymentEnabled] = useState(false);
@@ -87,11 +100,12 @@ export default function AgentSubscriptionPage() {
 
   async function reload() {
     try {
-      const [plansRes, subRes, walletRes, modeRes] = await Promise.allSettled([
+      const [plansRes, subRes, walletRes, modeRes, profileRes] = await Promise.allSettled([
         subscriptionApi.getPlans(),
         subscriptionApi.getCurrent(),
         walletApi.getWallet(),
         paymentApi.getMode(),
+        authApi.getProfile(),
       ]);
       if (plansRes.status === 'fulfilled') {
         const data = plansRes.value.data;
@@ -104,11 +118,15 @@ export default function AgentSubscriptionPage() {
       if (walletRes.status === 'fulfilled') {
         const wd = walletRes.value.data;
         setWalletBalance(wd?.balance ?? 0);
-        setQuotaUsed(wd?.quotaUsed ?? 0);
-        setQuotaTotal(wd?.quotaTotal ?? 0);
+        const quota = wd?.quota;
+        setQuotaUsed(quota?.usedListings ?? wd?.quotaUsed ?? 0);
+        setQuotaTotal(quota?.maxListings ?? wd?.quotaTotal ?? 0);
       }
       if (modeRes.status === 'fulfilled') {
         setPaymentEnabled(modeRes.value.data?.paymentEnabled ?? false);
+      }
+      if (profileRes.status === 'fulfilled') {
+        setAgentTick(profileRes.value.data?.agentTick ?? 'none');
       }
     } catch (e) {
       console.error(e);
@@ -119,6 +137,20 @@ export default function AgentSubscriptionPage() {
 
   useEffect(() => { reload(); }, []);
 
+  // ── Tier enforcement ────────────────────────────────────────────────────────
+  // Active subscription tier OR badge tier — whichever is higher locks lower plans
+  const currentPlanType = (current?.planSnapshot as any)?.type ?? current?.plan?.type ?? null;
+  const subTier   = currentPlanType ? (PLAN_TIER[currentPlanType] ?? -1) : -1;
+  const badgeTier = BADGE_TIER[agentTick] ?? -1;
+  const activeTier = Math.max(subTier, badgeTier);
+
+  function getPlanState(plan: Plan): 'current' | 'upgrade' | 'lower' {
+    const planTier = PLAN_TIER[plan.type] ?? 0;
+    if (planTier === activeTier && current) return 'current';
+    if (planTier < activeTier) return 'lower';
+    return 'upgrade';
+  }
+
   async function handlePurchase(planId: string, planPrice: number, planName: string) {
     setPurchasing(planId);
     setError('');
@@ -128,7 +160,6 @@ export default function AgentSubscriptionPage() {
       const data = res.data;
 
       if (data?.requiresPayment) {
-        // Real-money mode: redirect to checkout with plan details
         const plan = data.plan;
         sessionStorage.setItem('payment_type', 'subscription');
         sessionStorage.setItem('payment_amount', String(plan.price));
@@ -146,7 +177,6 @@ export default function AgentSubscriptionPage() {
         return;
       }
 
-      // Token mode: instant activation (same as before)
       setSuccess('Subscription activated successfully!');
       await reload();
     } catch (e: any) {
@@ -186,7 +216,14 @@ export default function AgentSubscriptionPage() {
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
               <div className="text-sm text-blue-200 mb-1">Current Plan</div>
-              <div className="text-xl font-bold">{current.plan.name}</div>
+              <div className="text-xl font-bold flex items-center gap-2">
+                {current.plan.name}
+                {agentTick && agentTick !== 'none' && (
+                  <span className="text-sm bg-white/20 px-2 py-0.5 rounded-full">
+                    {BADGE_ICONS[agentTick]} {agentTick} badge
+                  </span>
+                )}
+              </div>
               <div className="text-sm text-blue-200 mt-1">
                 Active until {new Date(current.expiresAt).toLocaleDateString('en-IN', {
                   day: 'numeric', month: 'long', year: 'numeric',
@@ -205,12 +242,11 @@ export default function AgentSubscriptionPage() {
               </div>
             </div>
           </div>
-          {/* Quota progress bar */}
           {quotaTotal > 0 && (
             <div className="mt-4">
               <div className="flex justify-between text-xs text-blue-200 mb-1">
                 <span>Listing quota used</span>
-                <span>{quotaUsed}/{quotaTotal} ({Math.round((quotaUsed/quotaTotal)*100)}%)</span>
+                <span>{quotaUsed}/{quotaTotal} ({Math.round((quotaUsed / quotaTotal) * 100)}%)</span>
               </div>
               <div className="w-full bg-white/20 rounded-full h-1.5">
                 <div
@@ -223,7 +259,7 @@ export default function AgentSubscriptionPage() {
         </div>
       )}
 
-      {/* Wallet balance + quota (no active subscription) */}
+      {/* Wallet balance row */}
       <div className="bg-white rounded-xl p-4 shadow-sm mb-6 flex flex-wrap items-center justify-between gap-4">
         {paymentEnabled ? (
           <div className="flex items-center gap-3">
@@ -242,12 +278,12 @@ export default function AgentSubscriptionPage() {
             </div>
           </div>
         )}
-        {!current && quotaTotal > 0 && (
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🏠</span>
+        {agentTick && agentTick !== 'none' && (
+          <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+            <span className="text-lg">{BADGE_ICONS[agentTick]}</span>
             <div>
-              <div className="text-sm text-gray-500">Listing Quota</div>
-              <div className="text-xl font-bold text-gray-900">{quotaUsed} / {quotaTotal} used</div>
+              <div className="text-xs text-gray-500">Agent Badge</div>
+              <div className="text-sm font-semibold capitalize text-gray-800">{agentTick}</div>
             </div>
           </div>
         )}
@@ -260,14 +296,10 @@ export default function AgentSubscriptionPage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-5 text-sm">
-          {error}
-        </div>
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-5 text-sm">{error}</div>
       )}
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl p-4 mb-5 text-sm">
-          ✓ {success}
-        </div>
+        <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl p-4 mb-5 text-sm">✓ {success}</div>
       )}
 
       {/* Plans grid */}
@@ -281,19 +313,20 @@ export default function AgentSubscriptionPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
           {plans.map((plan) => {
             const style = PLAN_STYLES[plan.type] || PLAN_STYLES.basic;
-            const isCurrentPlan = current?.planSnapshot
-              ? (current.planSnapshot as any)?.name === plan.name
-              : current?.plan?.id === plan.id;
-            const canAfford = walletBalance >= plan.price;
+            const planState = getPlanState(plan);
+            const isLower = planState === 'lower';
+            const isCurrent = planState === 'current';
+            const canAfford = paymentEnabled || walletBalance >= plan.price;
 
             return (
               <div
                 key={plan.id}
-                className={`bg-white rounded-xl border-2 ${style.border} p-5 flex flex-col relative shadow-sm ${
-                  style.highlight ? 'ring-2 ring-yellow-400 ring-offset-1' : ''
+                className={`bg-white rounded-xl border-2 ${isLower ? 'border-gray-100 opacity-60' : style.border} p-5 flex flex-col relative shadow-sm ${
+                  style.highlight && !isLower ? 'ring-2 ring-yellow-400 ring-offset-1' : ''
                 }`}
               >
-                {style.highlight && (
+                {/* Most Popular badge */}
+                {style.highlight && !isLower && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <span className="px-3 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full whitespace-nowrap">
                       Most Popular
@@ -301,11 +334,20 @@ export default function AgentSubscriptionPage() {
                   </div>
                 )}
 
+                {/* Locked overlay label for lower plans */}
+                {isLower && (
+                  <div className="absolute top-3 right-3">
+                    <span className="px-2 py-0.5 bg-gray-100 text-gray-400 text-xs font-medium rounded-full flex items-center gap-1">
+                      🔒 Lower Plan
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-2xl">{PLAN_ICONS[plan.type] || '📦'}</span>
+                  <span className={`text-2xl ${isLower ? 'grayscale' : ''}`}>{PLAN_ICONS[plan.type] || '📦'}</span>
                   <div>
                     <div className="font-bold text-gray-900 text-sm">{plan.name}</div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${style.badge}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${isLower ? 'bg-gray-100 text-gray-400' : style.badge}`}>
                       {plan.type}
                     </span>
                   </div>
@@ -313,33 +355,32 @@ export default function AgentSubscriptionPage() {
 
                 <div className="mb-1">
                   {paymentEnabled ? (
-                    <>
-                      <span className="text-3xl font-bold text-gray-900">₹{plan.price.toLocaleString()}</span>
-                    </>
+                    <span className={`text-3xl font-bold ${isLower ? 'text-gray-300' : 'text-gray-900'}`}>
+                      ₹{plan.price.toLocaleString()}
+                    </span>
                   ) : (
                     <>
-                      <span className="text-3xl font-bold text-gray-900">{plan.price.toLocaleString()}</span>
-                      <span className="text-gray-500 text-sm ml-1">tokens</span>
+                      <span className={`text-3xl font-bold ${isLower ? 'text-gray-300' : 'text-gray-900'}`}>
+                        {plan.price.toLocaleString()}
+                      </span>
+                      <span className="text-gray-400 text-sm ml-1">tokens</span>
                     </>
                   )}
                 </div>
                 <div className="text-xs text-gray-400 mb-3">{plan.durationDays} days</div>
 
                 <div className="space-y-2 mb-4 flex-1">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <span className="text-green-500 text-xs">✓</span>
-                    <span>{plan.maxListings} property listings</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <span className="text-green-500 text-xs">✓</span>
-                    <span>{plan.tokensIncluded} tokens included</span>
-                  </div>
                   <FeatureList features={plan.features} />
                 </div>
 
-                {isCurrentPlan ? (
+                {/* Action button */}
+                {isCurrent ? (
                   <div className="w-full py-2.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium text-center">
                     ✓ Current Plan
+                  </div>
+                ) : isLower ? (
+                  <div className="w-full py-2.5 bg-gray-50 text-gray-400 rounded-lg text-sm font-medium text-center cursor-not-allowed border border-gray-100">
+                    🔒 Not Available
                   </div>
                 ) : (
                   <button
@@ -356,10 +397,10 @@ export default function AgentSubscriptionPage() {
                     {purchasing === plan.id
                       ? (paymentEnabled ? 'Redirecting...' : 'Activating...')
                       : paymentEnabled
-                      ? `Pay ₹${plan.price.toLocaleString()}`
+                      ? `Upgrade — ₹${plan.price.toLocaleString()}`
                       : !canAfford
                       ? `Need ${(plan.price - walletBalance).toLocaleString()} more tokens`
-                      : `Activate — ${plan.price.toLocaleString()} 🪙`}
+                      : `Upgrade — ${plan.price.toLocaleString()} 🪙`}
                   </button>
                 )}
               </div>
