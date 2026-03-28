@@ -54,6 +54,7 @@ export interface PostPropertyForm {
   cityId: string;
   locality: string;
   localityId: string;
+  society: string;       // Society / building name (maps to property.society column)
   pincode: string;
   address: string;
   latitude: number | null;
@@ -69,6 +70,8 @@ export interface PostPropertyForm {
   totalFloors: string;
   furnishingStatus: string;
   possessionStatus: string;
+  builderName: string;   // Builder / developer name (builder_project + general)
+  reraNumber: string;    // RERA registration number
   industrialHeight: string;
   industrialPowerLoad: string;
   hasDock: boolean;
@@ -104,6 +107,7 @@ const initialFormState: PostPropertyForm = {
   cityId: '',
   locality: '',
   localityId: '',
+  society: '',
   pincode: '',
   address: '',
   latitude: null,
@@ -117,6 +121,8 @@ const initialFormState: PostPropertyForm = {
   totalFloors: '',
   furnishingStatus: 'unfurnished',
   possessionStatus: 'ready_to_move',
+  builderName: '',
+  reraNumber: '',
   industrialHeight: '',
   industrialPowerLoad: '',
   hasDock: false,

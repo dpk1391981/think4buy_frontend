@@ -753,7 +753,7 @@ function RightPanel({
   userPending: any[];
   activeDraftId: string | null;
   isEditMode: boolean;
-  editingProperty?: { title?: string; city?: string; locality?: string; approvalStatus?: string } | null;
+  editingProperty?: { title?: string; city?: string; locality?: string; isDraft?: boolean; approvalStatus?: string } | null;
 }) {
   const sinceLastSave = lastSaved ? Math.round((Date.now() - lastSaved) / 60000) : null;
 
@@ -1553,6 +1553,9 @@ function Step5AutoTitle({ form, dispatch }: any) {
     listingType: form.listingType || (form.mainCategory === 'pg' || form.mainCategory === 'rent' ? 'rent' : 'buy'),
     propertyType: form.propertyType, bedrooms: form.bedrooms,
     city: form.city, locality: form.locality,
+    society: form.society || undefined,
+    projectName: form.dynamicFields?.project_name || undefined,
+    builderName: form.builderName || (form.userType === 'agent' ? form.agencyName : undefined) || undefined,
   });
 
   useEffect(() => { dispatch(updateForm({ autoTitle })); }, [autoTitle]);
@@ -1735,7 +1738,31 @@ function Step6Details({ form, dispatch, config }: any) {
         </div>
       )}
 
-      {/* ⑤ Other dynamic fields (non-dependent) */}
+      {/* ⑤ Builder / Developer info — shown for all categories but highlighted for builder_project */}
+      <div className={`border-t border-gray-100 pt-6 grid grid-cols-1 sm:grid-cols-2 gap-5`}>
+        <div>
+          <FieldLabel>
+            Builder / Developer Name
+            {cat === 'builder_project' && <span className="ml-1.5 text-[10px] font-semibold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full uppercase tracking-wide">Builder Project</span>}
+          </FieldLabel>
+          <Input value={form.builderName || ''}
+            onChange={(e: any) => dispatch(updateForm({ builderName: e.target.value }))}
+            placeholder="e.g., Prestige Group, DLF, Godrej Properties" />
+          <p className="text-xs text-gray-400 mt-1">Name of the builder or developer (optional)</p>
+        </div>
+        <div>
+          <FieldLabel>
+            RERA Number
+            {cat === 'builder_project' && <span className="ml-1.5 text-[10px] font-semibold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full uppercase tracking-wide">Verified</span>}
+          </FieldLabel>
+          <Input value={form.reraNumber || ''}
+            onChange={(e: any) => dispatch(updateForm({ reraNumber: e.target.value }))}
+            placeholder="e.g., P52100012345" />
+          <p className="text-xs text-gray-400 mt-1">RERA registration increases buyer trust (optional)</p>
+        </div>
+      </div>
+
+      {/* ⑥ Other dynamic fields (non-dependent) */}
       {!loadingFields && regularFields.length > 0 && (
         <div className="border-t border-gray-100 pt-6">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Additional Details</p>
@@ -1910,6 +1937,13 @@ function Step9Price({ form, dispatch }: any) {
   const isAgent = form.userType === 'agent';
   const brokerageOpts = isRent ? BROKERAGE_RENT_OPTIONS : BROKERAGE_SALE_OPTIONS;
 
+  // Auto-set priceUnit for rent/pg — these are always monthly, no selector shown
+  useEffect(() => {
+    if (isRent && form.priceUnit !== 'per month') {
+      dispatch(updateForm({ priceUnit: 'per month' }));
+    }
+  }, [isRent]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const fmt = (val: string) => {
     const n = Number(val);
     if (!n) return '';
@@ -1982,7 +2016,7 @@ function Step9Price({ form, dispatch }: any) {
 
 // ─── Step: Photos ────────────────────────────────────────────────────────────
 
-function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImages, onRemoveExisting, onSubmit, onSaveDraft, loading, savingDraft, error, isEditMode, brochureFile, setBrochureFile, removeBrochure, setRemoveBrochure }: any) {
+function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImages, onRemoveExisting, onSubmit, onSaveDraft, loading, savingDraft, error, isEditMode, isDraftEdit, brochureFile, setBrochureFile, removeBrochure, setRemoveBrochure }: any) {
   const imageRef = useRef<HTMLInputElement>(null);
   const brochureRef = useRef<HTMLInputElement>(null);
   const isBuilderProject = form.mainCategory === 'builder_project';
@@ -2175,7 +2209,7 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImage
           onSubmit();
         }} disabled={loading}
           className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 active:from-primary-800 active:to-primary-900 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 text-base transition-all shadow-xl shadow-primary-600/30">
-          {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Saving…</> : isEditMode ? '✏️ Update Property' : '🎉 Publish Property'}
+          {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Saving…</> : isEditMode && !isDraftEdit ? '✏️ Update Property' : '🎉 Publish Property'}
         </button>
         {!isEditMode && (
           <button type="button" onClick={onSaveDraft} disabled={savingDraft || loading}
@@ -2259,10 +2293,13 @@ function PostPropertyPageInner() {
       bedrooms: form.bedrooms,
       city: form.city,
       locality: form.locality,
+      society: form.society || undefined,
+      projectName: form.dynamicFields?.project_name || undefined,
+      builderName: form.builderName || (form.userType === 'agent' ? form.agencyName : undefined) || undefined,
     });
     dispatch(updateForm({ autoTitle: generatedTitle }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.mainCategory, form.listingType, form.propertyType, form.bedrooms, form.city, form.locality]);
+  }, [form.mainCategory, form.listingType, form.propertyType, form.bedrooms, form.city, form.locality, form.society, form.builderName, form.dynamicFields?.project_name]);
 
   // Fetch categories once
   useEffect(() => {
@@ -2322,6 +2359,9 @@ function PostPropertyPageInner() {
       category: formData.mainCategory,
       listingType: formData.listingType || (formData.mainCategory === 'pg' || formData.mainCategory === 'rent' ? 'rent' : 'buy'),
       propertyType: formData.propertyType, bedrooms: formData.bedrooms, city: formData.city, locality: formData.locality,
+      society: formData.society || undefined,
+      projectName: formData.dynamicFields?.project_name || undefined,
+      builderName: formData.builderName || (formData.userType === 'agent' ? formData.agencyName : undefined) || undefined,
     }) || 'Draft Property';
     const extraDetails: Record<string, any> = {};
     if (formData.mainCategory === 'industrial') {
@@ -2349,12 +2389,15 @@ function PostPropertyPageInner() {
       stateId: formData.stateId || undefined,
       locality: formData.locality || formData.city || 'Delhi',
       localityId: formData.localityId || undefined,
+      society: formData.society?.trim() || undefined,
       address: formData.address || undefined,
       pincode: formData.pincode || undefined,
       latitude: formData.latitude ?? undefined,
       longitude: formData.longitude ?? undefined,
       price: Number(formData.price) || 0,
-      priceUnit: formData.priceUnit,
+      priceUnit: (['rent', 'pg'].includes(formData.mainCategory) || formData.listingType === 'rent')
+        ? 'per month'
+        : (formData.priceUnit || 'total'),
       area: parseAreaFromDynamic(formData.dynamicFields).area,
       areaUnit: parseAreaFromDynamic(formData.dynamicFields).areaUnit,
       bedrooms: formData.bedrooms ? Number(formData.bedrooms) : undefined,
@@ -2362,8 +2405,9 @@ function PostPropertyPageInner() {
       floorNumber: formData.floor ? Number(formData.floor) : undefined,
       furnishingStatus: formData.furnishingStatus || undefined,
       possessionStatus: formData.possessionStatus,
+      builderName: formData.builderName?.trim() || (formData.userType === 'agent' ? formData.agencyName?.trim() : undefined) || undefined,
+      reraNumber: formData.reraNumber?.trim() || undefined,
       listedBy: formData.userType === 'agent' ? 'agent' : 'owner',
-      builderName: formData.userType === 'agent' ? (formData.agencyName?.trim() || undefined) : undefined,
       brokerage: formData.brokerage === 'custom' ? formData.brokerageCustom : formData.brokerage || undefined,
       amenityIds: formData.amenityIds.length > 0 ? formData.amenityIds : undefined,
       extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : undefined,
@@ -2486,6 +2530,7 @@ function PostPropertyPageInner() {
           stateId: property.stateId || '',
           locality: property.locality || '',
           localityId: property.localityId || '',
+          society: property.society || '',
           address: property.address || '',
           pincode: property.pincode || '',
           latitude: property.latitude ?? null,
@@ -2496,8 +2541,12 @@ function PostPropertyPageInner() {
           floor: property.floorNumber ? String(property.floorNumber) : '',
           furnishingStatus: property.furnishingStatus || 'unfurnished',
           possessionStatus: property.possessionStatus || 'ready_to_move',
-          price: property.price ? String(property.price) : '',
-          priceUnit: property.priceUnit || 'total',
+          builderName: property.builderName || '',
+          reraNumber: property.reraNumber || '',
+          price: property.price ? String(Number(property.price)) : '',
+          priceUnit: property.priceUnit && property.priceUnit !== 'total'
+            ? property.priceUnit
+            : (['rent', 'pg'].includes(property.category) ? 'per month' : 'total'),
           brokerage: property.brokerage || '',
           description: property.description || '',
           amenityIds,
@@ -2513,7 +2562,7 @@ function PostPropertyPageInner() {
             return df;
           })(),
           userType: property.listedBy === 'agent' ? 'agent' : 'owner',
-          agencyName: property.builderName || '',
+          agencyName: property.listedBy === 'agent' ? (property.builderName || '') : '',
         }));
 
         setExistingImages(
@@ -2526,6 +2575,7 @@ function PostPropertyPageInner() {
           title: property.title,
           city: property.city,
           locality: property.locality,
+          isDraft: property.isDraft,
           approvalStatus: property.isDraft ? 'draft' : (property.approvalStatus || 'pending'),
         });
         dispatch(setStep(0));
@@ -2594,6 +2644,9 @@ function PostPropertyPageInner() {
         category: form.mainCategory,
         listingType: form.listingType || (form.mainCategory === 'pg' || form.mainCategory === 'rent' ? 'rent' : 'buy'),
         propertyType: form.propertyType, bedrooms: form.bedrooms, city: form.city, locality: form.locality,
+        society: form.society || undefined,
+        projectName: form.dynamicFields?.project_name || undefined,
+        builderName: form.builderName || (form.userType === 'agent' ? form.agencyName : undefined) || undefined,
       });
 
       const extraDetails: Record<string, any> = {};
@@ -2621,12 +2674,15 @@ function PostPropertyPageInner() {
         state: form.state, stateId: form.stateId || undefined,
         locality: form.locality || form.city,
         localityId: form.localityId || undefined,
+        society: form.society?.trim() || undefined,
         address: form.address || undefined,
         pincode: form.pincode || undefined,
         latitude: form.latitude ?? undefined,
         longitude: form.longitude ?? undefined,
         price: Number(form.price),
-        priceUnit: form.priceUnit,
+        priceUnit: (['rent', 'pg'].includes(form.mainCategory) || form.listingType === 'rent')
+          ? 'per month'
+          : (form.priceUnit || 'total'),
         area: parseAreaFromDynamic(form.dynamicFields).area,
         areaUnit: parseAreaFromDynamic(form.dynamicFields).areaUnit,
         bedrooms: form.bedrooms ? Number(form.bedrooms) : undefined,
@@ -2634,8 +2690,9 @@ function PostPropertyPageInner() {
         floorNumber: form.floor ? Number(form.floor) : undefined,
         furnishingStatus: form.furnishingStatus || undefined,
         possessionStatus: form.possessionStatus,
+        builderName: form.builderName?.trim() || (form.userType === 'agent' ? form.agencyName?.trim() || user?.company : undefined) || undefined,
+        reraNumber: form.reraNumber?.trim() || undefined,
         listedBy: form.userType === 'agent' ? 'agent' : 'owner',
-        builderName: form.userType === 'agent' ? (form.agencyName?.trim() || user?.company || undefined) : undefined,
         brokerage: form.brokerage === 'custom' ? form.brokerageCustom : form.brokerage || undefined,
         amenityIds: form.amenityIds.length > 0 ? form.amenityIds : undefined,
         extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : undefined,
@@ -2652,6 +2709,12 @@ function PostPropertyPageInner() {
       if (isEditMode && editId) {
         // Delete removed images first
         await Promise.all(removedImageIds.map(imgId => propertiesApi.deleteImage(editId, imgId)));
+
+        const isDraftBeingPublished = editingProperty?.isDraft === true;
+
+        // If publishing a draft, explicitly signal isDraft=false so backend transitions to pending
+        if (isDraftBeingPublished) payload.isDraft = false;
+
         const { data: updated } = await propertiesApi.update(editId, payload);
         propertyId = updated.id;
         propertySlug = updated.slug;
@@ -2797,7 +2860,7 @@ function PostPropertyPageInner() {
       case 5: return <Step7Amenities {...stepProps} />;
       case 6: return <Step8Description {...stepProps} />;
       case 7: return <Step9Price {...stepProps} />;
-      case 8: return <Step10Photos {...stepProps} mediaFiles={mediaFiles} setMediaFiles={setMediaFiles} existingImages={existingImages} onRemoveExisting={handleRemoveExistingImage} onSubmit={handleSubmit} onSaveDraft={handleSaveDraftAndExit} savingDraft={savingDraft} loading={loading} error={error} isEditMode={isEditMode} brochureFile={brochureFile} setBrochureFile={setBrochureFile} removeBrochure={removeBrochure} setRemoveBrochure={setRemoveBrochure} />;
+      case 8: return <Step10Photos {...stepProps} mediaFiles={mediaFiles} setMediaFiles={setMediaFiles} existingImages={existingImages} onRemoveExisting={handleRemoveExistingImage} onSubmit={handleSubmit} onSaveDraft={handleSaveDraftAndExit} savingDraft={savingDraft} loading={loading} error={error} isEditMode={isEditMode} isDraftEdit={editingProperty?.isDraft === true} brochureFile={brochureFile} setBrochureFile={setBrochureFile} removeBrochure={removeBrochure} setRemoveBrochure={setRemoveBrochure} />;
       default: return null;
     }
   };

@@ -205,8 +205,11 @@ export function generatePropertyTitle(params: {
   bedrooms?: string;
   city?: string;
   locality?: string;
+  society?: string;      // Society / building name (from property.society)
+  projectName?: string;  // Project name (from extraDetails.project_name)
+  builderName?: string;  // Builder / developer name
 }): string {
-  const { listingType, propertyType, bedrooms, city, locality } = params;
+  const { listingType, propertyType, bedrooms, city, locality, society, projectName, builderName } = params;
 
   const typeLabels: Record<string, string> = {
     apartment: 'Apartment', flat: 'Flat', villa: 'Villa', house: 'Independent House',
@@ -219,14 +222,28 @@ export function generatePropertyTitle(params: {
   };
 
   const parts: string[] = [];
+
+  // BHK prefix
   if (bedrooms && ['apartment', 'flat', 'villa', 'house', 'builder_floor', 'penthouse'].includes(propertyType)) {
     parts.push(`${bedrooms} BHK`);
   }
   parts.push(typeLabels[propertyType] || propertyType);
-  parts.push(listingType === 'rent' ? 'for Rent' : listingType === 'buy' ? 'for Sale' : `for ${listingType}`);
-  parts.push('in');
-  const location = locality && city ? `${locality}, ${city}` : (locality || city || 'India');
-  parts.push(location);
+
+  // "in <Society/Project>" if available, else generic "for Sale/Rent in Location"
+  const nameTag = projectName?.trim() || society?.trim();
+  if (nameTag) {
+    parts.push(`in ${nameTag}`);
+    parts.push(listingType === 'rent' ? 'for Rent' : 'for Sale');
+    const location = locality && city ? `${locality}, ${city}` : (locality || city || '');
+    if (location) parts.push(`- ${location}`);
+    if (builderName?.trim()) parts.push(`by ${builderName.trim()}`);
+  } else {
+    parts.push(listingType === 'rent' ? 'for Rent' : listingType === 'buy' ? 'for Sale' : `for ${listingType}`);
+    parts.push('in');
+    const location = locality && city ? `${locality}, ${city}` : (locality || city || 'India');
+    parts.push(location);
+    if (builderName?.trim()) parts.push(`by ${builderName.trim()}`);
+  }
 
   return parts.join(' ');
 }

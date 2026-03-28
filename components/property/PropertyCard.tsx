@@ -186,8 +186,9 @@ export default function PropertyCard({ property, className, listView }: Property
   const plan           = property.listingPlan && PLAN_BADGE[property.listingPlan];
   const statusOverlay  = STATUS_OVERLAY[property.status];
   const { area: resolvedArea } = getPropertyArea(property);
+  const isMonthlyRental = property.priceUnit === 'per month' || ['rent', 'pg'].includes(property.category);
   const pricePerSqft =
-    resolvedArea && property.price && property.priceUnit !== 'per month'
+    resolvedArea && property.price && !isMonthlyRental
       ? Math.round(property.price / resolvedArea) : null;
   const isAgent   = property.owner?.role === 'agent';
   const ownerName = isAgent
@@ -334,7 +335,7 @@ export default function PropertyCard({ property, className, listView }: Property
                 <div className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="inline-flex items-center bg-emerald-600 text-white text-lg sm:text-xl font-black leading-none px-3 py-1 rounded-lg shadow-sm whitespace-nowrap">
-                      {formatPrice(property.price, property.priceUnit)}
+                      {formatPrice(property.price, property.priceUnit || (['rent', 'pg'].includes(property.category) ? 'per month' : undefined))}
                     </span>
                     {isAgent && property.brokerage === 'no_brokerage' && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded-full">

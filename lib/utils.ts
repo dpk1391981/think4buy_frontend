@@ -16,7 +16,7 @@ export function formatPrice(price: number, unit?: string): string {
   };
 
   const formatted = formatIndian(price);
-  if (unit === 'per month') return `${formatted}/mo`;
+  if (unit === 'per month') return `${formatted}/month`;
   if (unit === 'per sqft') return `${formatted}/sqft`;
   return formatted;
 }
