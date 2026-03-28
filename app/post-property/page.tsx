@@ -2232,6 +2232,13 @@ function PostPropertyPageInner() {
     if (!authLoading && !user) router.replace('/post-property/guest');
   }, [user, authLoading, router]);
 
+  // Restore draftId from localStorage on mount (Redux resets on refresh, localStorage persists)
+  useEffect(() => {
+    if (isEditMode || draftId) return;
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('t4bs_draft_id') : null;
+    if (stored) dispatch(setDraftId(stored));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-derive listing identity from user role — no step needed
   useEffect(() => {
     if (!user) return;
@@ -2648,17 +2655,21 @@ function PostPropertyPageInner() {
         const { data: updated } = await propertiesApi.update(editId, payload);
         propertyId = updated.id;
         propertySlug = updated.slug;
-      } else if (draftId) {
-        // Publish an existing draft: update with final data then submit for approval
-        await propertiesApi.update(draftId, payload);
-        const { data: published } = await propertiesApi.publishDraft(draftId);
-        propertyId = published.id;
-        propertySlug = published.slug;
-        if (typeof window !== 'undefined') localStorage.removeItem('t4bs_draft_id');
       } else {
-        const { data: property } = await propertiesApi.create(payload);
-        propertyId = property.id;
-        propertySlug = property.slug;
+        // Check Redux state first, then fall back to localStorage to avoid duplicate creation
+        const resolvedDraftId = draftId || (typeof window !== 'undefined' ? localStorage.getItem('t4bs_draft_id') : null);
+        if (resolvedDraftId) {
+          // Publish existing draft: update with final data then submit for approval
+          await propertiesApi.update(resolvedDraftId, payload);
+          const { data: published } = await propertiesApi.publishDraft(resolvedDraftId);
+          propertyId = published.id;
+          propertySlug = published.slug;
+          if (typeof window !== 'undefined') localStorage.removeItem('t4bs_draft_id');
+        } else {
+          const { data: property } = await propertiesApi.create(payload);
+          propertyId = property.id;
+          propertySlug = property.slug;
+        }
       }
 
       // Upload new images
