@@ -7,9 +7,12 @@ import {
   Search, MapPin, Loader2, X, Users, Building2,
   ArrowLeft, ChevronRight, SlidersHorizontal, TrendingUp,
   ChevronDown, BedDouble, IndianRupee, CheckCircle2, Sliders, LocateFixed,
+  Clock, Flame,
 } from 'lucide-react';
 import { locationsApi, propertyConfigApi, smartSearchApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCookieConsent } from '@/contexts/CookieConsentContext';
 const CITY_GRADIENTS = [
   'from-blue-500 to-cyan-400',
   'from-orange-500 to-red-400',
@@ -578,6 +581,8 @@ function DesktopPropertySearch({
   onSearch: (params: Record<string, string>) => void;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
+  const { preferences } = useCookieConsent();
   const [q, setQ]           = useState('');
   const [suggs, setSuggs]   = useState<any[]>([]);
   const [busy, setBusy]     = useState(false);
@@ -589,6 +594,8 @@ function DesktopPropertySearch({
   const [detecting, setDetecting] = useState(false);
   const [detectErr, setDetectErr] = useState('');
   const [popularCities, setPopularCities] = useState<{ id: string; cityName: string; counts: { total: number } }[]>([]);
+  const [trendingSearches, setTrendingSearches] = useState<{ query: string; count: number }[]>([]);
+  const [recentSearches, setRecentSearches]     = useState<{ searchQuery: string }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const deb = useRef<NodeJS.Timeout>();
   const suggRef = useRef<HTMLDivElement>(null);
@@ -607,6 +614,21 @@ function DesktopPropertySearch({
       setPopularCities(arr.slice(0, 8));
     }).catch(() => {});
   }, []);
+
+  // Fetch trending searches (category-aware)
+  useEffect(() => {
+    smartSearchApi.getTrending(5, category || undefined)
+      .then(r => setTrendingSearches(r.data ?? []))
+      .catch(() => {});
+  }, [category]);
+
+  // Fetch recent searches (only if logged in + personalization consent)
+  useEffect(() => {
+    if (!user || !preferences.personalization) { setRecentSearches([]); return; }
+    smartSearchApi.getHistory(category || undefined)
+      .then(r => setRecentSearches((r.data ?? []).slice(0, 5)))
+      .catch(() => {});
+  }, [user, preferences.personalization, category]);
 
   // Close suggestions on outside click
   useEffect(() => {
@@ -638,7 +660,7 @@ function DesktopPropertySearch({
     return p;
   };
 
-  const search = useCallback(async (city?: string, locality?: string) => {
+  const search = useCallback(async (city?: string, locality?: string, queryOverride?: string) => {
     setShowSugg(false);
     if (city) {
       // User selected a location suggestion — city is resolved, use directly
@@ -646,7 +668,7 @@ function DesktopPropertySearch({
       return;
     }
 
-    const rawQ = q.trim();
+    const rawQ = (queryOverride !== undefined ? queryOverride : q).trim();
 
     // If there are UI-selected filters but no text, just search with filters
     if (!rawQ) {
@@ -779,8 +801,11 @@ function DesktopPropertySearch({
         </div>
 
         {/* Suggestions dropdown */}
-        {showSugg && (suggs.length > 0 || (q.length < 2 && popularCities.length > 0)) && (
-          <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[200] overflow-hidden">
+        {showSugg && (
+          suggs.length > 0 ||
+          (q.length < 2 && (recentSearches.length > 0 || trendingSearches.length > 0 || popularCities.length > 0))
+        ) && (
+          <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[200] overflow-hidden max-h-[480px] overflow-y-auto">
             {suggs.length > 0 ? (
               <>
                 <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50">
@@ -811,30 +836,92 @@ function DesktopPropertySearch({
                   </button>
                 ))}
               </>
-            ) : q.length < 2 && popularCities.length > 0 ? (
+            ) : q.length < 2 ? (
               <>
-                <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50 flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3" /> Popular Cities
-                </div>
-                {popularCities.map((c) => (
-                  <button
-                    key={c.id}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left transition-colors"
-                    onClick={() => {
-                      setQ(c.cityName);
-                      setShowSugg(false);
-                      search(c.cityName);
-                    }}
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
-                      <MapPin className="w-4 h-4 text-primary-500" />
+                {/* Recent Searches */}
+                {recentSearches.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-gray-50">
+                      <Clock className="w-3 h-3" /> Recent Searches
                     </div>
-                    <span className="flex-1 text-sm text-gray-800 font-medium">{c.cityName}</span>
-                    {c.counts?.total > 0 && (
-                      <span className="text-xs text-gray-400 flex-shrink-0">{c.counts.total} listings</span>
-                    )}
-                  </button>
-                ))}
+                    {recentSearches.map((s, i) => (
+                      <button
+                        key={i}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left transition-colors group"
+                        onClick={() => {
+                          setQ(s.searchQuery);
+                          setShowSugg(false);
+                          search(undefined, undefined, s.searchQuery);
+                        }}
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-primary-50 transition-colors">
+                          <Clock className="w-3.5 h-3.5 text-gray-400 group-hover:text-primary-500 transition-colors" />
+                        </div>
+                        <span className="flex-1 text-sm text-gray-700 truncate">{s.searchQuery}</span>
+                        <Search className="w-3 h-3 text-gray-300 flex-shrink-0 group-hover:text-primary-400 transition-colors" />
+                      </button>
+                    ))}
+                  </>
+                )}
+
+                {/* Trending Searches */}
+                {trendingSearches.length > 0 && (
+                  <>
+                    <div className={cn(
+                      'px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5',
+                      recentSearches.length > 0 ? 'border-t border-gray-50 mt-1' : 'border-b border-gray-50',
+                    )}>
+                      <Flame className="w-3 h-3 text-orange-400" /> Trending{category ? ` in ${category.replace('_', ' ')}` : ''}
+                    </div>
+                    <div className="px-4 py-2 flex flex-wrap gap-2">
+                      {trendingSearches.map((s, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            setQ(s.query);
+                            setShowSugg(false);
+                            search(undefined, undefined, s.query);
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-100 text-xs font-semibold text-orange-700 hover:bg-orange-100 hover:border-orange-200 transition-all whitespace-nowrap"
+                        >
+                          <TrendingUp className="w-3 h-3 flex-shrink-0" />
+                          {s.query}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Popular Cities */}
+                {popularCities.length > 0 && (
+                  <>
+                    <div className={cn(
+                      'px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1',
+                      (recentSearches.length > 0 || trendingSearches.length > 0) ? 'border-t border-gray-100 mt-1' : 'border-b border-gray-50',
+                    )}>
+                      <MapPin className="w-3 h-3" /> Popular Cities
+                    </div>
+                    {popularCities.map((c) => (
+                      <button
+                        key={c.id}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left transition-colors"
+                        onClick={() => {
+                          setQ(c.cityName);
+                          setShowSugg(false);
+                          search(c.cityName);
+                        }}
+                      >
+                        <div className="w-7 h-7 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
+                          <MapPin className="w-3.5 h-3.5 text-primary-500" />
+                        </div>
+                        <span className="flex-1 text-sm text-gray-800 font-medium">{c.cityName}</span>
+                        {c.counts?.total > 0 && (
+                          <span className="text-xs text-gray-400 flex-shrink-0">{c.counts.total} listings</span>
+                        )}
+                      </button>
+                    ))}
+                  </>
+                )}
               </>
             ) : null}
           </div>
@@ -905,6 +992,8 @@ function MobileSearch({
   allTabs: CategoryTab[]; allTypes: PropType[];
 }) {
   const router   = useRouter();
+  const { user } = useAuth();
+  const { preferences } = useCookieConsent();
   const inputRef = useRef<HTMLInputElement>(null);
   const debRef   = useRef<NodeJS.Timeout>();
 
@@ -918,6 +1007,8 @@ function MobileSearch({
   const [detecting, setDetecting] = useState(false);
   const [detectErr, setDetectErr] = useState('');
   const [topCities, setTopCities] = useState<{ id: string; cityName: string; counts: { total: number } }[]>([]);
+  const [trendingSearches, setTrendingSearches] = useState<{ query: string; count: number }[]>([]);
+  const [recentSearches, setRecentSearches]     = useState<{ searchQuery: string }[]>([]);
 
   const [localTypes, setLocalTypes] = useState<PropType[]>(allTypes);
   const typeCache = useRef<Record<string, PropType[]>>({});
@@ -954,6 +1045,21 @@ function MobileSearch({
     }).catch(() => {});
   }, []);
 
+  // Fetch trending searches (category-aware)
+  useEffect(() => {
+    smartSearchApi.getTrending(6, cat || undefined)
+      .then(r => setTrendingSearches(r.data ?? []))
+      .catch(() => {});
+  }, [cat]);
+
+  // Fetch recent searches (only if logged in + personalization consent)
+  useEffect(() => {
+    if (!user || !preferences.personalization) { setRecentSearches([]); return; }
+    smartSearchApi.getHistory(cat || undefined)
+      .then(r => setRecentSearches((r.data ?? []).slice(0, 5)))
+      .catch(() => {});
+  }, [user, preferences.personalization, cat]);
+
   const close = () => {
     if (window.history.state?.msearch) window.history.back();
     else onClose();
@@ -970,7 +1076,7 @@ function MobileSearch({
     setCat(v); setBhk([]); setBudget(null); setType('');
   };
 
-  const go = async (city?: string, locality?: string, state?: string) => {
+  const go = async (city?: string, locality?: string, state?: string, queryOverride?: string) => {
     onClose();
 
     if (isAgent) {
@@ -996,7 +1102,7 @@ function MobileSearch({
     }
 
     // Free-text: use smart search API
-    const rawQ = query.trim();
+    const rawQ = (queryOverride !== undefined ? queryOverride : query).trim();
 
     // Only skip straight to /properties when there is truly NOTHING selected
     if (!rawQ && !bhk.length && !type && !budget) {
@@ -1199,7 +1305,7 @@ function MobileSearch({
           </div>
         ) : (
           <>
-            {/* GPS detect + Popular Cities */}
+            {/* GPS detect button */}
             <div className="bg-white">
               <button
                 onClick={handleDetect}
@@ -1232,8 +1338,53 @@ function MobileSearch({
                   <ChevronRight className={cn('w-4 h-4 flex-shrink-0', detectErr ? 'text-red-300' : 'text-gray-300')} />
                 )}
               </button>
+            </div>
 
-              <SectionHeader icon={<TrendingUp className="w-3.5 h-3.5" />} label="Popular Cities" />
+            {/* Recent Searches */}
+            {recentSearches.length > 0 && (
+              <div className="bg-white mt-2">
+                <SectionHeader icon={<Clock className="w-3.5 h-3.5" />} label="Recent Searches" />
+                {recentSearches.map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => go(undefined, undefined, undefined, s.searchQuery)}
+                    className="w-full flex items-center gap-4 px-5 py-3.5 active:bg-gray-50 transition-colors text-left"
+                  >
+                    <div className="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <span className="flex-1 text-sm font-medium text-gray-800 truncate">{s.searchQuery}</span>
+                    <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Trending Searches */}
+            {trendingSearches.length > 0 && (
+              <div className="bg-white mt-2">
+                <SectionHeader
+                  icon={<Flame className="w-3.5 h-3.5 text-orange-400" />}
+                  label={`Trending${cat ? ` — ${cat.replace('_', ' ')}` : ''}`}
+                />
+                <div className="px-5 pb-4 flex flex-wrap gap-2">
+                  {trendingSearches.map((s, i) => (
+                    <button
+                      key={i}
+                      onClick={() => go(undefined, undefined, undefined, s.query)}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-orange-50 border border-orange-100 active:bg-orange-100 transition-colors"
+                    >
+                      <TrendingUp className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
+                      <span className="text-sm font-semibold text-orange-700 whitespace-nowrap">{s.query}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Popular Cities */}
+            <div className="bg-white mt-2">
+              <SectionHeader icon={<MapPin className="w-3.5 h-3.5" />} label="Popular Cities" />
               {topCities.length > 0
                 ? topCities.map((city, idx) => (
                     <LocationRow
@@ -1246,7 +1397,6 @@ function MobileSearch({
                   ))
                 : null
               }
-
             </div>
 
             {/* ── Filters section — always visible ───────────────────── */}

@@ -1,17 +1,18 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   SlidersHorizontal, ChevronDown, X,
-  MapPin, Home, Map, ChevronLeft, ChevronRight,
+  MapPin, Home, Map, Loader2,
 } from 'lucide-react';
 import PropertyCard from '@/components/property/PropertyCard';
 import GlobalSearchBar from '@/components/search/GlobalSearchBar';
 import AgentsSection from '@/components/property/AgentsSection';
 import { propertiesApi, propertyConfigApi, locationsApi } from '@/lib/api';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import { Property, PaginatedProperties } from '@/types/property';
+import { useSearchState } from '@/contexts/SearchStateContext';
+import { Property } from '@/types/property';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -90,8 +91,15 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
   const urlSearchParams = useSearchParams();
   const router = useRouter();
 
-  const [data, setData]                   = useState<PaginatedProperties | null>(null);
-  const [loading, setLoading]             = useState(true);
+  // ── Infinite scroll state ────────────────────────────────────────────────
+  const [items, setItems]               = useState<Property[]>([]);
+  const [meta, setMeta]                 = useState<{ page: number; limit: number; total: number; totalPages: number } | null>(null);
+  const [loading, setLoading]           = useState(true);    // initial page skeleton
+  const [isLoadingMore, setIsLoadingMore] = useState(false); // subsequent pages spinner
+  const [hasMore, setHasMore]           = useState(false);
+  const pageRef        = useRef(1);     // current page (ref avoids stale closure)
+  const fetchLockRef   = useRef(false); // prevents duplicate concurrent fetches
+  const sentinelRef    = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode]           = useState<'list' | 'map'>('list');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [showFilterModal,   setShowFilterModal]   = useState(false);
@@ -103,6 +111,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
     if (sb === 'trending') return 'trending';
     return so ? `${sb}:${so}` : sb;
   });
+  const { syncFromUrl, trackFilterApply, trackScrollDepth } = useSearchState();
   const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
   const [seoContent, setSeoContent]       = useState<{
     type: 'city' | 'state'; name: string;
@@ -143,29 +152,88 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityParam, stateParam]);
 
-  // ── Fetch properties ────────────────────────────────────────────────────────
-  const fetchProperties = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params: Record<string, any> = { ...propDefaults };
-      urlSearchParams.forEach((val, key) => { params[key] = val; });
-      if (sortValue === 'relevance' || sortValue === 'trending') {
-        params.sortBy = sortValue;
-      } else {
-        const [sortBy, sortOrder] = sortValue.split(':');
-        params.sortBy = sortBy;
-        params.sortOrder = sortOrder;
-      }
-      const res = await propertiesApi.getAll(params);
-      setData(res.data);
-    } catch {
-      setData(null);
-    } finally {
-      setLoading(false);
+  // ── Build API params ─────────────────────────────────────────────────────────
+  const buildParams = useCallback((targetPage: number) => {
+    const params: Record<string, any> = { ...propDefaults };
+    urlSearchParams.forEach((val, key) => { if (key !== 'page') params[key] = val; });
+    if (sortValue === 'relevance' || sortValue === 'trending') {
+      params.sortBy = sortValue;
+    } else {
+      const [sortBy, sortOrder] = sortValue.split(':');
+      params.sortBy = sortBy;
+      params.sortOrder = sortOrder;
     }
+    params.page  = targetPage;
+    params.limit = 20;
+    return params;
   }, [urlSearchParams, sortValue, propDefaults]);
 
-  useEffect(() => { fetchProperties(); }, [fetchProperties]);
+  // ── Initial / filter-change fetch (resets accumulated list) ─────────────────
+  useEffect(() => {
+    pageRef.current    = 1;
+    fetchLockRef.current = false;
+    setItems([]);
+    setHasMore(false);
+    setMeta(null);
+    setLoading(true);
+
+    propertiesApi.getAll(buildParams(1))
+      .then(res => {
+        const d = res.data;
+        setItems(d.data);
+        setMeta(d.meta);
+        setHasMore(1 < d.meta.totalPages);
+        pageRef.current = 1;
+      })
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildParams]);
+
+  // ── Load more (append next page) ─────────────────────────────────────────────
+  const loadMore = useCallback(() => {
+    if (fetchLockRef.current || !hasMore) return;
+    fetchLockRef.current = true;
+    const nextPage = pageRef.current + 1;
+    setIsLoadingMore(true);
+
+    propertiesApi.getAll(buildParams(nextPage))
+      .then(res => {
+        const d = res.data;
+        setItems(prev => [...prev, ...d.data]);
+        setMeta(d.meta);
+        setHasMore(nextPage < d.meta.totalPages);
+        pageRef.current = nextPage;
+      })
+      .catch(() => {})
+      .finally(() => {
+        setIsLoadingMore(false);
+        fetchLockRef.current = false;
+      });
+  }, [hasMore, buildParams]);
+
+  // ── IntersectionObserver — trigger load-more when sentinel is visible ─────────
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadMore(); },
+      { rootMargin: '400px', threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
+
+  // ── Scroll depth tracking ────────────────────────────────────────────────────
+  useEffect(() => {
+    const onScroll = () => {
+      const scrolled = window.scrollY + window.innerHeight;
+      const total    = document.documentElement.scrollHeight;
+      if (total > 0) trackScrollDepth(Math.round((scrolled / total) * 100));
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [trackScrollDepth]);
 
   // ── Derived values ──────────────────────────────────────────────────────────
   const category     = getMerged('category');
@@ -176,6 +244,17 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
   const locality     = getMerged('locality');
 
   const { trackSearch } = useAnalytics();
+
+  // Sync URL state into SearchStateContext for global tracking
+  useEffect(() => {
+    syncFromUrl({
+      category: getMerged('category') || undefined,
+      city: getMerged('city') || undefined,
+      type: getMerged('type') || undefined,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSearchParams.toString()]);
+
   useEffect(() => {
     const q = search || keyword;
     if (q || city || category) {
@@ -188,6 +267,12 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
           bedrooms: urlSearchParams.get('bedrooms') || undefined },
       });
     }
+    // Track filter apply when active filters exist
+    const activeFilterMap: Record<string, string> = {};
+    urlSearchParams.forEach((val, key) => {
+      if (key !== 'page' && key !== 'sortBy' && key !== 'sortOrder') activeFilterMap[key] = val;
+    });
+    if (Object.keys(activeFilterMap).length > 0) trackFilterApply(activeFilterMap);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSearchParams.toString()]);
 
@@ -233,7 +318,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
     if (key === 'minArea')  params.delete('maxArea');
     if (key === 'maxArea')  params.delete('minArea');
     params.delete(key);
-    params.set('page', '1');
+    params.delete('page');
     router.push(`/properties?${params.toString()}`, { scroll: false });
   };
 
@@ -244,23 +329,17 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
   const toggleBoolFilter = (key: string, active: boolean) => {
     const params = new URLSearchParams(urlSearchParams.toString());
     if (active) { params.delete(key); } else { params.set(key, 'true'); }
-    params.set('page', '1');
+    params.delete('page');
     router.push(`/properties?${params.toString()}`, { scroll: false });
   };
 
   const toggleOwnerFilter = () => {
     const params = new URLSearchParams(urlSearchParams.toString());
     if (ownerFilterActive) { params.delete('listedBy'); } else { params.set('listedBy', 'owner'); }
-    params.set('page', '1');
+    params.delete('page');
     router.push(`/properties?${params.toString()}`, { scroll: false });
   };
 
-  const handlePageChange = (page: number) => {
-    const params = new URLSearchParams(urlSearchParams.toString());
-    params.set('page', String(page));
-    router.push(`/properties?${params.toString()}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   const mapSearchParams: Record<string, string> = { ...propDefaults };
   urlSearchParams.forEach((val, key) => { mapSearchParams[key] = val; });
@@ -275,7 +354,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
     seen.add(key);
   }
 
-  const totalStr = loading ? '…' : (data?.meta.total.toLocaleString('en-IN') ?? '0');
+  const totalStr = loading ? '…' : (meta?.total.toLocaleString('en-IN') ?? '0');
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -481,7 +560,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
                 <p className="text-sm text-gray-500 mt-0.5">
                   {loading
                     ? <InlineLoader className="text-gray-400" />
-                    : data ? <>{data.meta.total.toLocaleString('en-IN')} properties found</> : null}
+                    : meta ? <>{meta.total.toLocaleString('en-IN')} properties found</> : null}
                 </p>
               </div>
 
@@ -629,11 +708,11 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
                 </div>
               </>
 
-            ) : data?.data.length ? (
+            ) : items.length ? (
               <>
                 {/* Desktop: list view */}
                 <div className="hidden sm:block space-y-3">
-                  {data.data.map((property: Property) => (
+                  {items.map((property: Property) => (
                     <PropertyCard
                       key={property.id}
                       property={property}
@@ -643,72 +722,30 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
                   ))}
                 </div>
 
-                {/* Mobile: single column like 99acres */}
+                {/* Mobile: single column */}
                 <div className="sm:hidden flex flex-col gap-3 px-3 pb-3">
-                  {data.data.map((property: Property) => (
+                  {items.map((property: Property) => (
                     <PropertyCard key={property.id} property={property} />
                   ))}
                 </div>
 
-                {/* ── Pagination ─────────────────────────────────────── */}
-                {data.meta.totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-1.5 mt-6 mb-4 px-4 sm:px-0 flex-wrap">
-                    <button
-                      onClick={() => handlePageChange(data.meta.page - 1)}
-                      disabled={data.meta.page === 1}
-                      className="flex items-center gap-1 px-3 sm:px-4 h-9 sm:h-10 border border-gray-200 rounded-xl text-sm font-medium disabled:opacity-40 bg-white"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                      <span className="hidden sm:inline">Prev</span>
-                    </button>
+                {/* ── Infinite scroll sentinel ─────────────────────── */}
+                {hasMore && <div ref={sentinelRef} className="h-4" aria-hidden />}
 
-                    {(() => {
-                      const total = data.meta.totalPages;
-                      const cur   = data.meta.page;
-                      const pages: (number | '...')[] = [];
-                      if (total <= 5) {
-                        for (let i = 1; i <= total; i++) pages.push(i);
-                      } else {
-                        pages.push(1);
-                        if (cur > 3) pages.push('...');
-                        for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) pages.push(i);
-                        if (cur < total - 2) pages.push('...');
-                        pages.push(total);
-                      }
-                      return pages.map((p, i) =>
-                        p === '...' ? (
-                          <span key={`e${i}`} className="px-1 text-gray-400 text-sm">…</span>
-                        ) : (
-                          <button
-                            key={p}
-                            onClick={() => handlePageChange(p as number)}
-                            className={cn(
-                              'w-9 h-9 sm:w-10 sm:h-10 rounded-xl text-sm font-medium transition-colors',
-                              p === cur
-                                ? 'bg-primary-600 text-white shadow-sm'
-                                : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50',
-                            )}
-                          >{p}</button>
-                        ),
-                      );
-                    })()}
-
-                    <button
-                      onClick={() => handlePageChange(data.meta.page + 1)}
-                      disabled={data.meta.page === data.meta.totalPages}
-                      className="flex items-center gap-1 px-3 sm:px-4 h-9 sm:h-10 border border-gray-200 rounded-xl text-sm font-medium disabled:opacity-40 bg-white"
-                    >
-                      <span className="hidden sm:inline">Next</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                {/* Loading next page */}
+                {isLoadingMore && (
+                  <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-500">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary-500" />
+                    Loading more properties…
                   </div>
                 )}
 
-                <p className="text-center text-xs text-gray-400 pb-6 sm:pb-2">
-                  Showing {(data.meta.page - 1) * data.meta.limit + 1}–
-                  {Math.min(data.meta.page * data.meta.limit, data.meta.total)} of{' '}
-                  {data.meta.total.toLocaleString('en-IN')} results
-                </p>
+                {/* End of results */}
+                {!hasMore && items.length > 0 && (
+                  <p className="text-center text-xs text-gray-400 py-6">
+                    All {meta?.total.toLocaleString('en-IN')} properties loaded
+                  </p>
+                )}
               </>
 
             ) : (
@@ -803,14 +840,14 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
       <MobileFilterSheet
         open={showMobileFilters}
         onClose={() => setShowMobileFilters(false)}
-        totalCount={data?.meta.total}
+        totalCount={meta?.total}
       />
 
       {/* ── Desktop Filter Modal ─────────────────────────────────────────── */}
       <FilterModal
         open={showFilterModal}
         onClose={() => setShowFilterModal(false)}
-        totalCount={data?.meta.total}
+        totalCount={meta?.total}
       />
 
     </div>

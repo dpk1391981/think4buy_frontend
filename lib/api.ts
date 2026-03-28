@@ -98,8 +98,8 @@ api.interceptors.response.use(
 export const propertiesApi = {
   getAll: (params?: Record<string, any>) => api.get('/properties', { params }),
   getForMap: (params?: Record<string, any>) => api.get('/properties/map', { params }),
-  getSearchSuggestions: (q: string) =>
-    api.get('/properties/search/suggestions', { params: { q } }),
+  getSearchSuggestions: (q: string, category?: string) =>
+    api.get('/properties/search/suggestions', { params: { q, category: category || undefined } }),
   getPopularKeywords: (limit = 8) =>
     api.get('/properties/search/popular-keywords', { params: { limit } }),
   getFeatured: (limit = 8) => api.get('/properties/featured', { params: { limit } }),
@@ -180,10 +180,11 @@ export const smartSearchApi = {
     contactEmail?: string;
   }) => api.post('/smart-search/behavior', body).catch(() => {}),
 
-  getTrending: (limit = 8) =>
-    api.get('/smart-search/trending', { params: { limit } }),
+  getTrending: (limit = 8, category?: string) =>
+    api.get('/smart-search/trending', { params: { limit, category: category || undefined } }),
 
-  getHistory: () => api.get('/smart-search/history'),
+  getHistory: (category?: string) =>
+    api.get('/smart-search/history', { params: { category: category || undefined } }),
 };
 
 // Auth

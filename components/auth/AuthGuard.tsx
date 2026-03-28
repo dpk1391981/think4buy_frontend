@@ -66,10 +66,14 @@ export default function AuthGuard({ children, allowedRoles, redirectTo, loginRed
       return;
     }
 
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
+    // super_admin bypasses all role restrictions
+    const isSuperAdmin = user.role === 'super_admin' || (user as any).isSuperAdmin;
+    if (allowedRoles && !isSuperAdmin && !allowedRoles.includes(user.role)) {
       router.replace('/');
     }
   }, [mounted, loading, user, allowedRoles, redirectTo, router]);
+
+  const isSuperAdmin = user?.role === 'super_admin' || (user as any)?.isSuperAdmin;
 
   // Show loader during SSR hydration, auth loading, or while redirecting
   const shouldShowLoader =
@@ -78,7 +82,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo, loginRed
     !user ||
     user.needsOnboarding ||
     !user.name?.trim() ||
-    (allowedRoles && !allowedRoles.includes(user.role ?? ''));
+    (allowedRoles && !isSuperAdmin && !allowedRoles.includes(user.role ?? ''));
 
   if (shouldShowLoader) {
     return <AuthLoadingScreen />;
