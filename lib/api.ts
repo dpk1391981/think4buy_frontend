@@ -414,6 +414,62 @@ export const adminPlansApi = {
   deleteBoostPlan: (id: string) => api.delete(`/admin/boost-plans/${id}`),
 };
 
+// ── Payment API (user-facing) ──────────────────────────────────────────────
+export const paymentApi = {
+  getMode: () => api.get<{ paymentEnabled: boolean }>('/payment/mode'),
+  initiatePayment: (data: {
+    idempotencyKey: string;
+    type: string;
+    amount: number;
+    currency?: string;
+    referenceId?: string;
+    referenceType?: string;
+    metadata?: Record<string, any>;
+  }) => api.post('/payment/initiate', data),
+  verifyPayment: (data: {
+    transactionId: string;
+    gatewayOrderId: string;
+    gatewayPaymentId: string;
+    gatewaySignature: string;
+  }) => api.post('/payment/verify', data),
+  getStatus: (transactionId: string) => api.get(`/payment/status/${transactionId}`),
+  getStatusPublic: (transactionId: string) => api.get(`/payment/status/${transactionId}/public`),
+  getHistory: (params?: { page?: number; limit?: number }) => api.get('/payment/history', { params }),
+};
+
+// ── Admin Payment API ──────────────────────────────────────────────────────
+export const adminPaymentApi = {
+  getDashboard: () => api.get('/admin/payment/dashboard'),
+
+  // Transactions
+  getTransactions: (params?: {
+    page?: number; limit?: number; status?: string; userId?: string; dateFrom?: string; dateTo?: string;
+  }) => api.get('/admin/payment/transactions', { params }),
+  exportTransactions: (params?: { status?: string; dateFrom?: string; dateTo?: string; format?: 'csv' | 'json' }) =>
+    api.get('/admin/payment/transactions/export', { params, responseType: 'blob' }),
+
+  // Webhook logs
+  getWebhookLogs: (params?: { transactionId?: string; page?: number; limit?: number }) =>
+    api.get('/admin/payment/webhook-logs', { params }),
+
+  // Refunds
+  initiateRefund: (data: { transactionId: string; amount: number; reason: string }) =>
+    api.post('/admin/payment/refunds', data),
+  getRefunds: (params?: { page?: number; limit?: number; status?: string }) =>
+    api.get('/admin/payment/refunds', { params }),
+  getRefundsByTransaction: (transactionId: string) =>
+    api.get(`/admin/payment/refunds/transaction/${transactionId}`),
+
+  // Gateways
+  listGateways: () => api.get('/admin/payment/gateways'),
+  getGateway: (id: string) => api.get(`/admin/payment/gateways/${id}`),
+  createGateway: (data: any) => api.post('/admin/payment/gateways', data),
+  updateGateway: (id: string, data: any) => api.patch(`/admin/payment/gateways/${id}`, data),
+  activateGateway: (id: string) => api.post(`/admin/payment/gateways/${id}/activate`),
+  deactivateGateway: (id: string) => api.post(`/admin/payment/gateways/${id}/deactivate`),
+  deleteGateway: (id: string) => api.delete(`/admin/payment/gateways/${id}`),
+};
+
 // Users / Agents (public)
 export const usersApi = {
   getStats: () => api.get<{ totalAgents: number }>('/users/stats'),

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { subscriptionApi, walletApi } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { subscriptionApi, walletApi, paymentApi } from '@/lib/api';
 
 interface Plan {
   id: string;
@@ -71,6 +72,7 @@ function FeatureList({ features }: { features: string[] | Record<string, any> | 
 }
 
 export default function AgentSubscriptionPage() {
+  const router = useRouter();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [current, setCurrent] = useState<ActiveSubscription | null>(null);
   const [history, setHistory] = useState<SubscriptionHistory[]>([]);
@@ -79,15 +81,17 @@ export default function AgentSubscriptionPage() {
   const [quotaTotal, setQuotaTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
+  const [paymentEnabled, setPaymentEnabled] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   async function reload() {
     try {
-      const [plansRes, subRes, walletRes] = await Promise.allSettled([
+      const [plansRes, subRes, walletRes, modeRes] = await Promise.allSettled([
         subscriptionApi.getPlans(),
         subscriptionApi.getCurrent(),
         walletApi.getWallet(),
+        paymentApi.getMode(),
       ]);
       if (plansRes.status === 'fulfilled') {
         const data = plansRes.value.data;
@@ -103,6 +107,9 @@ export default function AgentSubscriptionPage() {
         setQuotaUsed(wd?.quotaUsed ?? 0);
         setQuotaTotal(wd?.quotaTotal ?? 0);
       }
+      if (modeRes.status === 'fulfilled') {
+        setPaymentEnabled(modeRes.value.data?.paymentEnabled ?? false);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -112,20 +119,42 @@ export default function AgentSubscriptionPage() {
 
   useEffect(() => { reload(); }, []);
 
-  async function handlePurchase(planId: string, planPrice: number) {
-    if (walletBalance < planPrice) {
-      setError(`Insufficient tokens. You have ${walletBalance} tokens but need ${planPrice}.`);
-      return;
-    }
+  async function handlePurchase(planId: string, planPrice: number, planName: string) {
     setPurchasing(planId);
     setError('');
     setSuccess('');
     try {
-      await subscriptionApi.purchase(planId);
+      const res = await subscriptionApi.purchase(planId);
+      const data = res.data;
+
+      if (data?.requiresPayment) {
+        // Real-money mode: redirect to checkout with plan details
+        const plan = data.plan;
+        sessionStorage.setItem('payment_type', 'subscription');
+        sessionStorage.setItem('payment_amount', String(plan.price));
+        sessionStorage.setItem('payment_referenceId', planId);
+        sessionStorage.setItem('payment_referenceType', 'subscription_plan');
+        sessionStorage.setItem('payment_description', `${plan.name} — ${plan.durationDays} days`);
+        sessionStorage.setItem('payment_metadata', JSON.stringify({
+          tokensIncluded: plan.tokensIncluded,
+          maxListings: plan.maxListings,
+          planName: plan.name,
+        }));
+        router.push(
+          `/payment/checkout?type=subscription&amount=${plan.price}&referenceId=${planId}&description=${encodeURIComponent(`${plan.name} — ${plan.durationDays} days`)}`
+        );
+        return;
+      }
+
+      // Token mode: instant activation (same as before)
       setSuccess('Subscription activated successfully!');
       await reload();
     } catch (e: any) {
-      setError(e?.response?.data?.message || 'Failed to purchase subscription. Please try again.');
+      if (e?.response?.data?.message?.includes('Insufficient tokens')) {
+        setError(`Insufficient tokens. You have ${walletBalance} tokens but need ${planPrice}.`);
+      } else {
+        setError(e?.response?.data?.message || 'Failed to purchase subscription. Please try again.');
+      }
     } finally {
       setPurchasing(null);
     }
@@ -196,13 +225,23 @@ export default function AgentSubscriptionPage() {
 
       {/* Wallet balance + quota (no active subscription) */}
       <div className="bg-white rounded-xl p-4 shadow-sm mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🪙</span>
-          <div>
-            <div className="text-sm text-gray-500">Available Tokens</div>
-            <div className="text-xl font-bold text-gray-900">{walletBalance.toLocaleString()} tokens</div>
+        {paymentEnabled ? (
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">💳</span>
+            <div>
+              <div className="text-sm text-gray-500">Payment Mode</div>
+              <div className="text-base font-semibold text-blue-600">Real Money (Secure Checkout)</div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🪙</span>
+            <div>
+              <div className="text-sm text-gray-500">Available Tokens</div>
+              <div className="text-xl font-bold text-gray-900">{walletBalance.toLocaleString()} tokens</div>
+            </div>
+          </div>
+        )}
         {!current && quotaTotal > 0 && (
           <div className="flex items-center gap-3">
             <span className="text-2xl">🏠</span>
@@ -212,10 +251,12 @@ export default function AgentSubscriptionPage() {
             </div>
           </div>
         )}
-        <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 text-center">
-          <div>Plan prices are in</div>
-          <div className="font-medium text-gray-700">tokens (1 token ≈ ₹1)</div>
-        </div>
+        {!paymentEnabled && (
+          <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 text-center">
+            <div>Plan prices are in</div>
+            <div className="font-medium text-gray-700">tokens (1 token ≈ ₹1)</div>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -271,8 +312,16 @@ export default function AgentSubscriptionPage() {
                 </div>
 
                 <div className="mb-1">
-                  <span className="text-3xl font-bold text-gray-900">{plan.price.toLocaleString()}</span>
-                  <span className="text-gray-500 text-sm ml-1">tokens</span>
+                  {paymentEnabled ? (
+                    <>
+                      <span className="text-3xl font-bold text-gray-900">₹{plan.price.toLocaleString()}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-3xl font-bold text-gray-900">{plan.price.toLocaleString()}</span>
+                      <span className="text-gray-500 text-sm ml-1">tokens</span>
+                    </>
+                  )}
                 </div>
                 <div className="text-xs text-gray-400 mb-3">{plan.durationDays} days</div>
 
@@ -294,10 +343,10 @@ export default function AgentSubscriptionPage() {
                   </div>
                 ) : (
                   <button
-                    onClick={() => handlePurchase(plan.id, plan.price)}
-                    disabled={purchasing === plan.id || !canAfford}
+                    onClick={() => handlePurchase(plan.id, plan.price, plan.name)}
+                    disabled={purchasing === plan.id || (!paymentEnabled && !canAfford)}
                     className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      canAfford
+                      paymentEnabled || canAfford
                         ? style.highlight
                           ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
                           : 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -305,7 +354,9 @@ export default function AgentSubscriptionPage() {
                     } disabled:opacity-50`}
                   >
                     {purchasing === plan.id
-                      ? 'Activating...'
+                      ? (paymentEnabled ? 'Redirecting...' : 'Activating...')
+                      : paymentEnabled
+                      ? `Pay ₹${plan.price.toLocaleString()}`
                       : !canAfford
                       ? `Need ${(plan.price - walletBalance).toLocaleString()} more tokens`
                       : `Activate — ${plan.price.toLocaleString()} 🪙`}
