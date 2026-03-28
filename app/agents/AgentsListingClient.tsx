@@ -4,9 +4,9 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search, MapPin, Phone, Star, Shield, CheckCircle, Building2,
-  Briefcase, TrendingUp, ChevronRight, ChevronDown, ChevronLeft,
+  Briefcase, TrendingUp, ChevronRight, ChevronDown,
   X, Users, SlidersHorizontal, BadgeCheck,
-  Home, Handshake, Quote, Sparkles, Zap, Flame, Trophy, MessageCircle,
+  Home, Handshake, Quote, Sparkles, Zap, Flame, Trophy, MessageCircle, Loader2,
 } from 'lucide-react';
 import { usersApi, locationsApi, agencyApi } from '@/lib/api';
 import { getAgentUrl } from '@/lib/agentUrl';
@@ -213,7 +213,7 @@ const QUICK_FILTERS = [
   { label: '♛ Gold',          sort: 'rating',     badge: 'gold',     icon: '♛'  },
 ];
 
-const LIMIT = 15;
+const PAGE_SIZE = 20; // agents revealed per infinite-scroll step
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -596,46 +596,6 @@ function SidebarSection({ title, children, defaultOpen = true }: { title: string
   );
 }
 
-// ── Pagination ────────────────────────────────────────────────────────────────
-
-function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
-  if (totalPages <= 1) return null;
-  const pages: (number | '...')[] = [];
-  if (totalPages <= 7) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i);
-  } else {
-    pages.push(1);
-    if (page > 3) pages.push('...');
-    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
-    if (page < totalPages - 2) pages.push('...');
-    pages.push(totalPages);
-  }
-  return (
-    <div className="flex items-center justify-center gap-1.5 mt-8 flex-wrap">
-      <button onClick={() => onChange(page - 1)} disabled={page === 1}
-        className="px-4 h-10 border border-gray-200 rounded-xl text-sm font-medium disabled:opacity-40 hover:border-primary-400 hover:text-primary-600 bg-white transition-colors">
-        ← Prev
-      </button>
-      {pages.map((p, i) =>
-        p === '...'
-          ? <span key={`e${i}`} className="px-1 text-gray-400 text-sm">…</span>
-          : (
-            <button key={p} onClick={() => onChange(p as number)}
-              className={cn('w-10 h-10 rounded-xl text-sm font-medium transition-colors', p === page
-                ? 'bg-primary-600 text-white shadow-sm'
-                : 'bg-white border border-gray-200 text-gray-700 hover:border-primary-400 hover:text-primary-600')}>
-              {p}
-            </button>
-          )
-      )}
-      <button onClick={() => onChange(page + 1)} disabled={page >= totalPages}
-        className="px-4 h-10 border border-gray-200 rounded-xl text-sm font-medium disabled:opacity-40 hover:border-primary-400 hover:text-primary-600 bg-white transition-colors">
-        Next →
-      </button>
-    </div>
-  );
-}
-
 // ── SEO bottom sections ───────────────────────────────────────────────────────
 
 const HOW_IT_WORKS = [
@@ -687,15 +647,16 @@ export default function AgentsListingClient({
   const activeSort  = param('sort', 'rating');
   const activeMinExp    = param('minExp');
   const activeMinDeals  = param('minDeals');
-  const activePage  = parseInt(param('page', '1'), 10) || 1;
   const activeSearch = param('search');
 
   // Local UI state
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE); // infinite scroll
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [bannerAgents, setBannerAgents] = useState<Agent[]>([]);
+  const agentSentinelRef = useRef<HTMLDivElement>(null);
 
   // City search autocomplete (purely local — not a filter until applied)
   const [cityQuery, setCityQuery]     = useState(activeCity);
@@ -793,13 +754,6 @@ export default function AgentsListingClient({
     router.push(`/agents?${p.toString()}`, { scroll: false });
   }, [urlP, router]);
 
-  const pushPage = (pg: number) => {
-    const p = new URLSearchParams(urlP.toString());
-    p.set('page', String(pg));
-    router.push(`/agents?${p.toString()}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   const applyCity = (c: string) => {
     setCityQuery(c); setShowSug(false);
     pushFilter({ city: c || null });
@@ -853,13 +807,39 @@ export default function AgentsListingClient({
     return clientSort(result, activeSort);
   }, [allAgents, activeBadge, activeCity, activeSearch, activeMinExp, activeMinDeals, activeSort]);
 
-  // Client-side pagination
-  const total      = filteredAgents.length;
-  const totalPages = Math.ceil(total / LIMIT);
-  const agents     = useMemo(
-    () => filteredAgents.slice((activePage - 1) * LIMIT, activePage * LIMIT),
-    [filteredAgents, activePage],
+  // Virtual infinite scroll — reset visible count when filters change
+  const filterKey = `${activeCity}|${activeBadge}|${activeMinExp}|${activeMinDeals}|${activeSearch}|${activeSort}`;
+  const prevFilterKeyRef = useRef(filterKey);
+  useEffect(() => {
+    if (prevFilterKeyRef.current !== filterKey) {
+      prevFilterKeyRef.current = filterKey;
+      setVisibleCount(PAGE_SIZE);
+    }
+  }, [filterKey]);
+
+  const total  = filteredAgents.length;
+  const agents = useMemo(
+    () => filteredAgents.slice(0, visibleCount),
+    [filteredAgents, visibleCount],
   );
+  const hasMoreAgents = visibleCount < total;
+
+  // IntersectionObserver for agent infinite scroll
+  const loadMoreAgents = useCallback(() => {
+    if (visibleCount >= total) return;
+    setVisibleCount(prev => Math.min(prev + PAGE_SIZE, total));
+  }, [visibleCount, total]);
+
+  useEffect(() => {
+    const el = agentSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadMoreAgents(); },
+      { rootMargin: '400px', threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMoreAgents]);
 
   const verifiedCount = filteredAgents.filter(a => a.isVerified || (a.agentTick && a.agentTick !== 'none')).length;
 
@@ -1283,17 +1263,27 @@ export default function AgentsListingClient({
               <>
                 <div className="space-y-3">
                   {agents.map((a, i) => (
-                    <AgentCard key={a.id} agent={a} rank={activePage === 1 ? i + 1 : undefined} />
+                    <AgentCard key={a.id} agent={a} rank={i + 1} />
                   ))}
                 </div>
 
-                {/* Count line */}
-                <p className="text-center text-xs text-gray-400 mt-4">
-                  Showing {(activePage - 1) * LIMIT + 1}–{Math.min(activePage * LIMIT, total)} of {total.toLocaleString('en-IN')} agents
-                </p>
+                {/* Infinite scroll sentinel */}
+                {hasMoreAgents && <div ref={agentSentinelRef} className="h-4" aria-hidden />}
 
-                {/* Pagination */}
-                <Pagination page={activePage} totalPages={totalPages} onChange={pushPage} />
+                {/* Loading more indicator */}
+                {hasMoreAgents && (
+                  <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-500">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary-500" />
+                    Loading more agents…
+                  </div>
+                )}
+
+                {/* End of results */}
+                {!hasMoreAgents && agents.length > 0 && (
+                  <p className="text-center text-xs text-gray-400 py-6">
+                    All {total.toLocaleString('en-IN')} agents loaded
+                  </p>
+                )}
               </>
             )}
           </div>

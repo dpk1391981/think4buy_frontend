@@ -32,6 +32,8 @@ import { cn } from '@/lib/utils';
 import { detectLocation } from '@/lib/geolocation';
 import { useAuth } from '@/contexts/AuthContext';
 import { parseSearchHint, formatHintChips, QUICK_TAGS } from '@/lib/searchParser';
+import { useSearchState } from '@/contexts/SearchStateContext';
+import { useCookieConsent } from '@/contexts/CookieConsentContext';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -398,6 +400,8 @@ function SearchModal({
 }) {
   const router = useRouter();
   const { user } = useAuth();
+  const { preferences } = useCookieConsent();
+  const { trackCategorySelect, trackSearchPerform } = useSearchState();
   const inputRef = useRef<HTMLInputElement>(null);
   const debRef   = useRef<NodeJS.Timeout>();
   const [mounted, setMounted]     = useState(false);
@@ -443,32 +447,37 @@ function SearchModal({
     };
   }, [handleClose]);
 
-  // Fetch meta once
+  // Fetch trending + history — re-run when category changes so results are relevant
   useEffect(() => {
     locationsApi.getTopCities().then(r => {
       const raw = r.data;
       setPopularCities((Array.isArray(raw) ? raw : raw?.cities ?? []).slice(0, 8));
     }).catch(() => {});
-    smartSearchApi.getTrending(5).then(r => {
+
+    // Pass active category so trending reflects what users search in this category
+    smartSearchApi.getTrending(5, category || undefined).then(r => {
       if (Array.isArray(r?.data)) setTrendingSearches(r.data);
     }).catch(() => {});
-    // Search history for logged-in users
-    if (user) {
-      smartSearchApi.getHistory().then(r => {
+
+    // Search history — only for logged-in users with personalization consent
+    if (user && preferences.personalization) {
+      smartSearchApi.getHistory(category || undefined).then(r => {
         const logs: any[] = Array.isArray(r?.data) ? r.data : [];
         const seen = new Set<string>();
         const queries = logs.map((l: any) => l.searchQuery as string).filter(q => q && !seen.has(q) && seen.add(q)).slice(0, 5);
         setRecentSearches(queries);
       }).catch(() => {});
+    } else {
+      setRecentSearches([]);
     }
-  }, [user]);
+  }, [user, category, preferences.personalization]); // re-fetch whenever any of these change
 
   const fetchSugg = useCallback(async (val: string) => {
     if (!val.trim() || val.length < 2) { setSuggestions([]); return; }
     setLoadingSugg(true);
     try {
       const [sRes, lRes] = await Promise.allSettled([
-        propertiesApi.getSearchSuggestions(val),
+        propertiesApi.getSearchSuggestions(val, category || undefined),
         locationsApi.search(val),
       ]);
       const suggs: Suggestion[] = [];
@@ -491,7 +500,7 @@ function SearchModal({
       setSuggestions(suggs.slice(0, 8));
     } catch { setSuggestions([]); }
     finally { setLoadingSugg(false); }
-  }, []);
+  }, [category]);
 
   const handleChange = (val: string) => {
     setQuery(val);
@@ -515,15 +524,22 @@ function SearchModal({
       const url = new URL(res.data.redirectUrl, 'http://x');
       // UI-selected category always wins unless smart search returned one
       if (category && !res.data.filters?.category) url.searchParams.set('category', category);
+      // Track the search
+      trackSearchPerform(q, {
+        category: url.searchParams.get('category') || category || undefined,
+        city: url.searchParams.get('city') || undefined,
+        propertyType: url.searchParams.get('type') || undefined,
+      });
       router.push(`/properties?${url.searchParams.toString()}`);
     } catch {
       // BE unavailable — keyword fallback
       const p = new URLSearchParams();
       if (category) p.set('category', category);
       p.set('keyword', query.trim());
+      trackSearchPerform(query.trim(), { category: category || undefined });
       router.push(`/properties?${p.toString()}`);
     } finally { setSearching(false); }
-  }, [query, category, router, handleClose]);
+  }, [query, category, router, handleClose, trackSearchPerform]);
 
   const go = (url: string) => { handleClose(); router.push(url); };
 
@@ -675,7 +691,10 @@ function SearchModal({
               : categoryTabs.map(c => (
                   <button
                     key={c.value}
-                    onClick={() => setCategory(c.value)}
+                    onClick={() => {
+                      setCategory(c.value);
+                      if (c.value) trackCategorySelect(c.value, c.label);
+                    }}
                     className={cn(
                       'flex-shrink-0 px-5 py-2 rounded-full text-sm font-bold transition-all duration-150 border',
                       category === c.value
@@ -829,7 +848,7 @@ export default function GlobalSearchBar({
       )
     : '';
 
-  const displayText = initialKeyword || initialCity || '';
+  const displayText = initialKeyword || initialCity || (initialCategory ? `${initialCategory.charAt(0).toUpperCase() + initialCategory.slice(1)} Properties` : '');
 
   return (
     <>

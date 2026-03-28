@@ -2432,7 +2432,8 @@ function PostPropertyPageInner() {
         const { data: property } = await propertiesApi.getById(editId);
 
         // Unauthorised: user doesn't own this property
-        if (user.role !== 'admin' && property.ownerId && property.ownerId !== user.id) {
+        const isPrivileged = user.role === 'admin' || user.role === 'super_admin' || (user as any).isSuperAdmin;
+        if (!isPrivileged && property.ownerId && property.ownerId !== user.id) {
           setEditAccessDenied(true);
           setEditLoading(false);
           return;
@@ -3012,7 +3013,7 @@ function PostPropertyPageInner() {
 
 export default function PostPropertyPage() {
   return (
-    <AuthGuard allowedRoles={['buyer', 'owner', 'agent', 'seller', 'admin']} loginRedirect="/post-property/guest">
+    <AuthGuard allowedRoles={['buyer', 'owner', 'agent', 'seller', 'admin', 'super_admin']} loginRedirect="/post-property/guest">
       <Suspense fallback={
         <div className="min-h-screen flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary-600" />

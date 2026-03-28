@@ -13,6 +13,7 @@ import MobileGuestLoginPrompt from '@/components/auth/MobileGuestLoginPrompt';
 import OnboardingEnforcer from '@/components/auth/OnboardingEnforcer';
 import ToastNotification from '@/components/common/ToastNotification';
 import CookieConsentWrapper from '@/components/consent/CookieConsentWrapper';
+import { SearchStateProvider } from '@/contexts/SearchStateContext';
 import AuthProgressBar from '@/components/auth/AuthProgressBar';
 import AuthLoadingOverlay from '@/components/auth/AuthLoadingOverlay';
 import AuthSessionLoader from '@/components/auth/AuthSessionLoader';
@@ -103,6 +104,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <QueryProvider>
             <AuthProvider>
               <WishlistProvider>
+              <SearchStateProvider>
               <CookieConsentWrapper>
               <Header />
               <GlobalSearchBar asSticky variant="compact" />
@@ -120,6 +122,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <AuthSessionLoader />
               <AuthSessionExpiredToast />
               </CookieConsentWrapper>
+              </SearchStateProvider>
               </WishlistProvider>
             </AuthProvider>
           </QueryProvider>
