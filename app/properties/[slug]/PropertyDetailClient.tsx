@@ -32,6 +32,7 @@ import { WhatsAppIcon } from '@/components/common/PhoneRevealButton';
 import { usePropertyBehavior } from '@/hooks/usePropertyBehavior';
 import FloatingCTA from '@/components/common/FloatingCTA';
 import IntentPopup from '@/components/common/IntentPopup';
+import BrokerTransparencyBadge from '@/components/agent/BrokerTransparencyBadge';
 const GlobalSearchBar = dynamic(() => import('@/components/search/GlobalSearchBar'), { ssr: false });
 const PropertyCard = dynamic(() => import('@/components/property/PropertyCard'), { ssr: false });
 
@@ -333,7 +334,8 @@ export default function PropertyDetailClient({ property }: Props) {
   const waLink   = waNumber ? `https://wa.me/${waNumber}?text=${waText}` : null;
 
   const { area: resolvedArea, areaUnit: resolvedAreaUnit } = getPropertyArea(property);
-  const pricePerSqft = resolvedArea && property.price
+  const isMonthlyRental = property.priceUnit === 'per month' || ['rent', 'pg'].includes(property.category);
+  const pricePerSqft = resolvedArea && property.price && !isMonthlyRental
     ? Math.round(Number(property.price) / resolvedArea)
     : null;
 
@@ -357,7 +359,7 @@ export default function PropertyDetailClient({ property }: Props) {
     (property.furnishingStatus || edFurnishing) && { icon: <Wind className="w-5 h-5" />,  label: 'Furnishing', value: property.furnishingStatus ? getFurnishingLabel(property.furnishingStatus) : edFurnishing! },
   ].filter(Boolean) as { icon: React.ReactNode; label: string; value: string }[];
 
-  // Full specs table
+  // Full specs table — only include rows where value is truthy (non-empty)
   const baseSpecs = [
     { label: 'Bedrooms',      value: property.bedrooms   ? `${property.bedrooms} BHK`         : null },
     { label: 'Bathrooms',     value: property.bathrooms  ? `${property.bathrooms}`             : null },
@@ -365,15 +367,15 @@ export default function PropertyDetailClient({ property }: Props) {
     { label: 'Floor',         value: property.floorNumber != null ? `${property.floorNumber}${property.totalFloors ? ' of ' + property.totalFloors : ''}` : (edFloorNumber ? `${edFloorNumber}${edTotalFloors ? ' of ' + edTotalFloors : ''}` : null) },
     { label: 'Balconies',     value: property.balconies  ? `${property.balconies}` : null },
     { label: 'Parking',       value: property.parkingSpots ? `${property.parkingSpots} spot${property.parkingSpots > 1 ? 's' : ''}` : null },
-    { label: 'Furnishing',    value: property.furnishingStatus ? getFurnishingLabel(property.furnishingStatus) : (edFurnishing || '') },
-    { label: 'Possession',    value: property.possessionStatus === 'ready_to_move' ? 'Ready to Move' : 'Under Construction' },
+    { label: 'Furnishing',    value: property.furnishingStatus ? getFurnishingLabel(property.furnishingStatus) : (edFurnishing || null) },
+    { label: 'Possession',    value: property.possessionStatus ? (property.possessionStatus === 'ready_to_move' ? 'Ready to Move' : 'Under Construction') : null },
     { label: 'Property Age',  value: property.propertyAge ? `${property.propertyAge} yr${property.propertyAge > 1 ? 's' : ''}` : null },
-    { label: 'Property Type', value: getPropertyTypeLabel(property.type) },
+    { label: 'Property Type', value: property.type ? getPropertyTypeLabel(property.type) : null },
     { label: 'RERA No.',      value: property.reraNumber || null },
     { label: 'Builder Name',  value: property.builderName || null },
     { label: 'Project Name',  value: edProjectName },
     { label: 'Society',       value: property.society || null },
-  ].filter(s => s.value);
+  ].filter(s => s.value != null && s.value !== '');
 
   // Extra dynamic fields from extraDetails
   const extraSpecs: { label: string; value: string; isDependentRows?: boolean; rows?: { label: string; value: string; unit: string }[] }[] = [];
@@ -813,57 +815,49 @@ export default function PropertyDetailClient({ property }: Props) {
                 <span>{[property.locality, property.city, property.state].filter(Boolean).join(', ')}{property.pincode ? ` – ${property.pincode}` : ''}</span>
               </div>
 
-              {/* ── KEY METRICS — Price · Area · Price/sqft ─────────────── */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
-
-                {/* Price */}
-                <div className="flex flex-col gap-0.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-3 sm:px-4">
-                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Price</p>
-                  <p className="text-base sm:text-xl font-black text-emerald-800 leading-tight">
-                    {formatPrice(property.price, property.priceUnit)}
-                  </p>
-                  {property.priceUnit === 'per month' && (
-                    <p className="text-[10px] text-emerald-500 font-medium">per month</p>
-                  )}
-                </div>
-
-                {/* Area */}
-                <div className="flex flex-col gap-0.5 bg-blue-50 border border-blue-200 rounded-xl px-3 py-3 sm:px-4">
-                  <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{areaLabel}</p>
-                  {resolvedArea ? (
-                    <>
-                      <p className="text-base sm:text-xl font-black text-blue-800 leading-tight">
-                        {resolvedArea.toLocaleString('en-IN')}
+              {/* ── KEY METRICS — Price · Area (if available) · Price/sqft (if available) ── */}
+              <div className={cn(
+                'grid gap-2 sm:gap-3 mb-4',
+                resolvedArea && pricePerSqft ? 'grid-cols-3' : resolvedArea ? 'grid-cols-2' : 'grid-cols-1',
+              )}>
+                {/* Price — always shown */}
+                {(() => {
+                  // Infer per-month if category implies rental but priceUnit wasn't stored
+                  const effectiveUnit = property.priceUnit ||
+                    (['rent', 'pg'].includes(property.category) ? 'per month' : undefined);
+                  return (
+                    <div className="flex flex-col gap-0.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-3 sm:px-4">
+                      <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">
+                        {effectiveUnit === 'per month' ? 'Price/Month' : 'Price'}
                       </p>
-                      <p className="text-[10px] text-blue-500 font-medium">{resolvedAreaUnit ?? 'sqft'}</p>
-                    </>
-                  ) : (
-                    <p className="text-sm font-semibold text-blue-400 italic mt-1">N/A</p>
-                  )}
-                </div>
-
-                {/* Price / sqft */}
-                <div className={cn(
-                  'flex flex-col gap-0.5 rounded-xl px-3 py-3 sm:px-4',
-                  pricePerSqft
-                    ? 'bg-violet-50 border border-violet-200'
-                    : 'bg-gray-50 border border-gray-200',
-                )}>
-                  <p className={cn(
-                    'text-[10px] font-bold uppercase tracking-widest',
-                    pricePerSqft ? 'text-violet-600' : 'text-gray-400',
-                  )}>Price/sqft</p>
-                  {pricePerSqft ? (
-                    <>
-                      <p className="text-base sm:text-xl font-black text-violet-800 leading-tight">
-                        ₹{pricePerSqft.toLocaleString('en-IN')}
+                      <p className="text-base sm:text-xl font-black text-emerald-800 leading-tight">
+                        {formatPrice(property.price, effectiveUnit)}
                       </p>
-                      <p className="text-[10px] text-violet-500 font-medium">per sqft</p>
-                    </>
-                  ) : (
-                    <p className="text-sm font-semibold text-gray-400 italic mt-1">N/A</p>
-                  )}
-                </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Area — only shown when value exists */}
+                {resolvedArea && (
+                  <div className="flex flex-col gap-0.5 bg-blue-50 border border-blue-200 rounded-xl px-3 py-3 sm:px-4">
+                    <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{areaLabel}</p>
+                    <p className="text-base sm:text-xl font-black text-blue-800 leading-tight">
+                      {resolvedArea.toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-[10px] text-blue-500 font-medium">{resolvedAreaUnit ?? 'sqft'}</p>
+                  </div>
+                )}
+
+                {/* Price/sqft — only shown when area exists to derive it */}
+                {pricePerSqft && (
+                  <div className="flex flex-col gap-0.5 bg-violet-50 border border-violet-200 rounded-xl px-3 py-3 sm:px-4">
+                    <p className="text-[10px] font-bold text-violet-600 uppercase tracking-widest">Price/sqft</p>
+                    <p className="text-base sm:text-xl font-black text-violet-800 leading-tight">
+                      ₹{pricePerSqft.toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-[10px] text-violet-500 font-medium">per sqft</p>
+                  </div>
+                )}
               </div>
 
               {/* Stats row */}
@@ -1053,7 +1047,7 @@ export default function PropertyDetailClient({ property }: Props) {
                         {property.city} is one of the most sought-after real estate destinations.
                         This {property.bedrooms ? `${property.bedrooms} BHK ` : ''}{getPropertyTypeLabel(property.type).toLowerCase()}
                         {resolvedArea ? ` of ${formatArea(resolvedArea, resolvedAreaUnit)} ` : ' '}
-                        in {property.locality} is priced at {formatPrice(property.price, property.priceUnit)}.
+                        in {property.locality} is priced at {formatPrice(property.price, property.priceUnit || (['rent', 'pg'].includes(property.category) ? 'per month' : undefined))}.
                         {property.possessionStatus === 'ready_to_move' ? ' Ready to move in immediately.' : ''}
                         {property.amenities?.length ? ` Premium amenities: ${property.amenities.slice(0, 3).map(a => a.name).join(', ')}.` : ''}
                         {' '}Contact the {isAgent ? 'agency' : 'owner'} now for the best deal.
@@ -1276,12 +1270,24 @@ export default function PropertyDetailClient({ property }: Props) {
                           <p className="text-[10px] text-gray-500 font-medium mt-0.5">Rating</p>
                         </div>
                       )}
-                      {(owner as any)?.agentUsedQuota > 0 && (
+                      {(owner as any)?.totalDeals > 0 ? (
+                        <div className="bg-green-50 rounded-xl p-3 text-center border border-green-100">
+                          <p className="text-lg font-black text-green-700">{(owner as any).totalDeals}</p>
+                          <p className="text-[10px] text-gray-500 font-medium mt-0.5">Deals</p>
+                        </div>
+                      ) : (owner as any)?.agentUsedQuota > 0 ? (
                         <div className="bg-primary-50 rounded-xl p-3 text-center border border-primary-100">
                           <p className="text-lg font-black text-primary-700">{(owner as any).agentUsedQuota}</p>
                           <p className="text-[10px] text-gray-500 font-medium mt-0.5">Listings</p>
                         </div>
-                      )}
+                      ) : null}
+                    </div>
+                  )}
+
+                  {/* Broker transparency badge — shows deals, response time, trust badges */}
+                  {isAgent && owner?.id && (
+                    <div className="mb-4">
+                      <BrokerTransparencyBadge agentUserId={owner.id} variant="card" />
                     </div>
                   )}
 
@@ -1518,8 +1524,15 @@ export default function PropertyDetailClient({ property }: Props) {
 
               {/* Price summary */}
               <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-2xl p-5 text-white shadow-xl">
-                <p className="text-primary-200 text-xs font-semibold uppercase tracking-wide mb-1">Asking Price</p>
-                <p className="text-3xl font-black mb-0.5">{formatPrice(property.price, property.priceUnit)}</p>
+                {(() => {
+                  const effectiveUnit = property.priceUnit || (['rent', 'pg'].includes(property.category) ? 'per month' : undefined);
+                  return <>
+                    <p className="text-primary-200 text-xs font-semibold uppercase tracking-wide mb-1">
+                      {effectiveUnit === 'per month' ? 'Monthly Rent' : 'Asking Price'}
+                    </p>
+                    <p className="text-3xl font-black mb-0.5">{formatPrice(property.price, effectiveUnit)}</p>
+                  </>;
+                })()}
                 {pricePerSqft && <p className="text-primary-200 text-sm">₹{pricePerSqft.toLocaleString('en-IN')}/sqft</p>}
                 <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/20 text-sm flex-wrap">
                   {property.bedrooms && <span className="flex items-center gap-1"><BedDouble className="w-4 h-4 text-primary-300" />{property.bedrooms} BHK</span>}
