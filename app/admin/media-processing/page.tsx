@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 
 type JobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 type JobType   = 'image' | 'video';
