@@ -950,3 +950,29 @@ export const rbacApi = {
   getAuditLogs: (params?: { actorId?: string; action?: string; resource?: string; page?: number; limit?: number }) =>
     api.get('/rbac/audit-logs', { params }),
 };
+
+// ── Support / Help Center ──────────────────────────────────────────────────
+export const supportApi = {
+  /** Submit a help query or feedback — works for guests and logged-in users */
+  create: (data: {
+    name: string;
+    email?: string;
+    phone?: string;
+    type: 'help' | 'feedback';
+    category?: string;
+    subject?: string;
+    message: string;
+    rating?: number;
+  }) => api.post('/support', data),
+
+  /** Get the current user's submitted tickets */
+  getMyTickets: () => api.get('/support/my'),
+
+  // Admin
+  getAll: (params?: { page?: number; limit?: number; search?: string; status?: string; type?: string }) =>
+    api.get('/support', { params }),
+  getOne: (id: string) => api.get(`/support/${id}`),
+  getStats: () => api.get('/support/stats'),
+  update: (id: string, data: { status?: string; adminNotes?: string }) =>
+    api.patch(`/support/${id}`, data),
+};
