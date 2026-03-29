@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import type { MenuItem } from '@/contexts/AuthContext';
+import { subscriptionApi } from '@/lib/api';
 
 // ─── Nav groups (desktop sidebar) ─────────────────────────────────────────────
 
@@ -84,6 +85,8 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
   const { user, loading } = useAuth();
   const [mounted,         setMounted]         = useState(false);
   const [moreOpen,        setMoreOpen]        = useState(false);
+  const [subAlert, setSubAlert] = useState<{ type: 'expired' | 'expiring'; daysLeft?: number } | null>(null);
+  const [subAlertDismissed, setSubAlertDismissed] = useState(false);
 
   // All labeled groups collapsed by default
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
@@ -117,6 +120,23 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => { setMoreOpen(false); }, [pathname]);
+
+  // Check subscription expiry once per session
+  useEffect(() => {
+    if (!user) return;
+    const dismissKey = `sub_alert_dismissed_${new Date().toDateString()}_${user.id}`;
+    if (sessionStorage.getItem(dismissKey)) { setSubAlertDismissed(true); return; }
+    subscriptionApi.getCurrent().then((res) => {
+      const sub = res.data?.current;
+      if (!sub) return;
+      if (sub.status === 'expired') {
+        setSubAlert({ type: 'expired' });
+      } else if (sub.status === 'active') {
+        const daysLeft = Math.ceil((new Date(sub.expiresAt).getTime() - Date.now()) / 86400000);
+        if (daysLeft <= 7) setSubAlert({ type: 'expiring', daysLeft });
+      }
+    }).catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     if (!loading && mounted) {
@@ -313,6 +333,44 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
           </div>
         </header>
 
+        {/* Subscription expiry banner */}
+        {subAlert && !subAlertDismissed && (
+          <div className={`px-8 py-2.5 flex items-center justify-between gap-4 text-sm ${
+            subAlert.type === 'expired'
+              ? 'bg-red-600 text-white'
+              : 'bg-yellow-400 text-yellow-900'
+          }`}>
+            <span className="font-medium">
+              {subAlert.type === 'expired'
+                ? '🔴 Your subscription has expired — post new properties by renewing your plan.'
+                : `⚠️ Your plan expires in ${subAlert.daysLeft} day${subAlert.daysLeft !== 1 ? 's' : ''} — renew to avoid interruption.`}
+            </span>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <Link
+                href="/agent/subscription"
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
+                  subAlert.type === 'expired'
+                    ? 'bg-white text-red-600 hover:bg-red-50'
+                    : 'bg-yellow-900/20 text-yellow-900 hover:bg-yellow-900/30'
+                }`}
+              >
+                View Plans
+              </Link>
+              <button
+                onClick={() => {
+                  const dismissKey = `sub_alert_dismissed_${new Date().toDateString()}_${user?.id}`;
+                  sessionStorage.setItem(dismissKey, '1');
+                  setSubAlertDismissed(true);
+                }}
+                className="opacity-70 hover:opacity-100 text-lg leading-none"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Page content */}
         <main>{children}</main>
       </div>
@@ -346,7 +404,44 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Scrollable page content */}
-        <main className="flex-1 pt-14 pb-[72px]">{children}</main>
+        <main className="flex-1 pt-14 pb-[72px]">
+          {/* Subscription expiry banner — mobile */}
+          {subAlert && !subAlertDismissed && (
+            <div className={`px-4 py-2.5 flex items-center justify-between gap-3 text-xs ${
+              subAlert.type === 'expired'
+                ? 'bg-red-600 text-white'
+                : 'bg-yellow-400 text-yellow-900'
+            }`}>
+              <span className="font-medium flex-1">
+                {subAlert.type === 'expired'
+                  ? '🔴 Subscription expired'
+                  : `⚠️ Plan expires in ${subAlert.daysLeft}d`}
+              </span>
+              <Link
+                href="/agent/subscription"
+                className={`px-2.5 py-1 rounded-lg font-bold transition-colors whitespace-nowrap ${
+                  subAlert.type === 'expired'
+                    ? 'bg-white text-red-600'
+                    : 'bg-yellow-900/20 text-yellow-900'
+                }`}
+              >
+                Renew
+              </Link>
+              <button
+                onClick={() => {
+                  const dismissKey = `sub_alert_dismissed_${new Date().toDateString()}_${user?.id}`;
+                  sessionStorage.setItem(dismissKey, '1');
+                  setSubAlertDismissed(true);
+                }}
+                className="opacity-70 text-lg leading-none"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+          {children}
+        </main>
 
         {/* ── Mobile bottom tab bar ────────────────── */}
         <nav
