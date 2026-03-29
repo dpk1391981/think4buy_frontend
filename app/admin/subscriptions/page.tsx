@@ -103,12 +103,13 @@ export default function AdminSubscriptionsPage() {
   async function deleteSub(id: string) {
     if (id.startsWith('default-')) { setDeleteConfirm(null); return; }
     setActionLoading(id);
+    setError('');
     try {
       await adminPlansApi.deleteSubscriptionPlan(id);
       setDeleteConfirm(null);
       loadSubPlans();
     } catch (e: any) {
-      alert(e?.response?.data?.message || 'Failed to delete.');
+      setError(e?.response?.data?.message || 'Failed to delete.');
     } finally { setActionLoading(null); }
   }
 
@@ -393,7 +394,8 @@ export default function AdminSubscriptionsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
             <h3 className="font-semibold text-gray-900 mb-2">Confirm Delete</h3>
-            <p className="text-sm text-gray-500 mb-5">Are you sure you want to delete this plan? This action cannot be undone.</p>
+            <p className="text-sm text-gray-500 mb-3">Are you sure you want to delete this plan? This action cannot be undone.</p>
+            {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">{error}</p>}
             <div className="flex gap-3">
               <button
                 onClick={() => deleteConfirm.type === 'sub' ? deleteSub(deleteConfirm.id) : deleteBoost(deleteConfirm.id)}
@@ -402,7 +404,7 @@ export default function AdminSubscriptionsPage() {
               >
                 {actionLoading ? 'Deleting...' : 'Delete'}
               </button>
-              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { setDeleteConfirm(null); setError(''); }} className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
             </div>
           </div>
         </div>
