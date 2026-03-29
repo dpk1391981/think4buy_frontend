@@ -137,8 +137,8 @@ function AgentCard({ agent }: { agent: Agent }) {
       className="relative rounded-2xl overflow-hidden flex flex-col h-full transition-all duration-300 ease-out group"
       style={{
         background:  T ? T.cardBg  : '#ffffff',
-        border:      T ? T.cardBorder : '1px solid #e5e7eb',
-        boxShadow:   T ? T.shadow  : '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)',
+        border:      T ? T.cardBorder : '1.5px solid #e2e8f0',
+        boxShadow:   T ? T.shadow  : '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.07)',
         transform:   'translateY(0) scale(1)',
         willChange:  'transform, box-shadow',
       }}
@@ -153,7 +153,7 @@ function AgentCard({ agent }: { agent: Agent }) {
         el.style.boxShadow  = T ? T.shadow : '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)';
       }}
     >
-      {/* ── Metallic header band (tiered only) ── */}
+      {/* ── Header band ── */}
       {T ? (
         <div
           className="relative h-[76px] overflow-hidden flex-shrink-0"
@@ -181,18 +181,27 @@ function AgentCard({ agent }: { agent: Agent }) {
           <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full opacity-10 blur-xl pointer-events-none" style={{ background: 'radial-gradient(circle, #fff 0%, transparent 70%)' }} />
         </div>
       ) : (
-        /* Plain header for no-tier agents */
-        <div className="h-10 bg-gradient-to-r from-gray-50 to-white flex-shrink-0" />
+        /* Clean header for untiered agents */
+        <div
+          className="relative h-[56px] overflow-hidden flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 50%, #f8fafc 100%)' }}
+        >
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-60 transition-opacity duration-500 pointer-events-none"
+            style={{ background: 'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.6) 50%, transparent 65%)' }} />
+          <div className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/70 border border-gray-200/80">
+            <span className="text-[9px] font-bold tracking-widest text-gray-500 uppercase">Agent</span>
+          </div>
+        </div>
       )}
 
       {/* ── Avatar row (overlaps header) ── */}
-      <div className="px-4 flex items-end gap-3" style={{ marginTop: T ? -28 : 4 }}>
+      <div className="px-4 flex items-end gap-3" style={{ marginTop: T ? -28 : -20 }}>
         <div
           className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-base flex-shrink-0 overflow-hidden relative"
           style={{
             background: T ? T.headerGrad : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-            border:     T ? T.avatarBorder : '2px solid rgba(255,255,255,0.5)',
-            boxShadow:  T ? T.avatarShadow : '0 2px 8px rgba(0,0,0,0.12)',
+            border:     T ? T.avatarBorder : '2.5px solid #ffffff',
+            boxShadow:  T ? T.avatarShadow : '0 2px 10px rgba(0,0,0,0.14), 0 0 0 1px rgba(226,232,240,0.8)',
           }}
         >
           {agent.avatar
@@ -232,29 +241,21 @@ function AgentCard({ agent }: { agent: Agent }) {
           </div>
         )}
 
-        {/* Stats row */}
-        <div
-          className="flex items-center gap-3 mt-3 pt-3"
-          style={{ borderTop: `1px solid ${T ? T.divider : '#f3f4f6'}` }}
-        >
-          {(agent.totalDeals ?? 0) > 0 && (
-            <div className="text-center">
-              <div className="text-sm font-black" style={{ color: T ? T.statColor : '#111827' }}>
-                {agent.totalDeals}
-              </div>
-              <div className="text-[10px] text-gray-400 leading-none mt-0.5">Deals</div>
-            </div>
-          )}
-          {agent.agentLicense && (
-            <div className="flex-1 min-w-0 ml-auto">
+        {/* Stats row — RERA license only (Deals shown in transparency badge below) */}
+        {agent.agentLicense && (
+          <div
+            className="flex items-center gap-3 mt-3 pt-3"
+            style={{ borderTop: `1px solid ${T ? T.divider : '#f3f4f6'}` }}
+          >
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1 text-[10px] font-mono text-emerald-600 truncate">
                 <Award className="w-2.5 h-2.5 flex-shrink-0" />
                 {agent.agentLicense}
               </div>
               <div className="text-[10px] text-gray-400 mt-0.5">RERA Licensed</div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </Link>
 
       {/* Transparency badge */}
