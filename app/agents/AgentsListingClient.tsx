@@ -632,9 +632,17 @@ const FAQ = [
 export default function AgentsListingClient({
   searchParams: _sp,
   city: serverCity = '',
+  seo,
 }: {
   searchParams: Record<string, string>;
   city?: string;
+  /** Pass from city-specific page — content rendered below listing, suppresses duplicate static sections */
+  seo?: {
+    h1Title?: string;
+    introContent?: string;
+    bottomContent?: string;
+    faqJson?: { question: string; answer: string }[];
+  };
 }) {
   const router = useRouter();
   const urlP = useSearchParams();
@@ -1032,26 +1040,6 @@ export default function AgentsListingClient({
               {hasActiveFilters && <span className="w-2 h-2 bg-primary-600 rounded-full" />}
             </button>
           </div>
-          {/* Horizontal quick filters */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 pt-2 scrollbar-hide -mx-2 px-2" style={{ scrollbarWidth: 'none' }}>
-            {QUICK_FILTERS.map((qf) => {
-              const isActive = activeSort === qf.sort && activeBadge === (qf.badge ?? '');
-              return (
-                <button
-                  key={qf.label}
-                  onClick={() => pushFilter({ sort: qf.sort, badge: qf.badge })}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 border ${
-                    isActive
-                      ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:text-primary-600'
-                  }`}
-                >
-                  <span>{qf.icon}</span>
-                  {qf.label}
-                </button>
-              );
-            })}
-          </div>
         </div>
       </div>
 
@@ -1195,6 +1183,29 @@ export default function AgentsListingClient({
         </div>
       )}
 
+      {/* ── Quick filter chips — below featured agents ───────────────────── */}
+      <div className="container-max">
+        <div className="flex items-center gap-2 overflow-x-auto py-3 scrollbar-hide -mx-2 px-2" style={{ scrollbarWidth: 'none' }}>
+          {QUICK_FILTERS.map((qf) => {
+            const isActive = activeSort === qf.sort && activeBadge === (qf.badge ?? '');
+            return (
+              <button
+                key={qf.label}
+                onClick={() => pushFilter({ sort: qf.sort, badge: qf.badge })}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 border ${
+                  isActive
+                    ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:text-primary-600'
+                }`}
+              >
+                <span>{qf.icon}</span>
+                {qf.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ── Page body: sidebar + content ─────────────────────────────────── */}
       <div className="container-max py-5">
         <div className="flex gap-6">
@@ -1211,9 +1222,9 @@ export default function AgentsListingClient({
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
-                  {activeCity
+                  {seo?.h1Title || (activeCity
                     ? `Real Estate Agents in ${activeCity}`
-                    : 'Find Top Real Estate Agents in India'}
+                    : 'Find Top Real Estate Agents in India')}
                 </h1>
                 <p className="text-sm text-gray-500 mt-0.5">
                   {loading ? 'Loading…' : (
@@ -1310,57 +1321,121 @@ export default function AgentsListingClient({
         </>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════
-          SEO CONTENT — BELOW THE FOLD
-      ══════════════════════════════════════════════════════════════════ */}
+      {/* ══ SEO CONTENT — BELOW LISTING ══════════════════════════════════════ */}
 
-      {/* City SEO links */}
-      <section className="bg-white border-t border-gray-100 py-12 md:py-16">
-        <div className="container-max">
-          <div className="text-center mb-8">
-            <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-2">Explore by City</p>
-            <h2 className="text-xl md:text-2xl font-extrabold text-gray-900">Find Agents in Your City</h2>
-            <p className="text-gray-500 mt-2 text-sm max-w-lg mx-auto">Browse RERA-certified real estate agents in all major cities across India.</p>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
-            {[...TOP_CITIES, 'Chandigarh', 'Lucknow', 'Kochi', 'Indore', 'Nagpur', 'Bhopal', 'Coimbatore', 'Vadodara', 'Patna', 'Bhubaneswar', 'Visakhapatnam', 'Mangalore'].map(c => (
-              <Link key={c} href={`/agents?city=${encodeURIComponent(c)}`}
-                className="flex items-center justify-between gap-1.5 bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-2.5 text-sm font-medium text-gray-700 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-all group">
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3 h-3 text-gray-400 group-hover:text-primary-500 flex-shrink-0" />{c}
-                </span>
-                <ChevronRight className="w-3 h-3 text-gray-300 group-hover:text-primary-400 flex-shrink-0" />
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Dynamic intro content (city-specific) */}
+      {seo?.introContent && (
+        <section className="bg-white border-t border-gray-100">
+          <div
+            className="container-max max-w-5xl py-10
+              prose prose-sm prose-gray max-w-none
+              prose-headings:font-bold prose-headings:text-gray-900
+              prose-p:text-gray-600 prose-p:leading-relaxed
+              prose-strong:text-gray-800
+              prose-ul:text-gray-600 prose-li:leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: seo.introContent }}
+          />
+        </section>
+      )}
 
-      {/* How it works */}
-      <section className="bg-gray-50 border-y border-gray-100 py-12 md:py-16">
-        <div className="container-max">
-          <div className="text-center mb-8">
-            <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-2">Simple Process</p>
-            <h2 className="text-xl md:text-2xl font-extrabold text-gray-900">How to Find the Right Agent</h2>
-            <p className="text-gray-500 mt-2 text-sm max-w-lg mx-auto">Finding a trustworthy real estate agent in India has never been easier.</p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {HOW_IT_WORKS.map(step => (
-              <div key={step.step} className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-primary-200 transition-colors">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 bg-primary-600 text-white rounded-xl flex items-center justify-center shadow-sm">{step.icon}</div>
-                  <span className="text-3xl font-black text-gray-100 leading-none">{step.step}</span>
-                </div>
-                <h3 className="font-bold text-gray-900 text-sm mb-1">{step.title}</h3>
-                <p className="text-xs text-gray-500 leading-relaxed">{step.desc}</p>
+      {/* Dynamic bottom content OR static editorial fallback */}
+      {seo?.bottomContent ? (
+        <section className="bg-gray-50 border-t border-gray-100" aria-label={activeCity ? `Real estate guide for ${activeCity}` : 'Real estate agent guide'}>
+          <div
+            className="container-max max-w-5xl py-10
+              prose prose-sm prose-gray max-w-none
+              prose-headings:font-bold prose-headings:text-gray-900
+              prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3
+              prose-h3:text-base prose-h3:mt-5 prose-h3:mb-2
+              prose-p:text-gray-600 prose-p:leading-relaxed
+              prose-ul:text-gray-600 prose-li:leading-relaxed prose-li:my-1
+              prose-strong:text-gray-800"
+            dangerouslySetInnerHTML={{ __html: seo.bottomContent }}
+          />
+        </section>
+      ) : (
+        <section className="bg-gray-50 border-t border-gray-100 py-10">
+          <div className="container-max max-w-4xl">
+            <h2 className="text-xl md:text-2xl font-extrabold text-gray-900 mb-5">
+              {activeCity ? `Real Estate Agents in ${activeCity} — Complete Guide` : 'Real Estate Agents in India — Your Complete Guide'}
+            </h2>
+            <div className="space-y-4 text-sm text-gray-600 leading-relaxed">
+              <p>Finding a reliable real estate agent in India is one of the most critical steps when buying, selling or renting property. A good agent brings expert market knowledge, handles complex legal documentation, negotiates the best price on your behalf, and guides you every step of the way from shortlisting to final registration.</p>
+              <p>All brokers listed on Think4BuySale must submit their RERA number during onboarding. RERA was established under the Real Estate (Regulation and Development) Act, 2016 to protect home buyers. Working with a RERA-registered agent gives you legal recourse — making it the single most important credential to verify before engaging any broker.</p>
+              {activeCity && (
+                <p>The real estate market in {activeCity} is highly dynamic, with prices varying by locality, floor level and project vintage. An experienced local agent in {activeCity} understands neighbourhood-level price trends, upcoming infrastructure projects, metro connectivity and micro-market dynamics that no national portal can fully capture.</p>
+              )}
+              <div>
+                <h3 className="font-bold text-gray-900 mt-5 mb-2 text-base">How to Choose the Right Real Estate Agent</h3>
+                <p>Look for: (1) <strong>RERA registration</strong> — legally required; (2) <strong>Local experience</strong> — active in your target area for at least 3 years; (3) <strong>Strong reviews</strong> — 4+ stars with verified client testimonials; (4) <strong>Transparent fees</strong> — brokerage agreed in writing before beginning.</p>
               </div>
-            ))}
+              <div>
+                <h3 className="font-bold text-gray-900 mt-5 mb-2 text-base">What is the Brokerage Fee?</h3>
+                <p>Standard brokerage is 1–2% of property value for purchase/sale transactions, or 1–2 months' rent for rentals. Rates vary by city and deal size — always clarify and document the amount upfront.</p>
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      {/* Why choose */}
-      <section className="bg-white py-12 md:py-16">
+      {/* Dynamic FAQ (city-specific) OR static generic FAQ fallback */}
+      {seo?.faqJson?.length ? (
+        <section className="bg-white border-t border-gray-100 py-10 md:py-14" aria-labelledby="faq-heading">
+          <div className="container-max max-w-3xl">
+            <div className="text-center mb-8">
+              <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-2">FAQ</p>
+              <h2 id="faq-heading" className="text-xl md:text-2xl font-extrabold text-gray-900">
+                Frequently Asked Questions{activeCity ? ` — Agents in ${activeCity}` : ''}
+              </h2>
+            </div>
+            <dl className="space-y-2.5">
+              {seo.faqJson.map((item, i) => (
+                <details key={i} className="border border-gray-100 rounded-2xl overflow-hidden bg-gray-50 group">
+                  <summary className="flex items-center justify-between gap-4 px-5 py-4 cursor-pointer list-none hover:bg-gray-100 transition-colors">
+                    <dt className="font-semibold text-gray-900 text-sm leading-snug">{item.question}</dt>
+                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-white border border-gray-200 group-open:bg-primary-50 group-open:border-primary-200 flex items-center justify-center text-gray-400 group-open:text-primary-600 text-xs font-bold transition-colors">
+                      <span className="group-open:hidden">+</span>
+                      <span className="hidden group-open:inline">−</span>
+                    </span>
+                  </summary>
+                  <dd className="px-5 pb-4 pt-3 border-t border-gray-100 bg-white text-sm text-gray-600 leading-relaxed">
+                    {item.answer}
+                  </dd>
+                </details>
+              ))}
+            </dl>
+          </div>
+        </section>
+      ) : (
+        <section className="bg-white border-t border-gray-100 py-10 md:py-14">
+          <div className="container-max max-w-3xl">
+            <div className="text-center mb-8">
+              <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-2">FAQ</p>
+              <h2 className="text-xl md:text-2xl font-extrabold text-gray-900">Frequently Asked Questions</h2>
+            </div>
+            <div className="space-y-2.5">
+              {FAQ.map((item, i) => (
+                <div key={i} className="border border-gray-100 rounded-2xl overflow-hidden bg-gray-50">
+                  <button onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                    className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-gray-100 transition-colors"
+                    aria-expanded={openFaq === i}>
+                    <span className="font-semibold text-gray-900 text-sm leading-snug">{item.q}</span>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
+                  </button>
+                  {openFaq === i && (
+                    <div className="px-5 pb-4 border-t border-gray-100 bg-white">
+                      <p className="text-sm text-gray-600 leading-relaxed pt-3">{item.a}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Why choose — trust signals */}
+      <section className="bg-gray-50 border-t border-gray-100 py-10 md:py-14">
         <div className="container-max">
           <div className="text-center mb-8">
             <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-2">Why Think4BuySale</p>
@@ -1380,95 +1455,25 @@ export default function AgentsListingClient({
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="bg-gray-50 border-y border-gray-100 py-12 md:py-16">
+      {/* Find agents in your city — internal linking */}
+      <section className="bg-white border-t border-gray-100 py-10 md:py-14">
         <div className="container-max">
           <div className="text-center mb-8">
-            <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-2">Client Stories</p>
-            <h2 className="text-xl md:text-2xl font-extrabold text-gray-900">What Our Clients Say</h2>
+            <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-2">Explore by City</p>
+            <h2 className="text-xl md:text-2xl font-extrabold text-gray-900">Find Agents in Your City</h2>
+            <p className="text-gray-500 mt-2 text-sm max-w-lg mx-auto">Browse RERA-certified real estate agents in all major cities across India.</p>
           </div>
-          <div className="grid sm:grid-cols-3 gap-5">
-            {TESTIMONIALS.map((t, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 relative">
-                <Quote className="w-7 h-7 text-gray-100 absolute top-4 right-4" />
-                <div className="flex gap-0.5 mb-3">
-                  {[1,2,3,4,5].map(s => <Star key={s} className={`w-3.5 h-3.5 ${s <= t.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-200'}`} />)}
-                </div>
-                <p className="text-sm text-gray-600 leading-relaxed mb-4 italic">"{t.text}"</p>
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white text-xs font-black">
-                    {t.name.split(' ').map(w => w[0]).join('')}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{t.name}</p>
-                    <p className="text-xs text-gray-400 flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{t.city}</p>
-                  </div>
-                </div>
-              </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+            {[...TOP_CITIES, 'Chandigarh', 'Lucknow', 'Kochi', 'Indore', 'Nagpur', 'Bhopal', 'Coimbatore', 'Vadodara', 'Patna', 'Bhubaneswar', 'Visakhapatnam', 'Mangalore'].map(c => (
+              <Link key={c} href={`/agents?city=${encodeURIComponent(c)}`}
+                className="flex items-center justify-between gap-1.5 bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-2.5 text-sm font-medium text-gray-700 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-all group">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-3 h-3 text-gray-400 group-hover:text-primary-500 flex-shrink-0" />{c}
+                </span>
+                <ChevronRight className="w-3 h-3 text-gray-300 group-hover:text-primary-400 flex-shrink-0" />
+              </Link>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section className="bg-white py-12 md:py-16">
-        <div className="container-max max-w-3xl">
-          <div className="text-center mb-8">
-            <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-2">FAQ</p>
-            <h2 className="text-xl md:text-2xl font-extrabold text-gray-900">Frequently Asked Questions</h2>
-          </div>
-          <div className="space-y-2.5">
-            {FAQ.map((item, i) => (
-              <div key={i} className="border border-gray-100 rounded-2xl overflow-hidden bg-gray-50">
-                <button onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-gray-100 transition-colors">
-                  <span className="font-semibold text-gray-900 text-sm leading-snug">{item.q}</span>
-                  <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
-                </button>
-                {openFaq === i && (
-                  <div className="px-5 pb-4 border-t border-gray-100 bg-white">
-                    <p className="text-sm text-gray-600 leading-relaxed pt-3">{item.a}</p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Editorial SEO content */}
-      <section className="bg-gray-50 border-t border-gray-100 py-12 md:py-16">
-        <div className="container-max max-w-4xl">
-          <h2 className="text-xl md:text-2xl font-extrabold text-gray-900 mb-5">
-            {activeCity ? `Real Estate Agents in ${activeCity} — Complete Guide` : 'Real Estate Agents in India — Your Complete Guide'}
-          </h2>
-          <div className="space-y-4 text-sm text-gray-600 leading-relaxed">
-            <p>Finding a reliable real estate agent in India is one of the most critical steps when buying, selling or renting property. A good agent doesn't just show you listings — they bring expert market knowledge, handle complex legal documentation, negotiate the best price on your behalf, and guide you every step of the way from shortlisting to final registration.</p>
-            <p>All real estate brokers listed on Think4BuySale are required to register with their RERA (Real Estate Regulatory Authority) number during onboarding. RERA was established under the Real Estate (Regulation and Development) Act, 2016 to protect home buyers from fraud. Working with a RERA-registered agent gives you legal recourse if something goes wrong — making it the single most important credential to verify before engaging any broker.</p>
-            {activeCity && (
-              <p>The real estate market in {activeCity} is highly dynamic, with prices varying significantly by locality, floor level and project vintage. An experienced local agent in {activeCity} understands neighbourhood-level price trends, upcoming infrastructure projects, school zones, metro connectivity and micro-market dynamics that no national portal can capture in a database. They have relationships with builders, legal advocates and financial institutions that help you close deals faster and avoid costly mistakes.</p>
-            )}
-            <div>
-              <h3 className="font-bold text-gray-900 mt-4 mb-2 text-base">How to Choose the Right Real Estate Agent</h3>
-              <p>When choosing a real estate agent, look for: (1) <strong>RERA registration</strong> — legally required for all practicing agents; (2) <strong>Local market experience</strong> — an agent active in your target neighbourhood for at least 3 years; (3) <strong>Strong reviews</strong> — prioritise agents with 4+ star ratings and multiple verified client testimonials; (4) <strong>Responsive communication</strong> — your agent should respond promptly and explain every step clearly; (5) <strong>Transparent fee structure</strong> — brokerage should be discussed and agreed in writing before beginning.</p>
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-900 mt-4 mb-2 text-base">What is the Brokerage Fee for Real Estate Agents in India?</h3>
-              <p>In India, the standard brokerage fee is typically 1–2% of the property value for both buyer and seller in purchase transactions, or 1–2 months' rent for rental transactions. However, this varies significantly by city and property type. Always clarify and document the brokerage amount before engaging an agent. Think4BuySale encourages agents to disclose their fee structure upfront on their profile page to ensure complete transparency for both parties.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Bottom CTA */}
-      <section className="bg-primary-800 py-12">
-        <div className="container-max text-center">
-          <h2 className="text-xl md:text-2xl font-extrabold text-white mb-2">Ready to Find Your Agent?</h2>
-          <p className="text-primary-200 text-sm mb-5 max-w-md mx-auto">Search from {total > 0 ? `${total.toLocaleString('en-IN')}+` : 'thousands of'} verified agents. Free consultation. Zero hidden fees.</p>
-          <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-gray-900 font-extrabold px-7 py-3 rounded-2xl text-sm transition-colors shadow-lg">
-            <Search className="w-4 h-4" /> Search Agents Now
-          </button>
         </div>
       </section>
     </div>

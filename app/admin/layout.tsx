@@ -86,8 +86,9 @@ const NAV_GROUPS = [
   {
     label: 'SEO',
     items: [
-      { href: '/admin/seo/footer-links', label: 'Footer SEO Links', icon: Link2,    slug: 'admin_seo_footer_links' },
-      { href: '/admin/seo/config',       label: 'SEO Config',       icon: Settings, slug: 'admin_seo_config'       },
+      { href: '/admin/seo/footer-links',   label: 'Footer SEO Links',   icon: Link2,    slug: 'admin_seo_footer_links'   },
+      { href: '/admin/seo/agent-listing', label: 'Agent Listing SEO', icon: MapPin,   slug: 'admin_seo_agent_listing' },
+      { href: '/admin/seo/config',        label: 'SEO Config',         icon: Settings, slug: 'admin_seo_config'        },
     ],
   },
   {

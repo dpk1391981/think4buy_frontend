@@ -202,6 +202,7 @@ export function generatePropertyTitle(params: {
   category: string;
   listingType: string;  // 'rent' | 'buy'
   propertyType: string;
+  propertyTypeName?: string; // display label from config (e.g. "Hotel")
   bedrooms?: string;
   city?: string;
   locality?: string;
@@ -209,7 +210,7 @@ export function generatePropertyTitle(params: {
   projectName?: string;  // Project name (from extraDetails.project_name)
   builderName?: string;  // Builder / developer name
 }): string {
-  const { listingType, propertyType, bedrooms, city, locality, society, projectName, builderName } = params;
+  const { listingType, propertyType, propertyTypeName, bedrooms, city, locality, society, projectName, builderName } = params;
 
   const typeLabels: Record<string, string> = {
     apartment: 'Apartment', flat: 'Flat', villa: 'Villa', house: 'Independent House',
@@ -221,13 +222,18 @@ export function generatePropertyTitle(params: {
     industrial_shed: 'Industrial Shed', showroom: 'Showroom',
   };
 
+  // Resolve the human-readable label: static map → config name → slug title-cased
+  const slugToTitleCase = (slug: string) =>
+    slug.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const resolvedTypeLabel = typeLabels[propertyType] || propertyTypeName?.trim() || slugToTitleCase(propertyType);
+
   const parts: string[] = [];
 
   // BHK prefix
   if (bedrooms && ['apartment', 'flat', 'villa', 'house', 'builder_floor', 'penthouse'].includes(propertyType)) {
     parts.push(`${bedrooms} BHK`);
   }
-  parts.push(typeLabels[propertyType] || propertyType);
+  parts.push(resolvedTypeLabel);
 
   // "in <Society/Project>" if available, else generic "for Sale/Rent in Location"
   const nameTag = projectName?.trim() || society?.trim();

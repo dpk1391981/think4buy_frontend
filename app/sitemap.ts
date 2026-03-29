@@ -47,6 +47,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     'Navi-Mumbai', 'Thane', 'Surat', 'Jaipur', 'Kochi',
   ];
 
+  const topCitySlugs = [
+    'mumbai', 'delhi', 'bangalore', 'pune', 'hyderabad',
+    'chennai', 'kolkata', 'ahmedabad', 'noida', 'gurgaon',
+    'navi-mumbai', 'thane', 'surat', 'jaipur', 'kochi',
+  ];
+
   const cityBuyRoutes: MetadataRoute.Sitemap = topCities.map((city) => ({
     url: `${BASE_URL}/properties?city=${city}&category=buy`,
     lastModified: now,
@@ -71,11 +77,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.7,
   }));
 
+  // Agent listing by city (SEO-friendly URLs)
+  const agentCityRoutes: MetadataRoute.Sitemap = topCitySlugs.map((slug) => ({
+    url: `${BASE_URL}/agents-in-${slug}`,
+    lastModified: now,
+    changeFrequency: 'weekly' as const,
+    priority: 0.8,
+  }));
+
   return [
     ...staticRoutes,
     ...serviceRoutes,
     ...cityBuyRoutes,
     ...cityRentRoutes,
     ...propertyTypeRoutes,
+    ...agentCityRoutes,
   ];
 }

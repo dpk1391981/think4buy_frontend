@@ -546,6 +546,8 @@ export const propertyConfigApi = {
   getFields: (typeId: string) => api.get('/property-config/fields', { params: { typeId } }),
   getListingFilters: (category?: string) =>
     api.get('/property-config/listing-filters', { params: category ? { category } : {} }),
+  /** Fetch active search keyword mappings — used to keep the FE parser in sync with admin config */
+  getSearchKeywordMappings: () => api.get('/property-config/search-keywords'),
 };
 
 // ── Property Config Admin ─────────────────────────────────────────────────────
@@ -583,6 +585,12 @@ export const propConfigAdminApi = {
   deleteListingFilter: (id: string) => api.delete(`/property-config/admin/listing-filters/${id}`),
   reorderListingFilters: (orderedIds: string[]) =>
     api.post('/property-config/admin/listing-filters/reorder', { orderedIds }),
+  // Search Keyword Mappings (admin)
+  getSearchKeywords: () => api.get('/property-config/admin/search-keywords'),
+  createSearchKeyword: (d: any) => api.post('/property-config/admin/search-keywords', d),
+  updateSearchKeyword: (id: string, d: any) => api.patch(`/property-config/admin/search-keywords/${id}`, d),
+  deleteSearchKeyword: (id: string) => api.delete(`/property-config/admin/search-keywords/${id}`),
+  seedDefaultKeywords: () => api.post('/property-config/admin/search-keywords/seed-defaults', {}),
 };
 
 // ── Agency & Agent Profile APIs ───────────────────────────────────────────────
@@ -708,6 +716,16 @@ export const seoApi = {
     api.post('/seo/admin/configs/bulk', { configs }),
   adminUpsertConfig: (key: string, value: string) => api.patch(`/seo/admin/configs/${key}`, { value }),
   adminDeleteConfig: (id: string) => api.delete(`/seo/admin/configs/${id}`),
+
+  // Public - Agent City SEO
+  getAgentCitySeoBySlug: (slug: string) => api.get(`/seo/agent-city-pages/${slug}`),
+
+  // Admin - Agent City SEO
+  adminGetAgentCityPages: (params?: { page?: number; limit?: number; search?: string }) =>
+    api.get('/seo/admin/agent-city-pages', { params }),
+  adminCreateAgentCityPage: (data: any) => api.post('/seo/admin/agent-city-pages', data),
+  adminUpdateAgentCityPage: (id: string, data: any) => api.patch(`/seo/admin/agent-city-pages/${id}`, data),
+  adminDeleteAgentCityPage: (id: string) => api.delete(`/seo/admin/agent-city-pages/${id}`),
 
   // Admin - Footer Links
   adminGetFooterGroups: () => api.get('/seo/admin/footer-groups'),

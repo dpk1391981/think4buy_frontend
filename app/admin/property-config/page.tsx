@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Plus, Pencil, Trash2, Search, ChevronDown, ChevronRight,
   ToggleLeft, ToggleRight, GripVertical, X, Check, Tag,
-  Building2, Layers, Star, Settings2, AlertTriangle, Filter,
+  Building2, Layers, Star, Settings2, AlertTriangle, Filter, KeyRound,
 } from 'lucide-react';
 import { propConfigAdminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -37,6 +37,7 @@ const TABS = [
   { key: 'fields',            label: 'Form Fields',      icon: Settings2 },
   { key: 'listing-filters',   label: 'Listing Filters',  icon: Filter },
   { key: 'predefined-fields', label: 'Predefined Fields', icon: Layers },
+  { key: 'search-keywords',   label: 'Search Keywords',  icon: KeyRound },
 ] as const;
 
 type Tab = typeof TABS[number]['key'];
@@ -1469,6 +1470,303 @@ function PredefinedFieldsTab() {
   );
 }
 
+// ─── Tab 7: Search Keywords ───────────────────────────────────────────────────
+
+interface SearchKeyword {
+  id: string;
+  keyword: string;
+  mapsToType: string | null;
+  mapsToCategory: string | null;
+  label: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+function SearchKeywordsTab() {
+  const [rows, setRows] = useState<SearchKeyword[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<SearchKeyword | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SearchKeyword | null>(null);
+  const [testQuery, setTestQuery] = useState('');
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  const blank: Omit<SearchKeyword, 'id'> = {
+    keyword: '', mapsToType: '', mapsToCategory: '', label: '', sortOrder: 100, isActive: true,
+  };
+  const [form, setForm] = useState<Omit<SearchKeyword, 'id'>>(blank);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await propConfigAdminApi.getSearchKeywords();
+      setRows(data);
+    } catch { toast('Failed to load search keywords', false); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openCreate = () => { setEditing(null); setForm(blank); setShowModal(true); };
+  const openEdit = (r: SearchKeyword) => {
+    setEditing(r);
+    setForm({ keyword: r.keyword, mapsToType: r.mapsToType ?? '', mapsToCategory: r.mapsToCategory ?? '', label: r.label, sortOrder: r.sortOrder, isActive: r.isActive });
+    setShowModal(true);
+  };
+
+  const save = async () => {
+    try {
+      const payload = {
+        keyword: form.keyword.trim(),
+        mapsToType: form.mapsToType?.trim() || null,
+        mapsToCategory: form.mapsToCategory?.trim() || null,
+        label: form.label.trim(),
+        sortOrder: Number(form.sortOrder),
+        isActive: form.isActive,
+      };
+      if (!payload.keyword || !payload.label) { toast('Keyword and label are required', false); return; }
+      if (editing) {
+        await propConfigAdminApi.updateSearchKeyword(editing.id, payload);
+        toast('Keyword updated');
+      } else {
+        await propConfigAdminApi.createSearchKeyword(payload);
+        toast('Keyword created');
+      }
+      setShowModal(false);
+      load();
+    } catch { toast('Save failed', false); }
+  };
+
+  const doDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await propConfigAdminApi.deleteSearchKeyword(deleteTarget.id);
+      toast('Deleted');
+      setDeleteTarget(null);
+      load();
+    } catch { toast('Delete failed', false); }
+  };
+
+  const toggleActive = async (r: SearchKeyword) => {
+    try {
+      await propConfigAdminApi.updateSearchKeyword(r.id, { isActive: !r.isActive });
+      load();
+    } catch { toast('Update failed', false); }
+  };
+
+  const seedDefaults = async () => {
+    try {
+      const { data } = await propConfigAdminApi.seedDefaultKeywords();
+      toast(data.seeded > 0 ? `Seeded ${data.seeded} default keywords` : 'Defaults already exist');
+      load();
+    } catch { toast('Seed failed', false); }
+  };
+
+  const testParse = () => {
+    if (!testQuery.trim()) return;
+    const matched = rows.find(r => {
+      try { return r.isActive && r.mapsToType && new RegExp(`\\b${r.keyword}\\b`, 'i').test(testQuery); }
+      catch { return false; }
+    });
+    if (matched) {
+      setTestResult(`✓ Matched → type: "${matched.mapsToType}"${matched.mapsToCategory ? `, category: "${matched.mapsToCategory}"` : ''} (keyword: "${matched.keyword}")`);
+    } else {
+      setTestResult('✗ No keyword mapping matched this query');
+    }
+  };
+
+  const filtered = rows.filter(r =>
+    r.keyword.toLowerCase().includes(search.toLowerCase()) ||
+    r.label.toLowerCase().includes(search.toLowerCase()) ||
+    (r.mapsToType ?? '').toLowerCase().includes(search.toLowerCase()),
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Search Query Manager</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Define keyword→type mappings used by both the FE instant parser and the BE smart search. Lower sort order = evaluated first.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={seedDefaults} className="px-3 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 font-medium">
+            Seed Defaults
+          </button>
+          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700">
+            <Plus className="w-4 h-4" /> Add Keyword
+          </button>
+        </div>
+      </div>
+
+      {/* Test parser */}
+      <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+        <p className="text-xs font-bold text-amber-700 mb-2">Test Search Parser</p>
+        <div className="flex gap-2">
+          <input
+            value={testQuery}
+            onChange={e => { setTestQuery(e.target.value); setTestResult(null); }}
+            onKeyDown={e => e.key === 'Enter' && testParse()}
+            placeholder='e.g. "hotel in Mumbai" or "3 bhk flat noida"'
+            className="flex-1 border border-amber-200 rounded-lg px-3 py-2 text-sm bg-white"
+          />
+          <button onClick={testParse} className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-semibold hover:bg-amber-600">
+            Test
+          </button>
+        </div>
+        {testResult && (
+          <p className={`mt-2 text-xs font-mono px-3 py-1.5 rounded-lg ${testResult.startsWith('✓') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+            {testResult}
+          </p>
+        )}
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search keywords, types..."
+          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-300 focus:outline-none"
+        />
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div className="text-center py-10 text-gray-400">Loading…</div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Order</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Keyword / Regex</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Label</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Maps To Type</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} className="text-center py-8 text-gray-400">No keywords found</td></tr>
+              )}
+              {filtered.map(r => (
+                <tr key={r.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">{r.sortOrder}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-800 max-w-[200px] truncate">{r.keyword}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">{r.label}</td>
+                  <td className="px-4 py-3">
+                    {r.mapsToType
+                      ? <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">{r.mapsToType}</span>
+                      : <span className="text-gray-300 text-xs">—</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    {r.mapsToCategory
+                      ? <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">{r.mapsToCategory}</span>
+                      : <span className="text-gray-300 text-xs">—</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => toggleActive(r)}>
+                      {r.isActive
+                        ? <ToggleRight className="w-5 h-5 text-emerald-500" />
+                        : <ToggleLeft className="w-5 h-5 text-gray-300" />}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-gray-100 rounded-lg"><Pencil className="w-3.5 h-3.5 text-gray-500" /></button>
+                      <button onClick={() => setDeleteTarget(r)} className="p-1.5 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-gray-900 text-lg">{editing ? 'Edit' : 'Add'} Search Keyword</h3>
+              <button onClick={() => setShowModal(false)}><X className="w-5 h-5 text-gray-400" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Keyword / Regex Pattern <span className="text-red-500">*</span></label>
+                <input value={form.keyword} onChange={e => setForm(f => ({ ...f, keyword: e.target.value }))}
+                  placeholder='e.g. hotel[s]? or co[\s\-]?living'
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-primary-300 focus:outline-none"
+                />
+                <p className="text-[10px] text-gray-400 mt-1">Regex matched case-insensitively with \b word boundaries. Multi-word patterns need lower sortOrder.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Display Label <span className="text-red-500">*</span></label>
+                <input value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
+                  placeholder='e.g. Hotel'
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-300 focus:outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Maps To Type (slug)</label>
+                  <input value={form.mapsToType ?? ''} onChange={e => setForm(f => ({ ...f, mapsToType: e.target.value }))}
+                    placeholder='e.g. hotel, apartment'
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-primary-300 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Maps To Category (slug)</label>
+                  <input value={form.mapsToCategory ?? ''} onChange={e => setForm(f => ({ ...f, mapsToCategory: e.target.value }))}
+                    placeholder='e.g. commercial, pg'
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-primary-300 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Sort Order</label>
+                  <input type="number" value={form.sortOrder} onChange={e => setForm(f => ({ ...f, sortOrder: parseInt(e.target.value) || 100 }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary-300 focus:outline-none"
+                  />
+                </div>
+                <div className="flex items-end pb-0.5">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))}
+                      className="w-4 h-4 rounded accent-primary-600"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Active</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium">Cancel</button>
+              <button onClick={save} className="flex-1 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700">
+                <Check className="w-4 h-4 inline mr-1" />{editing ? 'Update' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <DeleteDialog
+          label={`"${deleteTarget.label}" keyword`}
+          onConfirm={doDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function PropertyConfigPage() {
@@ -1480,7 +1778,7 @@ export default function PropertyConfigPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Property Configuration</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Manage property categories, types, amenities, and dynamic form fields
+          Manage property categories, types, amenities, dynamic form fields, and search keyword mappings
         </p>
       </div>
 
@@ -1513,6 +1811,7 @@ export default function PropertyConfigPage() {
       {activeTab === 'fields'            && <FormFieldsTab />}
       {activeTab === 'listing-filters'   && <ListingFiltersTab />}
       {activeTab === 'predefined-fields' && <PredefinedFieldsTab />}
+      {activeTab === 'search-keywords'   && <SearchKeywordsTab />}
     </div>
   );
 }

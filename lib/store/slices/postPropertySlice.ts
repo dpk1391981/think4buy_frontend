@@ -45,8 +45,9 @@ export interface PostPropertyForm {
   // Step 2 — Listing type (shown only for commercial/industrial/builder_project/investment)
   listingType: 'rent' | 'buy' | '';
   // Step 3 — Property type (dynamic from config, filtered by categoryId)
-  propertyType: string;  // slug
-  typeId: string;        // UUID from prop_types
+  propertyType: string;     // slug
+  propertyTypeName: string; // display label from config (e.g. "Hotel")
+  typeId: string;           // UUID from prop_types
   // Step 4 — Location
   state: string;
   stateId: string;
@@ -100,6 +101,7 @@ const initialFormState: PostPropertyForm = {
   categoryId: '',
   listingType: '',
   propertyType: '',
+  propertyTypeName: '',
   typeId: '',
   state: 'Delhi',
   stateId: '',
