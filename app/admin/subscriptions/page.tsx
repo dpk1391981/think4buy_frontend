@@ -24,7 +24,7 @@ interface BoostPlan {
   isActive: boolean;
 }
 
-const EMPTY_SUB: Partial<SubscriptionPlan> = { name: '', type: 'basic', price: 0, durationDays: 30, tokensIncluded: 0, maxListings: 5, isActive: true };
+const EMPTY_SUB: Partial<SubscriptionPlan> = { name: '', type: 'free', price: 0, durationDays: 30, tokensIncluded: 0, maxListings: 2000, isActive: true };
 const EMPTY_BOOST: Partial<BoostPlan> = { name: '', durationDays: 7, tokenCost: 10, isActive: true };
 
 export default function AdminSubscriptionsPage() {
@@ -307,12 +307,13 @@ export default function AdminSubscriptionsPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Plan Type</label>
-                <select value={subForm.type || 'basic'} onChange={(e) => setSubForm((f) => ({ ...f, type: e.target.value }))}
+                <select value={subForm.type || 'free'} onChange={(e) => setSubForm((f) => ({ ...f, type: e.target.value }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="free">Free</option>
                   <option value="basic">Basic</option>
                   <option value="premium">Premium</option>
                   <option value="featured">Featured</option>
+                  <option value="enterprise">Enterprise</option>
                 </select>
               </div>
               <div>
