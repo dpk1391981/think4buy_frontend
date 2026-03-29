@@ -421,8 +421,8 @@ function UserMenu({ compact = false }: { compact?: boolean }) {
           'rounded-full bg-primary-600 flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden',
           compact ? 'w-8 h-8 text-xs' : 'w-8 h-8 text-xs'
         )}>
-          {(user?.avatar || user?.pendingAvatar)
-            ? <img src={resolveImageSrc(user.avatar || user.pendingAvatar)} alt={user?.name || ''} className="w-full h-full object-cover" />
+          {user?.avatar
+            ? <img src={resolveImageSrc(user.avatar)} alt={user?.name || ''} className="w-full h-full object-cover" />
             : initials}
         </div>
         {!compact && (
