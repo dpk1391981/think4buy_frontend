@@ -1104,7 +1104,7 @@ function Step3PropertyType({ form, dispatch, config }: any) {
             <SelectTile key={t.id} label={t.name} icon={t.icon || '🏢'}
               selected={form.typeId === t.id}
               onClick={() => dispatch(updateForm({
-                typeId: t.id, propertyType: t.slug,
+                typeId: t.id, propertyType: t.slug, propertyTypeName: t.name,
                 bedrooms: '', amenityIds: [], dynamicFields: {},
               }))} />
           ))}
@@ -1579,7 +1579,7 @@ function Step5AutoTitle({ form, dispatch }: any) {
   const autoTitle = generatePropertyTitle({
     category: form.mainCategory,
     listingType: form.listingType || (form.mainCategory === 'pg' || form.mainCategory === 'rent' ? 'rent' : 'buy'),
-    propertyType: form.propertyType, bedrooms: form.bedrooms,
+    propertyType: form.propertyType, propertyTypeName: form.propertyTypeName, bedrooms: form.bedrooms,
     city: form.city, locality: form.locality,
     society: form.society || undefined,
     projectName: form.dynamicFields?.project_name || undefined,
@@ -1905,7 +1905,7 @@ function Step8Description({ form, dispatch }: any) {
   const buildDescription = () => {
     const title = form.autoTitle || generatePropertyTitle({
       category: form.mainCategory, listingType: form.listingType || 'rent',
-      propertyType: form.propertyType, bedrooms: form.bedrooms, city: form.city, locality: form.locality,
+      propertyType: form.propertyType, propertyTypeName: form.propertyTypeName, bedrooms: form.bedrooms, city: form.city, locality: form.locality,
     });
     const { area: dynArea, areaUnit: dynAreaUnit } = parseAreaFromDynamic(form.dynamicFields);
     const locationStr = form.locality && form.city
@@ -2098,7 +2098,7 @@ function Step10Photos({ form, dispatch, mediaFiles, setMediaFiles, existingImage
 
   const title = form.autoTitle || generatePropertyTitle({
     category: form.mainCategory, listingType: form.listingType || 'rent',
-    propertyType: form.propertyType, bedrooms: form.bedrooms, city: form.city, locality: form.locality,
+    propertyType: form.propertyType, propertyTypeName: form.propertyTypeName, bedrooms: form.bedrooms, city: form.city, locality: form.locality,
   });
 
   return (
@@ -2364,6 +2364,7 @@ function PostPropertyPageInner() {
       category: form.mainCategory,
       listingType: form.listingType || (form.mainCategory === 'pg' || form.mainCategory === 'rent' ? 'rent' : 'buy'),
       propertyType: form.propertyType,
+      propertyTypeName: form.propertyTypeName,
       bedrooms: form.bedrooms,
       city: form.city,
       locality: form.locality,
@@ -2432,7 +2433,7 @@ function PostPropertyPageInner() {
     const effectiveTitle = formData.autoTitle || generatePropertyTitle({
       category: formData.mainCategory,
       listingType: formData.listingType || (formData.mainCategory === 'pg' || formData.mainCategory === 'rent' ? 'rent' : 'buy'),
-      propertyType: formData.propertyType, bedrooms: formData.bedrooms, city: formData.city, locality: formData.locality,
+      propertyType: formData.propertyType, propertyTypeName: formData.propertyTypeName, bedrooms: formData.bedrooms, city: formData.city, locality: formData.locality,
       society: formData.society || undefined,
       projectName: formData.dynamicFields?.project_name || undefined,
       builderName: formData.builderName || (formData.userType === 'agent' ? formData.agencyName : undefined) || undefined,
@@ -2507,7 +2508,21 @@ function PostPropertyPageInner() {
     try {
       const payload = buildDraftPayload(f, info);
       if (did) {
-        await propertiesApi.update(did, payload);
+        try {
+          await propertiesApi.update(did, payload);
+        } catch (updateErr: any) {
+          if (updateErr?.response?.status === 404) {
+            // Stale draft ID — clear it and create a fresh one
+            dispatch(setDraftId(''));
+            if (typeof window !== 'undefined') localStorage.removeItem('t4bs_draft_id');
+            draftCreatingRef.current = true;
+            const { data } = await propertiesApi.create(payload);
+            dispatch(setDraftId(data.id));
+            if (typeof window !== 'undefined') localStorage.setItem('t4bs_draft_id', data.id);
+          } else {
+            throw updateErr;
+          }
+        }
       } else {
         draftCreatingRef.current = true;
         const { data } = await propertiesApi.create(payload);
@@ -2571,6 +2586,7 @@ function PostPropertyPageInner() {
           .find((c: any) => c.slug === property.category);
 
         let typeId = '';
+        let typeDisplayName = '';
         let amenityIds: string[] = [];
         if (category) {
           const { data: types } = await propertyConfigApi.getTypes(category.id);
@@ -2580,6 +2596,7 @@ function PostPropertyPageInner() {
           );
           if (type) {
             typeId = type.id;
+            typeDisplayName = type.name || '';
             const [ar, fr] = await Promise.all([
               propertyConfigApi.getAmenities(type.id),
               propertyConfigApi.getFields(type.id),
@@ -2597,6 +2614,7 @@ function PostPropertyPageInner() {
           categoryId: category?.id || '',
           listingType: property.listingType || IMPLICIT_LISTING[property.category] || 'buy',
           propertyType: property.type || '',
+          propertyTypeName: typeDisplayName,
           typeId,
           city: property.city || '',
           cityId: property.cityId || '',
@@ -2738,7 +2756,7 @@ function PostPropertyPageInner() {
       const effectiveTitle = form.autoTitle || generatePropertyTitle({
         category: form.mainCategory,
         listingType: form.listingType || (form.mainCategory === 'pg' || form.mainCategory === 'rent' ? 'rent' : 'buy'),
-        propertyType: form.propertyType, bedrooms: form.bedrooms, city: form.city, locality: form.locality,
+        propertyType: form.propertyType, propertyTypeName: form.propertyTypeName, bedrooms: form.bedrooms, city: form.city, locality: form.locality,
         society: form.society || undefined,
         projectName: form.dynamicFields?.project_name || undefined,
         builderName: form.builderName || (form.userType === 'agent' ? form.agencyName : undefined) || undefined,
@@ -2816,10 +2834,24 @@ function PostPropertyPageInner() {
       } else {
         // Check Redux state first, then fall back to localStorage to avoid duplicate creation
         const resolvedDraftId = draftId || (typeof window !== 'undefined' ? localStorage.getItem('t4bs_draft_id') : null);
-        if (resolvedDraftId) {
+        let usedDraftId = resolvedDraftId;
+        if (usedDraftId) {
           // Publish existing draft: update with final data then submit for approval
-          await propertiesApi.update(resolvedDraftId, payload);
-          const { data: published } = await propertiesApi.publishDraft(resolvedDraftId);
+          try {
+            await propertiesApi.update(usedDraftId, payload);
+          } catch (updateErr: any) {
+            if (updateErr?.response?.status === 404) {
+              // Stale draft — discard ID and fall through to fresh creation
+              usedDraftId = null;
+              dispatch(setDraftId(''));
+              if (typeof window !== 'undefined') localStorage.removeItem('t4bs_draft_id');
+            } else {
+              throw updateErr;
+            }
+          }
+        }
+        if (usedDraftId) {
+          const { data: published } = await propertiesApi.publishDraft(usedDraftId);
           propertyId = published.id;
           propertySlug = published.slug;
           if (typeof window !== 'undefined') localStorage.removeItem('t4bs_draft_id');

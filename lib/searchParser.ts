@@ -2,7 +2,21 @@
  * Client-side instant search intent parser.
  * Mirrors the backend NLP logic for zero-latency UI feedback while the user types.
  * No API call — pure string analysis.
+ *
+ * TYPE_MAP is now driven by admin-managed SearchKeywordMapping records fetched once
+ * at app init via `propertyConfigApi.getSearchKeywordMappings()`.
+ * Pass them into `parseSearchHint(query, { dynamicMappings })` to override defaults.
  */
+
+export interface SearchKeywordMapping {
+  id: string;
+  keyword: string;
+  mapsToType: string | null;
+  mapsToCategory: string | null;
+  label: string;
+  sortOrder: number;
+  isActive: boolean;
+}
 
 export interface ParsedHint {
   bedrooms?: number;
@@ -19,55 +33,64 @@ export interface ParsedHint {
   lifestyleTags?: string[];
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  apartment: 'Flat', villa: 'Villa', house: 'House',
-  builder_floor: 'Builder Floor', penthouse: 'Penthouse', studio: 'Studio',
-  plot: 'Plot', farm_house: 'Farmhouse', co_living: 'Co-Living', pg: 'PG',
-  commercial_office: 'Office', commercial_shop: 'Shop',
-  commercial_warehouse: 'Warehouse', factory: 'Factory',
-  showroom: 'Showroom', industrial_shed: 'Industrial Shed', land: 'Land',
-};
+/** Build a runtime TYPE_MAP from admin-managed keyword mappings. */
+export function buildTypeMap(mappings: SearchKeywordMapping[]): [RegExp, string, string | null, string][] {
+  return mappings
+    .filter(m => m.isActive && m.mapsToType)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map(m => [
+      new RegExp(`\\b${m.keyword}\\b`, 'i'),
+      m.mapsToType!,
+      m.mapsToCategory,
+      m.label,
+    ]);
+}
 
-const CATEGORY_LABELS: Record<string, string> = {
-  buy: 'Buy', rent: 'Rent', pg: 'PG', commercial: 'Commercial',
-  industrial: 'Industrial', builder_project: 'New Project', investment: 'Investment',
-  new_projects: 'New Project',
-};
+/** Build a runtime CATEGORY_ONLY_MAP for mappings that only set a category. */
+export function buildCategoryMap(mappings: SearchKeywordMapping[]): [RegExp, string][] {
+  return mappings
+    .filter(m => m.isActive && !m.mapsToType && m.mapsToCategory)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map(m => [new RegExp(`\\b${m.keyword}\\b`, 'i'), m.mapsToCategory!]);
+}
 
-const TYPE_MAP: [RegExp, string][] = [
-  [/\bservice[\s-]apartment\b/i, 'apartment'],
-  [/\bcommercial[\s-]warehouse\b/i, 'commercial_warehouse'],
-  [/\bcommercial[\s-]office\b/i, 'commercial_office'],
-  [/\bcommercial[\s-]shop\b/i, 'commercial_shop'],
-  [/\bindustrial[\s-]shed\b/i, 'industrial_shed'],
-  [/\bbuilder[\s-]floor\b/i, 'builder_floor'],
-  [/\bindependent[\s-]floor\b/i, 'builder_floor'],
-  [/\boffice[\s-]space\b/i, 'commercial_office'],
-  [/\bfarm[\s-]house\b/i, 'farm_house'],
-  [/\bpaying[\s-]guest\b/i, 'pg'],
-  [/\bco[\s-]?living\b/i, 'co_living'],
-  [/\bapartment\b/i, 'apartment'],
-  [/\bflats?\b/i, 'apartment'],
-  [/\bunit\b/i, 'apartment'],
-  [/\bvillas?\b/i, 'villa'],
-  [/\bbungalow\b/i, 'villa'],
-  [/\bpenthouse\b/i, 'penthouse'],
-  [/\bstudio\b/i, 'studio'],
-  [/\b1\s*rk\b/i, 'studio'],
-  [/\bfarmhouse\b/i, 'farm_house'],
-  [/\bwarehouse\b/i, 'commercial_warehouse'],
-  [/\bshowroom\b/i, 'showroom'],
-  [/\bfactory\b/i, 'factory'],
-  [/\bplots?\b/i, 'plot'],
-  [/\bland\b/i, 'plot'],
-  [/\bindependent\b/i, 'house'],
-  [/\bhouses?\b/i, 'house'],
-  [/\bhome\b/i, 'house'],
-  [/\bpg\b/i, 'pg'],
-  [/\bhostel\b/i, 'pg'],
-  [/\boffice\b/i, 'commercial_office'],
-  [/\bshops?\b/i, 'commercial_shop'],
-  [/\bindustrial\b/i, 'factory'],
+// ─── Static fallback TYPE_MAP (used when dynamic mappings not yet loaded) ────
+// This matches the defaults seeded in the backend — kept in sync manually.
+const STATIC_TYPE_MAP: [RegExp, string, string | null, string][] = [
+  [/\bservice[\s-]apartment\b/i,    'apartment',           null,         'Service Apartment'],
+  [/\bcommercial[\s-]warehouse\b/i, 'commercial_warehouse','commercial', 'Warehouse'],
+  [/\bcommercial[\s-]office\b/i,    'commercial_office',   'commercial', 'Commercial Office'],
+  [/\bcommercial[\s-]shop\b/i,      'commercial_shop',     'commercial', 'Commercial Shop'],
+  [/\bindustrial[\s-]shed\b/i,      'industrial_shed',     'industrial', 'Industrial Shed'],
+  [/\bbuilder[\s-]floor\b/i,        'builder_floor',       null,         'Builder Floor'],
+  [/\bindependent[\s-]floor\b/i,    'builder_floor',       null,         'Builder Floor'],
+  [/\boffice[\s-]space\b/i,         'commercial_office',   'commercial', 'Office Space'],
+  [/\bfarm[\s-]house\b/i,           'farm_house',          null,         'Farmhouse'],
+  [/\bpaying[\s-]guest\b/i,         'pg',                  'pg',         'PG'],
+  [/\bco[\s-]?living\b/i,           'co_living',           'pg',         'Co-Living'],
+  [/\bapartment\b/i,                'apartment',           null,         'Apartment'],
+  [/\bflats?\b/i,                   'apartment',           null,         'Flat'],
+  [/\bunit\b/i,                     'apartment',           null,         'Apartment'],
+  [/\bvillas?\b/i,                  'villa',               null,         'Villa'],
+  [/\bbungalow\b/i,                 'villa',               null,         'Bungalow/Villa'],
+  [/\bpenthouse\b/i,                'penthouse',           null,         'Penthouse'],
+  [/\bstudio\b/i,                   'studio',              null,         'Studio'],
+  [/\b1\s*rk\b/i,                   'studio',              null,         '1 RK / Studio'],
+  [/\bfarmhouse\b/i,                'farm_house',          null,         'Farmhouse'],
+  [/\bwarehouse\b/i,                'commercial_warehouse','commercial', 'Warehouse'],
+  [/\bshowroom\b/i,                 'showroom',            'commercial', 'Showroom'],
+  [/\bfactory\b/i,                  'factory',             'industrial', 'Factory'],
+  [/\bplots?\b/i,                   'plot',                null,         'Plot'],
+  [/\bland\b/i,                     'plot',                null,         'Land/Plot'],
+  [/\bindependent\b/i,              'house',               null,         'Independent House'],
+  [/\bhouses?\b/i,                  'house',               null,         'House'],
+  [/\bhome\b/i,                     'house',               null,         'House/Home'],
+  [/\bpg\b/i,                       'pg',                  'pg',         'PG'],
+  [/\bhostel\b/i,                   'pg',                  'pg',         'Hostel/PG'],
+  [/\boffice\b/i,                   'commercial_office',   'commercial', 'Office'],
+  [/\bshops?\b/i,                   'commercial_shop',     'commercial', 'Shop'],
+  [/\bindustrial\b/i,               'factory',             'industrial', 'Industrial'],
+  [/\bhotels?\b/i,                  'hotel',               'commercial', 'Hotel'],
 ];
 
 const LIFESTYLE_PATTERNS: [RegExp, string][] = [
@@ -110,8 +133,13 @@ function formatPrice(price: number): string {
   return `₹${price}`;
 }
 
+export interface ParseSearchHintOptions {
+  /** Dynamic mappings from admin panel — overrides static TYPE_MAP when provided. */
+  dynamicMappings?: SearchKeywordMapping[];
+}
+
 /** Parse a natural language search query into structured hint (no API call). */
-export function parseSearchHint(rawQuery: string): ParsedHint {
+export function parseSearchHint(rawQuery: string, options: ParseSearchHintOptions = {}): ParsedHint {
   const hint: ParsedHint = {};
   let text = rawQuery.replace(/-/g, ' ').toLowerCase().trim();
 
@@ -160,9 +188,18 @@ export function parseSearchHint(rawQuery: string): ParsedHint {
     }
   }
 
-  // Property type
-  for (const [re, val] of TYPE_MAP) {
-    if (re.test(text)) { hint.type = val; text = text.replace(re, '').trim(); break; }
+  // Property type — use dynamic mappings when available, otherwise static fallback
+  const typeMap: [RegExp, string, string | null, string][] = options.dynamicMappings?.length
+    ? buildTypeMap(options.dynamicMappings)
+    : STATIC_TYPE_MAP;
+
+  for (const [re, typeVal, categoryVal, _label] of typeMap) {
+    if (re.test(text)) {
+      hint.type = typeVal;
+      if (categoryVal && !hint.category) hint.category = categoryVal;
+      text = text.replace(re, '').trim();
+      break;
+    }
   }
 
   // Furnishing
@@ -186,13 +223,15 @@ export function parseSearchHint(rawQuery: string): ParsedHint {
     text = text.replace(/\bunder[\s-]?construction\b|\bnew[\s-]?launch\b/i, '').trim();
   }
 
-  // Category
-  if (/\b(?:for\s+rent|on\s+rent|rental|lease)\b/i.test(rawQuery)) hint.category = 'rent';
-  else if (/\b(?:for\s+sale|to\s+buy|buy|purchase)\b/i.test(rawQuery)) hint.category = 'buy';
-  else if (/\bpg\b|\bhostel\b|\bpaying\s+guest\b/i.test(rawQuery)) hint.category = 'pg';
-  else if (/\bnew\s+project\b/i.test(rawQuery)) hint.category = 'new_projects';
-  else if (/\bcommercial\b/i.test(rawQuery)) hint.category = 'commercial';
-  else if (/\binvestment\b/i.test(rawQuery)) hint.category = 'investment';
+  // Category — from query keywords (only if not already set by type map)
+  if (!hint.category) {
+    if (/\b(?:for\s+rent|on\s+rent|rental|lease)\b/i.test(rawQuery)) hint.category = 'rent';
+    else if (/\b(?:for\s+sale|to\s+buy|buy|purchase)\b/i.test(rawQuery)) hint.category = 'buy';
+    else if (/\bpg\b|\bhostel\b|\bpaying\s+guest\b/i.test(rawQuery)) hint.category = 'pg';
+    else if (/\bnew\s+project\b/i.test(rawQuery)) hint.category = 'new_projects';
+    else if (/\bcommercial\b/i.test(rawQuery)) hint.category = 'commercial';
+    else if (/\binvestment\b/i.test(rawQuery)) hint.category = 'investment';
+  }
 
   // Lifestyle tags
   const tags: string[] = [];
@@ -217,15 +256,35 @@ export function parseSearchHint(rawQuery: string): ParsedHint {
   return hint;
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  apartment: 'Flat', villa: 'Villa', house: 'House',
+  builder_floor: 'Builder Floor', penthouse: 'Penthouse', studio: 'Studio',
+  plot: 'Plot', farm_house: 'Farmhouse', co_living: 'Co-Living', pg: 'PG',
+  commercial_office: 'Office', commercial_shop: 'Shop',
+  commercial_warehouse: 'Warehouse', factory: 'Factory',
+  showroom: 'Showroom', industrial_shed: 'Industrial Shed', land: 'Land',
+  hotel: 'Hotel',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  buy: 'Buy', rent: 'Rent', pg: 'PG', commercial: 'Commercial',
+  industrial: 'Industrial', builder_project: 'New Project', investment: 'Investment',
+  new_projects: 'New Project',
+};
+
 /**
  * Format a ParsedHint into a readable intent summary string.
  * Example: "2 BHK · Noida · Under ₹60L · Furnished · Near Metro"
  */
-export function formatHintChips(hint: ParsedHint): string[] {
+export function formatHintChips(hint: ParsedHint, dynamicMappings?: SearchKeywordMapping[]): string[] {
   const chips: string[] = [];
 
   if (hint.bedrooms)  chips.push(`${hint.bedrooms} BHK`);
-  if (hint.type)      chips.push(TYPE_LABELS[hint.type] || hint.type);
+  if (hint.type) {
+    // Prefer dynamic label if available
+    const dynLabel = dynamicMappings?.find(m => m.mapsToType === hint.type)?.label;
+    chips.push(dynLabel || TYPE_LABELS[hint.type] || hint.type);
+  }
   if (hint.category)  chips.push(CATEGORY_LABELS[hint.category] || hint.category);
   if (hint.city)      chips.push(hint.city);
   if (hint.locality)  chips.push(hint.locality);

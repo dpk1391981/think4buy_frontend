@@ -31,7 +31,7 @@ import { locationsApi, propertiesApi, smartSearchApi, propertyConfigApi } from '
 import { cn } from '@/lib/utils';
 import { getGeoCoords, reverseGeocode } from '@/lib/geolocation';
 import { useAuth } from '@/contexts/AuthContext';
-import { parseSearchHint, formatHintChips, QUICK_TAGS } from '@/lib/searchParser';
+import { parseSearchHint, formatHintChips, QUICK_TAGS, SearchKeywordMapping } from '@/lib/searchParser';
 import { useSearchState } from '@/contexts/SearchStateContext';
 import { useCookieConsent } from '@/contexts/CookieConsentContext';
 
@@ -127,6 +127,25 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
+// ── Module-level keyword mapping cache (fetched once per page load) ───────────
+let _kwMappingsCache: SearchKeywordMapping[] | null = null;
+let _kwMappingsFetch: Promise<SearchKeywordMapping[]> | null = null;
+
+function fetchKeywordMappings(): Promise<SearchKeywordMapping[]> {
+  if (_kwMappingsCache) return Promise.resolve(_kwMappingsCache);
+  if (_kwMappingsFetch) return _kwMappingsFetch;
+  _kwMappingsFetch = propertyConfigApi.getSearchKeywordMappings()
+    .then(({ data }) => { _kwMappingsCache = data; return data; })
+    .catch(() => [] as SearchKeywordMapping[]);
+  return _kwMappingsFetch;
+}
+
+function useKeywordMappings(): SearchKeywordMapping[] {
+  const [mappings, setMappings] = useState<SearchKeywordMapping[]>(_kwMappingsCache ?? []);
+  useEffect(() => { fetchKeywordMappings().then(setMappings).catch(() => {}); }, []);
+  return mappings;
+}
+
 // ── useCategoryTabs — fetch categories from BE ────────────────────────────────
 
 function useCategoryTabs() {
@@ -151,10 +170,11 @@ function useCategoryTabs() {
 // Shows parsed understanding of the user's natural language query in real time.
 
 function IntentPreview({ query }: { query: string }) {
+  const kwMappings = useKeywordMappings();
   const chips = useMemo(() => {
     if (!query || query.length < 4) return [];
-    return formatHintChips(parseSearchHint(query));
-  }, [query]);
+    return formatHintChips(parseSearchHint(query, { dynamicMappings: kwMappings }), kwMappings);
+  }, [query, kwMappings]);
 
   if (chips.length === 0) return null;
 
