@@ -31,11 +31,12 @@ interface Field {
 }
 
 const TABS = [
-  { key: 'categories',      label: 'Categories',     icon: Tag },
-  { key: 'types',           label: 'Property Types',  icon: Building2 },
-  { key: 'amenities',       label: 'Amenities',       icon: Star },
-  { key: 'fields',          label: 'Form Fields',     icon: Settings2 },
-  { key: 'listing-filters', label: 'Listing Filters', icon: Filter },
+  { key: 'categories',        label: 'Categories',       icon: Tag },
+  { key: 'types',             label: 'Property Types',   icon: Building2 },
+  { key: 'amenities',         label: 'Amenities',        icon: Star },
+  { key: 'fields',            label: 'Form Fields',      icon: Settings2 },
+  { key: 'listing-filters',   label: 'Listing Filters',  icon: Filter },
+  { key: 'predefined-fields', label: 'Predefined Fields', icon: Layers },
 ] as const;
 
 type Tab = typeof TABS[number]['key'];
@@ -1344,6 +1345,130 @@ function ListingFiltersTab() {
   );
 }
 
+// ─── Tab 6: Predefined Fields ─────────────────────────────────────────────────
+
+const PREDEFINED_FIELDS = [
+  {
+    key: 'SHOW_SOCIETY_FIELD',
+    label: 'Society / Building',
+    description: 'Show the "Society / Building" field in the post-property form (Step: Location)',
+    group: 'forms',
+    valueType: 'boolean',
+  },
+  {
+    key: 'SHOW_BUILDER_FIELD',
+    label: 'Builder / Developer Name',
+    description: 'Show the "Builder / Developer Name" field in the post-property form (Step: Details)',
+    group: 'forms',
+    valueType: 'boolean',
+  },
+  {
+    key: 'SHOW_RERA_FIELD',
+    label: 'RERA Number',
+    description: 'Show the "RERA Number" field in the post-property form (Step: Details)',
+    group: 'forms',
+    valueType: 'boolean',
+  },
+  {
+    key: 'SHOW_MAP_PICKER',
+    label: 'Pin Location on Map (Leaflet)',
+    description: 'Show the interactive map picker in the post-property form (owners only) — disable if Leaflet is causing issues',
+    group: 'forms',
+    valueType: 'boolean',
+  },
+];
+
+function PredefinedFieldsTab() {
+  const [flags, setFlags] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await (await import('@/lib/api')).systemConfigApi.adminGetAll('forms');
+        const map: Record<string, boolean> = {};
+        for (const cfg of r.data as any[]) {
+          map[cfg.key] = cfg.value === 'true' || cfg.value === true;
+        }
+        // Defaults if not yet seeded
+        for (const f of PREDEFINED_FIELDS) {
+          if (!(f.key in map)) map[f.key] = true;
+        }
+        setFlags(map);
+      } catch {
+        toast('Failed to load field visibility settings', false);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const handleToggle = async (key: string, current: boolean) => {
+    setSaving(key);
+    const next = !current;
+    setFlags(prev => ({ ...prev, [key]: next }));
+    try {
+      const field = PREDEFINED_FIELDS.find(f => f.key === key)!;
+      await (await import('@/lib/api')).systemConfigApi.adminUpsert(key, {
+        value: String(next),
+        valueType: 'boolean',
+        description: field.description,
+        group: field.group,
+      });
+      toast(`${field.label} visibility ${next ? 'enabled' : 'disabled'}`);
+    } catch {
+      setFlags(prev => ({ ...prev, [key]: current }));
+      toast('Failed to save setting', false);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16">
+        <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-sm text-blue-700">
+        <strong>Predefined Fields</strong> are built-in fields shown in the post-property form.
+        Toggle them on or off here — changes take effect immediately for all users.
+      </div>
+
+      {PREDEFINED_FIELDS.map(field => {
+        const enabled = flags[field.key] ?? true;
+        return (
+          <div key={field.key} className="flex items-start gap-4 bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+            <div className="flex-1">
+              <p className="font-semibold text-gray-800 text-sm">{field.label}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{field.description}</p>
+            </div>
+            <button
+              onClick={() => handleToggle(field.key, enabled)}
+              disabled={saving === field.key}
+              className="flex-shrink-0 mt-0.5"
+              title={enabled ? 'Click to hide' : 'Click to show'}
+            >
+              {saving === field.key ? (
+                <div className="w-5 h-5 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
+              ) : enabled ? (
+                <ToggleRight className="w-8 h-8 text-primary-600" />
+              ) : (
+                <ToggleLeft className="w-8 h-8 text-gray-400" />
+              )}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function PropertyConfigPage() {
@@ -1382,11 +1507,12 @@ export default function PropertyConfigPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'categories'      && <CategoriesTab />}
-      {activeTab === 'types'           && <PropertyTypesTab />}
-      {activeTab === 'amenities'       && <AmenitiesTab />}
-      {activeTab === 'fields'          && <FormFieldsTab />}
-      {activeTab === 'listing-filters' && <ListingFiltersTab />}
+      {activeTab === 'categories'        && <CategoriesTab />}
+      {activeTab === 'types'             && <PropertyTypesTab />}
+      {activeTab === 'amenities'         && <AmenitiesTab />}
+      {activeTab === 'fields'            && <FormFieldsTab />}
+      {activeTab === 'listing-filters'   && <ListingFiltersTab />}
+      {activeTab === 'predefined-fields' && <PredefinedFieldsTab />}
     </div>
   );
 }

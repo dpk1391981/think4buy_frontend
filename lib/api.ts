@@ -149,7 +149,11 @@ export const smartSearchApi = {
    * Returns structured filters, redirect URL, and filter chips.
    * Use this for ALL search bar submissions across the platform.
    */
-  parse: (query: string, category?: string): Promise<{
+  parse: (
+    query: string,
+    category?: string,
+    geo?: { lat: number; lng: number; radius?: number },
+  ): Promise<{
     data: {
       filters: Record<string, string>;
       redirectUrl: string;
@@ -159,7 +163,7 @@ export const smartSearchApi = {
       /** Suggested city name correction when user's input was unrecognised */
       didYouMean?: string;
     };
-  }> => api.post('/smart-search', { query, category }),
+  }> => api.post('/smart-search', { query, category, ...geo }),
 
   logSearch: (body: {
     searchQuery: string;
@@ -952,6 +956,16 @@ export const rbacApi = {
 };
 
 // ── Support / Help Center ──────────────────────────────────────────────────
+export const systemConfigApi = {
+  /** Public config flags (groups: feature, media, general, forms) — no auth required */
+  getPublic: () => api.get<Record<string, any>>('/config/public'),
+  /** Admin: get all configs, optionally filtered by group */
+  adminGetAll: (group?: string) => api.get('/admin/config', { params: group ? { group } : {} }),
+  /** Admin: upsert a config key */
+  adminUpsert: (key: string, data: { value: string; valueType?: string; description?: string; group?: string }) =>
+    api.put(`/admin/config/${key}`, data),
+};
+
 export const supportApi = {
   /** Submit a help query or feedback — works for guests and logged-in users */
   create: (data: {
