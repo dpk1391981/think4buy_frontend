@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { locationsApi, propertiesApi, smartSearchApi, propertyConfigApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { detectLocation } from '@/lib/geolocation';
+import { getGeoCoords, reverseGeocode } from '@/lib/geolocation';
 import { useAuth } from '@/contexts/AuthContext';
 import { parseSearchHint, formatHintChips, QUICK_TAGS } from '@/lib/searchParser';
 import { useSearchState } from '@/contexts/SearchStateContext';
@@ -524,6 +524,19 @@ function SearchModal({
       const url = new URL(res.data.redirectUrl, 'http://x');
       // UI-selected category always wins unless smart search returned one
       if (category && !res.data.filters?.category) url.searchParams.set('category', category);
+
+      // NLP detected "near me" intent — get real GPS coords
+      if (res.data.nearbySearch) {
+        try {
+          const { lat, lng } = await getGeoCoords();
+          url.searchParams.set('lat', String(lat));
+          url.searchParams.set('lng', String(lng));
+          url.searchParams.set('radius', '5');
+          url.searchParams.delete('city');
+          url.searchParams.delete('locality');
+        } catch { /* geolocation denied — proceed without geo */ }
+      }
+
       // Track the search
       trackSearchPerform(q, {
         category: url.searchParams.get('category') || category || undefined,
@@ -562,16 +575,20 @@ function SearchModal({
   const handleNearMe = async () => {
     setGeoLoading(true);
     try {
-      const loc = await detectLocation();
-      const city = loc.city || loc.locality;
-      if (city) {
-        const p = new URLSearchParams();
-        if (category) p.set('category', category);
-        p.set('city', city);
-        go(`/properties?${p.toString()}`);
-      }
-    } catch {}
-    finally { setGeoLoading(false); }
+      const { lat, lng } = await getGeoCoords();
+      const p = new URLSearchParams({ lat: String(lat), lng: String(lng), radius: '5' });
+      if (category) p.set('category', category);
+      // Fire reverse geocode in background to show label — navigation happens immediately
+      reverseGeocode(lat, lng).then(geo => {
+        const label = geo.locality && geo.city
+          ? `${geo.locality}, ${geo.city}`
+          : geo.city || geo.locality || 'Near Me';
+        setQuery(label);
+      }).catch(() => setQuery('Near Me'));
+      go(`/properties?${p.toString()}`);
+    } catch (e: any) {
+      // Silently ignore — user denied or no GPS
+    } finally { setGeoLoading(false); }
   };
 
   const handleTrending = async (tq: string) => {

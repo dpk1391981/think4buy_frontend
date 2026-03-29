@@ -10,6 +10,7 @@ import {
   Clock, Flame,
 } from 'lucide-react';
 import { locationsApi, propertyConfigApi, smartSearchApi } from '@/lib/api';
+import { getGeoCoords, reverseGeocode } from '@/lib/geolocation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCookieConsent } from '@/contexts/CookieConsentContext';
@@ -681,6 +682,18 @@ function DesktopPropertySearch({
       const res = await smartSearchApi.parse(rawQ, category || undefined);
       const url = new URL(res.data.redirectUrl, 'http://x');
 
+      // NLP detected "near me" intent — get real GPS coords
+      if (res.data.nearbySearch) {
+        try {
+          const { lat, lng } = await getGeoCoords();
+          url.searchParams.set('lat', String(lat));
+          url.searchParams.set('lng', String(lng));
+          url.searchParams.set('radius', '5');
+          url.searchParams.delete('city');
+          url.searchParams.delete('locality');
+        } catch { /* geolocation denied */ }
+      }
+
       // Inject UI-selected filters on top of NLP result
       if (bhk.length)       url.searchParams.set('bedrooms', bhk.join(','));
       if (budget?.min)      url.searchParams.set('minPrice', String(budget.min));
@@ -702,16 +715,20 @@ function DesktopPropertySearch({
     setDetecting(true);
     setDetectErr('');
     try {
-      const loc = await detectLocation();
-      const city = loc.city || loc.locality;
-      if (city) {
-        const locality = loc.locality && loc.locality !== city ? loc.locality : undefined;
-        setQ(locality ? `${locality}, ${city}` : city);
-        search(city, locality);
-      } else {
-        setDetectErr('City not found');
-        setTimeout(() => setDetectErr(''), 3000);
-      }
+      const { lat, lng } = await getGeoCoords();
+      // Navigate immediately with GPS coords; refine display label in background
+      setQ('Near Me');
+      reverseGeocode(lat, lng).then(geo => {
+        const label = geo.locality && geo.city
+          ? `${geo.locality}, ${geo.city}`
+          : geo.city || geo.locality || 'Near Me';
+        setQ(label);
+      }).catch(() => {});
+      const params = buildParams();
+      params.lat    = String(lat);
+      params.lng    = String(lng);
+      params.radius = '5';
+      onSearch(params);
     } catch (e: any) {
       const msg = e?.code === 1 ? 'Location access denied' : 'Location unavailable';
       setDetectErr(msg);
@@ -1118,6 +1135,19 @@ function MobileSearch({
         const url = new URL(res.data.redirectUrl, 'http://x');
         if (isNewProject)  url.searchParams.set('isNewProject', 'true');
         else if (cat && !res.data.filters?.category) url.searchParams.set('category', cat);
+
+        // NLP detected "near me" intent — get real GPS coords
+        if (res.data.nearbySearch) {
+          try {
+            const { lat, lng } = await getGeoCoords();
+            url.searchParams.set('lat', String(lat));
+            url.searchParams.set('lng', String(lng));
+            url.searchParams.set('radius', '5');
+            url.searchParams.delete('city');
+            url.searchParams.delete('locality');
+          } catch { /* geolocation denied */ }
+        }
+
         // UI-selected filters override parsed ones
         if (bhk.length)   url.searchParams.set('bedrooms', bhk.join(','));
         if (budget?.min)  url.searchParams.set('minPrice', String(budget.min));
@@ -1152,15 +1182,26 @@ function MobileSearch({
     setDetecting(true);
     setDetectErr('');
     try {
-      const loc = await detectLocation();
-      const city = loc.city || loc.locality;
-      if (city) {
-        const locality = loc.locality && loc.locality !== city ? loc.locality : undefined;
-        go(city, locality);
-      } else {
-        setDetectErr('City not found');
-        setTimeout(() => setDetectErr(''), 4000);
+      const { lat, lng } = await getGeoCoords();
+      // Navigate immediately; refine display label in background
+      setQuery('Near Me');
+      reverseGeocode(lat, lng).then(geo => {
+        const label = geo.locality && geo.city
+          ? `${geo.locality}, ${geo.city}`
+          : geo.city || geo.locality || 'Near Me';
+        setQuery(label);
+      }).catch(() => {});
+      onClose();
+      const p = new URLSearchParams({ lat: String(lat), lng: String(lng), radius: '5' });
+      if (!isAgent) {
+        if (isNewProject) p.set('isNewProject', 'true');
+        else if (cat) p.set('category', cat);
+        if (bhk.length)  p.set('bedrooms', bhk.join(','));
+        if (budget?.min) p.set('minPrice', String(budget.min));
+        if (budget?.max) p.set('maxPrice', String(budget.max));
+        if (type)        p.set('type', type);
       }
+      router.push(`/properties?${p}`);
     } catch (e: any) {
       const msg = e?.code === 1 ? 'Access denied' : 'Unavailable';
       setDetectErr(msg);

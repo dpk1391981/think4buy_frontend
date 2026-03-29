@@ -314,29 +314,35 @@ function DependentRowsField({ labelOptions, unitOptions, value, onChange, requir
 
 // ─── Dynamic Field Renderer ───────────────────────────────────────────────────
 
-function DynamicField({ field, value, onChange }: {
+function DynamicField({ field, value, onChange, hasError = false, errorMessage }: {
   field: PropConfigField; value: string; onChange: (v: string) => void;
+  hasError?: boolean; errorMessage?: string;
 }) {
   const options: string[] = field.optionsJson
     ? (Array.isArray(field.optionsJson) ? field.optionsJson : JSON.parse(field.optionsJson as any))
     : [];
 
+  const inputErrorClass = hasError ? 'border-red-400 focus:ring-red-400 focus:border-red-400' : '';
+  const textareaErrorClass = hasError
+    ? 'border-red-400 focus:ring-red-400'
+    : 'border-gray-200 focus:ring-primary-400';
+
   return (
     <div>
       <FieldLabel required={field.isRequired}>{field.fieldLabel}</FieldLabel>
       {field.fieldType === 'text' && (
-        <Input value={value} onChange={(e: any) => onChange(e.target.value)} placeholder={field.placeholder || ''} />
+        <Input value={value} onChange={(e: any) => onChange(e.target.value)} placeholder={field.placeholder || ''} className={inputErrorClass} />
       )}
       {field.fieldType === 'number' && (
-        <Input type="number" value={value} onChange={(e: any) => onChange(e.target.value)} placeholder={field.placeholder || ''} />
+        <Input type="number" value={value} onChange={(e: any) => onChange(e.target.value)} placeholder={field.placeholder || ''} className={inputErrorClass} />
       )}
       {field.fieldType === 'textarea' && (
         <textarea value={value} onChange={e => onChange(e.target.value)} rows={3}
           placeholder={field.placeholder || ''}
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none" />
+          className={`w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 resize-none ${textareaErrorClass}`} />
       )}
       {field.fieldType === 'dropdown' && (
-        <Select value={value} onChange={(e: any) => onChange(e.target.value)}>
+        <Select value={value} onChange={(e: any) => onChange(e.target.value)} className={hasError ? 'border-red-400' : ''}>
           <option value="">Select…</option>
           {options.map(o => <option key={o} value={o}>{o}</option>)}
         </Select>
@@ -382,6 +388,9 @@ function DynamicField({ field, value, onChange }: {
           onChange={onChange}
           required={field.isRequired}
         />
+      )}
+      {hasError && errorMessage && (
+        <p className="text-xs text-red-500 mt-1">{errorMessage}</p>
       )}
     </div>
   );
@@ -1107,7 +1116,7 @@ function Step3PropertyType({ form, dispatch, config }: any) {
 
 // ─── Step: Location ──────────────────────────────────────────────────────────
 
-function Step4Location({ form, dispatch }: any) {
+function Step4Location({ form, dispatch, fieldErrors = {}, setFieldErrors, formVisibility = { showSociety: true, showMap: false } }: any) {
   const [cities, setCities] = useState<any[]>([]);
   const [citiesLoading, setCitiesLoading] = useState(false);
   const [localities, setLocalities] = useState<any[]>([]);
@@ -1178,9 +1187,9 @@ function Step4Location({ form, dispatch }: any) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // ── Initialize Leaflet map (owner only) ────────────────────────────────────
+  // ── Initialize Leaflet map (owner only, config-gated) ─────────────────────
   useEffect(() => {
-    if (!isOwner) return; // agents don't see map
+    if (!isOwner || !formVisibility.showMap) return; // agents don't see map; map disabled by admin
     let destroyed = false;
     let sizeTimer: ReturnType<typeof setTimeout>;
 
@@ -1242,7 +1251,7 @@ function Step4Location({ form, dispatch }: any) {
         markerRef.current = null;
       }
     };
-  }, [isOwner]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOwner, formVisibility.showMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Sync marker when lat/lng changes ──────────────────────────────────────
   useEffect(() => {
@@ -1356,19 +1365,25 @@ function Step4Location({ form, dispatch }: any) {
             <input
               type="text"
               value={citySearch}
-              onChange={(e) => handleCityInputChange(e.target.value)}
+              onChange={(e) => {
+                handleCityInputChange(e.target.value);
+                if (fieldErrors.city && setFieldErrors) setFieldErrors((p: any) => { const n = {...p}; delete n.city; return n; });
+              }}
               onFocus={() => setShowCityDropdown(true)}
               placeholder="Search city (e.g., Delhi, Mumbai…)"
               className={cn(
-                'w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white',
-                'focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400',
-                'placeholder:text-gray-400 transition-colors'
+                'w-full border rounded-xl px-4 py-3 text-sm bg-white',
+                'focus:outline-none focus:ring-2 placeholder:text-gray-400 transition-colors',
+                fieldErrors.city
+                  ? 'border-red-400 focus:ring-red-400 focus:border-red-400'
+                  : 'border-gray-200 focus:ring-primary-400 focus:border-primary-400'
               )}
             />
             {form.cityId && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-xs font-semibold">✓</span>
             )}
           </div>
+          {fieldErrors.city && <p className="text-xs text-red-500 mt-1">{fieldErrors.city}</p>}
           {showCityDropdown && (cities.length > 0 || citiesLoading) && (
             <div className="absolute z-20 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
               {citiesLoading && (
@@ -1404,6 +1419,7 @@ function Step4Location({ form, dispatch }: any) {
                 setLocalitySearch(v);
                 setShowLocalityList(true);
                 if (!v) dispatch(updateForm({ localityId: '', locality: '', pincode: '' }));
+                if (fieldErrors.locality && setFieldErrors) setFieldErrors((p: any) => { const n = {...p}; delete n.locality; return n; });
                 clearTimeout(localityDebounceRef.current);
                 if (v && form.city) {
                   const matched = localities.filter(l =>
@@ -1427,9 +1443,11 @@ function Step4Location({ form, dispatch }: any) {
               }
               disabled={!form.city}
               className={cn(
-                'w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white',
-                'focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400',
-                'placeholder:text-gray-400 disabled:opacity-50 transition-colors'
+                'w-full border rounded-xl px-4 py-3 text-sm bg-white',
+                'focus:outline-none focus:ring-2 placeholder:text-gray-400 disabled:opacity-50 transition-colors',
+                fieldErrors.locality
+                  ? 'border-red-400 focus:ring-red-400 focus:border-red-400'
+                  : 'border-gray-200 focus:ring-primary-400 focus:border-primary-400'
               )}
             />
             {localitiesLoading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />}
@@ -1468,7 +1486,8 @@ function Step4Location({ form, dispatch }: any) {
             </div>
           )}
 
-          {form.localityId && form.pincode && (
+          {fieldErrors.locality && <p className="text-xs text-red-500 mt-1">{fieldErrors.locality}</p>}
+          {!fieldErrors.locality && form.localityId && form.pincode && (
             <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1">
               <span>✓</span>
               <span>Auto-filled from location data{form.pincode ? ` — Pincode: ${form.pincode}` : ''}</span>
@@ -1476,22 +1495,24 @@ function Step4Location({ form, dispatch }: any) {
           )}
         </div>
 
-        {/* Society / Building — right after locality for logical order */}
-        <div>
-          <FieldLabel>
-            Society / Building
-            <span className="ml-1.5 text-[10px] font-semibold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
-              Recommended
-            </span>
-          </FieldLabel>
-          <Input value={form.society || ''}
-            onChange={(e: any) => dispatch(updateForm({ society: e.target.value }))}
-            placeholder="e.g., Prestige Shantiniketan, DLF Cyber City" />
-          <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-            <Building2 className="w-3 h-3 flex-shrink-0" />
-            Helps buyers search by society name and boosts your listing visibility.
-          </p>
-        </div>
+        {/* Society / Building — conditionally shown based on admin config */}
+        {formVisibility.showSociety && (
+          <div>
+            <FieldLabel>
+              Society / Building
+              <span className="ml-1.5 text-[10px] font-semibold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+                Recommended
+              </span>
+            </FieldLabel>
+            <Input value={form.society || ''}
+              onChange={(e: any) => dispatch(updateForm({ society: e.target.value }))}
+              placeholder="e.g., Prestige Shantiniketan, DLF Cyber City" />
+            <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+              <Building2 className="w-3 h-3 flex-shrink-0" />
+              Helps buyers search by society name and boosts your listing visibility.
+            </p>
+          </div>
+        )}
 
         {/* Pincode */}
         <div>
@@ -1506,15 +1527,22 @@ function Step4Location({ form, dispatch }: any) {
           <div className="sm:col-span-2">
             <FieldLabel required>Full Address</FieldLabel>
             <Input value={form.address || ''}
-              onChange={(e: any) => dispatch(updateForm({ address: e.target.value }))}
-              placeholder="House / Flat no., Street, Area, City" />
-            <p className="text-xs text-gray-400 mt-1">Exact address is shown to serious buyers after inquiry.</p>
+              onChange={(e: any) => {
+                dispatch(updateForm({ address: e.target.value }));
+                if (fieldErrors.address && setFieldErrors) setFieldErrors((p: any) => { const n = {...p}; delete n.address; return n; });
+              }}
+              placeholder="House / Flat no., Street, Area, City"
+              className={fieldErrors.address ? 'border-red-400 focus:ring-red-400 focus:border-red-400' : ''} />
+            {fieldErrors.address
+              ? <p className="text-xs text-red-500 mt-1">{fieldErrors.address}</p>
+              : <p className="text-xs text-gray-400 mt-1">Exact address is shown to serious buyers after inquiry.</p>
+            }
           </div>
         )}
       </div>
 
-      {/* GPS Map Picker — Owner only */}
-      {isOwner && (
+      {/* GPS Map Picker — Owner only, admin config-gated */}
+      {isOwner && formVisibility.showMap && (
         <SectionCard title="Pin Location on Map">
           <p className="text-xs text-gray-500 mb-3">
             {form.localityId
@@ -1593,7 +1621,7 @@ function Step5AutoTitle({ form, dispatch }: any) {
 
 // ─── Step: Details ───────────────────────────────────────────────────────────
 
-function Step6Details({ form, dispatch, config }: any) {
+function Step6Details({ form, dispatch, config, fieldErrors = {}, setFieldErrors, formVisibility = { showBuilder: true, showRera: true } }: any) {
   const { fields, loadingFields } = config;
   const cat = form.mainCategory;
   const isResidential = ['buy', 'rent', 'pg', 'builder_project'].includes(cat);
@@ -1612,7 +1640,14 @@ function Step6Details({ form, dispatch, config }: any) {
       <DynamicField
         field={field}
         value={form.dynamicFields[field.fieldName] || ''}
-        onChange={(v) => dispatch(setDynamicField({ key: field.fieldName, value: v }))}
+        onChange={(v) => {
+          dispatch(setDynamicField({ key: field.fieldName, value: v }));
+          if (fieldErrors[field.fieldName] && setFieldErrors) {
+            setFieldErrors((p: any) => { const n = {...p}; delete n[field.fieldName]; return n; });
+          }
+        }}
+        hasError={!!fieldErrors[field.fieldName]}
+        errorMessage={fieldErrors[field.fieldName]}
       />
     </div>
   );
@@ -1738,29 +1773,35 @@ function Step6Details({ form, dispatch, config }: any) {
         </div>
       )}
 
-      {/* ⑤ Builder / Developer info — shown for all categories but highlighted for builder_project */}
-      <div className={`border-t border-gray-100 pt-6 grid grid-cols-1 sm:grid-cols-2 gap-5`}>
-        <div>
-          <FieldLabel>
-            Builder / Developer Name
-            {cat === 'builder_project' && <span className="ml-1.5 text-[10px] font-semibold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full uppercase tracking-wide">Builder Project</span>}
-          </FieldLabel>
-          <Input value={form.builderName || ''}
-            onChange={(e: any) => dispatch(updateForm({ builderName: e.target.value }))}
-            placeholder="e.g., Prestige Group, DLF, Godrej Properties" />
-          <p className="text-xs text-gray-400 mt-1">Name of the builder or developer (optional)</p>
+      {/* ⑤ Builder / Developer info — conditionally shown based on admin config */}
+      {(formVisibility.showBuilder || formVisibility.showRera) && (
+        <div className={`border-t border-gray-100 pt-6 grid grid-cols-1 sm:grid-cols-2 gap-5`}>
+          {formVisibility.showBuilder && (
+            <div>
+              <FieldLabel>
+                Builder / Developer Name
+                {cat === 'builder_project' && <span className="ml-1.5 text-[10px] font-semibold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full uppercase tracking-wide">Builder Project</span>}
+              </FieldLabel>
+              <Input value={form.builderName || ''}
+                onChange={(e: any) => dispatch(updateForm({ builderName: e.target.value }))}
+                placeholder="e.g., Prestige Group, DLF, Godrej Properties" />
+              <p className="text-xs text-gray-400 mt-1">Name of the builder or developer (optional)</p>
+            </div>
+          )}
+          {formVisibility.showRera && (
+            <div>
+              <FieldLabel>
+                RERA Number
+                {cat === 'builder_project' && <span className="ml-1.5 text-[10px] font-semibold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full uppercase tracking-wide">Verified</span>}
+              </FieldLabel>
+              <Input value={form.reraNumber || ''}
+                onChange={(e: any) => dispatch(updateForm({ reraNumber: e.target.value }))}
+                placeholder="e.g., P52100012345" />
+              <p className="text-xs text-gray-400 mt-1">RERA registration increases buyer trust (optional)</p>
+            </div>
+          )}
         </div>
-        <div>
-          <FieldLabel>
-            RERA Number
-            {cat === 'builder_project' && <span className="ml-1.5 text-[10px] font-semibold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full uppercase tracking-wide">Verified</span>}
-          </FieldLabel>
-          <Input value={form.reraNumber || ''}
-            onChange={(e: any) => dispatch(updateForm({ reraNumber: e.target.value }))}
-            placeholder="e.g., P52100012345" />
-          <p className="text-xs text-gray-400 mt-1">RERA registration increases buyer trust (optional)</p>
-        </div>
-      </div>
+      )}
 
       {/* ⑥ Other dynamic fields (non-dependent) */}
       {!loadingFields && regularFields.length > 0 && (
@@ -1861,7 +1902,7 @@ function Step8Description({ form, dispatch }: any) {
     : form.mainCategory === 'pg' ? DESCRIPTION_HINTS.pg
     : DESCRIPTION_HINTS.residential;
 
-  const autoSuggest = () => {
+  const buildDescription = () => {
     const title = form.autoTitle || generatePropertyTitle({
       category: form.mainCategory, listingType: form.listingType || 'rent',
       propertyType: form.propertyType, bedrooms: form.bedrooms, city: form.city, locality: form.locality,
@@ -1882,8 +1923,15 @@ function Step8Description({ form, dispatch }: any) {
       sentences.push(`Located in ${form.city}${form.locality ? ` (${form.locality})` : ''}, it provides excellent connectivity to major hubs and local amenities.`);
     }
     sentences.push('Contact us today to schedule a site visit and get more details.');
-    dispatch(updateForm({ description: sentences.join(' ') }));
+    return sentences.join(' ');
   };
+
+  const autoSuggest = () => dispatch(updateForm({ description: buildDescription() }));
+
+  // Auto-fill description when arriving on this step if field is empty
+  useEffect(() => {
+    if (!form.description) dispatch(updateForm({ description: buildDescription() }));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-6">
@@ -1932,7 +1980,7 @@ function Step8Description({ form, dispatch }: any) {
 
 // ─── Step: Price ─────────────────────────────────────────────────────────────
 
-function Step9Price({ form, dispatch }: any) {
+function Step9Price({ form, dispatch, fieldErrors = {}, setFieldErrors }: any) {
   const isRent = form.listingType === 'rent' || form.mainCategory === 'pg' || form.mainCategory === 'rent';
   const isAgent = form.userType === 'agent';
   const brokerageOpts = isRent ? BROKERAGE_RENT_OPTIONS : BROKERAGE_SALE_OPTIONS;
@@ -1964,11 +2012,20 @@ function Step9Price({ form, dispatch }: any) {
         <div className="relative">
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-lg">₹</span>
           <input type="number" value={form.price}
-            onChange={(e) => dispatch(updateForm({ price: e.target.value }))}
+            onChange={(e) => {
+              dispatch(updateForm({ price: e.target.value }));
+              if (fieldErrors.price && setFieldErrors) setFieldErrors((p: any) => { const n = {...p}; delete n.price; return n; });
+            }}
             placeholder={isRent ? '25000' : '5000000'}
-            className="w-full border-2 border-gray-200 rounded-xl pl-10 pr-4 py-4 text-xl font-bold focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all" />
+            className={cn(
+              'w-full border-2 rounded-xl pl-10 pr-4 py-4 text-xl font-bold focus:outline-none focus:ring-2 transition-all',
+              fieldErrors.price
+                ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
+                : 'border-gray-200 focus:border-primary-400 focus:ring-primary-100'
+            )} />
         </div>
-        {form.price && (
+        {fieldErrors.price && <p className="text-xs text-red-500 mt-1">{fieldErrors.price}</p>}
+        {!fieldErrors.price && form.price && (
           <div className="mt-2 flex items-center gap-2">
             <span className="text-lg font-bold text-primary-600">{fmt(form.price)}</span>
             {isRent && <span className="text-gray-400 text-sm">/month</span>}
@@ -2249,9 +2306,11 @@ function PostPropertyPageInner() {
   const [editLoading, setEditLoading] = useState(true);
   const [editAccessDenied, setEditAccessDenied] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [userDrafts, setUserDrafts] = useState<any[]>([]);
   const [userPending, setUserPending] = useState<any[]>([]);
   const [editingProperty, setEditingProperty] = useState<any>(null);
+  const [formVisibility, setFormVisibility] = useState({ showSociety: true, showBuilder: true, showRera: true, showMap: false });
 
   // Refs so auto-save interval always reads the latest values
   const latestRef = useRef({ form, draftId, agentAgencyInfo, isEditMode: false, currentStep: 0 });
@@ -2271,6 +2330,21 @@ function PostPropertyPageInner() {
     if (isEditMode || draftId) return;
     const stored = typeof window !== 'undefined' ? localStorage.getItem('t4bs_draft_id') : null;
     if (stored) dispatch(setDraftId(stored));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch form field visibility config once on mount
+  useEffect(() => {
+    import('@/lib/api').then(({ systemConfigApi }) => {
+      systemConfigApi.getPublic().then(r => {
+        const cfg = r.data;
+        setFormVisibility({
+          showSociety: cfg['SHOW_SOCIETY_FIELD'] !== false,
+          showBuilder: cfg['SHOW_BUILDER_FIELD'] !== false,
+          showRera:    cfg['SHOW_RERA_FIELD']    !== false,
+          showMap:     cfg['SHOW_MAP_PICKER']    === true,
+        });
+      }).catch(() => {}); // silently use defaults (all shown)
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-derive listing identity from user role — no step needed
@@ -2592,32 +2666,51 @@ function PostPropertyPageInner() {
     })();
   }, [editId, user?.id]);
 
+  // Returns per-field error map for the current step; empty = no errors
+  const getStepErrors = (step: number): Record<string, string> => {
+    const errs: Record<string, string> = {};
+    switch (step) {
+      case 3: // Location
+        if (!form.city) errs.city = 'Please select a city.';
+        if (!form.locality) errs.locality = 'Please select or enter a locality.';
+        if (!isAgent && !form.address) errs.address = 'Full address is required.';
+        break;
+      case 4: { // Details — validate required dynamic config fields
+        const requiredDynamic = (config.fields || []).filter((f: PropConfigField) => f.isRequired);
+        for (const f of requiredDynamic) {
+          const val = (form.dynamicFields[f.fieldName] || '').trim();
+          if (!val) errs[f.fieldName] = `${f.fieldLabel} is required.`;
+        }
+        break;
+      }
+      case 7: // Price
+        if (!form.price) errs.price = 'Please enter a price.';
+        break;
+      default:
+        break;
+    }
+    return errs;
+  };
+
   const canProceed = () => {
     switch (currentStep) {
       case 0: return !!form.categoryId;
       case 1: return !!form.listingType;
       case 2: return !!form.typeId;
-      case 3: return !!form.city && !!form.locality && (isAgent || !!form.address);
-      case 4: return true;
-      case 5: {
-        // Validate all required dynamic config fields
-        const requiredDynamic = (config.fields || []).filter((f: PropConfigField) => f.isRequired);
-        for (const f of requiredDynamic) {
-          const val = (form.dynamicFields[f.fieldName] || '').trim();
-          if (!val) return false;
-        }
-        return true;
-      }
-      case 6: return true;
-      case 7: return true;
-      case 8: return !!form.price;
-      case 9: return true;
-      default: return true;
+      default: return Object.keys(getStepErrors(currentStep)).length === 0;
     }
   };
 
   const handleNext = () => {
+    const errs = getStepErrors(currentStep);
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
+      setError('Please fill in the highlighted fields.');
+      return;
+    }
+    // For steps 0-2 that don't use getStepErrors
     if (!canProceed()) { setError('Please complete the required fields.'); return; }
+    setFieldErrors({});
     setError('');
     // Skip Purpose step for categories with an implicit listing type (buy/rent/pg)
     if (currentStep === 0) {
@@ -2631,6 +2724,8 @@ function PostPropertyPageInner() {
   };
 
   const handleBack = () => {
+    setFieldErrors({});
+    setError('');
     // When going back to Category from Property Type, skip Purpose if it was auto-set
     if (currentStep === 2 && IMPLICIT_LISTING[form.mainCategory]) { dispatch(setStep(0)); }
     else { dispatch(prevStep()); }
@@ -2848,7 +2943,7 @@ function PostPropertyPageInner() {
     );
   }
 
-  const stepProps = { form, dispatch, config };
+  const stepProps = { form, dispatch, config, fieldErrors, setFieldErrors, formVisibility };
 
   const renderStep = () => {
     switch (currentStep) {

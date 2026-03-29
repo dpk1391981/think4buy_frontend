@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, MapPin, Loader2, X, LocateFixed, Navigation } from 'lucide-react';
 import { locationsApi, smartSearchApi } from '@/lib/api';
-import { detectLocation } from '@/lib/geolocation';
+import { getGeoCoords, reverseGeocode } from '@/lib/geolocation';
 import { cn } from '@/lib/utils';
 
 export default function HomeStickySearch() {
@@ -61,7 +61,21 @@ export default function HomeStickySearch() {
     // Free-text — delegate entirely to BE smart search (logs analytics too)
     try {
       const res = await smartSearchApi.parse(q.trim());
-      router.push(`/properties?${new URLSearchParams(res.data.filters).toString()}`);
+      const url = new URL(res.data.redirectUrl, 'http://x');
+
+      // NLP detected "near me" intent — get real GPS coords
+      if (res.data.nearbySearch) {
+        try {
+          const { lat, lng } = await getGeoCoords();
+          url.searchParams.set('lat', String(lat));
+          url.searchParams.set('lng', String(lng));
+          url.searchParams.set('radius', '5');
+          url.searchParams.delete('city');
+          url.searchParams.delete('locality');
+        } catch { /* geolocation denied */ }
+      }
+
+      router.push(`/properties?${url.searchParams.toString()}`);
     } catch {
       router.push(`/properties?keyword=${encodeURIComponent(q.trim())}`);
     }
@@ -71,16 +85,17 @@ export default function HomeStickySearch() {
     setDetecting(true);
     setDetectErr('');
     try {
-      const loc = await detectLocation();
-      const city = loc.city || loc.locality;
-      if (city) {
-        const locality = loc.locality && loc.locality !== city ? loc.locality : undefined;
-        setQ(locality ? `${locality}, ${city}` : city);
-        doSearch(city, locality);
-      } else {
-        setDetectErr('City not found');
-        setTimeout(() => setDetectErr(''), 3000);
-      }
+      const { lat, lng } = await getGeoCoords();
+      const p = new URLSearchParams({ lat: String(lat), lng: String(lng), radius: '5' });
+      // Show label immediately, refine in background
+      setQ('Near Me');
+      reverseGeocode(lat, lng).then(geo => {
+        const label = geo.locality && geo.city
+          ? `${geo.locality}, ${geo.city}`
+          : geo.city || geo.locality || 'Near Me';
+        setQ(label);
+      }).catch(() => {});
+      router.push(`/properties?${p}`);
     } catch (e: any) {
       setDetectErr(e?.code === 1 ? 'Access denied' : 'Unavailable');
       setTimeout(() => setDetectErr(''), 3000);

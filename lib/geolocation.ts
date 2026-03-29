@@ -41,6 +41,25 @@ export async function reverseGeocode(lat: number, lng: number): Promise<Omit<Det
   };
 }
 
+/**
+ * Fast raw GPS coords — no reverse geocoding.
+ * Use this for "Near Me" button clicks where you only need lat/lng for the URL.
+ * Allows 30s cached position so subsequent clicks are instant.
+ */
+export function getGeoCoords(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      reject(new Error('Geolocation not supported'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (err) => reject(err),
+      { timeout: 8000, maximumAge: 30_000 },
+    );
+  });
+}
+
 /** Get browser geolocation + reverse-geocode in one call. */
 export function detectLocation(): Promise<DetectedLocation> {
   return new Promise((resolve, reject) => {

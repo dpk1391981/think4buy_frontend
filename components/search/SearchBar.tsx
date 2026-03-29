@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, MapPin, Building2, Home, Loader2, TrendingUp, Navigation, X } from 'lucide-react';
 import { propertiesApi, locationsApi, smartSearchApi } from '@/lib/api';
+import { getGeoCoords } from '@/lib/geolocation';
 import { cn } from '@/lib/utils';
 
 interface SearchBarProps {
@@ -195,18 +196,26 @@ export default function SearchBar({
     try {
       // Call centralized smart search API — parses NLP and returns structured filters
       const res = await smartSearchApi.parse(q, category || undefined);
-      const { redirectUrl, chips, filters } = res.data;
+      const { redirectUrl, chips, filters, nearbySearch } = res.data;
 
       setActiveChips(chips);
 
-      // If category override exists, inject it
-      if (category && !filters.category) {
-        const url = new URL(redirectUrl, 'http://x');
-        url.searchParams.set('category', category);
-        router.push(`/properties?${url.searchParams.toString()}`);
-      } else {
-        router.push(redirectUrl);
+      const url = new URL(redirectUrl, 'http://x');
+      if (category && !filters.category) url.searchParams.set('category', category);
+
+      // If NLP detected "near me" intent, append real GPS coords
+      if (nearbySearch) {
+        try {
+          const { lat, lng } = await getGeoCoords();
+          url.searchParams.set('lat', String(lat));
+          url.searchParams.set('lng', String(lng));
+          url.searchParams.set('radius', '5');
+          url.searchParams.delete('city');
+          url.searchParams.delete('locality');
+        } catch { /* geolocation denied — proceed without geo */ }
       }
+
+      router.push(`/properties?${url.searchParams.toString()}`);
     } catch {
       // Fallback: simple city or keyword search
       router.push(buildSearchUrl(/\s/.test(q) ? { keyword: q } : { city: q }));
