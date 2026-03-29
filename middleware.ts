@@ -95,6 +95,7 @@ const HYPHEN_TO_SLASH_REWRITES: Array<[RegExp, (m: RegExpMatchArray) => string]>
   [/^\/property-agents-in-([^/]+)$/, m => `/property-agents-in/${m[1]}`],
   [/^\/property-prices-in-([^/]+)$/, m => `/property-prices-in/${m[1]}`],
   [/^\/agents-in-([^/]+)$/, m => `/agents-in/${m[1]}`],
+  [/^\/properties-in-([^/]+)$/, m => `/properties-in/${m[1]}`],
 ];
 
 // ── Middleware ────────────────────────────────────────────────────────────────
@@ -128,6 +129,18 @@ export function middleware(request: NextRequest) {
       const citySlug = cityParam.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       const url = request.nextUrl.clone();
       url.pathname = `/agents-in-${citySlug}`;
+      url.search = '';
+      return NextResponse.redirect(url, 301);
+    }
+  }
+
+  // ── 3b. /properties?city=X → /properties-in-x (301) ─────────────────────
+  if (pathname === '/properties') {
+    const cityParam = request.nextUrl.searchParams.get('city');
+    if (cityParam) {
+      const citySlug = cityParam.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const url = request.nextUrl.clone();
+      url.pathname = `/properties-in-${citySlug}`;
       url.search = '';
       return NextResponse.redirect(url, 301);
     }

@@ -727,6 +727,16 @@ export const seoApi = {
   adminUpdateAgentCityPage: (id: string, data: any) => api.patch(`/seo/admin/agent-city-pages/${id}`, data),
   adminDeleteAgentCityPage: (id: string) => api.delete(`/seo/admin/agent-city-pages/${id}`),
 
+  // Public - Property City SEO
+  getPropertyCitySeoBySlug: (slug: string) => api.get(`/seo/property-city-pages/${slug}`),
+
+  // Admin - Property City SEO
+  adminGetPropertyCityPages: (params?: { page?: number; limit?: number; search?: string }) =>
+    api.get('/seo/admin/property-city-pages', { params }),
+  adminCreatePropertyCityPage: (data: any) => api.post('/seo/admin/property-city-pages', data),
+  adminUpdatePropertyCityPage: (id: string, data: any) => api.patch(`/seo/admin/property-city-pages/${id}`, data),
+  adminDeletePropertyCityPage: (id: string) => api.delete(`/seo/admin/property-city-pages/${id}`),
+
   // Admin - Footer Links
   adminGetFooterGroups: () => api.get('/seo/admin/footer-groups'),
   adminCreateFooterGroup: (data: any) => api.post('/seo/admin/footer-groups', data),
