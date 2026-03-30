@@ -60,13 +60,14 @@ const SECTION_META: Record<string, { label: string; color: string; icon: React.E
   admin_finance:    { label: 'Admin — Finance',          color: 'bg-green-700 text-white',          icon: CreditCard   },
   admin_messaging:  { label: 'Admin — Messaging',        color: 'bg-pink-700 text-white',           icon: MessageSquare},
   user_dashboard:   { label: 'User Dashboard',           color: 'bg-indigo-700 text-white',         icon: BarChart2    },
+  admin_support:    { label: 'Admin — Support',          color: 'bg-purple-700 text-white',         icon: MessageSquare},
 };
 
 const SECTION_ORDER = [
   'admin_overview', 'admin_listings', 'admin_agents', 'admin_users',
   'admin_content', 'admin_seo', 'admin_system', 'admin_rbac',
   'admin_locations', 'admin_crm', 'admin_finance', 'admin_messaging',
-  'user_dashboard',
+  'user_dashboard', 'admin_support',
 ];
 
 export default function RoleMenusPage() {
