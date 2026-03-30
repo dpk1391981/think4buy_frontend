@@ -43,6 +43,9 @@ import {
   MonitorPlay,
   ToggleLeft,
   Building2,
+  Inbox,
+  ThumbsUp,
+  AlertTriangle,
 } from 'lucide-react';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import { useAuth } from '@/contexts/AuthContext';
@@ -140,6 +143,13 @@ const NAV_GROUPS = [
     label: 'Messaging',
     items: [
       { href: '/admin/messaging', label: 'Messaging Centre', icon: MessageSquare, slug: 'admin_messaging' },
+    ],
+  },
+  {
+    label: 'Support',
+    items: [
+      { href: '/admin/support/feedback',    label: 'Feedback & Reviews', icon: ThumbsUp,      slug: 'admin_support_feedback'    },
+      { href: '/admin/support/complaints',  label: 'Complaints',         icon: AlertTriangle,  slug: 'admin_support_complaints'  },
     ],
   },
 ];

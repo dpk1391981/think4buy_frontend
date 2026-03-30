@@ -1,105 +1,64 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Star, Quote, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supportApi } from '@/lib/api';
+import OptimizedImage from '@/components/common/OptimizedImage';
+
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 interface Testimonial {
-  id: number;
+  id: string;
   name: string;
-  location: string;
-  role: 'buyer' | 'seller' | 'agent' | 'renter';
-  avatar: string; // emoji fallback
-  rating: number;
-  title: string;
-  text: string;
-  propertyType: string;
-  verified: boolean;
+  email: string | null;
+  category: string | null;
+  subject: string | null;
+  message: string;
+  rating: number | null;
+  createdAt: string;
+  userAvatar: string | null;
+  city: string | null;
+  state: string | null;
+  role: string | null;
 }
 
-const TESTIMONIALS: Testimonial[] = [
-  {
-    id: 1,
-    name: 'Rahul Sharma',
-    location: 'Delhi',
-    role: 'buyer',
-    avatar: '👨‍💼',
-    rating: 5,
-    title: 'Found my dream home in 3 weeks!',
-    text: "I was skeptical at first, but Think4BuySale showed me 50+ verified 3 BHK options in Dwarka within my budget. The price comparison feature saved me from overpaying. Closed the deal in just 3 weeks!",
-    propertyType: '3 BHK Apartment, Delhi',
-    verified: true,
-  },
-  {
-    id: 2,
-    name: 'Priya Mehta',
-    location: 'Bangalore',
-    role: 'renter',
-    avatar: '👩‍💻',
-    rating: 5,
-    title: 'No broker harassment, zero hidden fees',
-    text: "As a working professional relocating to Bangalore, I needed a flat fast. The direct owner connect was a game-changer — no broker middlemen, and my phone was never shared without consent. Highly recommend!",
-    propertyType: '2 BHK Flat, Whitefield',
-    verified: true,
-  },
-  {
-    id: 3,
-    name: 'Arun Patel',
-    location: 'Mumbai',
-    role: 'agent',
-    avatar: '👨‍💼',
-    rating: 5,
-    title: 'My lead volume doubled in 2 months',
-    text: "As a RERA-certified agent in Mumbai, I was struggling with lead quality on other platforms. Think4BuySale's agent dashboard gives me genuine buyer enquiries. My conversion rate improved by 40%.",
-    propertyType: 'Real Estate Agent, Thane',
-    verified: true,
-  },
-  {
-    id: 4,
-    name: 'Sunita Krishnan',
-    location: 'Chennai',
-    role: 'seller',
-    avatar: '👩‍🦱',
-    rating: 5,
-    title: 'Sold my flat 3 months ahead of target',
-    text: "I listed my 2 BHK in Adyar and got 12 genuine inquiries in the first week. The free listing with boost option gave me premium visibility. Got a buyer at above asking price. Absolutely brilliant platform!",
-    propertyType: '2 BHK, Adyar, Chennai',
-    verified: true,
-  },
-  {
-    id: 5,
-    name: 'Vikram Singh',
-    location: 'Pune',
-    role: 'buyer',
-    avatar: '👨‍🦰',
-    rating: 4,
-    title: 'The comparison tool is incredibly useful',
-    text: "The property comparison feature helped me shortlist from 15 properties down to 3. The price-per-sqft breakdown made it easy to spot overpriced listings. Eventually bought a great flat in Hinjewadi.",
-    propertyType: '2 BHK Apartment, Pune',
-    verified: true,
-  },
-  {
-    id: 6,
-    name: 'Anjali Desai',
-    location: 'Hyderabad',
-    role: 'buyer',
-    avatar: '👩‍🔬',
-    rating: 5,
-    title: 'AI insights helped me pick the right locality',
-    text: "The market intelligence section showed me that Gachibowli prices were set to rise faster than other areas. I invested there and saw a 15% appreciation in 8 months. Data-driven buying is the future!",
-    propertyType: '3 BHK Flat, Hyderabad',
-    verified: true,
-  },
-];
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
-const ROLE_COLORS: Record<Testimonial['role'], string> = {
-  buyer:  'bg-blue-100 text-blue-700',
-  seller: 'bg-green-100 text-green-700',
-  agent:  'bg-purple-100 text-purple-700',
-  renter: 'bg-orange-100 text-orange-700',
+const ROLE_COLORS: Record<string, string> = {
+  buyer:       'bg-blue-100 text-blue-700',
+  seller:      'bg-green-100 text-green-700',
+  agent:       'bg-purple-100 text-purple-700',
+  broker:      'bg-indigo-100 text-indigo-700',
+  renter:      'bg-orange-100 text-orange-700',
+  owner:       'bg-teal-100 text-teal-700',
+  admin:       'bg-gray-100 text-gray-600',
+  super_admin: 'bg-gray-100 text-gray-600',
 };
 
-function StarRating({ rating }: { rating: number }) {
+function roleLabel(role: string | null) {
+  if (!role) return 'Customer';
+  const map: Record<string, string> = {
+    buyer: 'Buyer', seller: 'Seller', agent: 'Agent',
+    broker: 'Broker', renter: 'Renter', owner: 'Owner',
+    admin: 'Member', super_admin: 'Member',
+  };
+  return map[role] ?? 'Customer';
+}
+
+function location(t: Testimonial) {
+  return [t.city, t.state].filter(Boolean).join(', ') || 'India';
+}
+
+function initials(name: string) {
+  return name
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
+function StarRating({ value }: { value: number }) {
   return (
     <div className="flex gap-0.5">
       {Array.from({ length: 5 }).map((_, i) => (
@@ -107,7 +66,7 @@ function StarRating({ rating }: { rating: number }) {
           key={i}
           className={cn(
             'w-3.5 h-3.5',
-            i < rating ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-200 text-gray-200'
+            i < value ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-200 text-gray-200',
           )}
         />
       ))}
@@ -115,7 +74,42 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
+// ── Avatar: shows profile photo or initials fallback ──────────────────────────
+
+function UserAvatar({ t, size = 9 }: { t: Testimonial; size?: number }) {
+  const sz = `w-${size} h-${size}`;
+  if (t.userAvatar) {
+    return (
+      <div className={cn(sz, 'rounded-full overflow-hidden flex-shrink-0 ring-2 ring-white')}>
+        <OptimizedImage
+          src={t.userAvatar}
+          alt={t.name}
+          width={size * 4}
+          height={size * 4}
+          className="object-cover w-full h-full"
+        />
+      </div>
+    );
+  }
+  // Initials fallback
+  const colors = ['bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700',
+    'bg-green-100 text-green-700', 'bg-orange-100 text-orange-700',
+    'bg-teal-100 text-teal-700', 'bg-pink-100 text-pink-700'];
+  const colorIdx = t.name.charCodeAt(0) % colors.length;
+  return (
+    <div className={cn(
+      sz, 'rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ring-2 ring-white',
+      colors[colorIdx],
+    )}>
+      {initials(t.name)}
+    </div>
+  );
+}
+
+// ── Card ──────────────────────────────────────────────────────────────────────
+
 function TestimonialCard({ t, featured = false }: { t: Testimonial; featured?: boolean }) {
+  const rating = t.rating ?? 5;
   return (
     <div className={cn(
       'flex flex-col rounded-2xl border transition-all duration-300 bg-white',
@@ -123,55 +117,76 @@ function TestimonialCard({ t, featured = false }: { t: Testimonial; featured?: b
         ? 'border-primary-200 shadow-[0_4px_24px_rgba(37,99,235,0.1)] p-5 sm:p-7'
         : 'border-gray-100 p-5 hover:border-primary-100 hover:shadow-card-hover',
     )}>
-      {/* Quote icon */}
       <Quote className="w-6 h-6 text-primary-100 mb-3 flex-shrink-0" />
 
-      {/* Rating */}
       <div className="flex items-center gap-2 mb-2">
-        <StarRating rating={t.rating} />
-        {t.verified && (
-          <span className="text-[10px] text-green-600 font-semibold bg-green-50 px-1.5 py-0.5 rounded-full">✓ Verified</span>
-        )}
+        <StarRating value={rating} />
+        <span className="text-[10px] text-green-600 font-semibold bg-green-50 px-1.5 py-0.5 rounded-full">
+          ✓ Verified
+        </span>
       </div>
 
-      {/* Title */}
-      <h4 className={cn('font-bold text-gray-900 mb-2', featured ? 'text-base sm:text-lg' : 'text-sm')}>{t.title}</h4>
+      {t.subject && (
+        <h4 className={cn('font-bold text-gray-900 mb-2', featured ? 'text-base sm:text-lg' : 'text-sm')}>
+          {t.subject}
+        </h4>
+      )}
 
-      {/* Body */}
       <p className={cn('text-gray-500 leading-relaxed flex-1', featured ? 'text-sm sm:text-base' : 'text-xs sm:text-sm')}>
-        &ldquo;{t.text}&rdquo;
+        &ldquo;{t.message}&rdquo;
       </p>
 
-      {/* Divider */}
       <div className="border-t border-gray-50 mt-4 pt-4 flex items-center gap-3">
-        {/* Avatar */}
-        <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-lg flex-shrink-0">
-          {t.avatar}
-        </div>
+        <UserAvatar t={t} size={9} />
 
-        {/* Name + role */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900">{t.name}</p>
-          <p className="text-[11px] text-gray-400 flex items-center gap-1">
-            📍 {t.location} · {t.propertyType}
+          <p className="text-sm font-semibold text-gray-900 truncate">{t.name}</p>
+          <p className="text-[11px] text-gray-400 truncate">
+            📍 {location(t)}{t.category ? ` · ${t.category}` : ''}
           </p>
         </div>
 
-        {/* Role badge */}
-        <span className={cn('text-[10px] font-bold px-2 py-1 rounded-full capitalize flex-shrink-0', ROLE_COLORS[t.role])}>
-          {t.role}
+        <span className={cn(
+          'text-[10px] font-bold px-2 py-1 rounded-full capitalize flex-shrink-0',
+          ROLE_COLORS[t.role ?? ''] ?? 'bg-gray-100 text-gray-600',
+        )}>
+          {roleLabel(t.role)}
         </span>
       </div>
     </div>
   );
 }
 
+// ── Main section ───────────────────────────────────────────────────────────────
+
 export default function TestimonialsSection() {
-  const [page, setPage] = useState(0);
-  const perPage = 3;
-  const pages = Math.ceil((TESTIMONIALS.length - 1) / perPage);
-  const rest = TESTIMONIALS.slice(1);
-  const visible = rest.slice(page * perPage, page * perPage + perPage);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [page,         setPage]         = useState(0);
+
+  useEffect(() => {
+    supportApi.getTestimonials(30)
+      .then((res) => {
+        setTestimonials(res.data ?? []);
+      })
+      .catch(() => setTestimonials([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Nothing to show
+  if (!loading && testimonials.length === 0) return null;
+
+  const perPage  = 3;
+  const featured = testimonials[0] ?? null;
+  const rest     = testimonials.slice(1);
+  const pages    = Math.ceil(rest.length / perPage);
+  const visible  = rest.slice(page * perPage, page * perPage + perPage);
+
+  // Derived stats from real data
+  const rated       = testimonials.filter((t) => t.rating);
+  const avgRating   = rated.length
+    ? Math.round((rated.reduce((s, t) => s + (t.rating ?? 0), 0) / rated.length) * 10) / 10
+    : null;
 
   return (
     <section className="py-5 sm:py-14 bg-gradient-to-b from-gray-50 to-white">
@@ -189,33 +204,59 @@ export default function TestimonialsSection() {
             See how Indians are finding their dream properties on Think4BuySale
           </p>
 
-          {/* Aggregate rating */}
-          <div className="flex items-center justify-center gap-3 mt-4">
-            <div className="flex items-center gap-1">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-              ))}
+          {avgRating && (
+            <div className="flex items-center justify-center gap-3 mt-4">
+              <div className="flex items-center gap-1">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                ))}
+              </div>
+              <span className="text-2xl font-black text-gray-900">{avgRating}</span>
+              <span className="text-sm text-gray-500">/ 5 · Based on {testimonials.length}+ reviews</span>
             </div>
-            <span className="text-2xl font-black text-gray-900">4.9</span>
-            <span className="text-sm text-gray-500">/ 5 · Based on 2,400+ reviews</span>
-          </div>
+          )}
         </div>
+
+        {/* Skeleton while loading */}
+        {loading && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-gray-100 p-5 animate-pulse">
+                <div className="h-4 bg-gray-100 rounded w-1/3 mb-3" />
+                <div className="h-3 bg-gray-100 rounded w-full mb-2" />
+                <div className="h-3 bg-gray-100 rounded w-5/6 mb-2" />
+                <div className="h-3 bg-gray-100 rounded w-4/6 mb-6" />
+                <div className="flex items-center gap-3 pt-4 border-t border-gray-50">
+                  <div className="w-9 h-9 rounded-full bg-gray-100" />
+                  <div className="flex-1">
+                    <div className="h-3 bg-gray-100 rounded w-1/2 mb-1" />
+                    <div className="h-2 bg-gray-100 rounded w-2/3" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Featured testimonial */}
-        <div className="mb-5 sm:mb-8">
-          <TestimonialCard t={TESTIMONIALS[0]} featured />
-        </div>
+        {!loading && featured && (
+          <div className="mb-5 sm:mb-8">
+            <TestimonialCard t={featured} featured />
+          </div>
+        )}
 
         {/* Paginated grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          {visible.map((t) => (
-            <TestimonialCard key={t.id} t={t} />
-          ))}
-        </div>
+        {!loading && visible.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            {visible.map((t) => (
+              <TestimonialCard key={t.id} t={t} />
+            ))}
+          </div>
+        )}
 
         {/* Pagination */}
-        {pages > 1 && (
-          <div className="flex items-center justify-center gap-3">
+        {!loading && pages > 1 && (
+          <div className="flex items-center justify-center gap-3 mb-6">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
@@ -230,7 +271,9 @@ export default function TestimonialsSection() {
                 onClick={() => setPage(i)}
                 className={cn(
                   'w-9 h-9 rounded-xl text-sm font-medium transition-all',
-                  i === page ? 'bg-primary-600 text-white' : 'border border-gray-200 text-gray-500 hover:border-primary-200'
+                  i === page
+                    ? 'bg-primary-600 text-white'
+                    : 'border border-gray-200 text-gray-500 hover:border-primary-200',
                 )}
               >
                 {i + 1}
@@ -247,21 +290,23 @@ export default function TestimonialsSection() {
           </div>
         )}
 
-        {/* Stats strip */}
-        <div className="mt-8 sm:mt-10 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          {[
-            { value: '4.9★', label: 'Avg. Rating', sub: 'on Google & App Store' },
-            { value: '98%', label: 'Satisfaction', sub: 'among buyers & renters' },
-            { value: '2400+', label: 'Reviews', sub: 'verified & authentic' },
-            { value: '10K+', label: 'Families', sub: 'found their dream home' },
-          ].map(({ value, label, sub }) => (
-            <div key={label} className="text-center bg-white rounded-2xl border border-gray-100 p-4">
-              <p className="text-2xl font-black text-primary-700">{value}</p>
-              <p className="text-xs font-bold text-gray-900 mt-0.5">{label}</p>
-              <p className="text-[10px] text-gray-400">{sub}</p>
-            </div>
-          ))}
-        </div>
+        {/* Stats strip — only shown when we have data */}
+        {!loading && testimonials.length > 0 && (
+          <div className="mt-8 sm:mt-10 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            {[
+              { value: avgRating ? `${avgRating}★` : '5★', label: 'Avg. Rating',  sub: 'from verified users'     },
+              { value: '98%',                               label: 'Satisfaction', sub: 'among buyers & renters'  },
+              { value: `${testimonials.length}+`,           label: 'Reviews',      sub: 'verified & authentic'    },
+              { value: '10K+',                              label: 'Families',     sub: 'found their dream home'  },
+            ].map(({ value, label, sub }) => (
+              <div key={label} className="text-center bg-white rounded-2xl border border-gray-100 p-4">
+                <p className="text-2xl font-black text-primary-700">{value}</p>
+                <p className="text-xs font-bold text-gray-900 mt-0.5">{label}</p>
+                <p className="text-[10px] text-gray-400">{sub}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
