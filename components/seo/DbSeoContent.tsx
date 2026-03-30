@@ -6,13 +6,23 @@
  *  - No fallback content, no auto-generation
  *  - Admin controls everything via backend SEO tables
  *  - All HTML content fields are parsed and rendered (dangerouslySetInnerHTML)
+ *
+ * Accepts any object with the fields it needs — compatible with SeoPageConfig,
+ * AgentCitySeo, PropertyCitySeo, or any custom shape.
  */
 import Link from 'next/link';
 import { HelpCircle } from 'lucide-react';
-import type { SeoPageConfig } from '@/lib/seo/listingPageSeo';
+
+export interface SeoContent {
+  h1Title?: string | null;
+  introContent?: string | null;
+  bottomContent?: string | null;
+  faqJson?: { question: string; answer: string }[] | null;
+  internalLinks?: { label: string; url: string }[] | null;
+}
 
 interface Props {
-  config: SeoPageConfig;
+  config: SeoContent;
 }
 
 /** True if the string contains at least one HTML tag. */

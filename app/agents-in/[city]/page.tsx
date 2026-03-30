@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import AgentsListingClient from '@/app/agents/AgentsListingClient';
 import AgentsLoading from '@/app/agents/loading';
+import DbSeoContent from '@/components/seo/DbSeoContent';
 import { KNOWN_CITY_SLUGS } from '@/lib/city-slugs';
 import { seoApi } from '@/lib/api';
 
@@ -49,42 +50,32 @@ export async function generateMetadata({
   params: { city: string };
 }): Promise<Metadata> {
   const citySlug = params.city;
-  const city = slugToCity(citySlug);
   const seo = await getAgentCitySeo(citySlug);
   const canonicalUrl = `${APP_URL}/agents-in-${citySlug}`;
 
-  const title = seo?.metaTitle || `Real Estate Agents in ${city} | Verified RERA Brokers | Think4BuySale`;
-  const description =
-    seo?.metaDescription ||
-    `Connect with top RERA-certified real estate agents in ${city}. Find experienced property brokers for buying, selling & renting homes in ${city}. Free consultation.`;
-  const keywords =
-    seo?.metaKeywords ||
-    `real estate agents ${city}, property brokers ${city}, RERA agents ${city}, buy sell property ${city}, top agents ${city}`;
+  if (!seo) return { robots: { index: false, follow: false } };
 
-  const ogTitle = seo?.ogTitle || title;
-  const ogDescription = seo?.ogDescription || description;
-  const ogImage = seo?.ogImage || `${APP_URL}/og-image.jpg`;
-  const robots = seo?.robots || 'index,follow';
+  const robots = seo.robots || 'index,follow';
   const [robotsIndex, robotsFollow] = robots.split(',').map(s => s.trim());
 
   return {
-    title,
-    description,
-    keywords,
-    alternates: { canonical: seo?.canonicalUrl || canonicalUrl },
+    ...(seo.metaTitle    && { title: seo.metaTitle }),
+    ...(seo.metaDescription && { description: seo.metaDescription }),
+    ...(seo.metaKeywords && { keywords: seo.metaKeywords }),
+    alternates: { canonical: seo.canonicalUrl || canonicalUrl },
     openGraph: {
-      title: ogTitle,
-      description: ogDescription,
       type: 'website',
-      url: seo?.canonicalUrl || canonicalUrl,
+      url: seo.canonicalUrl || canonicalUrl,
       siteName: 'Think4BuySale',
-      images: [{ url: ogImage, width: 1200, height: 630 }],
+      ...(seo.ogTitle       && { title: seo.ogTitle }),
+      ...(seo.ogDescription && { description: seo.ogDescription }),
+      ...(seo.ogImage       && { images: [{ url: seo.ogImage, width: 1200, height: 630 }] }),
     },
     twitter: {
       card: 'summary_large_image',
-      title: ogTitle,
-      description: ogDescription,
-      images: [ogImage],
+      ...(seo.ogTitle       && { title: seo.ogTitle }),
+      ...(seo.ogDescription && { description: seo.ogDescription }),
+      ...(seo.ogImage       && { images: [seo.ogImage] }),
     },
     robots: {
       index: robotsIndex !== 'noindex',
@@ -141,7 +132,7 @@ export default async function AgentsInCityPage({ params }: { params: { city: str
 
   return (
     <>
-      {/* Structured data — injected in <head> by Next.js */}
+      {/* Structured data */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListSchema) }} />
       {faqSchema && (
@@ -151,20 +142,13 @@ export default async function AgentsInCityPage({ params }: { params: { city: str
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(customSchema) }} />
       )}
 
-      {/* All SEO content (intro, bottom, FAQ) is passed as props and rendered
-          below the agent listing inside AgentsListingClient */}
+      {/* Agent listing */}
       <Suspense fallback={<AgentsLoading />}>
-        <AgentsListingClient
-          searchParams={{}}
-          city={city}
-          seo={{
-            h1Title: seo?.h1Title,
-            introContent: seo?.introContent,
-            bottomContent: seo?.bottomContent,
-            faqJson: seo?.faqJson,
-          }}
-        />
+        <AgentsListingClient searchParams={{}} city={city} />
       </Suspense>
+
+      {/* DB-driven SEO content — only renders non-null fields */}
+      {seo && <DbSeoContent config={seo} />}
     </>
   );
 }

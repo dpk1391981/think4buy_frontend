@@ -618,31 +618,15 @@ const TESTIMONIALS = [
   { text: 'As a first-time buyer, the agent guided me through every step. Complete transparency, no hidden charges.', name: 'Ananya Singh', city: 'Bangalore', rating: 5 },
 ];
 
-const FAQ = [
-  { q: 'How do I find a verified real estate agent in India?', a: 'Use the search bar to filter agents by city. Look for the Verified (✓) or RERA badge on profiles, which confirms the agent has been background-checked by Think4BuySale.' },
-  { q: 'Are agents on Think4BuySale RERA registered?', a: 'Yes. All listed agents must submit their RERA number during registration. Agents with the Verified badge have had their documents reviewed by our team. The RERA number is visible on every agent profile.' },
-  { q: 'Is it free to contact a real estate agent?', a: 'Absolutely. Connecting with any agent on Think4BuySale is completely free. Simply call or message them directly from their profile. No subscription or inquiry fees for buyers and sellers.' },
-  { q: 'How are agent ratings calculated?', a: 'Agent ratings are based on reviews submitted by verified clients — buyers, sellers and renters who have actually worked with the agent. Each review includes a 1–5 star rating and the average is updated automatically after every new review.' },
-  { q: 'Can I find agents for commercial properties?', a: 'Yes. Think4BuySale agents cover all categories including apartments, villas, plots, commercial offices, shops, warehouses and PG accommodations. Browse agent profiles to find specialists for your requirement.' },
-  { q: 'What is the difference between Verified, Gold and Diamond agents?', a: 'Verified agents have confirmed RERA registration. Gold agents additionally have a proven track record of high deal volume and strong ratings. Diamond is the highest tier, awarded to agents with exceptional performance, tenure and reviews.' },
-];
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AgentsListingClient({
   searchParams: _sp,
   city: serverCity = '',
-  seo,
 }: {
   searchParams: Record<string, string>;
   city?: string;
-  /** Pass from city-specific page — content rendered below listing, suppresses duplicate static sections */
-  seo?: {
-    h1Title?: string;
-    introContent?: string;
-    bottomContent?: string;
-    faqJson?: { question: string; answer: string }[];
-  };
 }) {
   const router = useRouter();
   const urlP = useSearchParams();
@@ -662,7 +646,6 @@ export default function AgentsListingClient({
   const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE); // infinite scroll
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [bannerAgents, setBannerAgents] = useState<Agent[]>([]);
   const agentSentinelRef = useRef<HTMLDivElement>(null);
 
@@ -1222,9 +1205,9 @@ export default function AgentsListingClient({
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
-                  {seo?.h1Title || (activeCity
+                  {activeCity
                     ? `Real Estate Agents in ${activeCity}`
-                    : 'Find Top Real Estate Agents in India')}
+                    : 'Find Top Real Estate Agents in India'}
                 </h1>
                 <p className="text-sm text-gray-500 mt-0.5">
                   {loading ? 'Loading…' : (
@@ -1319,119 +1302,6 @@ export default function AgentsListingClient({
             </div>
           </div>
         </>
-      )}
-
-      {/* ══ SEO CONTENT — BELOW LISTING ══════════════════════════════════════ */}
-
-      {/* Dynamic intro content (city-specific) */}
-      {seo?.introContent && (
-        <section className="bg-white border-t border-gray-100">
-          <div
-            className="container-max max-w-5xl py-10
-              prose prose-sm prose-gray max-w-none
-              prose-headings:font-bold prose-headings:text-gray-900
-              prose-p:text-gray-600 prose-p:leading-relaxed
-              prose-strong:text-gray-800
-              prose-ul:text-gray-600 prose-li:leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: seo.introContent }}
-          />
-        </section>
-      )}
-
-      {/* Dynamic bottom content OR static editorial fallback */}
-      {seo?.bottomContent ? (
-        <section className="bg-gray-50 border-t border-gray-100" aria-label={activeCity ? `Real estate guide for ${activeCity}` : 'Real estate agent guide'}>
-          <div
-            className="container-max max-w-5xl py-10
-              prose prose-sm prose-gray max-w-none
-              prose-headings:font-bold prose-headings:text-gray-900
-              prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3
-              prose-h3:text-base prose-h3:mt-5 prose-h3:mb-2
-              prose-p:text-gray-600 prose-p:leading-relaxed
-              prose-ul:text-gray-600 prose-li:leading-relaxed prose-li:my-1
-              prose-strong:text-gray-800"
-            dangerouslySetInnerHTML={{ __html: seo.bottomContent }}
-          />
-        </section>
-      ) : (
-        <section className="bg-gray-50 border-t border-gray-100 py-10">
-          <div className="container-max max-w-4xl">
-            <h2 className="text-xl md:text-2xl font-extrabold text-gray-900 mb-5">
-              {activeCity ? `Real Estate Agents in ${activeCity} — Complete Guide` : 'Real Estate Agents in India — Your Complete Guide'}
-            </h2>
-            <div className="space-y-4 text-sm text-gray-600 leading-relaxed">
-              <p>Finding a reliable real estate agent in India is one of the most critical steps when buying, selling or renting property. A good agent brings expert market knowledge, handles complex legal documentation, negotiates the best price on your behalf, and guides you every step of the way from shortlisting to final registration.</p>
-              <p>All brokers listed on Think4BuySale must submit their RERA number during onboarding. RERA was established under the Real Estate (Regulation and Development) Act, 2016 to protect home buyers. Working with a RERA-registered agent gives you legal recourse — making it the single most important credential to verify before engaging any broker.</p>
-              {activeCity && (
-                <p>The real estate market in {activeCity} is highly dynamic, with prices varying by locality, floor level and project vintage. An experienced local agent in {activeCity} understands neighbourhood-level price trends, upcoming infrastructure projects, metro connectivity and micro-market dynamics that no national portal can fully capture.</p>
-              )}
-              <div>
-                <h3 className="font-bold text-gray-900 mt-5 mb-2 text-base">How to Choose the Right Real Estate Agent</h3>
-                <p>Look for: (1) <strong>RERA registration</strong> — legally required; (2) <strong>Local experience</strong> — active in your target area for at least 3 years; (3) <strong>Strong reviews</strong> — 4+ stars with verified client testimonials; (4) <strong>Transparent fees</strong> — brokerage agreed in writing before beginning.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 mt-5 mb-2 text-base">What is the Brokerage Fee?</h3>
-                <p>Standard brokerage is 1–2% of property value for purchase/sale transactions, or 1–2 months' rent for rentals. Rates vary by city and deal size — always clarify and document the amount upfront.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Dynamic FAQ (city-specific) OR static generic FAQ fallback */}
-      {seo?.faqJson?.length ? (
-        <section className="bg-white border-t border-gray-100 py-10 md:py-14" aria-labelledby="faq-heading">
-          <div className="container-max max-w-3xl">
-            <div className="text-center mb-8">
-              <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-2">FAQ</p>
-              <h2 id="faq-heading" className="text-xl md:text-2xl font-extrabold text-gray-900">
-                Frequently Asked Questions{activeCity ? ` — Agents in ${activeCity}` : ''}
-              </h2>
-            </div>
-            <dl className="space-y-2.5">
-              {seo.faqJson.map((item, i) => (
-                <details key={i} className="border border-gray-100 rounded-2xl overflow-hidden bg-gray-50 group">
-                  <summary className="flex items-center justify-between gap-4 px-5 py-4 cursor-pointer list-none hover:bg-gray-100 transition-colors">
-                    <dt className="font-semibold text-gray-900 text-sm leading-snug">{item.question}</dt>
-                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-white border border-gray-200 group-open:bg-primary-50 group-open:border-primary-200 flex items-center justify-center text-gray-400 group-open:text-primary-600 text-xs font-bold transition-colors">
-                      <span className="group-open:hidden">+</span>
-                      <span className="hidden group-open:inline">−</span>
-                    </span>
-                  </summary>
-                  <dd className="px-5 pb-4 pt-3 border-t border-gray-100 bg-white text-sm text-gray-600 leading-relaxed">
-                    {item.answer}
-                  </dd>
-                </details>
-              ))}
-            </dl>
-          </div>
-        </section>
-      ) : (
-        <section className="bg-white border-t border-gray-100 py-10 md:py-14">
-          <div className="container-max max-w-3xl">
-            <div className="text-center mb-8">
-              <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-2">FAQ</p>
-              <h2 className="text-xl md:text-2xl font-extrabold text-gray-900">Frequently Asked Questions</h2>
-            </div>
-            <div className="space-y-2.5">
-              {FAQ.map((item, i) => (
-                <div key={i} className="border border-gray-100 rounded-2xl overflow-hidden bg-gray-50">
-                  <button onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                    className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-gray-100 transition-colors"
-                    aria-expanded={openFaq === i}>
-                    <span className="font-semibold text-gray-900 text-sm leading-snug">{item.q}</span>
-                    <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
-                  </button>
-                  {openFaq === i && (
-                    <div className="px-5 pb-4 border-t border-gray-100 bg-white">
-                      <p className="text-sm text-gray-600 leading-relaxed pt-3">{item.a}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
       )}
 
       {/* Why choose — trust signals */}

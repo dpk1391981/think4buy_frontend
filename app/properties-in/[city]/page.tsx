@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { MapPin, ArrowRight, Building2, ChevronRight } from 'lucide-react';
 import PropertyListingPage from '@/app/properties/PropertyListingPage';
+import DbSeoContent from '@/components/seo/DbSeoContent';
 import { KNOWN_CITY_SLUGS } from '@/lib/city-slugs';
 import { seoApi } from '@/lib/api';
 import JsonLd, { buildBreadcrumbSchema } from '@/components/seo/JsonLd';
@@ -87,42 +88,32 @@ export async function generateMetadata({ params }: { params: { city: string } })
 
   // City page
   if (KNOWN_CITY_SLUGS.has(slug)) {
-    const city = slugToTitle(slug);
     const seo = await getPropertyCitySeo(slug);
     const canonicalUrl = `${APP_URL}/properties-in-${slug}`;
 
-    const title = seo?.metaTitle || `Properties in ${city} | Buy, Sell & Rent | Think4BuySale`;
-    const description =
-      seo?.metaDescription ||
-      `Find verified properties for sale and rent in ${city}. Browse flats, villas, plots & commercial spaces in ${city} with best prices. Connect with RERA agents.`;
-    const keywords =
-      seo?.metaKeywords ||
-      `properties in ${city}, buy property ${city}, rent property ${city}, flats for sale ${city}, real estate ${city}`;
+    if (!seo) return { robots: { index: false, follow: false } };
 
-    const ogTitle = seo?.ogTitle || title;
-    const ogDescription = seo?.ogDescription || description;
-    const ogImage = seo?.ogImage || `${APP_URL}/og-image.jpg`;
-    const robots = seo?.robots || 'index,follow';
+    const robots = seo.robots || 'index,follow';
     const [robotsIndex, robotsFollow] = robots.split(',').map(s => s.trim());
 
     return {
-      title,
-      description,
-      keywords,
-      alternates: { canonical: seo?.canonicalUrl || canonicalUrl },
+      ...(seo.metaTitle    && { title: seo.metaTitle }),
+      ...(seo.metaDescription && { description: seo.metaDescription }),
+      ...(seo.metaKeywords && { keywords: seo.metaKeywords }),
+      alternates: { canonical: seo.canonicalUrl || canonicalUrl },
       openGraph: {
-        title: ogTitle,
-        description: ogDescription,
         type: 'website',
-        url: seo?.canonicalUrl || canonicalUrl,
+        url: seo.canonicalUrl || canonicalUrl,
         siteName: 'Think4BuySale',
-        images: [{ url: ogImage, width: 1200, height: 630 }],
+        ...(seo.ogTitle       && { title: seo.ogTitle }),
+        ...(seo.ogDescription && { description: seo.ogDescription }),
+        ...(seo.ogImage       && { images: [{ url: seo.ogImage, width: 1200, height: 630 }] }),
       },
       twitter: {
         card: 'summary_large_image',
-        title: ogTitle,
-        description: ogDescription,
-        images: [ogImage],
+        ...(seo.ogTitle       && { title: seo.ogTitle }),
+        ...(seo.ogDescription && { description: seo.ogDescription }),
+        ...(seo.ogImage       && { images: [seo.ogImage] }),
       },
       robots: {
         index: robotsIndex !== 'noindex',
@@ -300,71 +291,8 @@ export default async function PropertiesInPage({ params }: { params: { city: str
           <PropertyListingPage searchParams={{ city }} />
         </Suspense>
 
-        {(seo?.introContent || seo?.bottomContent || seo?.faqJson?.length) && (
-          <div className="bg-gray-50">
-            {seo?.introContent && (
-              <section className="bg-white border-t border-gray-100">
-                <div
-                  className="max-w-5xl mx-auto px-4 sm:px-6 py-10
-                    prose prose-sm prose-gray max-w-none
-                    prose-headings:font-bold prose-headings:text-gray-900
-                    prose-p:text-gray-600 prose-p:leading-relaxed
-                    prose-strong:text-gray-800
-                    prose-ul:text-gray-600 prose-li:leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: seo.introContent }}
-                />
-              </section>
-            )}
-
-            {seo?.bottomContent && (
-              <section className="bg-gray-50 border-t border-gray-100" aria-label={`Property guide for ${city}`}>
-                <div
-                  className="max-w-5xl mx-auto px-4 sm:px-6 py-10
-                    prose prose-sm prose-gray max-w-none
-                    prose-headings:font-bold prose-headings:text-gray-900
-                    prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3
-                    prose-h3:text-base prose-h3:mt-5 prose-h3:mb-2
-                    prose-p:text-gray-600 prose-p:leading-relaxed
-                    prose-ul:text-gray-600 prose-li:leading-relaxed prose-li:my-1
-                    prose-strong:text-gray-800"
-                  dangerouslySetInnerHTML={{ __html: seo.bottomContent }}
-                />
-              </section>
-            )}
-
-            {seo?.faqJson && seo.faqJson.length > 0 && (
-              <section className="bg-white border-t border-gray-100 py-10 md:py-14" aria-labelledby="prop-faq-heading">
-                <div className="max-w-3xl mx-auto px-4 sm:px-6">
-                  <div className="text-center mb-8">
-                    <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-2">FAQ</p>
-                    <h2 id="prop-faq-heading" className="text-xl md:text-2xl font-extrabold text-gray-900">
-                      Frequently Asked Questions — Properties in {city}
-                    </h2>
-                  </div>
-                  <dl className="space-y-2.5">
-                    {seo.faqJson.map((faq, i) => (
-                      <details
-                        key={i}
-                        className="border border-gray-100 rounded-2xl overflow-hidden bg-gray-50 group"
-                      >
-                        <summary className="flex items-center justify-between gap-4 px-5 py-4 cursor-pointer list-none hover:bg-gray-100 transition-colors">
-                          <dt className="font-semibold text-gray-900 text-sm leading-snug">{faq.question}</dt>
-                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-white border border-gray-200 group-open:bg-primary-50 group-open:border-primary-200 flex items-center justify-center text-gray-400 group-open:text-primary-600 text-xs font-bold transition-colors">
-                            <span className="group-open:hidden">+</span>
-                            <span className="hidden group-open:inline">−</span>
-                          </span>
-                        </summary>
-                        <dd className="px-5 pb-4 pt-3 border-t border-gray-100 bg-white text-sm text-gray-600 leading-relaxed">
-                          {faq.answer}
-                        </dd>
-                      </details>
-                    ))}
-                  </dl>
-                </div>
-              </section>
-            )}
-          </div>
-        )}
+        {/* DB-driven SEO content — only renders non-null fields */}
+        {seo && <DbSeoContent config={seo} />}
       </>
     );
   }
