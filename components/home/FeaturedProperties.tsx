@@ -102,7 +102,7 @@ function PropertyTags({ property }: { property: any }) {
 
 // ─── Individual property card ─────────────────────────────────────────────────
 
-function FeaturedCard({ property, rank }: { property: any; rank: number }) {
+function FeaturedCard({ property, rank, tabId }: { property: any; rank: number; tabId: TabId }) {
   const { area: resolvedArea, areaUnit: resolvedUnit } = getPropertyArea(property);
   const price  = formatPrice(property.price, property.priceUnit);
   const area   = resolvedArea ? formatArea(resolvedArea, resolvedUnit) : '';
@@ -146,12 +146,21 @@ function FeaturedCard({ property, rank }: { property: any; rank: number }) {
             sizes="(max-width:640px) 80vw, 320px"
           />
 
-          {/* Score pill — top right */}
-          {score > 0 && (
-            <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
-              <BarChart2 className="w-2.5 h-2.5" />
-              {score.toFixed(0)}
-            </div>
+          {/* Score pill / freshness badge — top right */}
+          {tabId === 'just_listed' ? (
+            property.createdAt && (
+              <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-green-600/80 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+                <Clock className="w-2.5 h-2.5" />
+                {timeAgo(property.createdAt)}
+              </div>
+            )
+          ) : (
+            score > 0 && (
+              <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+                <BarChart2 className="w-2.5 h-2.5" />
+                {score}
+              </div>
+            )
           )}
 
           {/* Gradient + price */}
@@ -336,7 +345,7 @@ function TabContent({
         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 snap-x snap-mandatory">
           {data.map((p: any, i: number) => (
             <div key={p.id} className="flex-shrink-0 w-[72vw] snap-start">
-              <FeaturedCard property={p} rank={i + 1} />
+              <FeaturedCard property={p} rank={i + 1} tabId={tabId} />
             </div>
           ))}
         </div>
@@ -344,7 +353,7 @@ function TabContent({
       {/* Desktop: grid */}
       <div className="hidden sm:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {data.map((p: any, i: number) => (
-          <FeaturedCard key={p.id} property={p} rank={i + 1} />
+          <FeaturedCard key={p.id} property={p} rank={i + 1} tabId={tabId} />
         ))}
       </div>
     </>

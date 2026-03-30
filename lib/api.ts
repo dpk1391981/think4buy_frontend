@@ -1010,11 +1010,27 @@ export const supportApi = {
   /** Get the current user's submitted tickets */
   getMyTickets: () => api.get('/support/my'),
 
-  // Admin
+  /** Public: approved testimonials for homepage (no auth) */
+  getTestimonials: (limit = 20) => api.get('/support/testimonials', { params: { limit } }),
+
+  // ── Admin ─────────────────────────────────────────────────────────────────
   getAll: (params?: { page?: number; limit?: number; search?: string; status?: string; type?: string }) =>
     api.get('/support', { params }),
   getOne: (id: string) => api.get(`/support/${id}`),
   getStats: () => api.get('/support/stats'),
   update: (id: string, data: { status?: string; adminNotes?: string }) =>
     api.patch(`/support/${id}`, data),
+
+  /** Toggle feedback visibility on homepage testimonials */
+  toggleTestimonial: (id: string) => api.patch(`/support/${id}/testimonial`),
+
+  /** Assign complaint ticket to a staff member */
+  assignTicket: (id: string, assignedToId: string) =>
+    api.patch(`/support/${id}/assign`, { assignedToId }),
+
+  /** Remove assignment from a ticket */
+  unassignTicket: (id: string) => api.patch(`/support/${id}/unassign`),
+
+  /** Get admin/staff members available for assignment */
+  getMembers: () => api.get('/support/members'),
 };

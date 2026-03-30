@@ -338,7 +338,7 @@ export default async function PropertiesInPage({ params }: { params: { city: str
         </div>
       </section>
 
-      {cities.length > 0 && (
+      {/* {cities.length > 0 && (
         <section className="py-8 sm:py-12 bg-gray-50 border-b border-gray-100">
           <div className="container-max px-4">
             <div className="flex items-end justify-between mb-6">
@@ -358,7 +358,7 @@ export default async function PropertiesInPage({ params }: { params: { city: str
             </div>
           </div>
         </section>
-      )}
+      )} */}
 
       <Suspense fallback={<div className="min-h-[60vh] bg-white animate-pulse" />}>
         <PropertyListingPage searchParams={{ state: data.name }} />
