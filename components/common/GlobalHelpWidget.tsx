@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   HelpCircle, X, MessageSquare, Star, Send,
   ChevronRight, CheckCircle, LogIn, Loader2, ChevronDown,
@@ -78,6 +79,14 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
 export default function GlobalHelpWidget() {
   const { user } = useAuth();
   const dispatch = useAppDispatch();
+  const pathname = usePathname();
+
+  // On property detail pages the sticky contact bar occupies the bottom-right.
+  // Shift the widget up so it doesn't overlap: mobile bottom-40, desktop bottom-36.
+  const isPropertyDetail = /^\/properties\/[^/]+/.test(pathname ?? '');
+  const posClass = isPropertyDetail
+    ? 'fixed bottom-40 right-4 lg:bottom-36 z-50'
+    : 'fixed bottom-20 right-4 lg:bottom-20 z-50';
 
   const [open,      setOpen]      = useState(false);
   const [tab,       setTab]       = useState<Tab>('help');
@@ -189,10 +198,7 @@ export default function GlobalHelpWidget() {
         onClick={handleOpen}
         aria-label="Help & Feedback"
         className={cn(
-          // LEFT side — never conflicts with FloatingCTA (always bottom-right)
-          // Mobile: bottom-20 clears the 64px mobile nav bar with room to spare
-          // Desktop: bottom-6 aligns with FloatingCTA height for visual symmetry
-          'fixed bottom-20 left-4 lg:bottom-6 z-50',
+          posClass,
           'w-12 h-12 rounded-full shadow-lg',
           'bg-indigo-600 hover:bg-indigo-700 text-white',
           'flex items-center justify-center',
@@ -211,12 +217,11 @@ export default function GlobalHelpWidget() {
       <div
         ref={panelRef}
         className={cn(
-          // Panel anchored bottom-left, opens upward — mirrors button position
-          'fixed bottom-20 left-4 lg:bottom-6 z-50',
+          posClass,
           'w-[calc(100vw-2rem)] sm:w-[380px]',
           'bg-white rounded-2xl shadow-2xl border border-slate-100',
           'flex flex-col overflow-hidden',
-          'transition-all duration-300 origin-bottom-left',
+          'transition-all duration-300 origin-bottom-right',
           open
             ? 'opacity-100 scale-100 pointer-events-auto'
             : 'opacity-0 scale-90 pointer-events-none',
