@@ -263,10 +263,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Navigation */}
       <nav className="flex-1 py-4 px-3 space-y-4 overflow-y-auto">
+        {allowedSlugs === null ? (
+          <div className="space-y-3 px-2 pt-2">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-8 bg-slate-800 rounded-lg animate-pulse opacity-60" />
+            ))}
+          </div>
+        ) : null}
         {NAV_GROUPS.map((group) => {
-          // Filter items by DB menu permissions (super_admin sees all if no permissions loaded yet)
           const visibleItems = allowedSlugs === null
-            ? group.items
+            ? []
             : group.items.filter((item) => {
                 const slug = (item as any).slug;
                 return !slug || allowedSlugs.has(slug);
