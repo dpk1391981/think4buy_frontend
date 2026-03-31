@@ -56,7 +56,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
     const client = await getClient();
     if (!client) return null;
     const raw = await client.get(key);
-    return raw ? (JSON.parse(raw) as T) : null;
+    return typeof raw === 'string' ? (JSON.parse(raw) as T) : null;
   } catch {
     return null;
   }

@@ -62,6 +62,9 @@ const nextConfig = {
 
     // Optimise CSS delivery (fewer unused selectors shipped)
     optimizeCss: false, // set true after installing 'critters' package
+
+    // Keep Node.js-only packages out of the client bundle
+    serverComponentsExternalPackages: ['redis'],
   },
 
   // ─── Headers ─────────────────────────────────────────────────────────────
