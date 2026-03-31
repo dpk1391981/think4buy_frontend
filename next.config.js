@@ -1,9 +1,15 @@
 /** @type {import('next').NextConfig} */
 
-// Extract just the origin from the API URL for CSP (works even if the full path is given)
-const _apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+// NEXT_PUBLIC_API_URL is the frontend URL (used for CSP frame-ancestors, not backend calls).
+// NEXT_PUBLIC_API_BASE_URL is the backend origin — include it in connect-src so the BFF
+// can forward requests and the browser can reach proxied API responses.
+const _apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+let _appOrigin = 'http://localhost:3000';
+try { _appOrigin = new URL(_apiUrl).origin; } catch {}
+
+const _backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 let _apiOrigin = 'http://localhost:3001';
-try { _apiOrigin = new URL(_apiUrl).origin; } catch {}
+try { _apiOrigin = new URL(_backendBaseUrl).origin; } catch {}
 
 const nextConfig = {
   // ─── Image Optimization ──────────────────────────────────────────────────
@@ -113,8 +119,8 @@ const nextConfig = {
               "img-src 'self' data: blob: https: http://localhost:3001",
               // Fonts
               "font-src 'self' https://fonts.gstatic.com",
-              // API calls: self (proxied) + backend origin
-              `connect-src 'self' ${_apiOrigin} ws: wss:`,
+              // API calls: self (BFF proxy) + backend origin (for direct static/CDN requests)
+              `connect-src 'self' ${_appOrigin} ${_apiOrigin} ws: wss:`,
               // No plugins
               "object-src 'none'",
               // iframes (maps)

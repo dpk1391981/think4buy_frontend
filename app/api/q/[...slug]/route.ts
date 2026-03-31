@@ -8,16 +8,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { cookies } from 'next/headers';
 
-// BACKEND_INTERNAL_URL must point to the NestJS backend (e.g. https://api.example.com/api/v1).
-// NEXT_PUBLIC_API_URL is the *frontend* URL — never use it as a backend target.
-// Falling back to NEXT_PUBLIC_API_URL here would cause the proxy to call itself.
-const BACKEND_URL    = process.env.BACKEND_INTERNAL_URL ?? 'http://localhost:3001/api/v1';
+// Resolution order for the backend URL:
+//   1. BACKEND_INTERNAL_URL          — server-only secret var, ideal for prod (e.g. http://127.0.0.1:3001/api/v1)
+//   2. NEXT_PUBLIC_API_BASE_URL+/api/v1 — public backend origin already needed for images
+//   3. localhost fallback             — local dev only
+// NEXT_PUBLIC_API_URL is the *frontend* URL — never use it here (would cause the proxy to call itself).
+const _backendOrigin = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, '');
+const BACKEND_URL =
+  process.env.BACKEND_INTERNAL_URL ??
+  (_backendOrigin ? `${_backendOrigin}/api/v1` : null) ??
+  'http://localhost:3001/api/v1';
+
 const BFF_SECRET     = process.env.BFF_INTERNAL_SECRET  ?? '';
 const SIGNING_KEY    = process.env.INTERNAL_API_KEY     ?? '';
 const SIGNING_SECRET = process.env.INTERNAL_API_SECRET  ?? '';
 
-if (!process.env.BACKEND_INTERNAL_URL) {
-  console.warn('[BFF] BACKEND_INTERNAL_URL is not set — falling back to http://localhost:3001/api/v1');
+if (!process.env.BACKEND_INTERNAL_URL && !process.env.NEXT_PUBLIC_API_BASE_URL) {
+  console.warn('[BFF] Neither BACKEND_INTERNAL_URL nor NEXT_PUBLIC_API_BASE_URL is set — falling back to localhost');
 }
 
 function buildSignatureHeaders(method: string, path: string) {
