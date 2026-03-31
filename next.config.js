@@ -51,8 +51,8 @@ const nextConfig = {
   // Enable gzip/brotli compression at Next.js level (disable if handled by nginx/CDN)
   compress: true,
 
-  // Standalone output for Docker/containerised deployments
-  output: process.env.NEXT_OUTPUT === 'standalone' ? 'standalone' : undefined,
+  // Standalone output required by Dockerfile — bundles server.js + node_modules
+  output: 'standalone',
 
   // ─── Experimental ────────────────────────────────────────────────────────
   experimental: {
