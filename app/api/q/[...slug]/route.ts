@@ -31,8 +31,8 @@ async function handler(req: NextRequest, { params }: { params: { slug: string[] 
   const target = `${BACKEND_URL}${path}${search}`;
 
   const authHeader  = req.headers.get('authorization') ?? '';
-  const cookieStore = await cookies();
-  const cookieHeader = cookieStore.toString();
+  const cookieStore = cookies();
+  const cookieHeader = cookieStore.getAll().map((c) => `${c.name}=${c.value}`).join('; ');
 
   const forwardHeaders: HeadersInit = {
     'Content-Type':    req.headers.get('content-type') ?? 'application/json',
