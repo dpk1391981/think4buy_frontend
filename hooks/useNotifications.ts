@@ -41,8 +41,10 @@ export function useNotifications() {
     if (!token) return;
     if (eventSourceRef.current) return; // already connected
 
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
-    const url = `${apiBase}/notifications/stream?token=${encodeURIComponent(token)}`;
+    // SSE must connect directly to the backend (not through the BFF proxy)
+    // NEXT_PUBLIC_API_BASE_URL is the backend origin (e.g. https://reales-api.vtechxhub.com)
+    const backendOrigin = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001').replace(/\/+$/, '');
+    const url = `${backendOrigin}/api/v1/notifications/stream?token=${encodeURIComponent(token)}`;
     const es = new EventSource(url);
     eventSourceRef.current = es;
 
