@@ -1,11 +1,31 @@
 import axios from 'axios';
 import { authEvents } from '@/lib/authEvents';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+// ── API Base URL Strategy ─────────────────────────────────────────────────────
+//
+// In production:
+//   NEXT_PUBLIC_API_URL = https://www.think4buysale.com
+//   All browser requests go to /api/q/... (Next.js BFF proxy)
+//   The real NestJS backend URL is NEVER sent to the browser.
+//
+// In development:
+//   NEXT_PUBLIC_API_URL = http://localhost:3000
+//   Same BFF proxy pattern (localhost:3000/api/q/...)
+//
+// The proxy at app/api/q/[...path]/route.ts adds:
+//   - BFF secret header (X-BFF-Secret)
+//   - HMAC signing headers
+//   - Forwards HTTP-only auth cookies
+//
+const _appUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/api\/v1\/?$/, '');
+const API_BASE = typeof window !== 'undefined'
+  ? `${_appUrl}/api/q`          // Browser: always go through BFF proxy
+  : `${_appUrl}/api/q`;         // SSR also uses proxy (though server components use bff-client.ts directly)
 
 export const api = axios.create({
   baseURL: API_BASE,
   timeout: 15000,
+  withCredentials: true,            // include HTTP-only cookies (refresh token)
   headers: { 'Content-Type': 'application/json' },
 });
 

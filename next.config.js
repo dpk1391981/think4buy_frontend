@@ -62,6 +62,9 @@ const nextConfig = {
 
     // Optimise CSS delivery (fewer unused selectors shipped)
     optimizeCss: false, // set true after installing 'critters' package
+
+    // Keep Node.js-only packages out of the client bundle
+    serverComponentsExternalPackages: ['redis'],
   },
 
   // ─── Headers ─────────────────────────────────────────────────────────────
@@ -132,13 +135,11 @@ const nextConfig = {
   },
 
   // ─── Rewrites ────────────────────────────────────────────────────────────
+  // NOTE: No direct rewrite to backend. All API calls go through the
+  // internal route handler at /api/q/[...slug] which adds BFF authentication.
+  // The backend URL is a server-side-only env var (BACKEND_INTERNAL_URL).
   async rewrites() {
-    return [
-      {
-        source:      '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/:path*`,
-      },
-    ];
+    return [];
   },
 
   // ─── Redirects ───────────────────────────────────────────────────────────
