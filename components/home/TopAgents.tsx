@@ -18,7 +18,7 @@ interface Agent {
   phone?: string;
   avatar?: string;
   city?: string;
-  state?: string;
+  locality?: string;
   company?: string;
   agentLicense?: string;
   agentBio?: string;
@@ -229,7 +229,7 @@ function AgentCard({ agent }: { agent: Agent }) {
             {agent.city && (
               <>
                 <MapPin className="w-3 h-3 flex-shrink-0" />
-                <span>{agent.city}{agent.state ? `, ${agent.state}` : ''}</span>
+                <span>{agent.city}{agent.locality ? `, ${agent.locality}` : ''}</span>
               </>
             )}
             {(agent.agentExperience ?? 0) > 0 && (
