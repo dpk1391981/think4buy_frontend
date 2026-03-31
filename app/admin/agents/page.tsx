@@ -16,8 +16,7 @@ const TICK_BADGE: Record<string, { label: string; cls: string }> = {
 function agentSlug(agent: any): string {
   const name = agent.name?.toLowerCase().replace(/\s+/g, '-') ?? 'agent';
   const city = (agent.city || 'india').toLowerCase().replace(/\s+/g, '-');
-  const uid  = agent.id?.replace(/-/g, '') ?? '';
-  return `${name}-in-${city}-${uid}`;
+  return `${name}/${city}`;
 }
 
 type TabType = 'all' | 'pending-images' | 'pending-professional';

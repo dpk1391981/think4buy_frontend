@@ -65,7 +65,8 @@ async function handler(req: NextRequest, { params }: { params: { slug: string[] 
   // does not log 503 errors or stall waiting for non-critical requests.
   const isAnalyticsTrack = path === '/analytics/track';
   const isPropertyView   = req.method === 'POST' && /^\/properties\/[^/]+\/view$/.test(path);
-  const isFireAndForget  = isAnalyticsTrack || isPropertyView;
+  const isConsentSave    = req.method === 'POST' && path === '/consent';
+  const isFireAndForget  = isAnalyticsTrack || isPropertyView || isConsentSave;
 
   try {
     const contentType = req.headers.get('content-type') ?? '';

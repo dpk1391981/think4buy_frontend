@@ -25,7 +25,7 @@ interface Agent {
   phone?: string;
   email?: string;
   city?: string;
-  state?: string;
+  locality?: string;
   company?: string;
   isVerified?: boolean;
   agentTick?: 'none' | 'verified' | 'bronze' | 'silver' | 'gold';
@@ -413,10 +413,10 @@ function AgentCard({ agent, rank }: { agent: Agent; rank?: number }) {
                   {agent.name}
                 </span>
               )}
-              {(agent.city || agent.state) && (
+              {(agent.city || agent.locality) && (
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-primary-400 flex-shrink-0" />
-                  {[agent.city, agent.state].filter(Boolean).join(', ')}
+                  {[agent.city, agent.locality].filter(Boolean).join(', ')}
                 </span>
               )}
             </div>
