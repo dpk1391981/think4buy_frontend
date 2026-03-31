@@ -117,9 +117,10 @@ const NAV_GROUPS = [
     items: [
       { href: '/admin/countries',           label: 'Countries',           icon: Globe,             slug: 'admin_countries'           },
       { href: '/admin/locations',           label: 'States & Cities',     icon: MapPin,            slug: 'admin_locations'           },
-      { href: '/admin/market-intelligence', label: 'Market Intelligence', icon: BarChart2,         slug: 'admin_market_intelligence' },
-      { href: '/admin/tools-insights',      label: 'Tools & Insights',    icon: Wrench,            slug: 'admin_tools_insights'      },
-      { href: '/admin/scoring-config',      label: 'Scoring Config',      icon: SlidersHorizontal, slug: 'admin_scoring_config'      },
+      { href: '/admin/market-intelligence',  label: 'Market Intelligence', icon: BarChart2,         slug: 'admin_market_intelligence'  },
+      { href: '/admin/tools-insights',      label: 'Tools & Insights',    icon: Wrench,            slug: 'admin_tools_insights'       },
+      { href: '/admin/scoring-config',      label: 'Scoring Config',      icon: SlidersHorizontal, slug: 'admin_scoring_config'       },
+      { href: '/admin/locations/import',    label: 'Import Locations',    icon: Database,          slug: 'admin_locations_import'     },
     ],
   },
   {
