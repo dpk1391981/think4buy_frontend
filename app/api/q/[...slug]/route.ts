@@ -47,8 +47,11 @@ async function handler(req: NextRequest, { params }: { params: { slug: string[] 
   };
 
   try {
+    const contentType = req.headers.get('content-type') ?? '';
     const body = req.method !== 'GET' && req.method !== 'HEAD'
-      ? await req.text()
+      ? contentType.includes('multipart/form-data')
+        ? await req.arrayBuffer()
+        : await req.text()
       : undefined;
 
     const backendRes = await fetch(target, {
