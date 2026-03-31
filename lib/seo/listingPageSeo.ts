@@ -11,7 +11,12 @@
 
 import { KNOWN_CITY_SLUGS } from '@/lib/city-slugs';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+// Server-side only: use BACKEND_INTERNAL_URL (never the frontend NEXT_PUBLIC_API_URL)
+const _backendOrigin = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, '');
+const API_BASE =
+  process.env.BACKEND_INTERNAL_URL ??
+  (_backendOrigin ? `${_backendOrigin}/api/v1` : null) ??
+  'http://localhost:3001/api/v1';
 
 export interface SeoPageConfig {
   source: 'footer_link' | 'category_locality' | 'category_city' | 'locality' | 'city' | 'category';
