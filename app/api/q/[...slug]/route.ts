@@ -8,10 +8,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { cookies } from 'next/headers';
 
-const BACKEND_URL    = process.env.BACKEND_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+// BACKEND_INTERNAL_URL must point to the NestJS backend (e.g. https://api.example.com/api/v1).
+// NEXT_PUBLIC_API_URL is the *frontend* URL — never use it as a backend target.
+// Falling back to NEXT_PUBLIC_API_URL here would cause the proxy to call itself.
+const BACKEND_URL    = process.env.BACKEND_INTERNAL_URL ?? 'http://localhost:3001/api/v1';
 const BFF_SECRET     = process.env.BFF_INTERNAL_SECRET  ?? '';
 const SIGNING_KEY    = process.env.INTERNAL_API_KEY     ?? '';
 const SIGNING_SECRET = process.env.INTERNAL_API_SECRET  ?? '';
+
+if (!process.env.BACKEND_INTERNAL_URL) {
+  console.warn('[BFF] BACKEND_INTERNAL_URL is not set — falling back to http://localhost:3001/api/v1');
+}
 
 function buildSignatureHeaders(method: string, path: string) {
   if (!SIGNING_KEY || !SIGNING_SECRET) return {};
@@ -77,8 +84,10 @@ async function handler(req: NextRequest, { params }: { params: { slug: string[] 
     });
   } catch (err: any) {
     if (err.name === 'TimeoutError') {
+      console.error(`[BFF] Timeout: ${req.method} ${target}`);
       return NextResponse.json({ success: false, message: 'Gateway timeout' }, { status: 504 });
     }
+    console.error(`[BFF] Upstream error: ${req.method} ${target} — ${err?.message ?? err}`);
     return NextResponse.json({ success: false, message: 'Service unavailable' }, { status: 503 });
   }
 }

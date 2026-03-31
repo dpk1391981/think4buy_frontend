@@ -4,9 +4,11 @@ import Image from 'next/image';
 import { useState } from 'react';
 import { BLUR_DATA_URL } from '@/lib/imageUtils';
 
-// Backend origin (no /api/v1 suffix) — images served from /uploads/ live here
+// Backend origin (no /api/v1 suffix) — images served from /uploads/ live here.
+// NEXT_PUBLIC_API_BASE_URL is the backend origin (e.g. https://reales-api.vtechxhub.com).
+// NEXT_PUBLIC_API_URL is the *frontend* URL since BFF was introduced — never use it as image origin.
 const BACKEND_URL =
-  (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api/v1')
+  (process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1')
     .replace(/\/api\/v1\/?$/, '');
 
 /**
