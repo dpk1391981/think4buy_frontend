@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { openAuthModal, setSelectedCity, loadCityFromLS, saveCityToLS } from '@/lib/store/slices/uiSlice';
-import { locationsApi } from '@/lib/api';
+import { locationsApi, seoApi } from '@/lib/api';
 import { resolveImageSrc } from '@/components/common/OptimizedImage';
 import { detectLocation } from '@/lib/geolocation';
 import { usePropertyCategories, usePropertyTypes, getCategoryHref } from '@/hooks/usePropertyCategories';
@@ -792,10 +792,10 @@ export default function Header() {
       }
     } catch { /* ignore */ }
 
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/seo/config`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data) {
+    seoApi.getSeoConfig()
+      .then(r => {
+        const data = r.data as Record<string, string>;
+        if (data && typeof data === 'object') {
           setNavCfg(data);
           localStorage.setItem(NAV_CONFIG_KEY, JSON.stringify({ ts: Date.now(), data }));
         }
