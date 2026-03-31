@@ -60,6 +60,13 @@ async function handler(req: NextRequest, { params }: { params: { slug: string[] 
     ...buildSignatureHeaders(req.method, path),
   };
 
+  // These endpoints are fire-and-forget — never block the client for them.
+  // If the backend is unreachable, acknowledge immediately so the browser
+  // does not log 503 errors or stall waiting for non-critical requests.
+  const isAnalyticsTrack = path === '/analytics/track';
+  const isPropertyView   = req.method === 'POST' && /^\/properties\/[^/]+\/view$/.test(path);
+  const isFireAndForget  = isAnalyticsTrack || isPropertyView;
+
   try {
     const contentType = req.headers.get('content-type') ?? '';
     const body = req.method !== 'GET' && req.method !== 'HEAD'
@@ -67,6 +74,17 @@ async function handler(req: NextRequest, { params }: { params: { slug: string[] 
         ? await req.arrayBuffer()
         : await req.text()
       : undefined;
+
+    if (isFireAndForget) {
+      // Fire-and-forget: respond immediately, send to backend in background
+      fetch(target, {
+        method:  req.method,
+        headers: forwardHeaders,
+        body,
+        signal:  AbortSignal.timeout(5_000),
+      }).catch(() => {});
+      return NextResponse.json({ success: true }, { status: 202 });
+    }
 
     const backendRes = await fetch(target, {
       method:  req.method,
@@ -90,6 +108,10 @@ async function handler(req: NextRequest, { params }: { params: { slug: string[] 
       headers: responseHeaders,
     });
   } catch (err: any) {
+    if (isFireAndForget) {
+      // Fire-and-forget failures must never surface as errors to the client
+      return NextResponse.json({ success: true }, { status: 202 });
+    }
     if (err.name === 'TimeoutError') {
       console.error(`[BFF] Timeout: ${req.method} ${target}`);
       return NextResponse.json({ success: false, message: 'Gateway timeout' }, { status: 504 });
