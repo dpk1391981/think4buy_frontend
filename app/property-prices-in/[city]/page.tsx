@@ -47,7 +47,8 @@ export function generateStaticParams() {
 
 // ── Server component fetches data at render time ──────────────────────────────
 async function fetchCityData(city: string) {
-  const apiBase = process.env.BACKEND_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+  const apiBase = process.env.BACKEND_INTERNAL_URL
+    ?? (process.env.NEXT_PUBLIC_API_BASE_URL ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1` : 'http://localhost:3001/api/v1');
   try {
     const res = await fetch(`${apiBase}/insights/price-trends?city=${encodeURIComponent(city)}`, {
       next: { revalidate: 3600 }, // ISR: revalidate every hour

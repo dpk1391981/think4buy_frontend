@@ -364,7 +364,7 @@ export default function LeadDetailPage() {
                   <img
                     src={lead.property.primaryImage.startsWith('http')
                       ? lead.property.primaryImage
-                      : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '')}${lead.property.primaryImage}`}
+                      : `${process.env.NEXT_PUBLIC_API_BASE_URL}${lead.property.primaryImage}`}
                     alt={lead.property.title}
                     className="w-20 h-16 object-cover rounded-lg flex-shrink-0"
                   />

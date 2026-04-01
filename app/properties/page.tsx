@@ -10,7 +10,9 @@ interface Props {
 async function fetchCategorySeo(categorySlug?: string) {
   if (!categorySlug) return null;
   try {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL
+      ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1`
+      : 'http://localhost:3001/api/v1';
     const res = await fetch(`${apiBase}/seo/categories/${categorySlug}`, { next: { revalidate: 3600 } });
     if (!res.ok) return null;
     return await res.json();
@@ -23,7 +25,9 @@ async function fetchLocationSeo(city?: string, state?: string) {
     const params = new URLSearchParams();
     if (city)  params.set('city', city);
     if (state) params.set('state', state);
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL
+      ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1`
+      : 'http://localhost:3001/api/v1';
     const res = await fetch(`${apiBase}/locations/seo?${params}`, { next: { revalidate: 3600 } });
     if (!res.ok) return null;
     return await res.json();
