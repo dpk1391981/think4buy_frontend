@@ -3,7 +3,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Clock, Eye, ArrowLeft, Tag, Calendar, User, Share2, BookOpen } from 'lucide-react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL
+  ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1`
+  : 'http://localhost:3001/api/v1';
 const APP_URL  = process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com';
 
 const CATEGORIES = [
