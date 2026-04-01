@@ -4,9 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Home, ChevronRight, AlertTriangle, Send, CheckCircle, AlertCircle } from 'lucide-react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL
-  ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1`
-  : 'http://localhost:3001/api/v1';
+const API_BASE = '/api/q';
 
 const CATEGORIES = [
   'Agent Misconduct',
