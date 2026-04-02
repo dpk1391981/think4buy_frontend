@@ -203,6 +203,8 @@ function LinkSlideOver({
                 </div>
               </div>
 
+              {field('Page Heading (H1)', 'h1Title', { placeholder: 'e.g. Office Space for Rent in Delhi', hint: '(shown as the main heading on the listing page)' })}
+
               <div className="p-3 bg-blue-50 rounded-xl text-xs text-blue-700">
                 <strong>Tip:</strong> Use the SEO Content tab to add meta tags, page content, and FAQs.
                 Footer link SEO takes <strong>highest priority</strong> — it overrides all other SEO configs for this URL.
@@ -220,7 +222,6 @@ function LinkSlideOver({
                   <span className="text-xs text-gray-400">(shown in Google search results)</span>
                 </div>
                 <div className="space-y-3">
-                  {field('H1 Title', 'h1Title', { placeholder: 'Flats for Sale in Mumbai — Best Deals 2025', hint: '(main page heading)' })}
                   {field('Meta Title', 'metaTitle', { placeholder: 'Flats for Sale in Mumbai | Think4BuySale', hint: '(60 chars max)' })}
                   {textarea('Meta Description', 'metaDescription', { placeholder: 'Find the best flats for sale in Mumbai...', rows: 2, hint: '(160 chars max)' })}
                   {field('Meta Keywords', 'metaKeywords', { placeholder: 'flats in mumbai, apartments for sale, 2bhk mumbai', hint: '(comma-separated)' })}

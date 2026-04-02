@@ -85,9 +85,10 @@ function formatFilterValue(key: string, value: string): string {
 
 interface Props {
   searchParams: { [key: string]: string | string[] | undefined };
+  pageH1?: string | null;
 }
 
-export default function PropertyListingPage({ searchParams: propSearchParams }: Props) {
+export default function PropertyListingPage({ searchParams: propSearchParams, pageH1 }: Props) {
   const urlSearchParams = useSearchParams();
   const router = useRouter();
 
@@ -294,11 +295,12 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
   const style = SLUG_STYLE[effectiveSlug] ?? DEFAULT_STYLE;
   const catLabel = isNewProject
     ? 'New Projects'
-    : (categoryNames[category]
-        ? `${categoryNames[category]} Properties`
-        : category ? `${category} Properties`
-        : typeParam ? (TYPE_LABELS[typeParam] ?? `${typeParam} Properties`)
-        : 'All Properties');
+    : (typeParam && TYPE_LABELS[typeParam]
+        ? TYPE_LABELS[typeParam]
+        : categoryNames[category]
+          ? `${categoryNames[category]} Properties`
+          : category ? `${category} Properties`
+          : 'Property');
 
   const headingParts = [catLabel];
   if (locality) headingParts.push(`in ${locality}`);
@@ -355,7 +357,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
   }
 
   const totalStr = loading ? '…' : (meta?.total.toLocaleString('en-IN') ?? '0');
-
+  
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
@@ -556,7 +558,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams }: 
             {/* Desktop header row (hidden on mobile) */}
             <div className="hidden sm:flex flex-wrap items-start justify-between gap-3 mb-4">
               <div>
-                <h1 className="text-xl font-bold text-gray-900">{seoContent?.h1 || heading}</h1>
+                <h1 className="text-xl font-bold text-gray-900">{pageH1 || seoContent?.h1 || heading}</h1>
                 <p className="text-sm text-gray-500 mt-0.5">
                   {loading
                     ? <InlineLoader className="text-gray-400" />
