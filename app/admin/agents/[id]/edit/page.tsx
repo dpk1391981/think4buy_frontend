@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { adminApi, locationsApi, agencyApi } from '@/lib/api';
+import { Loader2, Upload, CheckCircle2 } from 'lucide-react';
 
 interface Locality { id: string; name: string; }
 interface CoverageLocation {
@@ -12,6 +13,140 @@ interface CoverageLocation {
   stateName?: string; cityName?: string; localityName?: string;
   cityId?: string; stateId?: string;
   isActive?: boolean;
+}
+interface AgencyMember {
+  id: string;
+  userId: string;
+  role: string;
+  status: string;
+  isPrimaryOwner: boolean;
+  joinedAt?: string;
+  inviteExpiresAt?: string;
+}
+
+interface AgentMeta {
+  pan?: string;
+  businessType?: string;
+  specializations?: string;
+  languages?: string;
+  officeStart?: string;
+  officeEnd?: string;
+  workingDays?: string;
+  website?: string;
+  docRera?: string;
+  docGst?: string;
+  docPan?: string;
+  rejectionReason?: string;
+  reraNumber?: string;
+  gstNumber?: string;
+}
+
+function parseMeta(bio: string | undefined): AgentMeta {
+  if (!bio?.startsWith('__meta__:')) return {};
+  try { return JSON.parse(bio.slice(9)); } catch { return {}; }
+}
+
+// Admin-side document upload — uploads via /admin/agents/:id/documents/:docType
+// Preview is fetched through authenticated BE endpoint (never exposes raw storage URL)
+function AdminDocUpload({
+  agentId, label, docType, hasDoc, onUploaded,
+}: {
+  agentId: string;
+  label: string;
+  docType: 'rera' | 'gst' | 'pan';
+  hasDoc: boolean;
+  onUploaded: (url: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [previewSrc, setPreviewSrc] = useState<string>('');
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  // Fetch preview via authenticated BE endpoint
+  useEffect(() => {
+    if (!hasDoc || !agentId) { setPreviewSrc(''); return; }
+    let objectUrl = '';
+    setLoadingPreview(true);
+    adminApi.previewAgentDocument(agentId, docType)
+      .then(res => {
+        objectUrl = URL.createObjectURL(res.data);
+        setPreviewSrc(objectUrl);
+      })
+      .catch(() => setPreviewSrc(''))
+      .finally(() => setLoadingPreview(false));
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [agentId, docType, hasDoc]); // eslint-disable-line
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError('');
+    setUploading(true);
+    try {
+      const res = await adminApi.uploadAgentDocument(agentId, docType, file);
+      const bio: string = res.data?.agentBio ?? '';
+      let meta: Record<string, string> = {};
+      if (bio.startsWith('__meta__:')) {
+        try { meta = JSON.parse(bio.slice(9)); } catch {}
+      }
+      const key = `doc${docType.charAt(0).toUpperCase()}${docType.slice(1)}`;
+      onUploaded(meta[key] || '');
+      // Reload preview from BE after upload
+      const previewRes = await adminApi.previewAgentDocument(agentId, docType);
+      const objectUrl = URL.createObjectURL(previewRes.data);
+      setPreviewSrc(prev => { if (prev) URL.revokeObjectURL(prev); return objectUrl; });
+    } catch (err: any) {
+      setUploadError(err?.response?.data?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
+
+  return (
+    <div className="border border-gray-100 rounded-lg overflow-hidden bg-gray-50">
+      <div className="w-full h-28 flex items-center justify-center bg-gray-50">
+        {loadingPreview ? (
+          <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
+        ) : previewSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={previewSrc} alt={label} className="w-full h-28 object-cover" />
+        ) : (
+          <svg className="w-10 h-10 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        )}
+      </div>
+      <div className="px-3 py-2 space-y-1">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-gray-700">{label}</p>
+          {hasDoc && <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle2 className="w-3 h-3" /> Uploaded</span>}
+        </div>
+        <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFile} />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50 transition-colors w-full justify-center"
+        >
+          {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+          {uploading ? 'Uploading…' : hasDoc ? 'Replace' : 'Upload'}
+        </button>
+        {uploadError && <p className="text-red-500 text-[11px]">{uploadError}</p>}
+      </div>
+    </div>
+  );
+}
+
+function MetaField({ label, value }: { label: string; value?: string }) {
+  if (!value) return null;
+  return (
+    <div>
+      <p className="text-xs text-gray-500 mb-0.5">{label}</p>
+      <p className="text-sm font-medium text-gray-800">{value}</p>
+    </div>
+  );
 }
 
 // Defined outside component to keep a stable reference and prevent focus-loss on each keystroke
@@ -43,6 +178,32 @@ function Field({
   );
 }
 
+const BADGE_OPTIONS = [
+  { value: 'none',     label: 'None',         color: 'bg-gray-100 text-gray-600' },
+  { value: 'verified', label: '✓ Verified',    color: 'bg-blue-100 text-blue-700' },
+  { value: 'bronze',   label: '◉ Bronze',      color: 'bg-amber-100 text-amber-700' },
+  { value: 'silver',   label: '◈ Silver',      color: 'bg-slate-100 text-slate-700' },
+  { value: 'gold',     label: '★ Gold',        color: 'bg-yellow-100 text-yellow-700' },
+];
+
+const STATUS_COLORS: Record<string, string> = {
+  pending:  'bg-amber-100 text-amber-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-700',
+  none:     'bg-gray-100 text-gray-600',
+};
+const MEMBER_ROLE_COLOR: Record<string, string> = {
+  owner:   'bg-purple-100 text-purple-700',
+  manager: 'bg-blue-100 text-blue-700',
+  member:  'bg-gray-100 text-gray-600',
+};
+const MEMBER_STATUS_COLOR: Record<string, string> = {
+  active:   'bg-green-100 text-green-700',
+  invited:  'bg-amber-100 text-amber-700',
+  declined: 'bg-red-100 text-red-700',
+  removed:  'bg-gray-100 text-gray-500',
+};
+
 export default function EditAgentPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const router = useRouter();
@@ -52,6 +213,7 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
 
   // Coverage areas
   const [agentProfileId, setAgentProfileId] = useState<string | null>(null);
+  const [agencyId, setAgencyId] = useState<string | null>(null);
   const [coverageLocations, setCoverageLocations] = useState<CoverageLocation[]>([]);
   const [covLocalities, setCovLocalities]   = useState<Locality[]>([]);
   const [covCitySearch, setCovCitySearch] = useState('');
@@ -72,6 +234,29 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
   const [trustForm, setTrustForm] = useState({ complaintCount: '0', avgResponseHours: '' });
   const [savingTrust, setSavingTrust] = useState(false);
   const [trustSaved, setTrustSaved] = useState(false);
+
+  // Professional status
+  const [agentProfileStatus, setAgentProfileStatus] = useState<string>('none');
+  const [agentMeta, setAgentMeta] = useState<AgentMeta>({});
+  const [rawBio, setRawBio] = useState(''); // non-meta bio
+
+  // KYC document URLs (editable by admin)
+  const [docRera, setDocRera] = useState('');
+  const [docGst, setDocGst]   = useState('');
+  const [docPan, setDocPan]   = useState('');
+
+  // Approve modal
+  const [approveModal, setApproveModal] = useState(false);
+  const [selectedBadge, setSelectedBadge] = useState<string>('verified');
+  const [approving, setApproving] = useState(false);
+
+  // Reject modal
+  const [rejectModal, setRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
+
+  // Agency members
+  const [members, setMembers] = useState<AgencyMember[]>([]);
 
   const [form, setForm] = useState({
     name:            '',
@@ -96,6 +281,17 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
       agencyApi.adminGetAgentProfileByUser(id).catch(() => ({ data: null })),
     ]).then(([agentRes, profileRes]) => {
       const a = agentRes.data;
+
+      // Parse agentBio
+      const bio: string = a.agentBio ?? '';
+      const meta = parseMeta(bio);
+      setAgentMeta(meta);
+      setRawBio(bio.startsWith('__meta__:') ? '' : bio);
+      setAgentProfileStatus(a.agentProfileStatus ?? 'none');
+      setDocRera(meta.docRera || '');
+      setDocGst(meta.docGst   || '');
+      setDocPan(meta.docPan   || '');
+
       setForm({
         name:            a.name            ?? '',
         email:           a.email           ?? '',
@@ -106,20 +302,22 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
         cityId:          a.cityId          ?? '',
         city:            a.city            ?? '',
         agentLicense:    a.agentLicense    ?? '',
-        agentBio:        a.agentBio        ?? '',
+        agentBio:        bio,
         agentExperience: a.agentExperience != null ? String(a.agentExperience) : '',
         agentFreeQuota:  a.agentFreeQuota  != null ? String(a.agentFreeQuota)  : '100',
         agentTick:       a.agentTick       ?? 'none',
       });
+
       const profile = profileRes.data;
       if (profile?.id) {
         setAgentProfileId(profile.id);
+        const aid = profile.agencyId || profile.agency?.id || null;
+        setAgencyId(aid);
+
         agencyApi.adminListCoverage({ agentProfileId: profile.id })
           .then(r => {
             const coverage: CoverageLocation[] = r.data?.items || r.data || [];
             setCoverageLocations(coverage);
-            // If agent never set a primary city (onboarding only added coverage),
-            // auto-populate city from the first coverage entry.
             if (!a.city) {
               const firstCity = coverage.find(
                 l => (l.coverageType === 'city' || l.coverageType === 'locality') && l.cityName,
@@ -127,21 +325,28 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
               if (firstCity) {
                 setForm(prev => ({
                   ...prev,
-                  city:    prev.city    || firstCity.cityName    || '',
-                  state:   prev.state   || firstCity.stateName   || '',
+                  city:  prev.city  || firstCity.cityName  || '',
+                  state: prev.state || firstCity.stateName || '',
                 }));
               }
             }
           })
           .catch(() => {});
+
         setTrustForm({
-          complaintCount:  String(profile.complaintCount  ?? 0),
+          complaintCount:   String(profile.complaintCount ?? 0),
           avgResponseHours: profile.avgResponseHours != null ? String(profile.avgResponseHours) : '',
         });
+
+        // Load agency members
+        if (aid) {
+          agencyApi.adminGetAgencyMembers(aid)
+            .then(r => setMembers(Array.isArray(r.data) ? r.data : []))
+            .catch(() => {});
+        }
       }
     }).catch(() => setError('Failed to load agent data'))
       .finally(() => setFetching(false));
-
   }, [id]);
 
   // Load coverage localities when coverage cityName changes
@@ -181,7 +386,6 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
       setCovCitySuggestions([]);
       setShowCovCitySug(false);
     } else {
-      // locality type — set single city
       setCovCitySearch(city.name);
       setShowCovCitySug(false);
       setCovCitySuggestions([]);
@@ -253,6 +457,30 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
     } catch { /* ignore */ } finally { setSavingTrust(false); }
   }
 
+  async function handleApprove() {
+    setApproving(true);
+    try {
+      await adminApi.approveProfessionalDetails(id, selectedBadge);
+      setAgentProfileStatus('approved');
+      setForm(prev => ({ ...prev, agentTick: selectedBadge as any }));
+      setApproveModal(false);
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Approval failed');
+    } finally { setApproving(false); }
+  }
+
+  async function handleReject() {
+    setRejecting(true);
+    try {
+      await adminApi.rejectProfessionalDetails(id, rejectReason);
+      setAgentProfileStatus('rejected');
+      setRejectModal(false);
+      setRejectReason('');
+    } catch (e: any) {
+      alert(e?.response?.data?.message || 'Rejection failed');
+    } finally { setRejecting(false); }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -290,8 +518,79 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
     );
   }
 
+  const hasMeta = !!form.agentBio?.startsWith('__meta__:');
+
   return (
     <div className="p-6 max-w-3xl">
+      {/* Approve Modal */}
+      {approveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Approve Professional Details</h3>
+            <p className="text-sm text-gray-600 mb-4">Select a badge to assign upon approval. This will also update the agent's subscription plan.</p>
+            <div className="grid grid-cols-3 gap-2 mb-5">
+              {BADGE_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setSelectedBadge(opt.value)}
+                  className={`py-2 px-3 rounded-lg text-sm font-medium border-2 transition-all ${
+                    selectedBadge === opt.value
+                      ? 'border-blue-500 ring-2 ring-blue-200'
+                      : 'border-transparent'
+                  } ${opt.color}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleApprove}
+                disabled={approving}
+                className="flex-1 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+              >
+                {approving ? 'Approving…' : 'Confirm Approval'}
+              </button>
+              <button type="button" onClick={() => setApproveModal(false)} className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {rejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Reject Professional Details</h3>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Reason (shown to agent)</label>
+            <textarea
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+              placeholder="e.g. Documents are unclear, please re-upload..."
+              rows={3}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-400 resize-none mb-4"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleReject}
+                disabled={rejecting}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                {rejecting ? 'Rejecting…' : 'Confirm Rejection'}
+              </button>
+              <button type="button" onClick={() => setRejectModal(false)} className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 mb-6">
         <Link href="/admin/agents" className="text-gray-400 hover:text-gray-600 text-sm">← Agents</Link>
         <span className="text-gray-300">/</span>
@@ -322,6 +621,44 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
+        {/* Professional Status */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+            <h2 className="font-semibold text-gray-800">Professional Status</h2>
+            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${STATUS_COLORS[agentProfileStatus] ?? 'bg-gray-100 text-gray-600'}`}>
+              {agentProfileStatus}
+            </span>
+          </div>
+          {agentProfileStatus === 'pending' && (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-4">
+              This agent has submitted professional details for review. Please verify documents below before approving.
+            </p>
+          )}
+          {agentProfileStatus === 'rejected' && agentMeta.rejectionReason && (
+            <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-4">
+              <strong>Rejection reason:</strong> {agentMeta.rejectionReason}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setApproveModal(true)}
+              disabled={agentProfileStatus === 'approved'}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
+            >
+              Approve + Badge
+            </button>
+            <button
+              type="button"
+              onClick={() => setRejectModal(true)}
+              disabled={agentProfileStatus === 'rejected'}
+              className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-100 disabled:opacity-50 transition-colors"
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+
         {/* Professional Info */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h2 className="font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">Professional Info</h2>
@@ -346,17 +683,92 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-            <textarea
-              value={form.agentBio}
-              onChange={e => set('agentBio', e.target.value)}
-              placeholder="Short professional bio..."
-              rows={4}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
+          {/* Bio: show either parsed meta or plain textarea */}
+          {hasMeta ? (
+            <div className="bg-gray-50 border border-gray-100 rounded-lg p-4 text-sm text-gray-500 italic">
+              Bio is stored as structured company data — see "Company Details" section below.
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+              <textarea
+                value={form.agentBio}
+                onChange={e => set('agentBio', e.target.value)}
+                placeholder="Short professional bio..."
+                rows={4}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Company Details (parsed from __meta__) + KYC Documents */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+            <h2 className="font-semibold text-gray-800">Company Details &amp; KYC</h2>
+            <span className="text-xs text-gray-400">Documents upload via backend</span>
+          </div>
+
+          {hasMeta ? (
+            <div className="grid grid-cols-2 gap-4 mb-5">
+              <MetaField label="Business Type"   value={agentMeta.businessType} />
+              <MetaField label="Website"         value={agentMeta.website} />
+              <MetaField label="RERA Number"     value={agentMeta.reraNumber} />
+              <MetaField label="GST Number"      value={agentMeta.gstNumber} />
+              <MetaField label="PAN"             value={agentMeta.pan} />
+              <MetaField label="Specializations" value={agentMeta.specializations} />
+              <MetaField label="Languages"       value={agentMeta.languages} />
+              <MetaField label="Office Hours"
+                value={agentMeta.officeStart && agentMeta.officeEnd
+                  ? `${agentMeta.officeStart} – ${agentMeta.officeEnd}`
+                  : undefined}
+              />
+              <MetaField label="Working Days" value={agentMeta.workingDays?.replace(/,/g, ', ')} />
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic mb-5">Agent has not submitted company details yet.</p>
+          )}
+
+          {/* KYC Documents — admin can upload/replace regardless of meta state */}
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">KYC Documents</p>
+          <div className="grid grid-cols-3 gap-4">
+            <AdminDocUpload agentId={id} label="RERA Certificate" docType="rera" hasDoc={!!docRera} onUploaded={url => { setDocRera(url); setAgentMeta(prev => ({ ...prev, docRera: url })); }} />
+            <AdminDocUpload agentId={id} label="GST Certificate"  docType="gst"  hasDoc={!!docGst}  onUploaded={url => { setDocGst(url);  setAgentMeta(prev => ({ ...prev, docGst:  url })); }} />
+            <AdminDocUpload agentId={id} label="PAN Card"         docType="pan"  hasDoc={!!docPan}  onUploaded={url => { setDocPan(url);  setAgentMeta(prev => ({ ...prev, docPan:  url })); }} />
           </div>
         </div>
+
+        {/* Agency Members */}
+        {members.length > 0 && (
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <h2 className="font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">
+              Agency Members
+              <span className="ml-2 text-xs font-normal text-gray-400">({members.length})</span>
+            </h2>
+            <div className="space-y-2">
+              {members.map(m => (
+                <div key={m.id} className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${MEMBER_ROLE_COLOR[m.role] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {m.role}{m.isPrimaryOwner ? ' (owner)' : ''}
+                    </span>
+                    <span className="text-sm text-gray-700 font-mono text-xs">{m.userId}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {m.joinedAt && (
+                      <span className="text-xs text-gray-400">
+                        Joined {new Date(m.joinedAt).toLocaleDateString()}
+                      </span>
+                    )}
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${MEMBER_STATUS_COLOR[m.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {m.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Coverage Areas */}
         {agentProfileId && (
@@ -491,7 +903,6 @@ export default function EditAgentPage({ params }: { params: { id: string } }) {
               <p className="text-sm text-gray-400 italic">No coverage areas added yet.</p>
             ) : (
               <>
-                {/* Primary city selector — only shown when there are city/locality entries */}
                 {(() => {
                   const cityEntries = coverageLocations.filter(l => l.coverageType === 'city' || l.coverageType === 'locality');
                   const uniqueCities = Array.from(new Map(cityEntries.filter(l => l.cityName).map(l => [l.cityName, l])).values());

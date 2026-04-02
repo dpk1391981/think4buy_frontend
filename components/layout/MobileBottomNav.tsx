@@ -25,7 +25,8 @@ export default function MobileBottomNav() {
   if (
     pathname.startsWith('/admin') ||
     pathname === '/agent' || pathname.startsWith('/agent/') ||
-    pathname === '/owner' || pathname.startsWith('/owner/')
+    pathname === '/owner' || pathname.startsWith('/owner/') ||
+    pathname === '/auth/onboarding'
   ) return null;
 
   return (

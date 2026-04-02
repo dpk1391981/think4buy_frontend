@@ -827,13 +827,14 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Hide on dashboard panels — those layouts have their own top bar
+  // Hide on dashboard panels and onboarding — those have their own chrome
   // NOTE: use '/agent/' with trailing slash so '/agents/*' (public) is NOT hidden
   const isPanel =
     pathname.startsWith('/admin') ||
     pathname.startsWith('/agent/') || pathname === '/agent' ||
     pathname.startsWith('/owner') ||
-    pathname.startsWith('/buyer');
+    pathname.startsWith('/buyer') ||
+    pathname === '/auth/onboarding';
   if (isPanel) return null;
 
   return (

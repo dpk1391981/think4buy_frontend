@@ -8,7 +8,7 @@ import OptimizedImage from '@/components/common/OptimizedImage';
 import {
   LayoutDashboard, Target, MapPin, Handshake,
   BadgeDollarSign, Home, MessageSquare, Building2,
-  Wallet, Crown, User, Plus, Heart,
+  Wallet, Crown, User, Users, Plus, Heart,
   MoreHorizontal, X, ExternalLink, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import NotificationBell from '@/components/notifications/NotificationBell';
@@ -43,7 +43,9 @@ const NAV_GROUPS = [
   {
     label: 'Account',
     items: [
-      { href: '/agent/agency',       label: 'My Coverage',      icon: Building2 },
+      { href: '/agent/company',      label: 'Company Details',  icon: Building2 },
+      { href: '/agent/members',      label: 'Team Members',     icon: Users     },
+      { href: '/agent/agency',       label: 'My Coverage',      icon: MapPin },
       { href: '/agent/wallet',       label: 'Wallet',           icon: Wallet },
       { href: '/agent/subscription', label: 'Subscription',     icon: Crown },
       { href: '/wishlist',           label: 'Saved Properties', icon: Heart },
@@ -67,7 +69,9 @@ const MORE_ITEMS = [
   { href: '/agent/site-visits',  label: 'Site Visits',      icon: MapPin },
   { href: '/agent/commissions',  label: 'Commissions',      icon: BadgeDollarSign },
   { href: '/agent/inquiries',    label: 'Inquiries',        icon: MessageSquare },
-  { href: '/agent/agency',       label: 'My Agency',        icon: Building2 },
+  { href: '/agent/company',      label: 'Company',          icon: Building2 },
+  { href: '/agent/members',      label: 'Team Members',     icon: Users },
+  { href: '/agent/agency',       label: 'My Coverage',      icon: MapPin },
   { href: '/agent/wallet',       label: 'Wallet',           icon: Wallet },
   { href: '/agent/subscription', label: 'Subscription',     icon: Crown },
   { href: '/wishlist',           label: 'Saved Properties', icon: Heart },

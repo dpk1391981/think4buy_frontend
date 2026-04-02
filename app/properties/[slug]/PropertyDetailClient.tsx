@@ -30,6 +30,7 @@ import { openAuthModal } from '@/lib/store/slices/uiSlice';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import { WhatsAppIcon } from '@/components/common/PhoneRevealButton';
 import { usePropertyBehavior } from '@/hooks/usePropertyBehavior';
+import { useBehavioralLeadCapture } from '@/hooks/useLeadCapture';
 import FloatingCTA from '@/components/common/FloatingCTA';
 import IntentPopup from '@/components/common/IntentPopup';
 import BrokerTransparencyBadge from '@/components/agent/BrokerTransparencyBadge';
@@ -83,6 +84,18 @@ export default function PropertyDetailClient({ property }: Props) {
 
   // Smart behavior tracking — fires view, long_stay, scroll_deep events automatically
   const { track: trackBehavior } = usePropertyBehavior({ propertyId: property.id });
+
+  // Behavioral lead capture — anonymous fire-and-forget signals
+  const { onPropertyView, onSaveProperty } = useBehavioralLeadCapture();
+
+  // Fire a soft lead on page view (no auth needed — captures anonymous intent)
+  useEffect(() => {
+    onPropertyView(property.id, {
+      city:         property.city     ?? undefined,
+      locality:     property.locality ?? undefined,
+      propertyType: property.type     ?? undefined,
+    });
+  }, [property.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Gallery
   const [activeImage, setActiveImage] = useState(0);
@@ -210,7 +223,7 @@ export default function PropertyDetailClient({ property }: Props) {
     if (!user) { dispatch(openAuthModal({ mode: 'login' })); return; }
     try {
       if (isSaved) { await savedApi.unsave(property.id); setIsSaved(false); }
-      else          { await savedApi.save(property.id);   setIsSaved(true); trackBehavior('wishlist'); }
+      else          { await savedApi.save(property.id);   setIsSaved(true); trackBehavior('wishlist'); onSaveProperty(property.id, { city: property.city ?? undefined, propertyType: property.type ?? undefined }); }
     } catch { /* optimistic */ }
   };
 

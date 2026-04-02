@@ -2332,6 +2332,26 @@ function PostPropertyPageInner() {
     if (stored) dispatch(setDraftId(stored));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Apply onboarding pre-fill (owner redirected here after completing onboarding)
+  useEffect(() => {
+    if (isEditMode) return;
+    try {
+      const raw = sessionStorage.getItem('t4bs_pp_prefill');
+      if (!raw) return;
+      const prefill = JSON.parse(raw);
+      sessionStorage.removeItem('t4bs_pp_prefill');
+      if (prefill && typeof prefill === 'object') {
+        // Derive listingType from mainCategory for implicit categories
+        const implicit = IMPLICIT_LISTING[prefill.mainCategory];
+        if (implicit && !prefill.listingType) prefill.listingType = implicit;
+        dispatch(updateForm(prefill));
+        // Jump past category/purpose/property-type steps when all three are pre-filled
+        if (prefill.mainCategory && prefill.propertyType) dispatch(setStep(3)); // Land on Location
+        else if (prefill.mainCategory) dispatch(setStep(2));                    // Land on Property type
+      }
+    } catch {}
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch form field visibility config once on mount
   useEffect(() => {
     import('@/lib/api').then(({ systemConfigApi }) => {
@@ -2384,6 +2404,13 @@ function PostPropertyPageInner() {
       .catch(() => dispatch(setConfigLoading({ key: 'categories', value: false })));
   }, []);
 
+  // After categories load: resolve mainCategory slug → categoryId (fixes hard-refresh prefill)
+  useEffect(() => {
+    if (isEditMode || !form.mainCategory || form.categoryId || config.categories.length === 0) return;
+    const matched = config.categories.find(c => c.slug === form.mainCategory);
+    if (matched) dispatch(updateForm({ categoryId: matched.id }));
+  }, [config.categories, form.mainCategory]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch types when category changes
   useEffect(() => {
     if (!form.categoryId) { dispatch(setConfigTypes([])); return; }
@@ -2392,6 +2419,13 @@ function PostPropertyPageInner() {
       .then(r => dispatch(setConfigTypes(r.data)))
       .catch(() => dispatch(setConfigLoading({ key: 'types', value: false })));
   }, [form.categoryId]);
+
+  // After types load: resolve propertyType slug → typeId + name (fixes hard-refresh prefill)
+  useEffect(() => {
+    if (isEditMode || !form.propertyType || form.typeId || config.types.length === 0) return;
+    const matched = config.types.find(t => t.slug === form.propertyType);
+    if (matched) dispatch(updateForm({ typeId: matched.id, propertyTypeName: matched.name }));
+  }, [config.types, form.propertyType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch amenities + fields when type changes
   useEffect(() => {

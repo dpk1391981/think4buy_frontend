@@ -7,10 +7,8 @@
  *   - user.needsOnboarding is true, OR
  *   - user is authenticated but has no name saved yet
  *
- * This ensures onboarding is enforced on EVERY page — not just those
- * wrapped in <AuthGuard>. Without this, a user can visit public pages
- * (homepage, property listings, etc.) and bypass the onboarding screen
- * even after a hard refresh.
+ * Also blocks the browser back button while the user is on the onboarding
+ * page, ensuring they cannot navigate away until onboarding is complete.
  *
  * The redirect is skipped:
  *   - While auth is still loading (prevent flash)
@@ -27,6 +25,7 @@ export default function OnboardingEnforcer() {
   const router   = useRouter();
   const pathname = usePathname();
 
+  // Redirect to onboarding when needed
   useEffect(() => {
     // Wait for auth to resolve
     if (loading) return;
@@ -40,6 +39,25 @@ export default function OnboardingEnforcer() {
 
     router.replace(`/auth/onboarding?redirect=${encodeURIComponent(pathname)}`);
   }, [loading, user, pathname, router]);
+
+  // Block browser back button while on onboarding page
+  useEffect(() => {
+    if (!user) return;
+    const needsOnboarding = user.needsOnboarding || !user.name?.trim();
+    if (!needsOnboarding) return;
+    if (!pathname.startsWith('/auth/onboarding')) return;
+
+    // Push an extra history entry so "back" lands on this same page
+    history.pushState(null, '', window.location.href);
+
+    const blockBack = () => {
+      // Re-push to keep trapping the back button
+      history.pushState(null, '', window.location.href);
+    };
+
+    window.addEventListener('popstate', blockBack);
+    return () => window.removeEventListener('popstate', blockBack);
+  }, [user, pathname]);
 
   // Renders nothing — this is a pure side-effect component
   return null;

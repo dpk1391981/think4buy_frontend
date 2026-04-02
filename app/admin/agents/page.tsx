@@ -127,19 +127,29 @@ export default function AdminAgentsPage() {
     }
   }
 
-  async function handleApproveProfessional(id: string) {
+  // Badge-approve modal state
+  const [approveModal, setApproveModal] = useState<{ agent: any } | null>(null);
+  const [selectedBadge, setSelectedBadge] = useState<string>('verified');
+  const [rejectModal, setRejectModal]   = useState<{ id: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+
+  async function handleApproveProfessional(id: string, badge: string) {
     setActionLoading(id);
     try {
-      await adminApi.approveProfessionalDetails(id);
+      await adminApi.approveProfessionalDetails(id, badge);
+      setApproveModal(null);
       loadPendingProf();
+      load(); // refresh all-agents list too
     } catch (e) { console.error(e); }
     finally { setActionLoading(null); }
   }
 
-  async function handleRejectProfessional(id: string) {
+  async function handleRejectProfessional(id: string, reason: string) {
     setActionLoading(id);
     try {
-      await adminApi.rejectProfessionalDetails(id);
+      await adminApi.rejectProfessionalDetails(id, reason);
+      setRejectModal(null);
+      setRejectReason('');
       loadPendingProf();
     } catch (e) { console.error(e); }
     finally { setActionLoading(null); }
@@ -286,59 +296,228 @@ export default function AdminAgentsPage() {
               <p className="text-gray-400 text-sm">No pending professional details to review</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {pendingProfAgents.map((agent) => (
-                <div key={agent.id} className="bg-white rounded-xl border border-violet-200 p-5 shadow-sm">
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div className="flex items-center gap-4 min-w-0">
-                      {agent.avatar ? (
-                        <img src={resolveImageSrc(agent.avatar)} alt={agent.name} className="w-12 h-12 rounded-xl object-cover border border-gray-200 flex-shrink-0" />
-                      ) : (
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                          {agent.name?.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-gray-900 text-sm">{agent.name}</h3>
-                        <p className="text-xs text-gray-500">{agent.email}</p>
-                        {agent.company && <p className="text-xs text-gray-400 mt-0.5">{agent.company}</p>}
-                        <div className="mt-2 space-y-1">
-                          {agent.agentLicense && (
-                            <p className="text-xs text-gray-700"><span className="font-medium text-gray-500">RERA/License:</span> {agent.agentLicense}</p>
-                          )}
-                          {agent.agentExperience > 0 && (
-                            <p className="text-xs text-gray-700"><span className="font-medium text-gray-500">Experience:</span> {agent.agentExperience} yrs</p>
-                          )}
-                          {agent.agentBio && (
-                            <p className="text-xs text-gray-600 mt-1 max-w-md line-clamp-3">{agent.agentBio}</p>
-                          )}
+            <div className="space-y-5">
+              {pendingProfAgents.map((agent) => {
+                // Parse agentBio __meta__ to extract KYC + document URLs
+                let meta: Record<string, string> = {};
+                if (typeof agent.agentBio === 'string' && agent.agentBio.startsWith('__meta__:')) {
+                  try { meta = JSON.parse(agent.agentBio.slice(9)); } catch {}
+                }
+                const docs = [
+                  { key: 'docRera', label: 'RERA Certificate', url: meta.docRera },
+                  { key: 'docGst',  label: 'GST Certificate',  url: meta.docGst  },
+                  { key: 'docPan',  label: 'PAN Card',         url: meta.docPan  },
+                ].filter(d => d.url);
+
+                return (
+                  <div key={agent.id} className="bg-white rounded-xl border border-violet-200 shadow-sm overflow-hidden">
+                    {/* Agent header */}
+                    <div className="flex items-start justify-between gap-4 p-5 flex-wrap">
+                      <div className="flex items-center gap-4 min-w-0">
+                        {agent.avatar ? (
+                          <img src={resolveImageSrc(agent.avatar)} alt={agent.name} className="w-12 h-12 rounded-xl object-cover border border-gray-200 flex-shrink-0" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                            {agent.name?.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-gray-900 text-sm">{agent.name}</h3>
+                            {agent.agentTick && agent.agentTick !== 'none' && (
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${TICK_BADGE[agent.agentTick]?.cls}`}>
+                                {TICK_BADGE[agent.agentTick]?.label}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">{agent.email} {agent.phone && `· ${agent.phone}`}</p>
+                          {agent.company && <p className="text-xs text-gray-400 mt-0.5 font-medium">{agent.company}</p>}
                         </div>
                       </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => { setApproveModal({ agent }); setSelectedBadge(agent.agentTick && agent.agentTick !== 'none' ? agent.agentTick : 'verified'); }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Approve + Badge
+                        </button>
+                        <button
+                          onClick={() => { setRejectModal({ id: agent.id }); setRejectReason(''); }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors"
+                        >
+                          <XCircle className="w-3.5 h-3.5" /> Reject
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => handleApproveProfessional(agent.id)}
-                        disabled={actionLoading === agent.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        {actionLoading === agent.id ? 'Approving...' : 'Approve'}
-                      </button>
-                      <button
-                        onClick={() => handleRejectProfessional(agent.id)}
-                        disabled={actionLoading === agent.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-100 disabled:opacity-50 transition-colors"
-                      >
-                        <XCircle className="w-3.5 h-3.5" />
-                        Reject
-                      </button>
+
+                    {/* Professional details grid */}
+                    <div className="px-5 pb-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs border-t border-gray-50 pt-4">
+                      {agent.agentLicense && (
+                        <div className="bg-yellow-50 rounded-lg p-2.5">
+                          <p className="text-gray-400 font-medium mb-0.5">RERA / License</p>
+                          <p className="text-gray-800 font-semibold break-all">{agent.agentLicense}</p>
+                        </div>
+                      )}
+                      {agent.agentGstNumber && (
+                        <div className="bg-blue-50 rounded-lg p-2.5">
+                          <p className="text-gray-400 font-medium mb-0.5">GST Number</p>
+                          <p className="text-gray-800 font-semibold break-all">{agent.agentGstNumber}</p>
+                        </div>
+                      )}
+                      {meta.pan && (
+                        <div className="bg-purple-50 rounded-lg p-2.5">
+                          <p className="text-gray-400 font-medium mb-0.5">PAN</p>
+                          <p className="text-gray-800 font-semibold">{meta.pan}</p>
+                        </div>
+                      )}
+                      {meta.businessType && (
+                        <div className="bg-gray-50 rounded-lg p-2.5">
+                          <p className="text-gray-400 font-medium mb-0.5">Business Type</p>
+                          <p className="text-gray-800 font-semibold">{meta.businessType}</p>
+                        </div>
+                      )}
+                      {agent.agentExperience > 0 && (
+                        <div className="bg-gray-50 rounded-lg p-2.5">
+                          <p className="text-gray-400 font-medium mb-0.5">Experience</p>
+                          <p className="text-gray-800 font-semibold">{agent.agentExperience} yrs</p>
+                        </div>
+                      )}
+                      {meta.specializations && (
+                        <div className="bg-gray-50 rounded-lg p-2.5">
+                          <p className="text-gray-400 font-medium mb-0.5">Specializations</p>
+                          <p className="text-gray-800 font-semibold">{meta.specializations}</p>
+                        </div>
+                      )}
+                      {meta.website && (
+                        <div className="bg-gray-50 rounded-lg p-2.5">
+                          <p className="text-gray-400 font-medium mb-0.5">Website</p>
+                          <a href={meta.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate block">{meta.website}</a>
+                        </div>
+                      )}
+                      {(meta.officeStart || meta.workingDays) && (
+                        <div className="bg-gray-50 rounded-lg p-2.5">
+                          <p className="text-gray-400 font-medium mb-0.5">Office Hours</p>
+                          <p className="text-gray-800 font-semibold text-[11px]">
+                            {meta.officeStart && meta.officeEnd ? `${meta.officeStart}–${meta.officeEnd}` : ''}
+                            {meta.workingDays ? ` · ${meta.workingDays}` : ''}
+                          </p>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Document images */}
+                    {docs.length > 0 && (
+                      <div className="px-5 pb-5 flex gap-4 flex-wrap">
+                        {docs.map(doc => (
+                          <div key={doc.key} className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 w-48">
+                            <div className="px-3 py-1.5 bg-gray-100 border-b border-gray-200 flex items-center justify-between">
+                              <span className="text-[11px] font-semibold text-gray-600">{doc.label}</span>
+                              <a href={resolveImageSrc(doc.url!)} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:underline">View</a>
+                            </div>
+                            <img
+                              src={resolveImageSrc(doc.url!)}
+                              alt={doc.label}
+                              className="w-full h-28 object-contain p-2 bg-white"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Approve + Badge Modal ──────────────────────────────────────────── */}
+      {approveModal && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setApproveModal(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+              <h3 className="font-bold text-gray-900 text-lg mb-1">Approve Professional Profile</h3>
+              <p className="text-sm text-gray-500 mb-5">
+                <span className="font-medium text-gray-700">{approveModal.agent.name}</span> · {approveModal.agent.company || 'No agency'}
+              </p>
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">Assign Badge Tier</p>
+              <div className="grid grid-cols-2 gap-2 mb-6">
+                {[
+                  { value: 'none',     label: '— None',       cls: 'bg-gray-100 text-gray-600'     },
+                  { value: 'verified', label: '✓ Verified',   cls: 'bg-blue-100 text-blue-700'     },
+                  { value: 'bronze',   label: '◉ Bronze',     cls: 'bg-orange-100 text-orange-700' },
+                  { value: 'silver',   label: '◈ Silver',     cls: 'bg-slate-100 text-slate-700'   },
+                  { value: 'gold',     label: '★ Gold',       cls: 'bg-amber-100 text-amber-700'   },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setSelectedBadge(opt.value)}
+                    className={`px-3 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
+                      selectedBadge === opt.value
+                        ? `${opt.cls} border-current`
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-gray-400 mb-4">Badge tier auto-assigns the matching subscription plan.</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setApproveModal(null)}
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleApproveProfessional(approveModal.agent.id, selectedBadge)}
+                  disabled={actionLoading === approveModal.agent.id}
+                  className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
+                >
+                  {actionLoading === approveModal.agent.id ? 'Approving…' : 'Confirm Approve'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Reject Modal ──────────────────────────────────────────────────── */}
+      {rejectModal && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setRejectModal(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+              <h3 className="font-bold text-gray-900 text-lg mb-4">Reject Professional Profile</h3>
+              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Rejection Reason <span className="text-gray-400 font-normal">(shown to agent)</span></label>
+              <textarea
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                rows={3}
+                placeholder="e.g. RERA number format is incorrect, please resubmit…"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-red-400 mb-4 resize-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setRejectModal(null)}
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleRejectProfessional(rejectModal.id, rejectReason)}
+                  disabled={actionLoading === rejectModal.id}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  {actionLoading === rejectModal.id ? 'Rejecting…' : 'Confirm Reject'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* All Agents Tab */}
