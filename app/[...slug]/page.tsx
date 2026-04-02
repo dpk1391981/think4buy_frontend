@@ -124,7 +124,7 @@ export default async function ProgrammaticSeoListingPage({ params }: Props) {
 
       {/* Property listings — always rendered from property DB */}
       <Suspense fallback={<div className="min-h-screen bg-gray-50 pt-4" />}>
-        <PropertyListingPage searchParams={listingParams} />
+        <PropertyListingPage searchParams={listingParams} pageH1={config.h1Title} />
       </Suspense>
 
       {/* DB-driven SEO content — only renders non-null fields */}
