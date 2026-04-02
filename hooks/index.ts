@@ -14,3 +14,4 @@ export { usePaginatedFetch, useInfiniteFetch } from './usePaginatedFetch';
 export { useLazyComponent }      from './useLazyComponent';
 export { useWishlist }           from './useWishlist';
 export { useAnalytics }          from './useAnalytics';
+export { useLeadCapture, useBehavioralLeadCapture } from './useLeadCapture';

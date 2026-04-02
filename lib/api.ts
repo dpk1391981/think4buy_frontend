@@ -217,8 +217,20 @@ export const authApi = {
     api.post('/auth/login', { email, password }),
   register: (data: any) => api.post('/auth/register', data),
   getProfile: () => api.get('/auth/profile'),
-  updateProfile: (data: { name?: string; email?: string; city?: string; company?: string }) =>
+  updateProfile: (data: { name?: string; email?: string; city?: string; company?: string; phone?: string; agentLicense?: string; agentGstNumber?: string; agentBio?: string; agentExperience?: number }) =>
     api.patch('/auth/profile', data),
+  updateAgentCompany: (data: {
+    agencyName?: string; agentLicense?: string; agentGstNumber?: string; agentExperience?: number;
+    phone?: string; pan?: string; businessType?: string; specializations?: string; languages?: string;
+    officeStart?: string; officeEnd?: string; workingDays?: string; website?: string;
+  }) => api.patch('/auth/profile/company', data),
+  uploadDocument: (docType: 'rera' | 'gst' | 'pan', file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post(`/auth/profile/documents/${docType}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  previewDocument: (docType: 'rera' | 'gst' | 'pan') =>
+    api.get(`/auth/profile/documents/${docType}`, { responseType: 'blob' }),
   uploadAvatar: (file: File) => {
     const fd = new FormData();
     fd.append('avatar', file);
@@ -355,9 +367,18 @@ export const adminApi = {
   // Professional details approval
   getPendingProfessionalAgents: (params?: { page?: number; limit?: number }) =>
     api.get('/admin/agents/pending-professional', { params }),
-  approveProfessionalDetails: (id: string) => api.patch(`/admin/agents/${id}/approve-professional`),
-  rejectProfessionalDetails: (id: string) => api.patch(`/admin/agents/${id}/reject-professional`),
+  approveProfessionalDetails: (id: string, badge?: string) =>
+    api.patch(`/admin/agents/${id}/approve-professional`, { badge }),
+  rejectProfessionalDetails: (id: string, reason?: string) =>
+    api.patch(`/admin/agents/${id}/reject-professional`, { reason }),
   setAgentProfileInactive: (id: string) => api.patch(`/admin/agents/${id}/set-profile-inactive`),
+  uploadAgentDocument: (agentId: string, docType: 'rera' | 'gst' | 'pan', file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post(`/admin/agents/${agentId}/documents/${docType}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  previewAgentDocument: (agentId: string, docType: 'rera' | 'gst' | 'pan') =>
+    api.get(`/admin/agents/${agentId}/documents/${docType}`, { responseType: 'blob' }),
   // Countries
   getCountries: () => api.get('/admin/countries'),
   createCountry: (data: any) => api.post('/admin/countries', data),
@@ -643,6 +664,21 @@ export const agencyApi = {
   }) => api.post('/agency/me/locations', dto),
   removeMyLocation: (id: string) => api.delete(`/agency/me/locations/${id}`),
 
+  // Agency members (premium)
+  getMyMembers: () => api.get('/agency/me/members'),
+  inviteMember: (targetUserId: string, role?: 'owner' | 'manager' | 'member') =>
+    api.post('/agency/me/members/invite', { targetUserId, role }),
+  updateMemberRole: (targetUserId: string, role: 'owner' | 'manager' | 'member') =>
+    api.patch(`/agency/me/members/${targetUserId}/role`, { role }),
+  removeMember: (targetUserId: string, reason?: string) =>
+    api.delete(`/agency/me/members/${targetUserId}`, { data: { reason } }),
+  acceptInvite: (token: string) => api.patch(`/agency/me/members/invite/accept/${token}`),
+  declineInvite: (token: string) => api.patch(`/agency/me/members/invite/decline/${token}`),
+
+  // Admin: agency premium
+  adminSetAgencyPremium: (id: string, isPremium: boolean, maxMembers: number) =>
+    api.patch(`/agency/admin/agencies/${id}/premium`, { isPremium, maxMembers }),
+
   // Agent self-registration
   selfRegisterOrJoin: (data: { agencyName: string; contactPhone?: string; address?: string; city?: string; cityId?: string }) =>
     api.post('/agency/self/register-or-join', data),
@@ -667,6 +703,7 @@ export const agencyApi = {
     api.patch(`/agency/admin/agent-profiles/${profileId}/assign-agency`, { agencyId }),
   adminGetAgentProfile: (id: string) => api.get(`/agency/admin/agent-profiles/${id}`),
   adminGetAgentProfileByUser: (userId: string) => api.get(`/agency/admin/agent-profile-by-user/${userId}`),
+  adminGetAgencyMembers: (agencyId: string) => api.get(`/agency/admin/agencies/${agencyId}/members`),
 
   // Admin — Property Assignment
   adminAssignProperty: (data: { propertyId: string; agentId: string; assignedByAdmin?: boolean }) =>

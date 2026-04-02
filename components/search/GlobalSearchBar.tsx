@@ -848,7 +848,7 @@ function SearchModal({
 }
 
 // ── Hidden path prefixes (GlobalSearchBar not shown on these routes) ──────────
-const HIDDEN_PATH_PREFIXES = ['/admin', '/dashboard', '/buyer', '/owner', '/agent'];
+const HIDDEN_PATH_PREFIXES = ['/admin', '/dashboard', '/buyer', '/owner', '/agent', '/auth/onboarding'];
 
 // ── Main GlobalSearchBar export ───────────────────────────────────────────────
 

@@ -5,7 +5,8 @@ import {
   Search, Plus, Phone, Mail, MapPin, TrendingUp, Eye, EyeOff,
   Flame, Thermometer, Snowflake, MessageCircle, PhoneCall,
   RefreshCw, Filter, ChevronDown, X, IndianRupee,
-  Target, Calendar, FileText, ArrowRight,
+  Target, Calendar, FileText, ArrowRight, Zap, Clock, AlertCircle,
+  CheckCircle2, Star,
 } from 'lucide-react';
 import { leadsApi } from '@/lib/api';
 
@@ -61,6 +62,17 @@ function maskPhone(phone: string) {
   if (!phone) return '—';
   return phone.slice(0, 2) + '•••••' + phone.slice(-3);
 }
+
+function leadAgeLabel(createdAt: string): { label: string; cls: string } {
+  const hrs = (Date.now() - new Date(createdAt).getTime()) / 3_600_000;
+  if (hrs < 1)   return { label: 'Just now',   cls: 'text-green-600 font-bold' };
+  if (hrs < 24)  return { label: `${Math.floor(hrs)}h ago`,   cls: 'text-green-600' };
+  if (hrs < 72)  return { label: `${Math.floor(hrs / 24)}d ago`,  cls: 'text-amber-600' };
+  return           { label: `${Math.floor(hrs / 24)}d ago`,   cls: 'text-red-500' };
+}
+
+const WA_QUICK_REPLY = (name: string) =>
+  `Hi ${name?.split(' ')[0] || 'there'}, I noticed your property inquiry on Think4BuySale. I'd love to help you find the right property — when's a good time to chat?`;
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -216,6 +228,74 @@ export default function AgentLeadsPage() {
         </div>
       )}
 
+      {/* Urgency banner — only show when there are new hot leads */}
+      {stats && (stats.byTemperature?.hot > 0 || (stats.byStatus?.new > 0)) && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-2xl shadow-md">
+          <Zap className="w-5 h-5 flex-shrink-0 animate-pulse" />
+          <div className="flex-1">
+            <p className="text-sm font-bold">
+              {stats.byTemperature?.hot > 0
+                ? `${stats.byTemperature.hot} hot lead${stats.byTemperature.hot > 1 ? 's' : ''} need immediate follow-up!`
+                : `${stats.byStatus.new} new lead${stats.byStatus.new > 1 ? 's' : ''} assigned to you`
+              }
+            </p>
+            <p className="text-xs text-red-100">Fast response = higher conversion. Aim to call within 30 min.</p>
+          </div>
+          <button onClick={() => { setStatus('new'); setTemperature('hot'); setPage(1); }}
+            className="flex-shrink-0 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-semibold transition-colors">
+            View Now →
+          </button>
+        </div>
+      )}
+
+      {/* Hot Leads Quick-Action Strip */}
+      {!loading && leads.filter(l => l.temperature === 'hot' && l.status === 'new').length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Flame className="w-4 h-4 text-red-500" />
+            <span className="text-sm font-bold text-gray-800">Hot Leads — Act Now</span>
+            <span className="ml-auto text-xs text-gray-400">Respond fast to close more deals</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {leads.filter(l => l.temperature === 'hot' && l.status === 'new').slice(0, 3).map(lead => (
+              <div key={lead.id} className="bg-white border-2 border-red-100 rounded-2xl p-4 hover:border-red-300 transition-all group">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{lead.contactName}</p>
+                    {lead.city && <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><MapPin className="w-3 h-3" />{lead.city}{lead.locality ? `, ${lead.locality}` : ''}</p>}
+                  </div>
+                  <span className="flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-bold">
+                    <Flame className="w-3 h-3" />HOT
+                  </span>
+                </div>
+                {(lead.budgetMin || lead.budgetMax) && (
+                  <p className="text-xs text-emerald-700 font-semibold mb-3 flex items-center gap-1">
+                    <IndianRupee className="w-3 h-3" />
+                    {lead.budgetMin ? fmt(Number(lead.budgetMin)) : '—'}
+                    {lead.budgetMax ? ` – ${fmt(Number(lead.budgetMax))}` : ''}
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <a href={`tel:${lead.contactPhone}`}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-600 text-white rounded-xl text-xs font-bold hover:bg-green-700 active:scale-95 transition-all">
+                    <PhoneCall className="w-3.5 h-3.5" />Call
+                  </a>
+                  <a href={`https://wa.me/91${(lead.contactPhone || '').replace(/\D/g, '')}?text=${encodeURIComponent(`Hi ${lead.contactName?.split(' ')[0] || ''}, I'm reaching out regarding your property inquiry. When is a good time to connect?`)}`}
+                    target="_blank" rel="noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-[#25D366] text-white rounded-xl text-xs font-bold hover:bg-[#1ebe5d] active:scale-95 transition-all">
+                    <MessageCircle className="w-3.5 h-3.5" />WhatsApp
+                  </a>
+                  <button onClick={() => openLead(lead)}
+                    className="px-3 py-2 border-2 border-gray-200 text-gray-600 rounded-xl text-xs font-bold hover:border-blue-400 hover:text-blue-600 transition-all">
+                    Details
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
         <div className="flex flex-wrap gap-3 items-center">
@@ -353,14 +433,23 @@ export default function AgentLeadsPage() {
                         {lead.status?.replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                      {new Date(lead.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    <td className="px-4 py-3 text-xs whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                      {(() => { const a = leadAgeLabel(lead.createdAt); return <span className={a.cls}>{a.label}</span>; })()}
                     </td>
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => openLead(lead)}
-                        className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition-colors">
-                        Manage
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => openLead(lead)}
+                          className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition-colors">
+                          Manage
+                        </button>
+                        {lead.contactPhone && (
+                          <a href={`https://wa.me/91${(lead.contactPhone).replace(/\D/g,'')}?text=${encodeURIComponent(WA_QUICK_REPLY(lead.contactName))}`}
+                            target="_blank" rel="noreferrer" title="WhatsApp quick reply"
+                            className="w-7 h-7 flex items-center justify-center bg-[#25D366]/10 text-[#25D366] rounded-lg hover:bg-[#25D366]/20 transition-colors">
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -399,7 +488,16 @@ export default function AgentLeadsPage() {
                     {selected.status?.replace(/_/g, ' ')}
                   </span>
                 </div>
-                <div className="text-xs text-gray-400 mt-0.5">Score: {selected.leadScore}/100</div>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-xs text-gray-400">Score: {selected.leadScore}/100</span>
+                  {selected.status === 'new' && (
+                    <button onClick={async () => { setNewStatus('contacted'); await saveStatus(); }}
+                      disabled={saving}
+                      className="text-xs text-blue-600 font-semibold flex items-center gap-1 hover:text-blue-800">
+                      <CheckCircle2 className="w-3.5 h-3.5" />Mark Contacted
+                    </button>
+                  )}
+                </div>
               </div>
               <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100">
                 <X className="w-4 h-4" />
@@ -407,6 +505,18 @@ export default function AgentLeadsPage() {
             </div>
 
             <div className="flex-1 p-6 space-y-5">
+
+              {/* Response nudge for new leads */}
+              {selected.status === 'new' && (
+                <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl">
+                  <Clock className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-amber-800">New lead — respond within 30 min</p>
+                    <p className="text-[11px] text-amber-600 mt-0.5">Agents who respond fast close <strong>3× more deals</strong>.</p>
+                  </div>
+                </div>
+              )}
+
               {/* Contact */}
               <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide">Contact Info</h4>

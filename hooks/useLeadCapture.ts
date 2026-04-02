@@ -19,7 +19,8 @@ export type LeadSource =
   | 'campaign'
   | 'portal_import'
   | 'walkin'
-  | 'manual';
+  | 'manual'
+  | 'onboarding';
 
 export interface LeadCapturePayload {
   source: LeadSource;
@@ -139,4 +140,141 @@ function getOrCreateSessionId(): string {
   } catch {
     return '';
   }
+}
+
+// ── Behavioral (fire-and-forget) lead capture ─────────────────────────────────
+
+/**
+ * useBehavioralLeadCapture
+ *
+ * Captures implicit buyer intent signals without any UI friction.
+ * Every action is fire-and-forget — never blocks the user.
+ *
+ * De-duplication:
+ *  • In-memory set prevents repeated fires within the same page session.
+ *  • localStorage cooldown (30 min) prevents re-fires across page loads.
+ *
+ * Usage:
+ *   const { onPropertyView, onCallAgent, onSaveProperty } = useBehavioralLeadCapture();
+ *   // In a useEffect or event handler:
+ *   onPropertyView(property.id, { city: property.city, propertyType: property.type });
+ */
+
+const BEHAVIOR_COOLDOWN_MS = 30 * 60 * 1000; // 30 min per property+source pair
+const BEHAVIOR_LS_KEY = 't4bs_blc';
+
+function isBehaviorCooled(key: string): boolean {
+  try {
+    const raw = localStorage.getItem(BEHAVIOR_LS_KEY);
+    if (!raw) return false;
+    const map: Record<string, number> = JSON.parse(raw);
+    const ts = map[key];
+    if (!ts) return false;
+    return Date.now() - ts < BEHAVIOR_COOLDOWN_MS;
+  } catch { return false; }
+}
+
+function markBehaviorFired(key: string): void {
+  try {
+    const raw = localStorage.getItem(BEHAVIOR_LS_KEY);
+    const map: Record<string, number> = raw ? JSON.parse(raw) : {};
+    const now = Date.now();
+    // Prune entries older than 24 h to keep storage lean
+    for (const k of Object.keys(map)) {
+      if (now - map[k] > 24 * 60 * 60 * 1000) delete map[k];
+    }
+    map[key] = now;
+    localStorage.setItem(BEHAVIOR_LS_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+export interface BehavioralPayload {
+  /** Property ID / slug context */
+  propertyId?: string;
+  propertyType?: string;
+  city?: string;
+  cityId?: string;
+  locality?: string;
+  budgetMin?: number;
+  budgetMax?: number;
+}
+
+export function useBehavioralLeadCapture() {
+  const firedThisSession = useRef<Set<string>>(new Set());
+
+  const fire = useCallback((source: LeadSource, payload: BehavioralPayload = {}) => {
+    const key = `${payload.propertyId ?? 'np'}:${source}`;
+
+    // In-memory dedup
+    if (firedThisSession.current.has(key)) return;
+    // Cross-session cooldown
+    if (isBehaviorCooled(key)) return;
+
+    firedThisSession.current.add(key);
+    markBehaviorFired(key);
+
+    const body: Record<string, any> = {
+      source: source.toUpperCase(),
+      sessionId: getOrCreateSessionId(),
+      deviceType: typeof navigator !== 'undefined'
+        ? (/Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop')
+        : 'unknown',
+    };
+    if (payload.propertyId)   body.propertyId   = payload.propertyId;
+    if (payload.propertyType) body.propertyType = payload.propertyType;
+    if (payload.city)         body.city         = payload.city;
+    if (payload.cityId)       body.cityId       = payload.cityId;
+    if (payload.locality)     body.locality     = payload.locality;
+    if (payload.budgetMin)    body.budgetMin    = payload.budgetMin;
+    if (payload.budgetMax)    body.budgetMax    = payload.budgetMax;
+
+    // Fire-and-forget
+    leadsApi.capturePublic(body).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onPropertyView = useCallback(
+    (propertyId: string, ctx?: BehavioralPayload) => fire('property_page', { propertyId, ...ctx }),
+    [fire],
+  );
+
+  const onCallAgent = useCallback(
+    (propertyId: string, ctx?: BehavioralPayload) => fire('call', { propertyId, ...ctx }),
+    [fire],
+  );
+
+  const onWhatsApp = useCallback(
+    (propertyId: string, ctx?: BehavioralPayload) => fire('whatsapp', { propertyId, ...ctx }),
+    [fire],
+  );
+
+  const onSaveProperty = useCallback(
+    (propertyId: string, ctx?: BehavioralPayload) => fire('property_page', { propertyId, ...ctx }),
+    [fire],
+  );
+
+  const onSearchFilters = useCallback(
+    (ctx: BehavioralPayload) => fire('search', ctx),
+    [fire],
+  );
+
+  const onScheduleVisit = useCallback(
+    (propertyId: string, ctx?: BehavioralPayload) => fire('schedule_visit', { propertyId, ...ctx }),
+    [fire],
+  );
+
+  const onViewPhone = useCallback(
+    (propertyId: string, ctx?: BehavioralPayload) => fire('view_phone', { propertyId, ...ctx }),
+    [fire],
+  );
+
+  return {
+    fire,
+    onPropertyView,
+    onCallAgent,
+    onWhatsApp,
+    onSaveProperty,
+    onSearchFilters,
+    onScheduleVisit,
+    onViewPhone,
+  };
 }
