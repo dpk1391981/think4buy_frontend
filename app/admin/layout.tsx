@@ -43,9 +43,11 @@ import {
   MonitorPlay,
   ToggleLeft,
   Building2,
+  HardHat,
   Inbox,
   ThumbsUp,
   AlertTriangle,
+  PhoneCall,
 } from 'lucide-react';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import { useAuth } from '@/contexts/AuthContext';
@@ -72,6 +74,12 @@ const NAV_GROUPS = [
       { href: '/admin/agents',         label: 'Agents',         icon: UserCheck, slug: 'admin_agents'         },
       { href: '/admin/premium-slots',  label: 'Premium Slots',  icon: Zap,       slug: 'admin_premium_slots'  },
       { href: '/admin/agent-coverage', label: 'Agent Coverage', icon: Gem,       slug: 'admin_agent_coverage' },
+    ],
+  },
+  {
+    label: 'Builders',
+    items: [
+      { href: '/admin/builders', label: 'Builders', icon: HardHat, slug: 'admin_builders' },
     ],
   },
   {
@@ -149,8 +157,9 @@ const NAV_GROUPS = [
   {
     label: 'Support',
     items: [
-      { href: '/admin/support/feedback',    label: 'Feedback & Reviews', icon: ThumbsUp,      slug: 'admin_support_feedback'    },
-      { href: '/admin/support/complaints',  label: 'Complaints',         icon: AlertTriangle,  slug: 'admin_support_complaints'  },
+      { href: '/admin/support/feedback',         label: 'Feedback & Reviews',    icon: ThumbsUp,      slug: 'admin_support_feedback'         },
+      { href: '/admin/support/complaints',       label: 'Complaints',            icon: AlertTriangle, slug: 'admin_support_complaints'       },
+      { href: '/admin/support/contact-content',  label: 'Contact Content',       icon: PhoneCall,     slug: 'admin_support_contact_content'  },
     ],
   },
 ];

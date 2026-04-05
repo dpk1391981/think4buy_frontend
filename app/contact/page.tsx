@@ -1,37 +1,49 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MapPin, Phone, Mail, Clock, Send, CheckCircle, AlertCircle, Home, ChevronRight } from 'lucide-react';
 
 const API_BASE = '/api/q';
 
-const CONTACT_DETAILS = [
-  {
-    icon: <MapPin className="w-5 h-5 text-primary-600" />,
-    title: 'Our Office',
-    lines: ['Think4BuySale Pvt. Ltd.', 'New Delhi, India — 110001'],
-  },
-  {
-    icon: <Phone className="w-5 h-5 text-primary-600" />,
-    title: 'Phone',
-    lines: ['+91 98765 43210', 'Mon – Sat, 9am – 6pm'],
-  },
-  {
-    icon: <Mail className="w-5 h-5 text-primary-600" />,
-    title: 'Email',
-    lines: ['support@think4buysale.com', 'Response within 24 hours'],
-  },
-  {
-    icon: <Clock className="w-5 h-5 text-primary-600" />,
-    title: 'Business Hours',
-    lines: ['Mon – Sat: 9:00 AM – 6:00 PM', 'Sunday: Closed'],
-  },
-];
+interface ContactInfo {
+  address: string[];
+  phone:   string[];
+  email:   string[];
+  hours:   string[];
+}
+
+const FALLBACK_CONTACT: ContactInfo = {
+  address: ['Think4BuySale Pvt. Ltd.', 'New Delhi, India — 110001'],
+  phone:   ['+91 98765 43210', 'Mon – Sat, 9am – 6pm'],
+  email:   ['support@think4buysale.com', 'Response within 24 hours'],
+  hours:   ['Mon – Sat: 9:00 AM – 6:00 PM', 'Sunday: Closed'],
+};
+
+function buildContactDetails(info: ContactInfo) {
+  return [
+    { icon: <MapPin className="w-5 h-5 text-primary-600" />, title: 'Our Office',       lines: info.address },
+    { icon: <Phone  className="w-5 h-5 text-primary-600" />, title: 'Phone',             lines: info.phone   },
+    { icon: <Mail   className="w-5 h-5 text-primary-600" />, title: 'Email',             lines: info.email   },
+    { icon: <Clock  className="w-5 h-5 text-primary-600" />, title: 'Business Hours',    lines: info.hours   },
+  ];
+}
 
 export default function ContactPage() {
-  const [form, setForm]     = useState({ name: '', email: '', phone: '', message: '' });
+  const [form, setForm]           = useState({ name: '', email: '', phone: '', message: '' });
+  const [contactInfo, setContactInfo] = useState<ContactInfo>(FALLBACK_CONTACT);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/config/public`)
+      .then(r => r.ok ? r.json() : null)
+      .then(cfg => {
+        if (cfg?.CONTACT_PAGE_INFO && typeof cfg.CONTACT_PAGE_INFO === 'object') {
+          setContactInfo({ ...FALLBACK_CONTACT, ...cfg.CONTACT_PAGE_INFO });
+        }
+      })
+      .catch(() => {});
+  }, []);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
 
@@ -156,7 +168,7 @@ export default function ContactPage() {
               </div>
 
               <div className="space-y-4">
-                {CONTACT_DETAILS.map(d => (
+                {buildContactDetails(contactInfo).map(d => (
                   <div key={d.title} className="flex gap-4 p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
                     <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0">
                       {d.icon}

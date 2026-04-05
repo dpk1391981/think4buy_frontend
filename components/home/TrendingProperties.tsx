@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import OptimizedImage from '@/components/common/OptimizedImage';
@@ -179,16 +179,21 @@ function TrendingCardSkeleton() {
   );
 }
 
-export default function TrendingProperties() {
+export default function TrendingProperties({ city: cityProp }: { city?: string }) {
   const [activeFilter, setActiveFilter] = useState<'all' | 'buy' | 'rent'>('all');
+  const [mounted, setMounted] = useState(false);
   const selectedCity  = useAppSelector((s) => s.ui.selectedCity);
   const selectedState = useAppSelector((s) => s.ui.selectedState);
 
+  useEffect(() => { setMounted(true); }, []);
+
+  const effectiveCity = cityProp ?? selectedCity;
+
   const { data: res, isLoading } = useQuery({
-    queryKey: ['home-trending', selectedCity, selectedState, activeFilter],
+    queryKey: ['home-trending', effectiveCity, selectedState, activeFilter],
     queryFn: () => homeApi.getTrending({
-      city:     selectedCity  || undefined,
-      state:    !selectedCity && selectedState ? selectedState : undefined,
+      city:     effectiveCity || undefined,
+      state:    !effectiveCity && selectedState ? selectedState : undefined,
       category: activeFilter !== 'all' ? activeFilter : undefined,
       limit:    8,
     }).then(r => r.data),
@@ -197,7 +202,9 @@ export default function TrendingProperties() {
 
   const properties: any[] = res?.data ?? [];
   const hasData = !isLoading && properties.length > 0;
-  const locationLabel = selectedCity || selectedState || null;
+  const locationLabel = cityProp
+    ? (effectiveCity || null)
+    : (mounted ? (effectiveCity || selectedState || null) : null);
 
   return (
     <section className="py-5 sm:py-14 bg-gradient-to-b from-gray-50 to-white">

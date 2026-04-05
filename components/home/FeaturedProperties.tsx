@@ -362,17 +362,21 @@ function TabContent({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function FeaturedProperties() {
+export default function FeaturedProperties({ city: cityProp }: { city?: string }) {
   const [activeTab, setActiveTab] = useState<TabId>('smart_featured');
   const [mounted, setMounted]     = useState(false);
 
-  const selectedCity    = useAppSelector((s) => s.ui.selectedCity);
-  const selectedState   = useAppSelector((s) => s.ui.selectedState);
+  const selectedCity  = useAppSelector((s) => s.ui.selectedCity);
+  const selectedState = useAppSelector((s) => s.ui.selectedState);
 
   useEffect(() => { setMounted(true); }, []);
 
-  const tab        = TABS.find((t) => t.id === activeTab)!;
-  const location   = selectedCity || selectedState || null;
+  // Prop takes priority over Redux (city page passes prop; home page uses Redux after mount)
+  const effectiveCity = cityProp ?? selectedCity;
+  const tab           = TABS.find((t) => t.id === activeTab)!;
+  const location      = effectiveCity || selectedState || null;
+  // If prop provided: show immediately (SSR-safe). If Redux: wait for mount to avoid hydration mismatch.
+  const showLocation  = cityProp ? location : (mounted ? location : null);
 
   return (
     <section className="py-5 sm:py-14 bg-white">
@@ -389,8 +393,8 @@ export default function FeaturedProperties() {
             </div>
             <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
               Featured Properties
-              {mounted && location && (
-                <span className="text-sm font-normal text-gray-500">in {location}</span>
+              {showLocation && (
+                <span className="text-sm font-normal text-gray-500">in {showLocation}</span>
               )}
             </h2>
             <p className="text-xs sm:text-sm text-gray-500 mt-1">{tab.desc}</p>
@@ -458,7 +462,7 @@ export default function FeaturedProperties() {
         {/* ── Content ────────────────────────────────────────────────────── */}
         <TabContent
           tabId={activeTab}
-          city={selectedCity}
+          city={effectiveCity}
           state={selectedState}
         />
 

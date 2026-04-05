@@ -19,8 +19,9 @@ import AuthLoadingOverlay from '@/components/auth/AuthLoadingOverlay';
 import AuthSessionLoader from '@/components/auth/AuthSessionLoader';
 import AuthSessionExpiredToast from '@/components/auth/AuthSessionExpiredToast';
 
-const GlobalSearchBar  = dynamic(() => import('@/components/search/GlobalSearchBar'),  { ssr: false });
-const GlobalHelpWidget = dynamic(() => import('@/components/common/GlobalHelpWidget'), { ssr: false });
+const GlobalSearchBar      = dynamic(() => import('@/components/search/GlobalSearchBar'),           { ssr: false });
+const GlobalHelpWidget     = dynamic(() => import('@/components/common/GlobalHelpWidget'),          { ssr: false });
+const NavigationProgress   = dynamic(() => import('@/components/common/NavigationProgress'),        { ssr: false });
 
 const APP_NAME = 'Think4BuySale';
 const APP_URL  = process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com';
@@ -101,6 +102,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#2563eb" />
       </head>
       <body style={{ overflowX: 'clip' }}>
+        <NavigationProgress />
         <ReduxProvider>
           <QueryProvider>
             <AuthProvider>

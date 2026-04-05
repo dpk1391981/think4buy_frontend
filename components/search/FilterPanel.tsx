@@ -31,12 +31,15 @@ interface ListingFilter {
 }
 
 export interface FilterPanelProps {
-  className?:  string;
-  isMobile?:   boolean;
+  className?:       string;
+  isMobile?:        boolean;
   /** Mobile only: result count to show on the apply button */
-  totalCount?: number;
+  totalCount?:      number;
   /** Mobile only: called when user taps "Show results" */
-  onApply?:    () => void;
+  onApply?:         () => void;
+  /** Override category when URL has no ?category= (e.g. on SEO listing URLs like /new-projects-in-noida) */
+  propCategory?:    string;
+  propIsNewProject?: boolean;
 }
 
 // ─── Static data ──────────────────────────────────────────────────────────────
@@ -65,6 +68,17 @@ const ALL_FILTER_KEYS = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const BUILDER_ONLY_CATEGORIES = new Set(['new_projects', 'builder_project']);
+
+/** For builder/new-project categories, strip owner & agent from "Posted By" options */
+function applyBuilderFilter(filter: ListingFilter, isBuilderCat: boolean): ListingFilter {
+  if (!isBuilderCat || filter.filterKey !== 'listedBy') return filter;
+  return {
+    ...filter,
+    optionsJson: (filter.optionsJson || []).filter(o => o.value !== 'owner' && o.value !== 'agent'),
+  };
+}
 
 function isActive(filterKey: string, sp: URLSearchParams): boolean {
   if (filterKey === 'budget') return sp.has('minPrice') || sp.has('maxPrice');
@@ -99,10 +113,11 @@ function useFilterData(category: string) {
 
 // ─── Desktop FilterPanel ──────────────────────────────────────────────────────
 
-export default function FilterPanel({ className }: FilterPanelProps) {
+export default function FilterPanel({ className, propCategory, propIsNewProject }: FilterPanelProps) {
   const router      = useRouter();
   const sp          = useSearchParams();
-  const category    = sp.get('category') || 'buy';
+  const isBuilderCat = propIsNewProject || sp.get('isNewProject') === 'true' || BUILDER_ONLY_CATEGORIES.has(propCategory || sp.get('category') || '');
+  const category    = isBuilderCat && !(propCategory || sp.get('category')) ? 'new_projects' : (propCategory || sp.get('category') || 'buy');
 
   const { filters, propTypes, amenities, loading } = useFilterData(category);
   const [open, setOpen]             = useState<Record<string, boolean>>({});
@@ -207,7 +222,7 @@ export default function FilterPanel({ className }: FilterPanelProps) {
                 {isOpen && (
                   <div className="px-4 pb-4 pt-1">
                     <WidgetBody
-                      filter={f} get={get} push={push} set1={set1}
+                      filter={applyBuilderFilter(f, isBuilderCat)} get={get} push={push} set1={set1}
                       propTypes={propTypes} priceRanges={priceRanges}
                       amenityGroups={amenityGroups}
                       activeAmenityIds={activeAmenityIds}
@@ -254,13 +269,14 @@ function DesktopSkeleton() {
 // ─── Filter Modal (desktop centered overlay) ──────────────────────────────────
 
 export function FilterModal({
-  open: modalOpen, onClose, totalCount,
+  open: modalOpen, onClose, totalCount, propCategory, propIsNewProject,
 }: {
-  open: boolean; onClose: () => void; totalCount?: number;
+  open: boolean; onClose: () => void; totalCount?: number; propCategory?: string; propIsNewProject?: boolean;
 }) {
   const router   = useRouter();
   const sp       = useSearchParams();
-  const category = sp.get('category') || 'buy';
+  const isBuilderCat = propIsNewProject || sp.get('isNewProject') === 'true' || BUILDER_ONLY_CATEGORIES.has(propCategory || sp.get('category') || '');
+  const category = isBuilderCat && !(propCategory || sp.get('category')) ? 'new_projects' : (propCategory || sp.get('category') || 'buy');
 
   const { filters, propTypes, amenities, loading } = useFilterData(category);
 
@@ -436,7 +452,7 @@ export function FilterModal({
                     />
                   ) : (
                     <WidgetBody
-                      filter={currentFilter}
+                      filter={applyBuilderFilter(currentFilter, isBuilderCat)}
                       get={get}
                       push={setMultiP as any}
                       set1={setP}
@@ -488,13 +504,14 @@ export function FilterModal({
 // Full-screen with horizontal scrollable tabs at top
 
 export function MobileFilterSheet({
-  open: sheetOpen, onClose, totalCount,
+  open: sheetOpen, onClose, totalCount, propCategory, propIsNewProject,
 }: {
-  open: boolean; onClose: () => void; totalCount?: number;
+  open: boolean; onClose: () => void; totalCount?: number; propCategory?: string; propIsNewProject?: boolean;
 }) {
   const router   = useRouter();
   const sp       = useSearchParams();
-  const category = sp.get('category') || 'buy';
+  const isBuilderCat = propIsNewProject || sp.get('isNewProject') === 'true' || BUILDER_ONLY_CATEGORIES.has(propCategory || sp.get('category') || '');
+  const category = isBuilderCat && !(propCategory || sp.get('category')) ? 'new_projects' : (propCategory || sp.get('category') || 'buy');
 
   const { filters, propTypes, amenities, loading } = useFilterData(category);
 
@@ -674,7 +691,7 @@ export function MobileFilterSheet({
                   />
                 ) : (
                   <MobileWidget
-                    filter={currentFilter}
+                    filter={applyBuilderFilter(currentFilter, isBuilderCat)}
                     get={get}
                     setP={setP}
                     setMultiP={setMultiP}
@@ -1053,16 +1070,45 @@ function WidgetBody({
         </div>
       );
 
-    case 'option_select':
+    case 'option_select': {
+      const opts = filter.optionsJson || [];
+      if (opts.length >= 5) {
+        // Scrollable vertical list for long option sets (e.g. possession status)
+        return (
+          <div className="space-y-0.5 max-h-48 overflow-y-auto pr-0.5">
+            {opts.map(o => {
+              const active = get(filter.filterKey) === o.value;
+              return (
+                <button key={o.value}
+                  onClick={() => set1(filter.filterKey, active ? undefined : o.value)}
+                  className={cn(
+                    'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs transition-colors',
+                    active ? 'bg-primary-50 text-primary-700 font-semibold' : 'text-gray-600 hover:bg-gray-50',
+                  )}
+                >
+                  <span className={cn(
+                    'w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors',
+                    active ? 'bg-primary-600 border-primary-600' : 'border-gray-300',
+                  )}>
+                    {active && <CheckCircle className="w-3 h-3 text-white" />}
+                  </span>
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        );
+      }
       return (
         <div className="flex flex-wrap gap-1.5">
-          {(filter.optionsJson || []).map(o => {
+          {opts.map(o => {
             const active = get(filter.filterKey) === o.value;
             return <Chip key={o.value} active={active}
               onClick={() => set1(filter.filterKey, active ? undefined : o.value)}>{o.label}</Chip>;
           })}
         </div>
       );
+    }
 
     case 'amenity_picker': {
       const groups = Object.entries(amenityGroups);

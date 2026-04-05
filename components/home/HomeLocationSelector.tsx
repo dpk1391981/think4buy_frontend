@@ -89,7 +89,7 @@ export default function HomeLocationSelector() {
               return (
                 <Link
                   key={city.id}
-                  href={`/property-in-${slug}`}
+                  href={`/properties-in-${slug}`}
                   className="group flex-shrink-0 snap-start flex flex-col items-center gap-2 w-[76px] sm:w-[88px] focus:outline-none"
                   aria-label={`Properties in ${city.name}`}
                 >

@@ -66,13 +66,13 @@ export default function DbSeoContent({ config }: Props) {
     <section className="bg-white border-t border-gray-100 py-14" aria-label="Property information">
       <div className="container-max max-w-5xl space-y-12">
 
-        {/* ── H1 Title + Intro ─────────────────────────────────────────────── */}
+        {/* ── Section Heading + Intro ──────────────────────────────────────── */}
         {(hasH1 || hasIntro) && (
           <div>
             {hasH1 && (
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
                 {config.h1Title}
-              </h1>
+              </h2>
             )}
             <div className="w-16 h-1 bg-primary-500 rounded mb-6" />
             {hasIntro && (

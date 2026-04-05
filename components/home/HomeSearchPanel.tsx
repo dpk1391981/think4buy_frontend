@@ -44,7 +44,6 @@ const SLUG_COLORS: Record<string, string> = {
 };
 const DEFAULT_COLOR = 'from-gray-500 to-gray-600';
 
-const ALL_TAB: CategoryTab = { value: '', label: 'All', color: DEFAULT_COLOR };
 
 const VIRTUAL_TABS = [
   { value: 'agents', label: 'Agents', color: SLUG_COLORS.agents },
@@ -97,7 +96,7 @@ const POSTED_BY_OPTIONS = [
 
 // ─── Shared hook ──────────────────────────────────────────────────────────────
 
-function useCategoryData(activeCat: string) {
+function useCategoryData(activeCat: string, onFirstTab?: (slug: string) => void) {
   const [tabs, setTabs] = useState<CategoryTab[]>(VIRTUAL_TABS);
   const [types, setTypes] = useState<PropType[]>([]);
   const typeCache = useRef<Record<string, PropType[]>>({});
@@ -107,8 +106,10 @@ function useCategoryData(activeCat: string) {
       const dbTabs: CategoryTab[] = data.map((c: any) => ({
         value: c.slug, label: c.name, color: SLUG_COLORS[c.slug] ?? DEFAULT_COLOR,
       }));
-      setTabs([ALL_TAB, ...dbTabs, ...VIRTUAL_TABS]);
+      setTabs([...dbTabs, ...VIRTUAL_TABS]);
+      if (onFirstTab && dbTabs.length > 0) onFirstTab(dbTabs[0].value);
     }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -592,6 +593,7 @@ function DesktopPropertySearch({
   const [bhk, setBhk]       = useState<string[]>([]);
   const [budget, setBudget] = useState<{ label: string; min: number; max: number } | null>(null);
   const [more, setMore]     = useState({ possession: '', furnishing: '', postedBy: '' });
+  const [searching, setSearching] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [detectErr, setDetectErr] = useState('');
   const [popularCities, setPopularCities] = useState<{ id: string; cityName: string; counts: { total: number } }[]>([]);
@@ -665,6 +667,17 @@ function DesktopPropertySearch({
     setShowSugg(false);
     if (city) {
       // User selected a location suggestion — city is resolved, use directly
+      const hasOtherFilters = locality || type || bhk.length || budget || more.possession || more.furnishing || more.postedBy;
+      if (!hasOtherFilters) {
+        const citySlug = city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        if (category === 'buy')  { router.push(`/property-for-sale-in-${citySlug}`); return; }
+        if (category === 'rent') { router.push(`/property-for-rent-in-${citySlug}`); return; }
+        // All / other categories → listing page with city filter
+        const p = new URLSearchParams({ city });
+        if (category) p.set('category', category);
+        router.push(`/properties?${p}`);
+        return;
+      }
       onSearch(buildParams(city, locality));
       return;
     }
@@ -678,6 +691,7 @@ function DesktopPropertySearch({
     }
 
     // Smart backend NLP search
+    setSearching(true);
     try {
       const res = await smartSearchApi.parse(rawQ, category || undefined);
       const url = new URL(res.data.redirectUrl, 'http://x');
@@ -702,12 +716,28 @@ function DesktopPropertySearch({
       if (more.possession)  url.searchParams.set('possessionStatus', more.possession);
       if (more.furnishing)  url.searchParams.set('furnishingStatus', more.furnishing);
       if (more.postedBy)    url.searchParams.set('listedBy', more.postedBy);
-      if (category && !res.data.filters?.category) url.searchParams.set('category', category);
 
-      router.push(`/properties?${url.searchParams.toString()}`);
+      const effectiveCat = category || res.data.filters?.category || '';
+      if (effectiveCat && !res.data.filters?.category) url.searchParams.set('category', effectiveCat);
+
+      // Route to SEO listing URL for buy/rent/new-projects + city-only (no deep filters)
+      const sp = url.searchParams;
+      const resultCity = sp.get('city');
+      const hasDeepFilters = sp.get('type') || sp.get('bedrooms') || sp.get('minPrice') || sp.get('maxPrice') || sp.get('locality') || sp.get('lat');
+      const isNP = category === 'new_projects' || category === 'builder_project';
+      if (resultCity && !hasDeepFilters && !res.data.nearbySearch) {
+        const slug = resultCity.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        if (effectiveCat === 'buy')  { router.push(`/property-for-sale-in-${slug}`); return; }
+        if (effectiveCat === 'rent') { router.push(`/property-for-rent-in-${slug}`); return; }
+        if (isNP)                    { router.push(`/new-projects-in-${slug}`);       return; }
+      }
+
+      router.push(`/properties?${sp.toString()}`);
     } catch {
       // BE unavailable — keyword fallback (preserves UI-selected filters)
       onSearch({ ...buildParams(), keyword: rawQ });
+    } finally {
+      setSearching(false);
     }
   }, [q, type, bhk, budget, more, category, onSearch, router]);
 
@@ -805,11 +835,17 @@ function DesktopPropertySearch({
           {/* Search button */}
           <button
             onClick={() => search()}
-            className="h-full px-6 md:px-10 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-bold text-base flex items-center gap-2 md:gap-2.5 transition-colors flex-shrink-0"
+            disabled={searching}
+            className="h-full px-6 md:px-10 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 disabled:bg-primary-500 text-white font-bold text-base flex items-center gap-2 md:gap-2.5 transition-colors flex-shrink-0"
           >
-            <Search className="w-5 h-5 md:w-5 md:h-5" />
-            <span className="hidden sm:inline text-[15px] md:text-base">Search</span>
-            {activeFilterCount > 0 && (
+            {searching
+              ? <Loader2 className="w-5 h-5 animate-spin" />
+              : <Search className="w-5 h-5" />
+            }
+            <span className="hidden sm:inline text-[15px] md:text-base">
+              {searching ? 'Searching…' : 'Search'}
+            </span>
+            {!searching && activeFilterCount > 0 && (
               <span className="bg-white/25 text-white text-xs font-bold px-1.5 py-0.5 rounded-full ml-1">
                 +{activeFilterCount}
               </span>
@@ -1021,6 +1057,7 @@ function MobileSearch({
   const [bhk, setBhk]       = useState<string[]>([]);
   const [budget, setBudget] = useState<(typeof BUDGET_BUY)[0] | null>(null);
   const [type, setType]     = useState('');
+  const [searching, setSearching] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [detectErr, setDetectErr] = useState('');
   const [topCities, setTopCities] = useState<{ id: string; cityName: string; counts: { total: number } }[]>([]);
@@ -1041,7 +1078,7 @@ function MobileSearch({
   }, [cat]);
 
   const isAgent      = cat === 'agents';
-  const isNewProject = cat === 'new_projects';
+  const isNewProject = cat === 'new_projects' || cat === 'builder_project';
   const budgets      = (cat === 'rent' || cat === 'pg') ? BUDGET_RENT : BUDGET_BUY;
   const types        = localTypes;
   const showBHK      = !isAgent && !isNewProject && cat !== 'commercial';
@@ -1106,6 +1143,17 @@ function MobileSearch({
 
     // If city came from a suggestion click, skip smart search
     if (city) {
+      const hasOtherFilters = locality || bhk.length || budget || type;
+      if (!hasOtherFilters && !isNewProject) {
+        const citySlug = city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        if (cat === 'buy')  { router.push(`/property-for-sale-in-${citySlug}`); return; }
+        if (cat === 'rent') { router.push(`/property-for-rent-in-${citySlug}`); return; }
+        // All / other categories → listing page with city filter
+        const p = new URLSearchParams({ city });
+        if (cat) p.set('category', cat);
+        router.push(`/properties?${p}`);
+        return;
+      }
       const p = new URLSearchParams();
       if (isNewProject) p.set('isNewProject', 'true'); else if (cat) p.set('category', cat);
       p.set('city', city);
@@ -1130,11 +1178,14 @@ function MobileSearch({
     }
 
     if (rawQ) {
+      setSearching(true);
       try {
         const res = await smartSearchApi.parse(rawQ, isNewProject ? undefined : cat || undefined);
         const url = new URL(res.data.redirectUrl, 'http://x');
         if (isNewProject)  url.searchParams.set('isNewProject', 'true');
-        else if (cat && !res.data.filters?.category) url.searchParams.set('category', cat);
+
+        const effectiveCat = cat || res.data.filters?.category || '';
+        if (effectiveCat && !res.data.filters?.category) url.searchParams.set('category', effectiveCat);
 
         // NLP detected "near me" intent — get real GPS coords
         if (res.data.nearbySearch) {
@@ -1153,7 +1204,19 @@ function MobileSearch({
         if (budget?.min)  url.searchParams.set('minPrice', String(budget.min));
         if (budget?.max)  url.searchParams.set('maxPrice', String(budget.max));
         if (type)         url.searchParams.set('type', type);
-        router.push(`/properties?${url.searchParams.toString()}`);
+
+        // Route to SEO listing URL for buy/rent/new-projects + city-only
+        const sp = url.searchParams;
+        const resultCity = sp.get('city');
+        const hasDeepFilters = sp.get('type') || sp.get('bedrooms') || sp.get('minPrice') || sp.get('maxPrice') || sp.get('locality') || sp.get('lat');
+        if (resultCity && !hasDeepFilters && !res.data.nearbySearch) {
+          const slug = resultCity.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+          if (effectiveCat === 'buy')  { router.push(`/property-for-sale-in-${slug}`); return; }
+          if (effectiveCat === 'rent') { router.push(`/property-for-rent-in-${slug}`); return; }
+          if (isNewProject)            { router.push(`/new-projects-in-${slug}`);       return; }
+        }
+
+        router.push(`/properties?${sp.toString()}`);
         return;
       } catch {
         // BE unavailable — keyword fallback (keep UI-selected filters)
@@ -1165,6 +1228,8 @@ function MobileSearch({
         if (type)        p.set('type', type);
         p.set('keyword', rawQ);
         router.push(`/properties?${p}`);
+      } finally {
+        setSearching(false);
       }
     } else {
       // No text but filters (BHK/type/budget) are selected
@@ -1525,23 +1590,29 @@ function MobileSearch({
         )}
         <button
           onClick={() => go()}
+          disabled={searching}
           className={cn(
             'w-full h-14 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-2.5',
             'bg-gradient-to-r from-primary-600 to-primary-700',
-            'shadow-lg shadow-primary-600/40 active:scale-[0.98] transition-transform',
+            'shadow-lg shadow-primary-600/40 active:scale-[0.98] transition-all',
+            searching && 'opacity-80',
           )}
         >
-          {isAgent
-            ? <Users className="w-5 h-5 flex-shrink-0" />
-            : <Search className="w-5 h-5 flex-shrink-0" />
+          {searching
+            ? <Loader2 className="w-5 h-5 flex-shrink-0 animate-spin" />
+            : isAgent
+              ? <Users className="w-5 h-5 flex-shrink-0" />
+              : <Search className="w-5 h-5 flex-shrink-0" />
           }
           <span className="truncate">
-            {query
-              ? (isAgent ? `Find Agents — ${query}` : `Search in ${query}`)
-              : (isAgent ? 'Find Agents' : 'Search Properties')
+            {searching
+              ? 'Searching…'
+              : query
+                ? (isAgent ? `Find Agents — ${query}` : `Search in ${query}`)
+                : (isAgent ? 'Find Agents' : 'Search Properties')
             }
           </span>
-          {filterCount > 0 && (
+          {!searching && filterCount > 0 && (
             <span className="bg-white/25 text-white text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">
               +{filterCount}
             </span>
@@ -1619,10 +1690,10 @@ export default function HomeSearchPanel() {
   const [cat, setCat]   = useState('');
   const [open, setOpen] = useState(false);
 
-  const { tabs, types } = useCategoryData(cat);
+  const { tabs, types } = useCategoryData(cat, (slug) => { if (!cat) setCat(slug); });
 
   const isAgent      = cat === 'agents';
-  const isNewProject = cat === 'new_projects';
+  const isNewProject = cat === 'new_projects' || cat === 'builder_project';
   const catInfo = tabs.find(c => c.value === cat) ?? { value: cat, label: cat, color: DEFAULT_COLOR };
 
   const handleSearch = useCallback((params: Record<string, string>) => {
@@ -1635,12 +1706,24 @@ export default function HomeSearchPanel() {
       metadata:     { category: isAgent ? 'agents' : cat, ...params },
     });
 
+    const DEEP_FILTER_KEYS = ['type','bedrooms','minPrice','maxPrice','possessionStatus','furnishingStatus','listedBy','keyword','locality','lat','lng'];
+    const isCityOnly = !!params.city && !DEEP_FILTER_KEYS.some(k => params[k]);
+    const citySlug   = params.city ? params.city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
+
     if (isAgent) {
       const p = new URLSearchParams(params);
       router.push(`/agents?${p}`);
     } else if (isNewProject) {
-      const p = new URLSearchParams({ isNewProject: 'true', ...params });
-      router.push(`/properties?${p}`);
+      if (isCityOnly) {
+        router.push(`/new-projects-in-${citySlug}`);
+      } else {
+        const p = new URLSearchParams({ isNewProject: 'true', ...params });
+        router.push(`/properties?${p}`);
+      }
+    } else if (isCityOnly && cat === 'buy') {
+      router.push(`/property-for-sale-in-${citySlug}`);
+    } else if (isCityOnly && cat === 'rent') {
+      router.push(`/property-for-rent-in-${citySlug}`);
     } else {
       const p = new URLSearchParams(params);
       if (cat) p.set('category', cat);

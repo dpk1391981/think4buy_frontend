@@ -354,8 +354,15 @@ export default function PropertyCard({ property, className, listView }: Property
                 </span>
               </div>
 
+              {/* Builder / Developer name — shown above title for hierarchy */}
+              {property.builderName && (
+                <p className="flex items-center gap-1 text-xs font-bold text-primary-700 mb-0.5">
+                  <Building2 className="w-3 h-3 flex-shrink-0" />
+                  <span className="line-clamp-1">{property.builderName}</span>
+                </p>
+              )}
               {/* Title */}
-              <h2 className="text-sm font-bold text-gray-900 line-clamp-1 group-hover:text-primary-600 transition-colors">
+              <h2 className="text-base font-semibold text-gray-900 line-clamp-1 group-hover:text-primary-600 transition-colors">
                 {property.title}
               </h2>
 
@@ -648,9 +655,16 @@ export default function PropertyCard({ property, className, listView }: Property
           <span className="text-[11px] text-gray-400 flex-shrink-0 mt-1">{timeAgo(property.createdAt)}</span>
         </div>
 
+        {/* Builder / Developer name — shown above title for hierarchy */}
+        {property.builderName && (
+          <p className="flex items-center gap-1 text-xs font-bold text-primary-700 mb-0.5">
+            <Building2 className="w-3 h-3 flex-shrink-0" />
+            <span className="line-clamp-1">{property.builderName}</span>
+          </p>
+        )}
         {/* Title + Agent/Owner pill on same row */}
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <h2 className="text-sm font-bold text-gray-900 line-clamp-1 group-hover:text-primary-600 transition-colors flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2 mb-0.5">
+          <h2 className="text-base font-semibold text-gray-900 line-clamp-1 group-hover:text-primary-600 transition-colors flex-1 min-w-0">
             {property.title}
           </h2>
           <span className={cn(

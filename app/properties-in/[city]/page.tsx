@@ -4,11 +4,22 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { MapPin, ArrowRight, Building2, ChevronRight } from 'lucide-react';
-import PropertyListingPage from '@/app/properties/PropertyListingPage';
 import DbSeoContent from '@/components/seo/DbSeoContent';
 import { KNOWN_CITY_SLUGS } from '@/lib/city-slugs';
 import { seoApi } from '@/lib/api';
 import JsonLd, { buildBreadcrumbSchema } from '@/components/seo/JsonLd';
+import HomeSearchPanel from '@/components/home/HomeSearchPanel';
+import FeaturedProperties from '@/components/home/FeaturedProperties';
+import dynamic from 'next/dynamic';
+import CityHomeSetup from './CityHomeSetup';
+
+const TrendingProperties = dynamic(() => import('@/components/home/TrendingProperties'), { ssr: true  });
+const TopNewProjects              = dynamic(() => import('@/components/home/TopNewProjects'),                { ssr: true  });
+const NewProjectsDevelopersSection = dynamic(() => import('@/components/home/NewProjectsDevelopersSection'), { ssr: false });
+const TopAgents          = dynamic(() => import('@/components/home/TopAgents'),          { ssr: true  });
+const CityPriceSnapshot  = dynamic(() => import('@/components/home/CityPriceSnapshot'), { ssr: true  });
+const TopLocalities      = dynamic(() => import('@/components/home/TopLocalities'),      { ssr: false });
+const TopDevelopers      = dynamic(() => import('@/components/home/TopDevelopers'),      { ssr: false });
 
 export const revalidate = 600;
 
@@ -172,7 +183,7 @@ function CityCard({ city, idx, stateName }: { city: CityEntry; idx: number; stat
 
   return (
     <Link
-      href={`/property-in-${slug}`}
+      href={`/properties-in-${slug}`}
       className="group relative bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col"
     >
       <div className="relative aspect-[16/9] overflow-hidden flex-shrink-0">
@@ -237,8 +248,61 @@ function CityCard({ city, idx, stateName }: { city: CityEntry; idx: number; stat
 export default async function PropertiesInPage({ params }: { params: { city: string } }) {
   const slug = params.city;
 
-  // ── City route ────────────────────────────────────────────────────────────
-  if (KNOWN_CITY_SLUGS.has(slug)) {
+  // ── Try state route first only if NOT a city slug ─────────────────────────
+  const isKnownState = !KNOWN_CITY_SLUGS.has(slug) && !!(await getStateData(slug));
+
+  // ── State route ───────────────────────────────────────────────────────────
+  if (isKnownState) {
+    const data = await getStateData(slug);
+    if (!data) notFound();
+    const cities = (data!.cities || []).filter(c => (c as any).isActive !== false);
+    const breadcrumb = buildBreadcrumbSchema([
+      { name: 'Home',                         url: APP_URL },
+      { name: 'Property in India',            url: `${APP_URL}/property-for-sale-rent-in-india` },
+      { name: `Property in ${data!.name}`,   url: `${APP_URL}/properties-in-${slug}` },
+    ]);
+    return (
+      <>
+        <JsonLd schema={breadcrumb} />
+        <section className="bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 pt-20 pb-10">
+          <div className="container-max text-center px-4">
+            <div className="inline-flex items-center gap-2 bg-white/10 text-white/80 text-xs font-semibold px-4 py-1.5 rounded-full mb-4 border border-white/20">
+              <Building2 className="w-3.5 h-3.5" />{data!.name} · India
+            </div>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3" style={{fontSize:'clamp(20px,2.5vw,28px)'}}>
+              {data!.h1 || `Property in ${data!.name}`}
+            </h1>
+            <p className="text-blue-100/70 max-w-xl mx-auto text-sm sm:text-base">
+              Explore verified listings across {cities.length} {cities.length === 1 ? 'city' : 'cities'} in {data!.name}.
+            </p>
+            <nav className="flex items-center justify-center gap-1.5 mt-5 text-xs text-white/50">
+              <Link href="/" className="hover:text-white transition-colors">Home</Link>
+              <ChevronRight className="w-3 h-3" />
+              <Link href="/property-for-sale-rent-in-india" className="hover:text-white transition-colors">India</Link>
+              <ChevronRight className="w-3 h-3" />
+              <span className="text-white/80">{data!.name}</span>
+            </nav>
+          </div>
+        </section>
+        {cities.length > 0 && (
+          <section className="py-8 sm:py-12 bg-gray-50 border-b border-gray-100">
+            <div className="container-max px-4">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-6">Top Cities in {data!.name}</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {cities.map((city, idx) => <CityCard key={city.id} city={city} idx={idx} stateName={data!.name} />)}
+              </div>
+            </div>
+          </section>
+        )}
+        <Suspense fallback={<div className="min-h-[60vh] bg-white animate-pulse" />}>
+          <FeaturedProperties />
+        </Suspense>
+      </>
+    );
+  }
+
+  // ── City route (known + unknown city slugs get city homepage) ─────────────
+  {
     const city = slugToTitle(slug);
     const seo = await getPropertyCitySeo(slug);
     const canonicalUrl = `${APP_URL}/properties-in-${slug}`;
@@ -289,82 +353,58 @@ export default async function PropertiesInPage({ params }: { params: { city: str
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(customSchema) }} />
         )}
 
-        <Suspense fallback={<div className="min-h-screen bg-gray-50 pt-16 animate-pulse" />}>
-          <PropertyListingPage searchParams={{ city }} />
-        </Suspense>
+        {/* ── Hero with search panel ── */}
+        <section className="relative flex items-center bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 pt-14 md:pt-16">
+          {/* Decorative background — overflow-hidden here so blobs stay contained
+              but do NOT clip the search dropdown that extends below the section */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-20 left-10 w-72 h-72 bg-primary-600/20 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute bottom-10 right-10 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl animate-pulse [animation-delay:1s]" />
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMC4zIiBvcGFjaXR5PSIwLjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-40" />
+          </div>
 
-        {/* DB-driven SEO content — only renders non-null fields */}
+          <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 lg:pt-12 pb-10 sm:pb-14 lg:pb-16">
+            <div className="mb-7 sm:mb-9">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white leading-tight mb-2" style={{fontSize:'clamp(22px,3vw,32px)'}}>
+                Properties in{' '}
+                <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                  {city}
+                </span>
+              </h1>
+              <p className="text-sm sm:text-base text-blue-100/70">
+                {seo?.metaDescription || `Verified properties for sale and rent in ${city}. Browse flats, houses, plots and more.`}
+              </p>
+            </div>
+            <HomeSearchPanel />
+          </div>
+
+          <div className="absolute bottom-0 left-0 right-0">
+            <svg viewBox="0 0 1440 60" className="w-full fill-gray-50" preserveAspectRatio="none">
+              <path d="M0,30L60,28C120,26,240,22,360,22C480,22,600,26,720,30C840,34,960,38,1080,36C1200,34,1320,28,1380,25L1440,22L1440,60L0,60Z" />
+            </svg>
+          </div>
+        </section>
+
+        {/* Sync Redux + localStorage to this city (for navbar & future navigations) */}
+        <CityHomeSetup city={city} />
+
+        {/* City-scoped home sections — all receive city prop directly (SSR-safe, no Redux timing issue) */}
+        <TrendingProperties city={city} />
+        <FeaturedProperties city={city} />
+
+        {/* ── Unified New Projects + Developers section (city-scoped) ── */}
+        <NewProjectsDevelopersSection cityOverride={city} />
+
+        <TopNewProjects     city={city} />
+        <TopLocalities      city={city} />
+        <TopDevelopers      city={city} />
+        <TopAgents          city={city} />
+        <CityPriceSnapshot  city={city} />
+
+        {/* DB-driven SEO content */}
         {seo && <DbSeoContent config={seo} />}
       </>
     );
   }
 
-  // ── State route ───────────────────────────────────────────────────────────
-  const data = await getStateData(slug);
-  if (!data) notFound();
-
-  const cities = (data.cities || []).filter(c => (c as any).isActive !== false);
-
-  const breadcrumb = buildBreadcrumbSchema([
-    { name: 'Home',                           url: APP_URL },
-    { name: 'Property in India',              url: `${APP_URL}/property-for-sale-rent-in-india` },
-    { name: `Property in ${data.name}`,       url: `${APP_URL}/properties-in-${slug}` },
-  ]);
-
-  return (
-    <>
-      <JsonLd schema={breadcrumb} />
-
-      <section className="bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 pt-20 pb-10">
-        <div className="container-max text-center px-4">
-          <div className="inline-flex items-center gap-2 bg-white/10 text-white/80 text-xs font-semibold px-4 py-1.5 rounded-full mb-4 border border-white/20">
-            <Building2 className="w-3.5 h-3.5" />
-            {data.name} · India
-          </div>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-3">
-            {data.h1 || `Property in ${data.name}`}
-          </h1>
-          <p className="text-blue-100/70 max-w-xl mx-auto text-sm sm:text-base">
-            Explore verified listings in {data.cities.length} {data.cities.length === 1 ? 'city' : 'cities'} across {data.name}. Buy, rent or invest.
-          </p>
-
-          <nav className="flex items-center justify-center gap-1.5 mt-5 text-xs text-white/50">
-            <Link href="/" className="hover:text-white transition-colors">Home</Link>
-            <ChevronRight className="w-3 h-3" />
-            <Link href="/property-for-sale-rent-in-india" className="hover:text-white transition-colors">
-              India
-            </Link>
-            <ChevronRight className="w-3 h-3" />
-            <span className="text-white/80">{data.name}</span>
-          </nav>
-        </div>
-      </section>
-
-      {/* {cities.length > 0 && (
-        <section className="py-8 sm:py-12 bg-gray-50 border-b border-gray-100">
-          <div className="container-max px-4">
-            <div className="flex items-end justify-between mb-6">
-              <div>
-                <p className="text-xs font-semibold text-primary-600 uppercase tracking-widest mb-1">Browse by City</p>
-                <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900">
-                  Top Cities in {data.name}
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">Select a city to view its property listings</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {cities.map((city, idx) => (
-                <CityCard key={city.id} city={city} idx={idx} stateName={data.name} />
-              ))}
-            </div>
-          </div>
-        </section>
-      )} */}
-
-      <Suspense fallback={<div className="min-h-[60vh] bg-white animate-pulse" />}>
-        <PropertyListingPage searchParams={{ state: data.name }} />
-      </Suspense>
-    </>
-  );
 }

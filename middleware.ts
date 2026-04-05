@@ -134,14 +134,76 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // ── 3b. /properties?city=X → /properties-in-x (301) ─────────────────────
+  // ── 3b. /properties?city=X → /properties-in-x (301, only when city is the sole param) ──
   if (pathname === '/properties') {
-    const cityParam = request.nextUrl.searchParams.get('city');
+    const sp = request.nextUrl.searchParams;
+    const cityParam = sp.get('city');
     if (cityParam) {
-      const citySlug = cityParam.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      // Only redirect to city homepage when city is the ONLY query param.
+      // /properties?city=Delhi&category=buy must reach the listing page, not the city page.
+      const keys = [...sp.keys()];
+      if (keys.length === 1) {
+        const citySlug = cityParam.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        const url = request.nextUrl.clone();
+        url.pathname = `/properties-in-${citySlug}`;
+        url.search = '';
+        return NextResponse.redirect(url, 301);
+      }
+    }
+  }
+
+  // ── 3c. /properties?category=X&city=Y[&locality=Z] → canonical SEO URL (301) ─
+  //
+  // Converts filter-query URLs into hyphen SEO URLs so every category+city
+  // (and category+city+locality) combination has a single canonical address.
+  //
+  // Trigger conditions (per category):
+  //   • category + city           → /{prefix}-in-{city}
+  //   • category + city + locality → /{prefix}-in-{city}-{locality}
+  //
+  // Deep filters (type, bedrooms, price range, geo) keep the query-string form
+  // because they don't have dedicated SEO pages.
+  if (pathname === '/properties' || pathname === '/search') {
+    const sp       = request.nextUrl.searchParams;
+    const category = sp.get('category');
+    const city     = sp.get('city');
+    const locality = sp.get('locality');
+
+    // Only redirect when no other deep filter params are present
+    const hasDeepFilters =
+      sp.get('type') || sp.get('bedrooms') || sp.get('minPrice') ||
+      sp.get('maxPrice') || sp.get('lat') || sp.get('isNewProject');
+
+    if (category && city && !hasDeepFilters) {
+      const CATEGORY_TO_PREFIX: Record<string, string> = {
+        buy:             'property-for-sale-in',
+        rent:            'property-for-rent-in',
+        pg:              'pg-in',
+        commercial:      'commercial-property-in',
+        industrial:      'commercial-property-in',
+        builder_project: 'new-projects-in',
+        new_projects:    'new-projects-in',
+      };
+      const prefix = CATEGORY_TO_PREFIX[category];
+      if (prefix) {
+        const toSlug = (s: string) =>
+          s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        const citySlug     = toSlug(city);
+        const localitySlug = locality ? toSlug(locality) : '';
+        const seoPath      = localitySlug
+          ? `/${prefix}-${citySlug}-${localitySlug}`
+          : `/${prefix}-${citySlug}`;
+        const url = request.nextUrl.clone();
+        url.pathname = seoPath;
+        url.search   = '';
+        return NextResponse.redirect(url, 301);
+      }
+    }
+
+    // /search → /properties (preserve all query params)
+    if (pathname === '/search') {
       const url = request.nextUrl.clone();
-      url.pathname = `/properties-in-${citySlug}`;
-      url.search = '';
+      url.pathname = '/properties';
       return NextResponse.redirect(url, 301);
     }
   }
