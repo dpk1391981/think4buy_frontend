@@ -69,11 +69,11 @@ export default function DbSeoContent({ config }: Props) {
         {/* ── Section Heading + Intro ──────────────────────────────────────── */}
         {(hasH1 || hasIntro) && (
           <div>
-            {hasH1 && (
+            {/* {hasH1 && (
               <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
                 {config.h1Title}
               </h2>
-            )}
+            )} */}
             <div className="w-16 h-1 bg-primary-500 rounded mb-6" />
             {hasIntro && (
               <HtmlOrText content={config.introContent!} className={proseBase} />
