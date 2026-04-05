@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import HomeSearchPanel from '@/components/home/HomeSearchPanel';
 import HeroVisual from '@/components/home/HeroVisual';
+import CityRedirect from '@/components/home/CityRedirect';
 import JsonLd, { buildWebSiteSchema, buildOrganizationSchema } from '@/components/seo/JsonLd';
 import CategoryGrid from '@/components/home/CategoryGrid';
 
@@ -28,6 +29,8 @@ import TopCitiesSection from '@/components/home/TopCitiesSection';
 const TopCategories      = dynamic(() => import('@/components/home/TopCategories'),        { ssr: true  });
 const TopAgents          = dynamic(() => import('@/components/home/TopAgents'),             { ssr: true  });
 const TopNewProjects     = dynamic(() => import('@/components/home/TopNewProjects'),        { ssr: true  });
+const TopLocalities      = dynamic(() => import('@/components/home/TopLocalities'),         { ssr: false });
+const TopDevelopers      = dynamic(() => import('@/components/home/TopDevelopers'),         { ssr: false });
 const ServicesBanner     = dynamic(() => import('@/components/home/ServicesBanner'),        { ssr: true  });
 const TrendingProperties = dynamic(() => import('@/components/home/TrendingProperties'),   { ssr: true  });
 const PropertyComparison = dynamic(() => import('@/components/home/PropertyComparison'),   { ssr: false });
@@ -70,17 +73,23 @@ const WHY_US = [
 export default function HomePage() {
   return (
     <>
+      {/* Redirect to city page if user has a saved city in localStorage */}
+      <CityRedirect />
+
       {/* ══════════════════════════════════════════════════════════════════════════
           HERO SECTION — Premium, high-conversion above-the-fold
       ══════════════════════════════════════════════════════════════════════════ */}
-      <section className="relative flex items-center bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 pt-14 md:pt-16 overflow-hidden">
-        {/* Animated background blobs */}
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary-600/20 rounded-full blur-3xl pointer-events-none animate-pulse" />
-        <div className="absolute bottom-10 right-10 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none animate-pulse [animation-delay:1s]" />
-        <div className="absolute top-1/3 left-1/3 w-[500px] h-[400px] bg-indigo-700/10 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Grid texture overlay */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMC4zIiBvcGFjaXR5PSIwLjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-40 pointer-events-none" />
+      <section className="relative flex items-center bg-gradient-to-br from-slate-900 via-primary-900 to-primary-800 pt-14 md:pt-16">
+        {/* Decorative background — overflow-hidden here so blobs stay contained
+            but do NOT clip the search dropdown that extends below the section */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {/* Animated blobs */}
+          <div className="absolute top-20 left-10 w-72 h-72 bg-primary-600/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-10 right-10 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl animate-pulse [animation-delay:1s]" />
+          <div className="absolute top-1/3 left-1/3 w-[500px] h-[400px] bg-indigo-700/10 rounded-full blur-3xl" />
+          {/* Grid texture overlay */}
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMC4zIiBvcGFjaXR5PSIwLjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-40" />
+        </div>
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 lg:pt-12 pb-10 sm:pb-14 lg:pb-16">
 
@@ -202,6 +211,16 @@ export default function HomePage() {
           NEW PROJECTS / TOP RESIDENTIAL
       ══════════════════════════════════════════════════════════════════════════ */}
       <TopNewProjects />
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          TOP LOCALITIES
+      ══════════════════════════════════════════════════════════════════════════ */}
+      <TopLocalities />
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          TOP DEVELOPERS
+      ══════════════════════════════════════════════════════════════════════════ */}
+      <TopDevelopers />
 
       {/* ══════════════════════════════════════════════════════════════════════════
           ⚖️ PROPERTY COMPARISON WIDGET

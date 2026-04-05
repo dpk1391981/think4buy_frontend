@@ -111,12 +111,19 @@ export default async function ProgrammaticSeoListingPage({ params }: Props) {
   // Property listing search params — derived from smart search so ANY admin URL works.
   // e.g. "flat-in-noida" → { type: 'apartment', city: 'Noida' }
   //      "2bhk-villa-gurgaon-sector-56" → { bedrooms: '2', type: 'villa', city: 'Gurgaon', locality: 'sector 56' }
+  const urlParsed    = parseListingSlug(buildSlug(params.slug));
   const smartFilters = await parseSlugToFilters(params.slug.join(' '));
   const listingParams: Record<string, string> = { ...smartFilters };
-  // Fill in gaps from SEO context (smart search might not extract category from type-only slugs)
-  if (!listingParams.category && context.categorySlug) listingParams.category = context.categorySlug;
-  if (!listingParams.city     && cityName)             listingParams.city      = cityName;
-  if (!listingParams.locality && localityName)         listingParams.locality  = localityName;
+  // URL prefix category is authoritative — always overrides NLP smart search result
+  // (NLP may misinterpret "new-projects-in-noida" as buy/rent)
+  const resolvedCategory = urlParsed.category ?? context.categorySlug;
+  if (resolvedCategory) listingParams.category = resolvedCategory;
+  if (!listingParams.city     && cityName)    listingParams.city     = cityName;
+  if (!listingParams.locality && localityName) listingParams.locality = localityName;
+  // Set isNewProject flag so FilterPanel + top chips render correctly
+  if (listingParams.category === 'builder_project' || listingParams.category === 'new_projects') {
+    listingParams.isNewProject = 'true';
+  }
 
   return (
     <>

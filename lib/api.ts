@@ -487,6 +487,8 @@ export const paymentApi = {
 // ── Admin Payment API ──────────────────────────────────────────────────────
 export const adminPaymentApi = {
   getDashboard: () => api.get('/admin/payment/dashboard'),
+  getPaymentMode: () => api.get<{ paymentEnabled: boolean; hasActiveGateway: boolean }>('/admin/payment/mode'),
+  setPaymentMode: (enabled: boolean) => api.patch('/admin/payment/mode', { enabled }),
 
   // Transactions
   getTransactions: (params?: {
@@ -1092,4 +1094,18 @@ export const supportApi = {
 
   /** Get admin/staff members available for assignment */
   getMembers: () => api.get('/support/members'),
+};
+
+
+// Builders / Developers
+export const buildersApi = {
+  /** Top builders, optionally scoped to a city. limit defaults to 6 (homepage). */
+  getAll: (params?: { city?: string; limit?: number }) =>
+    api.get('/builders', { params }),
+
+  /** Builder detail page: summary + paginated projects.
+   *  slug examples: "godrej", "godrej-in-noida"
+   */
+  getDetail: (slug: string, params?: { page?: number; limit?: number; status?: string; city?: string }) =>
+    api.get(`/builders/${encodeURIComponent(slug)}`, { params }),
 };

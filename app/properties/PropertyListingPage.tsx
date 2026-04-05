@@ -342,6 +342,26 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
     router.push(`/properties?${params.toString()}`, { scroll: false });
   };
 
+  const POSSESSION_CHIPS = [
+    { value: 'ready_to_move',      label: 'Ready to Move' },
+    { value: 'under_construction', label: 'Under Construction' },
+    { value: 'new_launch',         label: 'New Launch' },
+    { value: 'affordable_housing', label: 'Affordable Housing' },
+    { value: 'luxury_housing',     label: 'Luxury Housing' },
+  ];
+  const activePossession = getMerged('possessionStatus');
+  const togglePossession = (val: string) => {
+    const params = new URLSearchParams(urlSearchParams.toString());
+    const current = params.get('possessionStatus');
+    if (current === val) { params.delete('possessionStatus'); } else { params.set('possessionStatus', val); }
+    // Preserve category/city from propDefaults when URL has no query params
+    if (!params.has('category') && propDefaults.category) params.set('category', propDefaults.category);
+    if (!params.has('city')     && propDefaults.city)     params.set('city',     propDefaults.city);
+    if (propDefaults.isNewProject === 'true') params.set('isNewProject', 'true');
+    params.delete('page');
+    router.push(`/properties?${params.toString()}`, { scroll: false });
+  };
+
 
   const mapSearchParams: Record<string, string> = { ...propDefaults };
   urlSearchParams.forEach((val, key) => { mapSearchParams[key] = val; });
@@ -434,39 +454,59 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
             >
               🔥 Trending
             </button>
-            <button
-              onClick={toggleOwnerFilter}
-              className={cn(
-                'flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold h-7 px-3 rounded-full border-2 transition-all active:scale-95',
-                ownerFilterActive
-                  ? 'bg-amber-500 text-white border-amber-500 shadow-sm shadow-amber-400/40'
-                  : 'bg-white text-gray-600 border-gray-200',
-              )}
-            >
-              👤 Owner
-            </button>
-            <button
-              onClick={() => toggleBoolFilter('zeroBrokerage', zeroBrokerageActive)}
-              className={cn(
-                'flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold h-7 px-3 rounded-full border-2 transition-all active:scale-95',
-                zeroBrokerageActive
-                  ? 'bg-teal-600 text-white border-teal-600 shadow-sm shadow-teal-500/30'
-                  : 'bg-white text-gray-600 border-gray-200',
-              )}
-            >
-              🚫 Zero Brokerage
-            </button>
-            <button
-              onClick={() => toggleBoolFilter('topAgent', topAgentActive)}
-              className={cn(
-                'flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold h-7 px-3 rounded-full border-2 transition-all active:scale-95',
-                topAgentActive
-                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm shadow-primary-600/30'
-                  : 'bg-white text-gray-600 border-gray-200',
-              )}
-            >
-              ⭐ Top Agent
-            </button>
+            {isNewProject ? (
+              /* New-projects page: possession status chips instead of owner/agent */
+              POSSESSION_CHIPS.map(chip => (
+                <button
+                  key={chip.value}
+                  onClick={() => togglePossession(chip.value)}
+                  className={cn(
+                    'flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold h-7 px-3 rounded-full border-2 transition-all active:scale-95',
+                    activePossession === chip.value
+                      ? 'bg-cyan-600 text-white border-cyan-600 shadow-sm shadow-cyan-500/30'
+                      : 'bg-white text-gray-600 border-gray-200',
+                  )}
+                >
+                  {chip.label}
+                </button>
+              ))
+            ) : (
+              <>
+                <button
+                  onClick={toggleOwnerFilter}
+                  className={cn(
+                    'flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold h-7 px-3 rounded-full border-2 transition-all active:scale-95',
+                    ownerFilterActive
+                      ? 'bg-amber-500 text-white border-amber-500 shadow-sm shadow-amber-400/40'
+                      : 'bg-white text-gray-600 border-gray-200',
+                  )}
+                >
+                  👤 Owner
+                </button>
+                <button
+                  onClick={() => toggleBoolFilter('zeroBrokerage', zeroBrokerageActive)}
+                  className={cn(
+                    'flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold h-7 px-3 rounded-full border-2 transition-all active:scale-95',
+                    zeroBrokerageActive
+                      ? 'bg-teal-600 text-white border-teal-600 shadow-sm shadow-teal-500/30'
+                      : 'bg-white text-gray-600 border-gray-200',
+                  )}
+                >
+                  🚫 Zero Brokerage
+                </button>
+                <button
+                  onClick={() => toggleBoolFilter('topAgent', topAgentActive)}
+                  className={cn(
+                    'flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold h-7 px-3 rounded-full border-2 transition-all active:scale-95',
+                    topAgentActive
+                      ? 'bg-primary-600 text-white border-primary-600 shadow-sm shadow-primary-600/30'
+                      : 'bg-white text-gray-600 border-gray-200',
+                  )}
+                >
+                  ⭐ Top Agent
+                </button>
+              </>
+            )}
 
             {/* Active filter chips inline */}
             {dedupedFilters.map(([key, value]) => (
@@ -548,7 +588,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
                 <SlidersHorizontal className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
                 Open Full Filter Panel
               </button>
-              <FilterPanel />
+              <FilterPanel propCategory={propDefaults.category || undefined} propIsNewProject={isNewProject} />
             </div>
           )}
 
@@ -598,39 +638,59 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
                 >
                   🔥 Trending
                 </button>
-                <button
-                  onClick={toggleOwnerFilter}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors',
-                    ownerFilterActive
-                      ? 'bg-amber-500 text-white border-amber-500'
-                      : 'bg-white text-gray-700 border-gray-200 hover:border-amber-400 hover:text-amber-600',
-                  )}
-                >
-                  👤 Owner
-                </button>
-                <button
-                  onClick={() => toggleBoolFilter('zeroBrokerage', zeroBrokerageActive)}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors',
-                    zeroBrokerageActive
-                      ? 'bg-teal-600 text-white border-teal-600'
-                      : 'bg-white text-gray-700 border-gray-200 hover:border-teal-400 hover:text-teal-600',
-                  )}
-                >
-                  🚫 Zero Brokerage
-                </button>
-                <button
-                  onClick={() => toggleBoolFilter('topAgent', topAgentActive)}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors',
-                    topAgentActive
-                      ? 'bg-primary-600 text-white border-primary-600'
-                      : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400 hover:text-primary-600',
-                  )}
-                >
-                  ⭐ Top Agent
-                </button>
+                {isNewProject ? (
+                  /* New-projects: possession status chips instead of owner/agent */
+                  POSSESSION_CHIPS.map(chip => (
+                    <button
+                      key={chip.value}
+                      onClick={() => togglePossession(chip.value)}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors',
+                        activePossession === chip.value
+                          ? 'bg-cyan-600 text-white border-cyan-600'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-cyan-400 hover:text-cyan-600',
+                      )}
+                    >
+                      {chip.label}
+                    </button>
+                  ))
+                ) : (
+                  <>
+                    <button
+                      onClick={toggleOwnerFilter}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors',
+                        ownerFilterActive
+                          ? 'bg-amber-500 text-white border-amber-500'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-amber-400 hover:text-amber-600',
+                      )}
+                    >
+                      👤 Owner
+                    </button>
+                    <button
+                      onClick={() => toggleBoolFilter('zeroBrokerage', zeroBrokerageActive)}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors',
+                        zeroBrokerageActive
+                          ? 'bg-teal-600 text-white border-teal-600'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-teal-400 hover:text-teal-600',
+                      )}
+                    >
+                      🚫 Zero Brokerage
+                    </button>
+                    <button
+                      onClick={() => toggleBoolFilter('topAgent', topAgentActive)}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-2.5 border rounded-xl text-sm font-medium transition-colors',
+                        topAgentActive
+                          ? 'bg-primary-600 text-white border-primary-600'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-primary-400 hover:text-primary-600',
+                      )}
+                    >
+                      ⭐ Top Agent
+                    </button>
+                  </>
+                )}
                 {viewMode !== 'map' && (
                   <div className="relative">
                     <select
@@ -692,7 +752,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
             {viewMode === 'map' ? (
               <div className="relative h-full min-h-[500px]">
                 <div className="absolute left-0 top-0 bottom-0 w-64 z-10 overflow-y-auto hidden lg:block">
-                  <FilterPanel className="rounded-r-none border-r-0" />
+                  <FilterPanel className="rounded-r-none border-r-0" propCategory={propDefaults.category || undefined} propIsNewProject={isNewProject} />
                 </div>
                 <div className="lg:ml-64 h-full">
                   <MapPropertySearch searchParams={mapSearchParams} className="h-full min-h-[500px]" />
@@ -785,6 +845,8 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
         open={showMobileFilters}
         onClose={() => setShowMobileFilters(false)}
         totalCount={meta?.total}
+        propCategory={propDefaults.category || undefined}
+        propIsNewProject={isNewProject}
       />
 
       {/* ── Desktop Filter Modal ─────────────────────────────────────────── */}
@@ -792,6 +854,8 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
         open={showFilterModal}
         onClose={() => setShowFilterModal(false)}
         totalCount={meta?.total}
+        propCategory={propDefaults.category || undefined}
+        propIsNewProject={isNewProject}
       />
 
     </div>

@@ -269,8 +269,9 @@ function SnapshotSkeleton() {
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
-export default function CityPriceSnapshot() {
+export default function CityPriceSnapshot({ city: cityProp }: { city?: string }) {
   const reduxCity = useAppSelector((s) => s.ui.selectedCity);
+  const effectiveCity = cityProp ?? reduxCity;
 
   const { data: citiesRes } = useQuery({
     queryKey: ['market-cities'],
@@ -281,13 +282,14 @@ export default function CityPriceSnapshot() {
   const apiCities: string[] = citiesRes?.data?.map((c: any) => c.city) ?? [];
   const cityList = apiCities.length > 0 ? apiCities : FALLBACK_CITIES;
 
-  const [activeCity, setActiveCity] = useState<string>(() =>
-    FALLBACK_CITIES.includes(reduxCity) ? reduxCity : FALLBACK_CITIES[0],
-  );
+  const [activeCity, setActiveCity] = useState<string>(() => {
+    if (effectiveCity && FALLBACK_CITIES.includes(effectiveCity)) return effectiveCity;
+    return FALLBACK_CITIES[0];
+  });
 
   useEffect(() => {
     if (cityList.length > 0 && !cityList.includes(activeCity)) {
-      const preferred = cityList.find(c => c.toLowerCase() === (reduxCity || '').toLowerCase());
+      const preferred = cityList.find(c => c.toLowerCase() === (effectiveCity || '').toLowerCase());
       setActiveCity(preferred || cityList[0]);
     }
   }, [cityList.join(',')]); // eslint-disable-line

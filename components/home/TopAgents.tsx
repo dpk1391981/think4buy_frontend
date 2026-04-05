@@ -297,7 +297,7 @@ function AgentCard({ agent }: { agent: Agent }) {
   );
 }
 
-export default function TopAgents() {
+export default function TopAgents({ city: cityProp }: { city?: string }) {
   const scrollRef       = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const selectedState   = useAppSelector(s => s.ui.selectedState);
@@ -307,15 +307,16 @@ export default function TopAgents() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Same priority as FeaturedProperties: cityId > city > stateId > state name
+  const effectiveCity = cityProp ?? selectedCity;
+
   const agentParams: Parameters<typeof usersApi.getAgents>[0] = { limit: 8 };
-  if (selectedCityId)       agentParams.cityId  = selectedCityId;
-  else if (selectedCity)    agentParams.city    = selectedCity;
+  if (effectiveCity)        agentParams.city    = effectiveCity;
+  else if (selectedCityId)  agentParams.cityId  = selectedCityId;
   else if (selectedStateId) agentParams.stateId = selectedStateId;
   else if (selectedState)   agentParams.state   = selectedState;
 
   const { data: agents = [], isLoading } = useQuery({
-    queryKey: ['home-top-agents', selectedStateId || selectedState, selectedCityId || selectedCity],
+    queryKey: ['home-top-agents', selectedStateId || selectedState, effectiveCity || selectedCityId],
     queryFn: () =>
       usersApi.getAgents(agentParams).then(r => r.data?.agents || []),
     staleTime: 3 * 60 * 1000,
@@ -327,11 +328,14 @@ export default function TopAgents() {
 
   if (!isLoading && agents.length === 0) return null;
 
-  const locationLabel = mounted
-    ? (selectedCity ? `in ${selectedCity}` : selectedState ? `in ${selectedState}` : 'across India')
-    : 'across India';
-  const viewAllHref = mounted && selectedCity
-    ? `/agents?city=${encodeURIComponent(selectedCity)}`
+  const locationLabel = cityProp
+    ? (effectiveCity ? `in ${effectiveCity}` : 'across India')
+    : (mounted ? (effectiveCity ? `in ${effectiveCity}` : selectedState ? `in ${selectedState}` : 'across India') : 'across India');
+
+  const viewAllHref = cityProp && effectiveCity
+    ? `/agents?city=${encodeURIComponent(effectiveCity)}`
+    : mounted && effectiveCity
+    ? `/agents?city=${encodeURIComponent(effectiveCity)}`
     : mounted && selectedState
     ? `/agents?state=${encodeURIComponent(selectedState)}`
     : '/agents';

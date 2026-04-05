@@ -16,7 +16,6 @@ interface SearchBarProps {
 }
 
 const CATEGORY_TABS = [
-  { value: '', label: 'All' },
   { value: 'buy', label: 'Buy' },
   { value: 'rent', label: 'Rent' },
   { value: 'pg', label: 'PG' },
@@ -76,7 +75,11 @@ export default function SearchBar({
   size = 'lg',
 }: SearchBarProps) {
   const router = useRouter();
-  const [category, setCategory] = useState('');
+  const navPush = (url: string) => {
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('t4bs:navstart'));
+    router.push(url);
+  };
+  const [category, setCategory] = useState(CATEGORY_TABS[0].value);
   const [query, setQuery] = useState(initialKeyword || initialCity || initialSearch);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -178,14 +181,14 @@ export default function SearchBar({
    */
   const handleSearch = useCallback(async (overrideParams?: Record<string, string>) => {
     if (overrideParams) {
-      router.push(buildSearchUrl(overrideParams));
+      navPush(buildSearchUrl(overrideParams));
       setShowSuggestions(false);
       return;
     }
 
     const q = query.trim();
     if (!q) {
-      router.push(category ? `/properties?category=${category}` : '/properties');
+      navPush(category ? `/properties?category=${category}` : '/properties');
       setShowSuggestions(false);
       return;
     }
@@ -215,10 +218,10 @@ export default function SearchBar({
         } catch { /* geolocation denied — proceed without geo */ }
       }
 
-      router.push(`/properties?${url.searchParams.toString()}`);
+      navPush(`/properties?${url.searchParams.toString()}`);
     } catch {
       // Fallback: simple city or keyword search
-      router.push(buildSearchUrl(/\s/.test(q) ? { keyword: q } : { city: q }));
+      navPush(buildSearchUrl(/\s/.test(q) ? { keyword: q } : { city: q }));
     } finally {
       setSearching(false);
     }
@@ -241,7 +244,7 @@ export default function SearchBar({
         });
         const params = new URLSearchParams({ lat: String(latitude), lng: String(longitude), radius: '5' });
         if (category) params.set('category', category);
-        router.push(`/properties?${params.toString()}`);
+        navPush(`/properties?${params.toString()}`);
         setShowSuggestions(false);
       },
       () => {
@@ -256,20 +259,20 @@ export default function SearchBar({
     setShowSuggestions(false);
     if (item.type === 'city') {
       setQuery(item.label);
-      router.push(buildSearchUrl({ city: item.value }));
+      navPush(buildSearchUrl({ city: item.value }));
     } else if (item.type === 'locality') {
       const [locality, city] = item.value.split('|');
       setQuery(`${locality}, ${city}`);
-      router.push(buildSearchUrl({ city, locality }));
+      navPush(buildSearchUrl({ city, locality }));
     } else if (item.type === 'builder') {
       setQuery(item.label);
-      router.push(buildSearchUrl({ builderName: item.value }));
+      navPush(buildSearchUrl({ builderName: item.value }));
     } else if (item.type === 'project') {
       setQuery(item.label);
-      router.push(buildSearchUrl({ search: item.value }));
+      navPush(buildSearchUrl({ search: item.value }));
     } else {
       setQuery(item.label);
-      router.push(buildSearchUrl({ search: item.value }));
+      navPush(buildSearchUrl({ search: item.value }));
     }
   };
 
@@ -478,9 +481,9 @@ export default function SearchBar({
                             try {
                               const res = await smartSearchApi.parse(t.query, category || undefined);
                               setActiveChips(res.data.chips);
-                              router.push(res.data.redirectUrl);
+                              navPush(res.data.redirectUrl);
                             } catch {
-                              router.push(buildSearchUrl({ keyword: t.query }));
+                              navPush(buildSearchUrl({ keyword: t.query }));
                             }
                           }}
                         >
@@ -502,7 +505,7 @@ export default function SearchBar({
                           className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left transition-colors"
                           onClick={() => {
                             setQuery(c.cityName);
-                            router.push(buildSearchUrl({ city: c.cityName }));
+                            navPush(buildSearchUrl({ city: c.cityName }));
                             setShowSuggestions(false);
                           }}
                         >

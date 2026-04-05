@@ -178,7 +178,7 @@ function SkeletonCard() {
 
 // ─── Section ──────────────────────────────────────────────────────────────────
 
-export default function TopNewProjects() {
+export default function TopNewProjects({ city: cityProp }: { city?: string }) {
   const scrollRef       = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const selectedState   = useAppSelector(s => s.ui.selectedState);
@@ -187,14 +187,15 @@ export default function TopNewProjects() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // city > stateId > state — same priority as FeaturedProperties
+  const effectiveCity = cityProp ?? selectedCity;
+
   const locationParams: Record<string, any> = {};
-  if (selectedCity)         locationParams.city    = selectedCity;
+  if (effectiveCity)        locationParams.city    = effectiveCity;
   else if (selectedStateId) locationParams.stateId = selectedStateId;
   else if (selectedState)   locationParams.state   = selectedState;
 
   const { data: projects = [], isLoading } = useQuery({
-    queryKey: ['home-new-projects', selectedStateId || selectedState, selectedCity],
+    queryKey: ['home-new-projects', selectedStateId || selectedState, effectiveCity],
     queryFn: () =>
       propertiesApi
         .getAll({
@@ -218,13 +219,15 @@ export default function TopNewProjects() {
 
   if (!isLoading && projects.length === 0) return null;
 
-  const locationLabel = mounted
-    ? (selectedCity ? `in ${selectedCity}` : selectedState ? `in ${selectedState}` : 'across India')
-    : 'across India';
+  const locationLabel = cityProp
+    ? (effectiveCity ? `in ${effectiveCity}` : 'across India')
+    : (mounted ? (effectiveCity ? `in ${effectiveCity}` : selectedState ? `in ${selectedState}` : 'across India') : 'across India');
 
   const viewAllBase = '/properties?possessionStatus=under_construction&approvalStatus=approved';
-  const viewAllHref = mounted && selectedCity
-    ? `${viewAllBase}&city=${encodeURIComponent(selectedCity)}`
+  const viewAllHref = cityProp && effectiveCity
+    ? `${viewAllBase}&city=${encodeURIComponent(effectiveCity)}`
+    : mounted && effectiveCity
+    ? `${viewAllBase}&city=${encodeURIComponent(effectiveCity)}`
     : mounted && selectedState
     ? `${viewAllBase}&state=${encodeURIComponent(selectedState)}`
     : viewAllBase;

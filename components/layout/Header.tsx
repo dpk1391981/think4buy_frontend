@@ -69,7 +69,8 @@ function CitySelector({ compact = false }: { compact?: boolean }) {
     saveCityToLS(cityObj.name, cityObj.id);
     setOpen(false);
     setQuery('');
-    if (pathname !== '/') router.push('/');
+    const citySlug = cityObj.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    router.push(`/properties-in-${citySlug}`);
   };
 
   const handleAllCities = () => {
@@ -93,14 +94,12 @@ function CitySelector({ compact = false }: { compact?: boolean }) {
           const n = normalize(c.name);
           return det.includes(n) || n.includes(det);
         });
-        if (match) {
-          dispatch(setSelectedCity({ city: match.name, cityId: match.id }));
-          saveCityToLS(match.name, match.id);
-        } else if (loc.city) {
-          // city not in DB but detected — store name without id
-          dispatch(setSelectedCity({ city: loc.city, cityId: '' }));
-          saveCityToLS(loc.city, '');
-        }
+        const cityName = match?.name || loc.city;
+        const cityId   = match?.id   || '';
+        dispatch(setSelectedCity({ city: cityName, cityId }));
+        saveCityToLS(cityName, cityId);
+        const slug = cityName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        router.push(`/properties-in-${slug}`);
       })
       .catch(() => {})
       .finally(() => setDetecting(false));
@@ -565,13 +564,13 @@ function MobileDrawer({ open, onClose, navLinks }: { open: boolean; onClose: () 
         const normalize = (s: string) => (s || '').toLowerCase().trim();
         let match = dbCities.find(c => normalize(c.name) === normalize(loc.city));
         if (!match) match = dbCities.find(c => normalize(c.name).includes(normalize(loc.city)) || normalize(loc.city).includes(normalize(c.name)));
-        if (match) {
-          dispatch(setSelectedCity({ city: match.name, cityId: match.id }));
-          saveCityToLS(match.name, match.id);
-        } else if (loc.city) {
-          dispatch(setSelectedCity({ city: loc.city, cityId: '' }));
-          saveCityToLS(loc.city, '');
-        }
+        const cityName = match?.name || loc.city;
+        const cityId   = match?.id   || '';
+        dispatch(setSelectedCity({ city: cityName, cityId }));
+        saveCityToLS(cityName, cityId);
+        onClose();
+        const slug = cityName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        router.push(`/properties-in-${slug}`);
       })
       .catch(() => {})
       .finally(() => setDetecting(false));

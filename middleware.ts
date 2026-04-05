@@ -134,14 +134,45 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // ── 3b. /properties?city=X → /properties-in-x (301) ─────────────────────
+  // ── 3b. /properties?city=X → /properties-in-x (301, only when city is the sole param) ──
   if (pathname === '/properties') {
-    const cityParam = request.nextUrl.searchParams.get('city');
+    const sp = request.nextUrl.searchParams;
+    const cityParam = sp.get('city');
     if (cityParam) {
-      const citySlug = cityParam.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      // Only redirect to city homepage when city is the ONLY query param.
+      // /properties?city=Delhi&category=buy must reach the listing page, not the city page.
+      const keys = [...sp.keys()];
+      if (keys.length === 1) {
+        const citySlug = cityParam.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        const url = request.nextUrl.clone();
+        url.pathname = `/properties-in-${citySlug}`;
+        url.search = '';
+        return NextResponse.redirect(url, 301);
+      }
+    }
+  }
+
+  // ── 3c. builder_project / new_projects + city → /new-projects-in-{city} (301) ─
+  //   Handles both /properties and /search entry points.
+  //   Deep filters (type, bedrooms, price range, locality, geo) stay on /properties.
+  if (pathname === '/properties' || pathname === '/search') {
+    const sp = request.nextUrl.searchParams;
+    const category = sp.get('category');
+    const city     = sp.get('city');
+    const hasDeepFilters =
+      sp.get('type') || sp.get('bedrooms') || sp.get('minPrice') ||
+      sp.get('maxPrice') || sp.get('locality') || sp.get('lat');
+    if ((category === 'builder_project' || category === 'new_projects') && city && !hasDeepFilters) {
+      const slug = city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       const url = request.nextUrl.clone();
-      url.pathname = `/properties-in-${citySlug}`;
+      url.pathname = `/new-projects-in-${slug}`;
       url.search = '';
+      return NextResponse.redirect(url, 301);
+    }
+    // /search → /properties (preserve all query params)
+    if (pathname === '/search') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/properties';
       return NextResponse.redirect(url, 301);
     }
   }

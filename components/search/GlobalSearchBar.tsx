@@ -21,7 +21,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import {
   Search, MapPin, Loader2, X, Navigation, TrendingUp,
   Building2, Home, LocateFixed, ChevronRight, History, Sparkles,
@@ -89,11 +89,6 @@ const SLUG_GRADIENT: Record<string, string> = {
   new_projects:    'from-teal-500 to-teal-600',
 };
 
-const ALL_CATEGORY: CategoryTab = {
-  value: '',
-  label: 'All',
-  gradient: 'from-gray-500 to-gray-600',
-};
 
 const CITY_GRADIENTS = [
   'from-blue-500 to-cyan-400', 'from-orange-500 to-red-400', 'from-green-500 to-teal-400',
@@ -149,7 +144,7 @@ function useKeywordMappings(): SearchKeywordMapping[] {
 // ── useCategoryTabs — fetch categories from BE ────────────────────────────────
 
 function useCategoryTabs() {
-  const [tabs, setTabs] = useState<CategoryTab[]>([ALL_CATEGORY]);
+  const [tabs, setTabs] = useState<CategoryTab[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -159,11 +154,31 @@ function useCategoryTabs() {
         label: c.name,
         gradient: SLUG_GRADIENT[c.slug] ?? GRADIENT_PALETTE[(idx + 1) % GRADIENT_PALETTE.length],
       }));
-      setTabs([ALL_CATEGORY, ...dbTabs]);
+      setTabs(dbTabs);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   return { tabs, loading };
+}
+
+/** Derive property search category from the current pathname + searchParams. */
+function useCategoryFromUrl(): string {
+  const pathname  = usePathname();
+  const sp        = useSearchParams();
+
+  if (sp.get('isNewProject') === 'true') return 'new_projects';
+  const catParam = sp.get('category');
+  if (catParam) return catParam;
+
+  // SEO slug patterns → category
+  if (/\/(property-for-sale-in|flats-for-sale-in|villas-for-sale-in|plots-for-sale-in)/.test(pathname)) return 'buy';
+  if (/\/(property-for-rent-in|flats-for-rent-in)/.test(pathname)) return 'rent';
+  if (/\/pg-in-/.test(pathname)) return 'pg';
+  if (/\/(commercial-property-in|office-space-for-rent-in)/.test(pathname)) return 'commercial';
+  if (/\/new-projects-in-/.test(pathname)) return 'new_projects';
+  if (catParam === 'builder_project') return 'builder_project';
+
+  return '';
 }
 
 // ── Intent Preview Strip ───────────────────────────────────────────────────────
@@ -419,6 +434,11 @@ function SearchModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  // navPush — fires the global progress bar for programmatic navigations
+  const navPush = (url: string) => {
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('t4bs:navstart'));
+    router.push(url);
+  };
   const { user } = useAuth();
   const { preferences } = useCookieConsent();
   const { trackCategorySelect, trackSearchPerform } = useSearchState();
@@ -429,7 +449,13 @@ function SearchModal({
 
   const { tabs: categoryTabs, loading: catsLoading } = useCategoryTabs();
 
-  const [category, setCategory]           = useState(initialCategory);
+  const [category, setCategory] = useState(initialCategory);
+
+  // Auto-select first tab when tabs load and no category is pre-set
+  useEffect(() => {
+    if (!category && categoryTabs.length > 0) setCategory(categoryTabs[0].value);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryTabs]);
   const [query, setQuery]                 = useState(initialKeyword);
   const [suggestions, setSuggestions]     = useState<Suggestion[]>([]);
   const [loadingSugg, setLoadingSugg]     = useState(false);
@@ -535,7 +561,7 @@ function SearchModal({
     try {
       const q = query.trim();
       if (!q) {
-        router.push(category ? `/properties?category=${category}` : '/properties');
+        navPush(category ? `/properties?category=${category}` : '/properties');
         return;
       }
       const res = await smartSearchApi.parse(q, category || undefined);
@@ -563,25 +589,47 @@ function SearchModal({
         city: url.searchParams.get('city') || undefined,
         propertyType: url.searchParams.get('type') || undefined,
       });
-      router.push(`/properties?${url.searchParams.toString()}`);
+      // Route to SEO URL for buy/rent/new-projects + city-only
+      const sp = url.searchParams;
+      const resultCity = sp.get('city');
+      const effectiveCat = category || res.data.filters?.category || '';
+      const hasDeepFilters = sp.get('type') || sp.get('bedrooms') || sp.get('minPrice') || sp.get('maxPrice') || sp.get('locality') || sp.get('lat');
+      const isNP = effectiveCat === 'new_projects' || effectiveCat === 'builder_project';
+      if (resultCity && !hasDeepFilters && !res.data.nearbySearch) {
+        const slug = resultCity.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        if (effectiveCat === 'buy')  { navPush(`/property-for-sale-in-${slug}`); return; }
+        if (effectiveCat === 'rent') { navPush(`/property-for-rent-in-${slug}`); return; }
+        if (isNP)                    { navPush(`/new-projects-in-${slug}`);       return; }
+      }
+      navPush(`/properties?${sp.toString()}`);
     } catch {
       // BE unavailable — keyword fallback
       const p = new URLSearchParams();
       if (category) p.set('category', category);
       p.set('keyword', query.trim());
       trackSearchPerform(query.trim(), { category: category || undefined });
-      router.push(`/properties?${p.toString()}`);
+      navPush(`/properties?${p.toString()}`);
     } finally { setSearching(false); }
   }, [query, category, router, handleClose, trackSearchPerform]);
 
-  const go = (url: string) => { handleClose(); router.push(url); };
+  const go = (url: string) => { handleClose(); navPush(url); };
 
   const handleSuggClick = (item: Suggestion) => {
+    if (item.type === 'city') {
+      const citySlug = item.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const isNP = category === 'new_projects' || category === 'builder_project';
+      if (category === 'buy')  { go(`/property-for-sale-in-${citySlug}`); return; }
+      if (category === 'rent') { go(`/property-for-rent-in-${citySlug}`); return; }
+      if (isNP)                { go(`/new-projects-in-${citySlug}`);       return; }
+      // Other categories — listing page with city filter
+      const p = new URLSearchParams({ city: item.value });
+      if (category) p.set('category', category);
+      go(`/properties?${p}`);
+      return;
+    }
     const p = new URLSearchParams();
     if (category) p.set('category', category);
-    if (item.type === 'city') {
-      p.set('city', item.value);
-    } else if (item.type === 'locality') {
+    if (item.type === 'locality') {
       const [locality, city] = item.value.split('|');
       p.set('city', city); p.set('locality', locality);
     } else if (item.type === 'builder') {
@@ -618,12 +666,12 @@ function SearchModal({
       const res = await smartSearchApi.parse(tq, category || undefined);
       const url = new URL(res.data.redirectUrl, 'http://x');
       if (category) url.searchParams.set('category', category);
-      router.push(`/properties?${url.searchParams.toString()}`);
+      navPush(`/properties?${url.searchParams.toString()}`);
     } catch {
       const p = new URLSearchParams();
       if (category) p.set('category', category);
       p.set('keyword', tq);
-      router.push(`/properties?${p.toString()}`);
+      navPush(`/properties?${p.toString()}`);
     }
   };
 
@@ -861,6 +909,9 @@ export default function GlobalSearchBar({
   className,
 }: GlobalSearchBarProps) {
   const pathname = usePathname();
+  const urlCategory = useCategoryFromUrl();
+  // Prop wins (page passed explicit category), otherwise derive from URL
+  const effectiveCategory = initialCategory || urlCategory;
   const [modalOpen, setModalOpen] = useState(false);
   const [stickyVisible, setStickyVisible] = useState(false);
 
@@ -885,7 +936,7 @@ export default function GlobalSearchBar({
       )
     : '';
 
-  const displayText = initialKeyword || initialCity || (initialCategory ? `${initialCategory.charAt(0).toUpperCase() + initialCategory.slice(1)} Properties` : '');
+  const displayText = initialKeyword || initialCity || (effectiveCategory ? `${effectiveCategory.charAt(0).toUpperCase() + effectiveCategory.slice(1).replace(/_/g, ' ')} Properties` : '');
 
   return (
     <>
@@ -942,7 +993,7 @@ export default function GlobalSearchBar({
       {/* ── Search Modal ─────────────────────────────────────────────────────── */}
       {modalOpen && (
         <SearchModal
-          initialCategory={initialCategory}
+          initialCategory={effectiveCategory}
           initialKeyword={initialKeyword || initialCity}
           onClose={() => setModalOpen(false)}
         />
