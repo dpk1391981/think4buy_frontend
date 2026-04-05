@@ -26,11 +26,12 @@ import CTAStatsText from '@/components/home/CTAStatsText';
 import TopCitiesSection from '@/components/home/TopCitiesSection';
 
 // ─── Below-the-fold: lazy-load with next/dynamic ─────────────────────────────
-const TopCategories      = dynamic(() => import('@/components/home/TopCategories'),        { ssr: true  });
-const TopAgents          = dynamic(() => import('@/components/home/TopAgents'),             { ssr: true  });
-const TopNewProjects     = dynamic(() => import('@/components/home/TopNewProjects'),        { ssr: true  });
-const TopLocalities      = dynamic(() => import('@/components/home/TopLocalities'),         { ssr: false });
-const TopDevelopers      = dynamic(() => import('@/components/home/TopDevelopers'),         { ssr: false });
+const TopCategories               = dynamic(() => import('@/components/home/TopCategories'),                    { ssr: true  });
+const TopAgents                   = dynamic(() => import('@/components/home/TopAgents'),                          { ssr: true  });
+const TopNewProjects              = dynamic(() => import('@/components/home/TopNewProjects'),                     { ssr: true  });
+const TopLocalities               = dynamic(() => import('@/components/home/TopLocalities'),                      { ssr: false });
+const TopDevelopers               = dynamic(() => import('@/components/home/TopDevelopers'),                      { ssr: false });
+const NewProjectsDevelopersSection = dynamic(() => import('@/components/home/NewProjectsDevelopersSection'),      { ssr: false });
 const ServicesBanner     = dynamic(() => import('@/components/home/ServicesBanner'),        { ssr: true  });
 const TrendingProperties = dynamic(() => import('@/components/home/TrendingProperties'),   { ssr: true  });
 const PropertyComparison = dynamic(() => import('@/components/home/PropertyComparison'),   { ssr: false });
@@ -208,7 +209,13 @@ export default function HomePage() {
       <TopCategories />
 
       {/* ══════════════════════════════════════════════════════════════════════════
-          NEW PROJECTS / TOP RESIDENTIAL
+          🏗️ NEW PROJECTS & TOP DEVELOPERS — unified city-aware section
+          Shows "All India" tab + "{City}" tab; both new-launches & builders
+      ══════════════════════════════════════════════════════════════════════════ */}
+      <NewProjectsDevelopersSection />
+
+      {/* ══════════════════════════════════════════════════════════════════════════
+          NEW PROJECTS / TOP RESIDENTIAL  (standalone city-aware scroll)
       ══════════════════════════════════════════════════════════════════════════ */}
       <TopNewProjects />
 
@@ -218,7 +225,7 @@ export default function HomePage() {
       <TopLocalities />
 
       {/* ══════════════════════════════════════════════════════════════════════════
-          TOP DEVELOPERS
+          TOP DEVELOPERS  (standalone card-per-builder scroll)
       ══════════════════════════════════════════════════════════════════════════ */}
       <TopDevelopers />
 

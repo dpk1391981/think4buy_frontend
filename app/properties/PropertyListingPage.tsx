@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import {
   SlidersHorizontal, ChevronDown, X,
   MapPin, Home, Map, Loader2,
@@ -91,6 +91,11 @@ interface Props {
 export default function PropertyListingPage({ searchParams: propSearchParams, pageH1 }: Props) {
   const urlSearchParams = useSearchParams();
   const router = useRouter();
+  // On SEO pages (/new-projects-in-noida, /flats-for-sale-in-gurgaon, etc.) the
+  // component is mounted outside /properties — filter navigations must stay on the
+  // current path rather than jumping to /properties.
+  const pathname = usePathname();
+  const filterBase = pathname.startsWith('/properties') ? '/properties' : pathname;
 
   // ── Infinite scroll state ────────────────────────────────────────────────
   const [items, setItems]               = useState<Property[]>([]);
@@ -321,7 +326,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
     if (key === 'maxArea')  params.delete('minArea');
     params.delete(key);
     params.delete('page');
-    router.push(`/properties?${params.toString()}`, { scroll: false });
+    router.push(`${filterBase}?${params.toString()}`, { scroll: false });
   };
 
   const topAgentActive       = urlSearchParams.get('topAgent')      === 'true';
@@ -332,14 +337,14 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
     const params = new URLSearchParams(urlSearchParams.toString());
     if (active) { params.delete(key); } else { params.set(key, 'true'); }
     params.delete('page');
-    router.push(`/properties?${params.toString()}`, { scroll: false });
+    router.push(`${filterBase}?${params.toString()}`, { scroll: false });
   };
 
   const toggleOwnerFilter = () => {
     const params = new URLSearchParams(urlSearchParams.toString());
     if (ownerFilterActive) { params.delete('listedBy'); } else { params.set('listedBy', 'owner'); }
     params.delete('page');
-    router.push(`/properties?${params.toString()}`, { scroll: false });
+    router.push(`${filterBase}?${params.toString()}`, { scroll: false });
   };
 
   const POSSESSION_CHIPS = [
@@ -359,7 +364,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
     if (!params.has('city')     && propDefaults.city)     params.set('city',     propDefaults.city);
     if (propDefaults.isNewProject === 'true') params.set('isNewProject', 'true');
     params.delete('page');
-    router.push(`/properties?${params.toString()}`, { scroll: false });
+    router.push(`${filterBase}?${params.toString()}`, { scroll: false });
   };
 
 
@@ -526,7 +531,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
                   const params = new URLSearchParams();
                   if (category) params.set('category', category);
                   if (city) params.set('city', city);
-                  router.push(`/properties?${params.toString()}`);
+                  router.push(`${filterBase}?${params.toString()}`);
                 }}
                 className="flex-shrink-0 text-[11px] text-red-500 font-bold h-7 px-2 whitespace-nowrap active:opacity-70"
               >
@@ -739,7 +744,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
                     const params = new URLSearchParams();
                     if (category) params.set('category', category);
                     if (city) params.set('city', city);
-                    router.push(`/properties?${params.toString()}`);
+                    router.push(`${filterBase}?${params.toString()}`);
                   }}
                   className="text-xs text-gray-400 hover:text-red-600 underline px-1"
                 >
@@ -822,7 +827,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
                   onClick={() => {
                     const params = new URLSearchParams();
                     if (category) params.set('category', category);
-                    router.push(`/properties?${params.toString()}`);
+                    router.push(`${filterBase}?${params.toString()}`);
                   }}
                   className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-2.5 rounded-xl font-medium text-sm"
                 >

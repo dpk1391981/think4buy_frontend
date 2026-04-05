@@ -59,13 +59,15 @@ async function getSeoConfig(slugParts: string[]): Promise<SeoPageConfig | null> 
 // ── generateMetadata ──────────────────────────────────────────────────────────
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const slug   = buildSlug(params.slug);
   const config = await getSeoConfig(params.slug);
 
+  // No SEO config — noindex but still renderable if URL is parseable
   if (!config) return { robots: { index: false, follow: false } };
 
   const robots = config.robots ?? 'index,follow';
   const [idx, fol] = robots.split(',');
-  const canonical = config.canonicalUrl ?? `${SITE}/${buildSlug(params.slug)}`;
+  const canonical = config.canonicalUrl ?? `${SITE}/${slug}`;
 
   return {
     ...(config.metaTitle && { title: config.metaTitle }),
@@ -90,37 +92,48 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // ── Page Component ────────────────────────────────────────────────────────────
 
 export default async function ProgrammaticSeoListingPage({ params }: Props) {
+  const slug   = buildSlug(params.slug);
   const config = await getSeoConfig(params.slug);
-  if (!config) notFound();
 
-  const { context } = config;
-  const cityName     = context.cityName     ?? (context.citySlug     ? slugToName(context.citySlug)     : undefined);
-  const localityName = context.localityName ?? (context.localitySlug ? slugToName(context.localitySlug) : undefined);
+  // Parse the URL slug into listing filters regardless of whether a SEO config exists.
+  // This lets redirected URLs (e.g. /property-for-sale-in-noida-sector-62) render the
+  // property grid even before an admin has configured a SEO record for that page.
+  const urlParsed    = parseListingSlug(slug);
+  const smartFilters = await parseSlugToFilters(params.slug.join(' '));
+
+  // If the URL can't be parsed into any recognisable filters AND there's no SEO config,
+  // serve a 404 (unknown/garbage URL).
+  if (!config && !urlParsed.city && !urlParsed.category) {
+    notFound();
+  }
+
+  // Fall-through context: use SEO config if available, else derive from URL parsing
+  const context      = config?.context ?? {};
+  const cityName     = context.cityName     ?? (context.citySlug     ? slugToName(context.citySlug)     : (urlParsed.city     ? slugToName(urlParsed.city)     : undefined));
+  const localityName = context.localityName ?? (context.localitySlug ? slugToName(context.localitySlug) : (urlParsed.locality ? slugToName(urlParsed.locality) : undefined));
 
   // Breadcrumb
+  const citySlugForBreadcrumb = context.citySlug ?? urlParsed.city;
   const breadcrumbs: { name: string; url: string }[] = [{ name: 'Home', url: SITE }];
-  if (cityName) breadcrumbs.push({ name: cityName, url: `${SITE}/property-in-${context.citySlug}` });
-  if (localityName && context.citySlug) {
-    breadcrumbs.push({ name: localityName, url: `${SITE}/${buildSlug(params.slug)}` });
+  if (cityName && citySlugForBreadcrumb) breadcrumbs.push({ name: cityName, url: `${SITE}/property-in-${citySlugForBreadcrumb}` });
+  if (localityName && citySlugForBreadcrumb) {
+    breadcrumbs.push({ name: localityName, url: `${SITE}/${slug}` });
   }
 
   // JSON-LD schemas
   const schemas: Record<string, unknown>[] = [buildBreadcrumbSchema(breadcrumbs)];
-  if (config.faqJson?.length) schemas.push(buildFaqSchema(config.faqJson));
+  if (config?.faqJson?.length) schemas.push(buildFaqSchema(config.faqJson));
 
-  // Property listing search params — derived from smart search so ANY admin URL works.
-  // e.g. "flat-in-noida" → { type: 'apartment', city: 'Noida' }
-  //      "2bhk-villa-gurgaon-sector-56" → { bedrooms: '2', type: 'villa', city: 'Gurgaon', locality: 'sector 56' }
-  const urlParsed    = parseListingSlug(buildSlug(params.slug));
-  const smartFilters = await parseSlugToFilters(params.slug.join(' '));
+  // Build listing params: URL parsing is authoritative for category/city/locality;
+  // smart NLP fills in any gaps (e.g. type from property-type prefix words).
+  // NLP smart-search MUST NOT override URL-parsed city/locality — numeric slugs like
+  // "noida-63" cause the NLP to emit city="noida 63" which breaks the exact-match city filter.
   const listingParams: Record<string, string> = { ...smartFilters };
-  // URL prefix category is authoritative — always overrides NLP smart search result
-  // (NLP may misinterpret "new-projects-in-noida" as buy/rent)
   const resolvedCategory = urlParsed.category ?? context.categorySlug;
   if (resolvedCategory) listingParams.category = resolvedCategory;
-  if (!listingParams.city     && cityName)    listingParams.city     = cityName;
-  if (!listingParams.locality && localityName) listingParams.locality = localityName;
-  // Set isNewProject flag so FilterPanel + top chips render correctly
+  // Always overwrite with URL-parsed values — they are canonical for SEO pages.
+  if (cityName)     listingParams.city     = cityName;
+  if (localityName) listingParams.locality = localityName;
   if (listingParams.category === 'builder_project' || listingParams.category === 'new_projects') {
     listingParams.isNewProject = 'true';
   }
@@ -131,11 +144,11 @@ export default async function ProgrammaticSeoListingPage({ params }: Props) {
 
       {/* Property listings — always rendered from property DB */}
       <Suspense fallback={<div className="min-h-screen bg-gray-50 pt-4" />}>
-        <PropertyListingPage searchParams={listingParams} pageH1={config.h1Title} />
+        <PropertyListingPage searchParams={listingParams} pageH1={config?.h1Title ?? null} />
       </Suspense>
 
-      {/* DB-driven SEO content — only renders non-null fields */}
-      <DbSeoContent config={config} />
+      {/* DB-driven SEO content — only renders when SEO config has non-null fields */}
+      {config && <DbSeoContent config={config} />}
     </>
   );
 }

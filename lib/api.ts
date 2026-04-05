@@ -351,6 +351,21 @@ export const adminApi = {
   reactivateProperty: (id: string) => api.patch(`/admin/properties/${id}/reactivate`),
   updatePropertySeo: (id: string, data: { slug?: string; metaTitle?: string; metaDescription?: string; allowIndexing?: boolean }) =>
     api.patch(`/admin/properties/${id}/seo`, data),
+  // Builders
+  getBuilders: (params?: { page?: number; limit?: number; search?: string }) =>
+    api.get('/admin/builders', { params }),
+  getBuilder: (id: string) => api.get(`/admin/builders/${id}`),
+  createBuilder: (data: any) => api.post('/admin/builders', data),
+  updateBuilder: (id: string, data: any) => api.patch(`/admin/builders/${id}`, data),
+  deleteBuilder: (id: string) => api.delete(`/admin/builders/${id}`),
+  toggleBuilderVerified: (id: string) => api.patch(`/admin/builders/${id}/toggle-verify`),
+  uploadBuilderLogo: (id: string, file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post(`/admin/builders/${id}/logo`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   // Agents
   getAgents: (params?: Record<string, any>) => api.get('/admin/agents', { params }),
   getAgent: (id: string) => api.get(`/admin/agents/${id}`),

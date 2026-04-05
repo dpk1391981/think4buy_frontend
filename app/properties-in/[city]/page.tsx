@@ -14,7 +14,8 @@ import dynamic from 'next/dynamic';
 import CityHomeSetup from './CityHomeSetup';
 
 const TrendingProperties = dynamic(() => import('@/components/home/TrendingProperties'), { ssr: true  });
-const TopNewProjects     = dynamic(() => import('@/components/home/TopNewProjects'),     { ssr: true  });
+const TopNewProjects              = dynamic(() => import('@/components/home/TopNewProjects'),                { ssr: true  });
+const NewProjectsDevelopersSection = dynamic(() => import('@/components/home/NewProjectsDevelopersSection'), { ssr: false });
 const TopAgents          = dynamic(() => import('@/components/home/TopAgents'),          { ssr: true  });
 const CityPriceSnapshot  = dynamic(() => import('@/components/home/CityPriceSnapshot'), { ssr: true  });
 const TopLocalities      = dynamic(() => import('@/components/home/TopLocalities'),      { ssr: false });
@@ -268,7 +269,7 @@ export default async function PropertiesInPage({ params }: { params: { city: str
             <div className="inline-flex items-center gap-2 bg-white/10 text-white/80 text-xs font-semibold px-4 py-1.5 rounded-full mb-4 border border-white/20">
               <Building2 className="w-3.5 h-3.5" />{data!.name} · India
             </div>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-3">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3" style={{fontSize:'clamp(20px,2.5vw,28px)'}}>
               {data!.h1 || `Property in ${data!.name}`}
             </h1>
             <p className="text-blue-100/70 max-w-xl mx-auto text-sm sm:text-base">
@@ -364,7 +365,7 @@ export default async function PropertiesInPage({ params }: { params: { city: str
 
           <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 lg:pt-12 pb-10 sm:pb-14 lg:pb-16">
             <div className="mb-7 sm:mb-9">
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-tight mb-2">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white leading-tight mb-2" style={{fontSize:'clamp(22px,3vw,32px)'}}>
                 Properties in{' '}
                 <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
                   {city}
@@ -390,6 +391,10 @@ export default async function PropertiesInPage({ params }: { params: { city: str
         {/* City-scoped home sections — all receive city prop directly (SSR-safe, no Redux timing issue) */}
         <TrendingProperties city={city} />
         <FeaturedProperties city={city} />
+
+        {/* ── Unified New Projects + Developers section (city-scoped) ── */}
+        <NewProjectsDevelopersSection cityOverride={city} />
+
         <TopNewProjects     city={city} />
         <TopLocalities      city={city} />
         <TopDevelopers      city={city} />
