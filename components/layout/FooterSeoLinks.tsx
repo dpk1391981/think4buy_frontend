@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { fetchFooterLinks } from '@/lib/store/slices/seoSlice';
@@ -63,6 +64,47 @@ const TITLE_TO_SLUG: Record<string, string> = {
   'pg / co-living':                 'pg',
   'pg/co-living':                   'pg',
 };
+
+// ── URL prefix → footer category mapping ─────────────────────────────────────
+// Order: most specific first (longer prefixes before shorter ones)
+
+const URL_PREFIX_TO_CAT: { prefix: string; catKey: string }[] = [
+  { prefix: 'flats-for-sale-in-',            catKey: 'flats'        },
+  { prefix: 'flats-for-rent-in-',            catKey: 'flats-rent'   },
+  { prefix: 'villas-for-sale-in-',           catKey: 'villas'       },
+  { prefix: 'plots-for-sale-in-',            catKey: 'plots'        },
+  { prefix: 'commercial-property-for-rent-in-', catKey: 'commercial' },
+  { prefix: 'commercial-property-in-',       catKey: 'commercial'   },
+  { prefix: 'office-space-for-rent-in-',     catKey: 'office'       },
+  { prefix: 'new-projects-in-',              catKey: 'new-projects' },
+  { prefix: 'pg-in-',                        catKey: 'pg'           },
+  { prefix: 'property-for-sale-in-',         catKey: 'buy'          },
+  { prefix: 'property-for-rent-in-',         catKey: 'rent'         },
+];
+
+// Parse pathname → { catKey, citySlug } or null
+function parseUrlContext(pathname: string): { catKey: string; citySlug: string } | null {
+  const seg = pathname.replace(/^\//, '').split('/')[0].toLowerCase();
+  for (const { prefix, catKey } of URL_PREFIX_TO_CAT) {
+    if (seg.startsWith(prefix)) {
+      return { catKey, citySlug: seg.slice(prefix.length) };
+    }
+  }
+  return null;
+}
+
+// Convert a city slug (e.g. "navi-mumbai") to a city name that matches footer data
+function slugToCity(slug: string, categories: CategoryEntry[]): string | null {
+  if (!slug) return null;
+  const normalize = (s: string) => s.toLowerCase().replace(/[-\s]+/g, '');
+  const normalizedSlug = normalize(slug);
+  for (const cat of categories) {
+    for (const cityEntry of cat.cities) {
+      if (normalize(cityEntry.city) === normalizedSlug) return cityEntry.city;
+    }
+  }
+  return null;
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -282,11 +324,17 @@ function LinkGrid({ links, collapseKey }: { links: FLink[]; collapseKey: string 
 
 // ── Main footer panel ─────────────────────────────────────────────────────────
 
-function FooterPanel({ cat }: { cat: CategoryEntry }) {
-  const [expandedCity, setExpandedCity] = useState('');
+function FooterPanel({ cat, initialCity }: { cat: CategoryEntry; initialCity?: string }) {
+  const [expandedCity, setExpandedCity] = useState(initialCity ?? '');
 
-  // Reset when category changes
-  useEffect(() => { setExpandedCity(''); }, [cat.key]);
+  // Reset when category changes (but keep initialCity on first render)
+  const prevCatKey = useRef(cat.key);
+  useEffect(() => {
+    if (prevCatKey.current !== cat.key) {
+      prevCatKey.current = cat.key;
+      setExpandedCity('');
+    }
+  }, [cat.key]);
 
   // Cities that have city-level links (shown in main grid)
   const cityLinks = useMemo(
@@ -321,7 +369,7 @@ function FooterPanel({ cat }: { cat: CategoryEntry }) {
           {/* Header + city pills */}
           <div className="flex items-start gap-3 flex-wrap">
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex-shrink-0 pt-1">
-              Browse Localities
+              Nearby Localities
             </span>
             <div className="flex flex-wrap gap-2">
               {localityCities.map(entry => {
@@ -373,13 +421,41 @@ function FooterPanel({ cat }: { cat: CategoryEntry }) {
 
 // ── Two-level footer ──────────────────────────────────────────────────────────
 
-function TwoLevelFooter({ categories }: { categories: CategoryEntry[] }) {
-  const [activeCat, setActiveCat] = useState(categories[0].key);
+function TwoLevelFooter({
+  categories,
+  initialCatKey,
+  initialCity,
+}: {
+  categories:     CategoryEntry[];
+  initialCatKey?: string;
+  initialCity?:   string;
+}) {
+  const defaultCat = (initialCatKey && categories.find(c => c.key === initialCatKey))
+    ? initialCatKey
+    : categories[0].key;
+
+  const [activeCat, setActiveCat] = useState(defaultCat);
+
+  // When initialCatKey changes (e.g. navigating between pages), re-sync
+  useEffect(() => {
+    if (initialCatKey && categories.find(c => c.key === initialCatKey)) {
+      setActiveCat(initialCatKey);
+    }
+  }, [initialCatKey, categories]);
 
   const currentCat = useMemo(
     () => categories.find(c => c.key === activeCat) ?? categories[0],
     [categories, activeCat],
   );
+
+  // Derive the city to auto-expand: use initialCity only when it matches activeCat's data
+  const autoCity = useMemo(() => {
+    if (!initialCity) return undefined;
+    const hasCityLocalities = currentCat.cities.some(
+      c => c.city === initialCity && c.localityLinks.length > 0
+    );
+    return hasCityLocalities ? initialCity : undefined;
+  }, [initialCity, currentCat]);
 
   return (
     <section className="border-b border-gray-800 bg-gray-900/80">
@@ -389,7 +465,7 @@ function TwoLevelFooter({ categories }: { categories: CategoryEntry[] }) {
           active={activeCat}
           onSelect={setActiveCat}
         />
-        <FooterPanel key={activeCat} cat={currentCat} />
+        <FooterPanel key={`${activeCat}|${autoCity ?? ''}`} cat={currentCat} initialCity={autoCity} />
       </div>
     </section>
   );
@@ -398,9 +474,11 @@ function TwoLevelFooter({ categories }: { categories: CategoryEntry[] }) {
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 export default function FooterSeoLinks() {
-  const dispatch     = useAppDispatch();
-  const dbGroups     = useAppSelector(s => s.seo.footerGroups) as FGroup[];
-  const footerLoaded = useAppSelector(s => s.seo.footerLoaded);
+  const dispatch      = useAppDispatch();
+  const dbGroups      = useAppSelector(s => s.seo.footerGroups) as FGroup[];
+  const footerLoaded  = useAppSelector(s => s.seo.footerLoaded);
+  const selectedCity  = useAppSelector(s => s.ui.selectedCity);   // e.g. "Mumbai"
+  const pathname      = usePathname();
 
   useEffect(() => {
     if (!footerLoaded) dispatch(fetchFooterLinks() as any);
@@ -409,6 +487,32 @@ export default function FooterSeoLinks() {
   const allActive  = useMemo(() => (dbGroups || []).filter(g => g.isActive !== false), [dbGroups]);
   const categories = useMemo(() => buildCategories(allActive), [allActive]);
 
+  // Derive context from URL (listing pages) or Redux city (home page)
+  const { initialCatKey, initialCity } = useMemo(() => {
+    if (!categories.length) return {};
+
+    const urlCtx = parseUrlContext(pathname);
+
+    if (urlCtx) {
+      // On a listing page: select matching category + resolve city from slug
+      const cityName = slugToCity(urlCtx.citySlug, categories);
+      return { initialCatKey: urlCtx.catKey, initialCity: cityName ?? undefined };
+    }
+
+    // On home page (or any non-listing page): use Redux selected city
+    if (selectedCity) {
+      return { initialCatKey: undefined, initialCity: selectedCity };
+    }
+
+    return {};
+  }, [pathname, categories, selectedCity]);
+
   if (!categories.length) return null;
-  return <TwoLevelFooter categories={categories} />;
+  return (
+    <TwoLevelFooter
+      categories={categories}
+      initialCatKey={initialCatKey}
+      initialCity={initialCity}
+    />
+  );
 }
