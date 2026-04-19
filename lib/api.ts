@@ -813,6 +813,15 @@ export const seoApi = {
   adminUpdatePropertyCityPage: (id: string, data: any) => api.patch(`/seo/admin/property-city-pages/${id}`, data),
   adminDeletePropertyCityPage: (id: string) => api.delete(`/seo/admin/property-city-pages/${id}`),
 
+  // Public - Footer Categories
+  getFooterCategories: () => api.get('/seo/footer-categories'),
+
+  // Admin - Footer Categories
+  adminGetFooterCategories: () => api.get('/seo/admin/footer-categories'),
+  adminCreateFooterCategory: (data: any) => api.post('/seo/admin/footer-categories', data),
+  adminUpdateFooterCategory: (id: string, data: any) => api.patch(`/seo/admin/footer-categories/${id}`, data),
+  adminDeleteFooterCategory: (id: string) => api.delete(`/seo/admin/footer-categories/${id}`),
+
   // Admin - Footer Links
   adminGetFooterGroups: () => api.get('/seo/admin/footer-groups'),
   adminCreateFooterGroup: (data: any) => api.post('/seo/admin/footer-groups', data),

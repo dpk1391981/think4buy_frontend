@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
-import { fetchFooterLinks } from '@/lib/store/slices/seoSlice';
+import { fetchFooterLinks, fetchFooterCategories } from '@/lib/store/slices/seoSlice';
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
@@ -118,17 +118,23 @@ function activeLinks(links: FLink[]) {
   return links.filter(l => l.isActive !== false && isValidUrl(l.url));
 }
 
-function resolveCategory(g: FGroup): { key: string; short: string; label: string } {
+function resolveCategory(
+  g: FGroup,
+  catMap: Map<string, { short: string; label: string }>,
+): { key: string; short: string; label: string } {
   if (g.category?.trim()) {
     const k = g.category.trim();
-    const m = CAT_MAP.get(k);
+    const m = catMap.get(k);
     return { key: k, short: m?.short ?? k, label: m?.label ?? g.title };
   }
   const bare = g.cityName
     ? g.title.replace(new RegExp(`\\s+in\\s+${escRe(g.cityName)}\\s*$`, 'i'), '').trim()
     : g.title;
   const slug = TITLE_TO_SLUG[bare.toLowerCase().trim()];
-  if (slug) { const m = CAT_MAP.get(slug)!; return { key: slug, short: m.short, label: m.label }; }
+  if (slug) {
+    const m = catMap.get(slug);
+    if (m) return { key: slug, short: m.short, label: m.label };
+  }
   return { key: bare.toLowerCase().trim(), short: bare, label: bare };
 }
 
@@ -146,7 +152,11 @@ function resolveCategory(g: FGroup): { key: string; short: string; label: string
 //   - Overrides localityLinks with the group's full locality list
 //   - Keeps cityLink from Pass 1 if it exists (so the main-grid link is preserved)
 
-function buildCategories(groups: FGroup[]): CategoryEntry[] {
+function buildCategories(
+  groups: FGroup[],
+  resolveMap: Map<string, { short: string; label: string }>,
+  categoryRegistry: { value: string; sortOrder: number }[],
+): CategoryEntry[] {
   type Cat = { short: string; label: string; cities: Map<string, CityEntry> };
   const catMap = new Map<string, Cat>();
 
@@ -159,7 +169,7 @@ function buildCategories(groups: FGroup[]): CategoryEntry[] {
   for (const g of groups.filter(g => !g.cityName)) {
     const al = activeLinks(g.links);
     if (!al.length) continue;
-    const { key, short, label } = resolveCategory(g);
+    const { key, short, label } = resolveCategory(g, resolveMap);
     const cat = getOrCreate(key, short, label);
 
     for (const link of al) {
@@ -178,7 +188,7 @@ function buildCategories(groups: FGroup[]): CategoryEntry[] {
   for (const g of groups.filter(g => !!g.cityName)) {
     const al = activeLinks(g.links);
     if (!al.length) continue;
-    const { key, short, label } = resolveCategory(g);
+    const { key, short, label } = resolveCategory(g, resolveMap);
     const cat = getOrCreate(key, short, label);
     const existing = cat.cities.get(g.cityName!);
 
@@ -190,7 +200,8 @@ function buildCategories(groups: FGroup[]): CategoryEntry[] {
   }
 
   // ── assemble ──────────────────────────────────────────────────────────────
-  const ORDER = FOOTER_CATEGORIES.map(c => c.value);
+  const sortedRegistry = [...categoryRegistry].sort((a, b) => a.sortOrder - b.sortOrder);
+  const ORDER = sortedRegistry.map(c => c.value);
   const result: CategoryEntry[] = [];
 
   for (const [key, { short, label, cities }] of catMap) {
@@ -477,15 +488,33 @@ export default function FooterSeoLinks() {
   const dispatch      = useAppDispatch();
   const dbGroups      = useAppSelector(s => s.seo.footerGroups) as FGroup[];
   const footerLoaded  = useAppSelector(s => s.seo.footerLoaded);
-  const selectedCity  = useAppSelector(s => s.ui.selectedCity);   // e.g. "Mumbai"
+  const dbCategories  = useAppSelector(s => s.seo.footerCategories);
+  const catsLoaded    = useAppSelector(s => s.seo.footerCategoriesLoaded);
+  const selectedCity  = useAppSelector(s => s.ui.selectedCity);
   const pathname      = usePathname();
 
   useEffect(() => {
-    if (!footerLoaded) dispatch(fetchFooterLinks() as any);
-  }, [dispatch, footerLoaded]);
+    if (!footerLoaded)  dispatch(fetchFooterLinks() as any);
+    if (!catsLoaded)    dispatch(fetchFooterCategories() as any);
+  }, [dispatch, footerLoaded, catsLoaded]);
+
+  // Use DB categories when available, otherwise fall back to hardcoded list
+  const activeCategoryList = useMemo(
+    () => dbCategories.length > 0 ? dbCategories : FOOTER_CATEGORIES.map((c, i) => ({ ...c, id: c.value, sortOrder: i, isActive: true })),
+    [dbCategories],
+  );
+
+  // Build dynamic CAT_MAP from the active category list
+  const dynamicCatMap = useMemo(
+    () => new Map(activeCategoryList.map(c => [c.value, { short: c.short, label: c.label }])),
+    [activeCategoryList],
+  );
 
   const allActive  = useMemo(() => (dbGroups || []).filter(g => g.isActive !== false), [dbGroups]);
-  const categories = useMemo(() => buildCategories(allActive), [allActive]);
+  const categories = useMemo(
+    () => buildCategories(allActive, dynamicCatMap, activeCategoryList),
+    [allActive, dynamicCatMap, activeCategoryList],
+  );
 
   // Derive context from URL (listing pages) or Redux city (home page)
   const { initialCatKey, initialCity } = useMemo(() => {

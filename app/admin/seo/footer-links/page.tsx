@@ -2,7 +2,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Plus, Pencil, Trash2, Link2, X, Search, Globe, FileText,
-  MapPin, ChevronDown, Building2, ArrowLeftRight, FolderInput, Tag,
+  MapPin, ChevronDown, Building2, ArrowLeftRight, FolderInput, Tag, Settings,
+  GripVertical,
 } from 'lucide-react';
 import { seoApi, locationsApi } from '@/lib/api';
 import { FOOTER_CATEGORIES } from '@/components/layout/FooterSeoLinks';
@@ -11,6 +12,14 @@ import { FOOTER_CATEGORIES } from '@/components/layout/FooterSeoLinks';
 
 interface City { id: string; name: string; slug?: string }
 interface LocalityOption { id: string; locality: string; city: string }
+interface FooterCategory {
+  id: string;
+  value: string;
+  label: string;
+  short: string;
+  sortOrder: number;
+  isActive: boolean;
+}
 
 interface FooterLink {
   id: string;
@@ -209,6 +218,7 @@ function RemapSlideOver({
   target,           // the group or link being remapped
   allGroups,
   cities,
+  categories,
   onSaved,
 }: {
   open: boolean;
@@ -217,6 +227,7 @@ function RemapSlideOver({
   target: FooterGroup | FooterLink | null;
   allGroups: FooterGroup[];
   cities: City[];
+  categories: { value: string; label: string; short: string }[];
   onSaved: () => void;
 }) {
   // --- group remap state ---
@@ -336,7 +347,7 @@ function RemapSlideOver({
               <>
                 {targetGroup?.category
                   ? <span className="inline-flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
-                      <Tag className="w-3 h-3" /> {FOOTER_CATEGORIES.find(c => c.value === targetGroup.category)?.short ?? targetGroup.category}
+                      <Tag className="w-3 h-3" /> {categories.find(c => c.value === targetGroup.category)?.short ?? targetGroup.category}
                     </span>
                   : <span className="text-xs text-amber-600 italic">No category (auto)</span>
                 }
@@ -426,15 +437,15 @@ function RemapSlideOver({
                   onChange={e => setNewCategory(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-400">
                   <option value="">— Auto-detect from title —</option>
-                  {FOOTER_CATEGORIES.map(c => (
+                  {categories.map(c => (
                     <option key={c.value} value={c.value}>{c.short} — {c.label}</option>
                   ))}
                 </select>
               </div>
               {newCategory && (
                 <div className="p-3 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700">
-                  Tab: <strong>{FOOTER_CATEGORIES.find(c => c.value === newCategory)?.short}</strong>
-                  {' '}({FOOTER_CATEGORIES.find(c => c.value === newCategory)?.label})
+                  Tab: <strong>{categories.find(c => c.value === newCategory)?.short}</strong>
+                  {' '}({categories.find(c => c.value === newCategory)?.label})
                 </div>
               )}
               {!newCategory && targetGroup?.category && (
@@ -731,6 +742,226 @@ function LinkSlideOver({
   );
 }
 
+// ── Category Manager Slide-Over ───────────────────────────────────────────────
+const EMPTY_CAT_FORM = { value: '', label: '', short: '', sortOrder: 0, isActive: true };
+type CatForm = typeof EMPTY_CAT_FORM;
+
+function CategoryManagerSlideOver({
+  open, onClose, onChanged,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [categories, setCategories] = useState<FooterCategory[]>([]);
+  const [loading, setLoading]       = useState(false);
+  const [editId, setEditId]         = useState<string | null>(null);
+  const [form, setForm]             = useState<CatForm>({ ...EMPTY_CAT_FORM });
+  const [showForm, setShowForm]     = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [deleteId, setDeleteId]     = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await seoApi.adminGetFooterCategories();
+      const sorted = (r.data || []).slice().sort((a: FooterCategory, b: FooterCategory) => a.sortOrder - b.sortOrder);
+      setCategories(sorted);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { if (open) load(); }, [open, load]);
+
+  const openAdd = () => {
+    setEditId(null);
+    setForm({ ...EMPTY_CAT_FORM, sortOrder: categories.length });
+    setShowForm(true);
+  };
+  const openEdit = (cat: FooterCategory) => {
+    setEditId(cat.id);
+    setForm({ value: cat.value, label: cat.label, short: cat.short, sortOrder: cat.sortOrder, isActive: cat.isActive });
+    setShowForm(true);
+  };
+  const cancelForm = () => { setShowForm(false); setEditId(null); };
+
+  const save = async () => {
+    if (!form.value.trim() || !form.label.trim() || !form.short.trim()) return;
+    setSaving(true);
+    try {
+      if (editId) {
+        await seoApi.adminUpdateFooterCategory(editId, form);
+      } else {
+        await seoApi.adminCreateFooterCategory(form);
+      }
+      setShowForm(false);
+      setEditId(null);
+      await load();
+      onChanged();
+    } catch (e: any) { alert(e?.response?.data?.message || 'Failed to save'); }
+    finally { setSaving(false); }
+  };
+
+  const doDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await seoApi.adminDeleteFooterCategory(deleteId);
+      setDeleteId(null);
+      await load();
+      onChanged();
+    } catch (e: any) { alert(e?.response?.data?.message || 'Failed to delete'); }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div className="flex-1 bg-black/40" onClick={onClose} />
+      <div className="w-full max-w-lg bg-white h-full flex flex-col shadow-2xl overflow-hidden">
+
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0 bg-gradient-to-r from-orange-50 to-white">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-100 rounded-xl">
+              <Tag className="w-4 h-4 text-orange-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-900">Manage Categories</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Add, rename, or remove footer tab categories</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+
+          {/* Add / Edit form */}
+          {showForm && (
+            <div className="border border-orange-200 bg-orange-50/40 rounded-2xl p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-gray-800">{editId ? 'Edit Category' : 'New Category'}</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Slug / Value <span className="text-gray-400 font-normal">(unique, URL-safe)</span>
+                  </label>
+                  <input
+                    value={form.value}
+                    onChange={e => setForm(f => ({ ...f, value: e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') }))}
+                    placeholder="e.g. buy, rent, flats-rent"
+                    disabled={!!editId}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-400 font-mono disabled:bg-gray-50 disabled:text-gray-400"
+                  />
+                  {editId && <p className="text-xs text-gray-400 mt-0.5">Slug cannot be changed after creation</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Short Label <span className="text-gray-400 font-normal">(tab name)</span></label>
+                  <input
+                    value={form.short}
+                    onChange={e => setForm(f => ({ ...f, short: e.target.value }))}
+                    placeholder="e.g. Buy, Flats"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Sort Order</label>
+                  <input type="number" value={form.sortOrder}
+                    onChange={e => setForm(f => ({ ...f, sortOrder: Number(e.target.value) }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Full Label</label>
+                  <input
+                    value={form.label}
+                    onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
+                    placeholder="e.g. Property for Sale"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div className="col-span-2 flex items-center gap-3">
+                  <label className="text-xs font-medium text-gray-700">Status:</label>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, isActive: !f.isActive }))}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold ${form.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {form.isActive ? 'Active' : 'Inactive'}
+                  </button>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={save} disabled={saving || !form.value || !form.label || !form.short}
+                  className="flex-1 py-2 bg-orange-600 text-white rounded-xl text-sm font-semibold hover:bg-orange-700 disabled:opacity-50 transition-colors">
+                  {saving ? 'Saving…' : editId ? 'Update' : 'Create'}
+                </button>
+                <button onClick={cancelForm} className="px-4 py-2 border border-gray-200 rounded-xl text-sm hover:bg-gray-50">Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {/* Category list */}
+          {loading ? (
+            <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+          ) : categories.length === 0 ? (
+            <div className="py-8 text-center text-sm text-gray-400">No categories yet. Click &ldquo;Add Category&rdquo; to create one.</div>
+          ) : (
+            <div className="space-y-2">
+              {categories.map(cat => (
+                <div key={cat.id}
+                  className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-100 rounded-xl hover:border-gray-200 transition-colors">
+                  <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-800">{cat.short}</span>
+                      <span className="text-xs font-mono text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">{cat.value}</span>
+                      {!cat.isActive && <span className="text-xs text-gray-400 italic">inactive</span>}
+                    </div>
+                    <p className="text-xs text-gray-500 truncate">{cat.label}</p>
+                  </div>
+                  <span className="text-xs text-gray-300 tabular-nums flex-shrink-0">#{cat.sortOrder}</span>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => openEdit(cat)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => setDeleteId(cat.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+          {!showForm && (
+            <button onClick={openAdd}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-semibold hover:bg-orange-700 transition-colors">
+              <Plus className="w-4 h-4" /> Add Category
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Delete confirm */}
+      {deleteId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
+            <div className="text-4xl mb-3">&#x26A0;&#xFE0F;</div>
+            <h3 className="font-bold text-gray-900 mb-2">Delete Category?</h3>
+            <p className="text-sm text-gray-500 mb-5">Groups assigned to this category will fall back to auto-detection.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteId(null)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm">Cancel</button>
+              <button onClick={doDelete} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Group Row ──────────────────────────────────────────────────────────────────
 function GroupRow({ g, selected, onSelect, onEdit, onRemap, onDelete }: {
   g: FooterGroup;
@@ -788,6 +1019,21 @@ export default function AdminFooterLinksPage() {
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>('__all__');
   const [selectedGroupId, setSelectedGroupId]       = useState<string | null>(null);
 
+  // Categories
+  const [adminCategories, setAdminCategories]   = useState<FooterCategory[]>([]);
+  const [catManagerOpen, setCatManagerOpen]     = useState(false);
+
+  const loadCategories = useCallback(async () => {
+    try {
+      const r = await seoApi.adminGetFooterCategories();
+      const sorted = (r.data || []).slice().sort((a: FooterCategory, b: FooterCategory) => a.sortOrder - b.sortOrder);
+      setAdminCategories(sorted);
+    } catch { /* ignore */ }
+  }, []);
+
+  // Merge dynamic + hardcoded categories for dropdowns
+  const categoryOptions = adminCategories.length > 0 ? adminCategories : FOOTER_CATEGORIES.map((c, i) => ({ ...c, id: c.value, sortOrder: i, isActive: true }));
+
   // Group modal
   const [groupModal, setGroupModal]   = useState(false);
   const [groupEditId, setGroupEditId] = useState<string | null>(null);
@@ -819,6 +1065,7 @@ export default function AdminFooterLinksPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadCategories(); }, [loadCategories]);
   useEffect(() => {
     locationsApi.getCities(undefined, 200)
       .then(r => setCities((r.data || []).map((c: any) => ({ id: c.id, name: c.name, slug: c.slug }))))
@@ -949,10 +1196,19 @@ export default function AdminFooterLinksPage() {
             Use <ArrowLeftRight className="w-3 h-3 inline text-violet-500 mx-0.5" /> to remap without losing SEO content.
           </p>
         </div>
-        <button onClick={openCreateGroup}
-          className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm">
-          <Plus className="w-4 h-4" /> New Group
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setCatManagerOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 border border-orange-200 rounded-xl text-sm font-semibold hover:bg-orange-100 transition-colors">
+            <Settings className="w-4 h-4" /> Manage Categories
+            {adminCategories.length > 0 && (
+              <span className="bg-orange-200 text-orange-800 text-xs font-bold px-1.5 py-0.5 rounded-full">{adminCategories.length}</span>
+            )}
+          </button>
+          <button onClick={openCreateGroup}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm">
+            <Plus className="w-4 h-4" /> New Group
+          </button>
+        </div>
       </div>
 
       {/* ── Filter tabs: All → Generic → City ──────────────────────────── */}
@@ -1162,13 +1418,13 @@ export default function AdminFooterLinksPage() {
                   onChange={e => setGroupForm(f => ({ ...f, category: e.target.value }))}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-400">
                   <option value="">— Select category —</option>
-                  {FOOTER_CATEGORIES.map(c => (
+                  {categoryOptions.map(c => (
                     <option key={c.value} value={c.value}>{c.short} — {c.label}</option>
                   ))}
                 </select>
                 {groupForm.category && (
                   <p className="text-xs text-orange-600 mt-1">
-                    Tab label: <strong>{FOOTER_CATEGORIES.find(c => c.value === groupForm.category)?.short}</strong>
+                    Tab label: <strong>{categoryOptions.find(c => c.value === groupForm.category)?.short}</strong>
                   </p>
                 )}
               </div>
@@ -1219,7 +1475,15 @@ export default function AdminFooterLinksPage() {
         target={remapTarget}
         allGroups={groups}
         cities={cities}
+        categories={categoryOptions}
         onSaved={load}
+      />
+
+      {/* ── Category Manager Slide-Over ──────────────────────────────────────── */}
+      <CategoryManagerSlideOver
+        open={catManagerOpen}
+        onClose={() => setCatManagerOpen(false)}
+        onChanged={loadCategories}
       />
 
       {/* ── Delete Confirm ───────────────────────────────────────────────────── */}
