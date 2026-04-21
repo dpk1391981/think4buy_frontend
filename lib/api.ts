@@ -827,9 +827,42 @@ export const seoApi = {
   adminCreateFooterGroup: (data: any) => api.post('/seo/admin/footer-groups', data),
   adminUpdateFooterGroup: (id: string, data: any) => api.patch(`/seo/admin/footer-groups/${id}`, data),
   adminDeleteFooterGroup: (id: string) => api.delete(`/seo/admin/footer-groups/${id}`),
+  adminGetAllFooterPages: (params?: { page?: number; limit?: number; search?: string; category?: string; city?: string; isActive?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.page)     q.set('page',     String(params.page));
+    if (params?.limit)    q.set('limit',    String(params.limit));
+    if (params?.search)   q.set('search',   params.search);
+    if (params?.category) q.set('category', params.category);
+    if (params?.city)     q.set('city',     params.city);
+    if (params?.isActive !== undefined) q.set('isActive', String(params.isActive));
+    return api.get(`/seo/admin/footer-links/all?${q.toString()}`);
+  },
   adminCreateFooterLink: (data: any) => api.post('/seo/admin/footer-links', data),
   adminUpdateFooterLink: (id: string, data: any) => api.patch(`/seo/admin/footer-links/${id}`, data),
   adminDeleteFooterLink: (id: string) => api.delete(`/seo/admin/footer-links/${id}`),
+
+  // Admin - Quick SEO
+  adminQuickSeoPreview: (data: any) => api.post('/seo/admin/quick-seo/preview', data),
+  adminQuickSeoApply: (data: any) => api.post('/seo/admin/quick-seo/apply', data),
+  adminListTemplates: () => api.get('/seo/admin/quick-seo/templates'),
+  adminSaveTemplate: (data: any) => api.post('/seo/admin/quick-seo/templates', data),
+  adminUpdateTemplate: (id: string, data: any) => api.patch(`/seo/admin/quick-seo/templates/${id}`, data),
+  adminDeleteTemplate: (id: string) => api.delete(`/seo/admin/quick-seo/templates/${id}`),
+  adminApplyTemplate: (id: string, scope: any) => api.post(`/seo/admin/quick-seo/templates/${id}/apply`, scope),
+
+  // Admin - Category-City SEO
+  adminGetCategoryCityPages: (params?: { page?: number; limit?: number; search?: string }) =>
+    api.get('/seo/admin/category-city-pages', { params }),
+  adminCreateCategoryCityPage: (data: any) => api.post('/seo/admin/category-city-pages', data),
+  adminUpdateCategoryCityPage: (id: string, data: any) => api.patch(`/seo/admin/category-city-pages/${id}`, data),
+  adminDeleteCategoryCityPage: (id: string) => api.delete(`/seo/admin/category-city-pages/${id}`),
+
+  // Admin - Category-Locality SEO
+  adminGetCategoryLocalityPages: (params?: { page?: number; limit?: number; search?: string }) =>
+    api.get('/seo/admin/category-locality-pages', { params }),
+  adminCreateCategoryLocalityPage: (data: any) => api.post('/seo/admin/category-locality-pages', data),
+  adminUpdateCategoryLocalityPage: (id: string, data: any) => api.patch(`/seo/admin/category-locality-pages/${id}`, data),
+  adminDeleteCategoryLocalityPage: (id: string) => api.delete(`/seo/admin/category-locality-pages/${id}`),
 };
 
 // ─── Leads API ───────────────────────────────────────────────────────────────

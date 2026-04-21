@@ -87,7 +87,9 @@ const LISTING_PREFIXES: Array<{ prefix: string; category: string; type?: string 
   { prefix: 'property-for-sale-in',      category: 'buy' },
   { prefix: 'property-for-rent-in',      category: 'rent' },
   { prefix: 'flats-for-sale-in',         category: 'buy',        type: 'apartment' },
+  { prefix: 'flat-for-sale-in',          category: 'buy',        type: 'apartment' },
   { prefix: 'flats-for-rent-in',         category: 'rent',       type: 'apartment' },
+  { prefix: 'flat-for-rent-in',          category: 'rent',       type: 'apartment' },
   { prefix: 'villas-for-sale-in',        category: 'buy',        type: 'villa' },
   { prefix: 'plots-for-sale-in',         category: 'buy',        type: 'plot' },
   { prefix: 'office-space-for-rent-in',  category: 'commercial', type: 'commercial_office' },
@@ -140,15 +142,22 @@ const LISTING_PREFIXES: Array<{ prefix: string; category: string; type?: string 
 function splitCityLocality(rest: string): { city: string; locality?: string } {
   const parts = rest.split('-');
 
-  // Try longest city slug first (greedy city match leaves shortest locality)
+  // Try city from the beginning — longest match first (handles "navi-mumbai-locality")
   for (let i = parts.length; i >= 1; i--) {
     const citySlug = parts.slice(0, i).join('-');
     if (KNOWN_CITY_SLUGS.has(citySlug)) {
       const localitySlug = parts.slice(i).join('-');
-      return {
-        city: citySlug,
-        locality: localitySlug || undefined,
-      };
+      return { city: citySlug, locality: localitySlug || undefined };
+    }
+  }
+
+  // Try city from the end — shortest match first (handles "locality-city" format,
+  // e.g. "aarey-road-mumbai" → city=mumbai, locality=aarey-road)
+  for (let i = parts.length - 1; i >= 1; i--) {
+    const citySlug = parts.slice(i).join('-');
+    if (KNOWN_CITY_SLUGS.has(citySlug)) {
+      const localitySlug = parts.slice(0, i).join('-');
+      return { city: citySlug, locality: localitySlug || undefined };
     }
   }
 

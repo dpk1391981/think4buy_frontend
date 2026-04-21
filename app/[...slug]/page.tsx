@@ -142,13 +142,18 @@ export default async function ProgrammaticSeoListingPage({ params }: Props) {
     <>
       <JsonLd schema={schemas} />
 
-      {/* Property listings — always rendered from property DB */}
+      {/* ── Property listings — h1 rendered inside the listing header ─────── */}
       <Suspense fallback={<div className="min-h-screen bg-gray-50 pt-4" />}>
-        <PropertyListingPage searchParams={listingParams} pageH1={config?.h1Title ?? null} />
+        <PropertyListingPage
+          searchParams={listingParams}
+          pageH1={config?.h1Title ?? null}
+        />
       </Suspense>
 
-      {/* DB-driven SEO content — only renders when SEO config has non-null fields */}
-      {config && <DbSeoContent config={config} />}
+      {/* ── SEO content below listing: intro text + FAQs + links + bottom ─── */}
+      {config && (config.introContent || config.bottomContent || config.faqJson?.length || config.internalLinks?.length) && (
+        <DbSeoContent config={config} section="body" />
+      )}
     </>
   );
 }

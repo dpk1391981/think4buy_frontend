@@ -1358,7 +1358,18 @@ export default function AdminFooterLinksPage() {
                               : <span className="text-xs text-gray-300">—</span>
                             }
                           </td>
-                          <td className="px-4 py-2.5 text-gray-500 text-xs font-mono max-w-[160px] truncate">{link.url}</td>
+                          <td className="px-4 py-2.5 max-w-[180px]">
+                            <a
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-mono hover:underline truncate"
+                              title={`Open: ${link.url}`}
+                            >
+                              <span className="truncate">{link.url}</span>
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                            </a>
+                          </td>
                           <td className="px-4 py-2.5">
                             {hasSeo(link)
                               ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700"><Globe className="w-3 h-3" /> SEO</span>
@@ -1372,6 +1383,11 @@ export default function AdminFooterLinksPage() {
                           </td>
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-1">
+                              <a href={link.url} target="_blank" rel="noopener noreferrer"
+                                title="Open live page"
+                                className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors inline-flex">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                              </a>
                               <button onClick={() => openRemapLink(link)} title="Remap group / locality"
                                 className="p-1.5 text-violet-600 hover:bg-violet-50 rounded-lg transition-colors">
                                 <ArrowLeftRight className="w-3.5 h-3.5" />
