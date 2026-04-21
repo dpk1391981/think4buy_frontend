@@ -128,9 +128,39 @@ export default async function ProgrammaticSeoListingPage({ params }: Props) {
   // smart NLP fills in any gaps (e.g. type from property-type prefix words).
   // NLP smart-search MUST NOT override URL-parsed city/locality — numeric slugs like
   // "noida-63" cause the NLP to emit city="noida 63" which breaks the exact-match city filter.
+
+  // Map footer/display category slugs → API category + optional type filter.
+  // This handles cases where context.categorySlug is a display slug ('flats', 'villas'…)
+  // rather than an API category slug ('buy', 'rent'…).
+  const DISPLAY_CATEGORY_MAP: Record<string, { category: string; type?: string }> = {
+    flats:          { category: 'buy',             type: 'apartment' },
+    'flats-rent':   { category: 'rent',            type: 'apartment' },
+    villas:         { category: 'buy',             type: 'villa' },
+    plots:          { category: 'buy',             type: 'plot' },
+    'new-projects': { category: 'builder_project' },
+    office:         { category: 'commercial',      type: 'commercial_office' },
+  };
+
   const listingParams: Record<string, string> = { ...smartFilters };
-  const resolvedCategory = urlParsed.category ?? context.categorySlug;
+
+  // Prefer URL-parsed category (from prefix like 'flats-for-sale-in' → 'buy').
+  // Fall back to context category only when URL parsing returned no category.
+  let resolvedCategory = urlParsed.category;
+  let resolvedType     = urlParsed.type;
+
+  if (resolvedCategory == null && context.categorySlug) {
+    const mapped = DISPLAY_CATEGORY_MAP[context.categorySlug];
+    if (mapped) {
+      resolvedCategory = mapped.category;
+      if (!resolvedType && mapped.type) resolvedType = mapped.type;
+    } else {
+      resolvedCategory = context.categorySlug;
+    }
+  }
+
   if (resolvedCategory) listingParams.category = resolvedCategory;
+  if (resolvedType)     listingParams.type     = resolvedType;
+
   // Always overwrite with URL-parsed values — they are canonical for SEO pages.
   if (cityName)     listingParams.city     = cityName;
   if (localityName) listingParams.locality = localityName;

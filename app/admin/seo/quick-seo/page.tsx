@@ -798,9 +798,12 @@ export default function QuickSeoPage() {
                 className={`${inputCls} font-mono text-xs`} />
               <p className="text-xs text-gray-400 mt-1">Placeholders: <code className="bg-gray-100 px-1 rounded">{'{city}'}</code> <code className="bg-gray-100 px-1 rounded">{'{locality}'}</code> <code className="bg-gray-100 px-1 rounded">{'{category}'}</code></p>
             </div>
-            {categorySlug && citySlug && localitySlug && (
+            {slugPattern && (
               <div className="p-2.5 bg-blue-50 rounded-lg text-xs text-blue-700 font-mono break-all">
-                {slugPattern.replace('{category}', categorySlug).replace('{city}', citySlug).replace('{locality}', localitySlug)}
+                {slugPattern
+                  .replace('{category}', categorySlug || '{category}')
+                  .replace('{city}', citySlug || '{city}')
+                  .replace('{locality}', localitySlug || '{locality}')}
               </div>
             )}
           </div>
@@ -843,9 +846,11 @@ export default function QuickSeoPage() {
                   placeholder="e.g. property-for-sale-in-{city}"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-400" />
                 <p className="text-xs text-gray-400">Placeholders: <code className="bg-gray-100 px-1 rounded">{'{city}'}</code> <code className="bg-gray-100 px-1 rounded">{'{category}'}</code></p>
-                {categorySlug && citySlug && (
+                {citySlugPattern && (
                   <div className="p-2 bg-blue-50 rounded-lg text-xs text-blue-700 font-mono break-all">
-                    {citySlugPattern.replace('{category}', categorySlug).replace('{city}', citySlug)}
+                    {citySlugPattern
+                      .replace('{category}', categorySlug || '{category}')
+                      .replace('{city}', citySlug || '{city}')}
                   </div>
                 )}
               </div>
