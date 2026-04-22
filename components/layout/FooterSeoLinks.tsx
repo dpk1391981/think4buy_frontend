@@ -47,6 +47,7 @@ export const FOOTER_CATEGORIES: { value: string; label: string; short: string }[
   { value: 'office',       label: 'Office Space for Rent', short: 'Office'       },
   { value: 'new-projects', label: 'New Projects',          short: 'New Projects' },
   { value: 'pg',           label: 'PG / Co-Living',        short: 'PG'           },
+  { value: 'agents',       label: 'Property Agents',       short: 'Agents'       },
 ];
 
 const CAT_MAP = new Map(FOOTER_CATEGORIES.map(c => [c.value, c]));
@@ -63,6 +64,7 @@ const TITLE_TO_SLUG: Record<string, string> = {
   'new projects':                   'new-projects',
   'pg / co-living':                 'pg',
   'pg/co-living':                   'pg',
+  'property agents':                'agents',
 };
 
 // ── URL prefix → footer category mapping ─────────────────────────────────────

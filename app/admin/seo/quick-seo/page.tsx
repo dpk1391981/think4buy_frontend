@@ -48,19 +48,20 @@ interface QuickSeoTemplate {
 }
 
 const CATEGORY_SLUG_DEFAULTS: Record<string, string> = {
-  buy:             'property-for-sale-in-{city}-{locality}',
-  rent:            'property-for-rent-in-{city}-{locality}',
-  pg:              'pg-in-{city}-{locality}',
-  commercial:      'commercial-property-in-{city}-{locality}',
-  industrial:      'industrial-property-in-{city}-{locality}',
-  builder_project: 'new-projects-in-{city}-{locality}',
-  investment:      'investment-property-in-{city}-{locality}',
+  buy:             'property-for-sale-in-{locality}-{city}',
+  rent:            'property-for-rent-in-{locality}-{city}',
+  pg:              'pg-in-{locality}-{city}',
+  commercial:      'commercial-property-in-{locality}-{city}',
+  industrial:      'industrial-property-in-{locality}-{city}',
+  builder_project: 'new-projects-in-{locality}-{city}',
+  investment:      'investment-property-in-{locality}-{city}',
   // legacy / footer-category slugs
-  flats:           'flats-for-sale-in-{city}-{locality}',
-  'flats-rent':    'flats-for-rent-in-{city}-{locality}',
-  villas:          'villas-for-sale-in-{city}-{locality}',
-  office:          'office-space-in-{city}-{locality}',
-  'new-projects':  'new-projects-in-{city}-{locality}',
+  flats:           'flats-for-sale-in-{locality}-{city}',
+  'flats-rent':    'flats-for-rent-in-{locality}-{city}',
+  villas:          'villas-for-sale-in-{locality}-{city}',
+  office:          'office-space-in-{locality}-{city}',
+  'new-projects':  'new-projects-in-{locality}-{city}',
+  agents:          'agents-in-{locality}-{city}',
 };
 
 const CITY_SLUG_DEFAULTS: Record<string, string> = {
@@ -76,9 +77,10 @@ const CITY_SLUG_DEFAULTS: Record<string, string> = {
   villas:          'villas-for-sale-in-{city}',
   office:          'office-space-in-{city}',
   'new-projects':  'new-projects-in-{city}',
+  agents:          'agents-in-{city}',
 };
 
-const DEFAULT_PATTERN = '{category}-in-{city}-{locality}';
+const DEFAULT_PATTERN = '{category}-in-{locality}-{city}';
 
 const PLACEHOLDER_HINT = 'Placeholders: {city}, {locality}, {category}';
 
@@ -356,7 +358,7 @@ export default function QuickSeoPage() {
     if (categorySlug && CATEGORY_SLUG_DEFAULTS[categorySlug]) {
       setSlugPattern(CATEGORY_SLUG_DEFAULTS[categorySlug]);
     } else if (categorySlug) {
-      setSlugPattern(`${categorySlug}-in-{city}-{locality}`);
+      setSlugPattern(`${categorySlug}-in-{locality}-{city}`);
     } else {
       setSlugPattern(DEFAULT_PATTERN);
     }
