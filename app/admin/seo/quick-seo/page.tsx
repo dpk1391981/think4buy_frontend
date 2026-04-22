@@ -545,7 +545,7 @@ export default function QuickSeoPage() {
             <div className="p-2 bg-violet-100 rounded-xl">
               <Zap className="w-5 h-5 text-violet-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Quick SEO</h1>
+            <h1 className="text-2xl font-bold text-gray-900">SEO Templates</h1>
           </div>
           <p className="text-sm text-gray-500 ml-12">
             Bulk-apply SEO content with dynamic placeholders across cities, categories &amp; localities.
@@ -562,7 +562,7 @@ export default function QuickSeoPage() {
         <div className="mb-5 p-4 bg-green-50 border border-green-200 rounded-2xl flex items-start gap-3">
           <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-semibold text-green-800">Quick SEO applied successfully!</p>
+            <p className="text-sm font-semibold text-green-800">SEO Template applied successfully!</p>
             <div className="flex gap-4 mt-1.5 text-xs text-green-700">
               <span>Created: <strong>{applyResult.created}</strong></span>
               <span>Updated: <strong>{applyResult.updated}</strong></span>
@@ -879,7 +879,7 @@ export default function QuickSeoPage() {
             <button onClick={() => setShowConfirm(true)} disabled={!canPreview || !previewData || applying}
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors shadow-sm">
               <Zap className="w-4 h-4" />
-              Apply Quick SEO {previewData ? `(${previewData.total} pages)` : ''}
+              Apply SEO Template {previewData ? `(${previewData.total} pages)` : ''}
             </button>
           </div>
         </div>
@@ -1118,7 +1118,7 @@ export default function QuickSeoPage() {
                 <Zap className="w-5 h-5 text-violet-600" />
               </div>
               <div>
-                <h3 className="font-bold text-gray-900">Apply Quick SEO?</h3>
+                <h3 className="font-bold text-gray-900">Apply SEO Template?</h3>
                 <p className="text-xs text-gray-500 mt-0.5">{scopeLabel}</p>
               </div>
             </div>

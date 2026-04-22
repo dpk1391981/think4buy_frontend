@@ -3,9 +3,10 @@
  * Calls the backend priority resolver and returns the DB-driven SEO config.
  * Returns null if no config found — the page must handle 404/noindex accordingly.
  *
- * URL CONVENTION: hyphen-only (no slashes in listing URLs)
- *   ✅  /flats-for-sale-in-noida
- *   ✅  /flats-for-sale-in-gurgaon-sector-56
+ * URL CONVENTION: hyphen-only, locality BEFORE city when both are present
+ *   ✅  /flats-for-sale-in-noida            (city-only)
+ *   ✅  /flats-for-sale-in-sector-56-noida  (locality-city)
+ *   ✅  /agents-in-sector-56-noida          (agents locality-city)
  *   ❌  /flats-for-sale-in/noida
  */
 
@@ -98,6 +99,7 @@ const LISTING_PREFIXES: Array<{ prefix: string; category: string; type?: string 
   { prefix: 'pg-in',                     category: 'pg',         type: 'pg' },
   { prefix: 'buy-property-in',           category: 'buy' },
   { prefix: 'rent-property-in',          category: 'rent' },
+  { prefix: 'agents-in',                 category: 'agents' },
   { prefix: 'properties-in',             category: '' },
   { prefix: 'property-in',               category: '' },
   // Short-form: type-in-city (footer SEO links — no category implied)
@@ -126,37 +128,42 @@ const LISTING_PREFIXES: Array<{ prefix: string; category: string; type?: string 
 /**
  * Split a hyphen slug into (citySlug, localitySlug | undefined) using KNOWN_CITY_SLUGS.
  *
- * Example: "gurgaon-sector-56"
- *   → tries "gurgaon" → found in KNOWN_CITY_SLUGS
- *   → city="gurgaon", locality="sector-56"
+ * URL convention is locality-before-city: "{locality}-{city}"
  *
- * Example: "navi-mumbai"
- *   → tries "navi" → not found
- *   → tries "navi-mumbai" → found
- *   → city="navi-mumbai", locality=undefined
+ * Example: "sector-56-noida"
+ *   → tries "noida" from end → found → city="noida", locality="sector-56"
  *
- * Example: "noida"
- *   → tries "noida" → found
- *   → city="noida", locality=undefined
+ * Example: "navi-mumbai"  (compound city, no locality)
+ *   → tries "mumbai" from end → found → city="mumbai", locality="navi" (wrong)
+ *   → also tries "navi-mumbai" from end → found → city="navi-mumbai", locality="" ✅
+ *   The longest-end match takes priority over shorter ones.
+ *
+ * Example: "noida"  (city-only)
+ *   → single part, returned as city directly
  */
 function splitCityLocality(rest: string): { city: string; locality?: string } {
   const parts = rest.split('-');
 
-  // Try city from the beginning — longest match first (handles "navi-mumbai-locality")
+  // Try city from the END — longest suffix first (primary convention: locality-city).
+  // Longest-first prevents "navi-mumbai" being split as city="mumbai", locality="navi".
+  // "aarey-road-navi-mumbai" → i=4 not found → i=3 not found → i=2 "navi-mumbai" found
+  //   → city="navi-mumbai", locality="aarey-road" ✅
+  // "sector-56-noida"        → i=3 not found → i=2 not found → i=1 "noida" found
+  //   → city="noida", locality="sector-56" ✅
   for (let i = parts.length; i >= 1; i--) {
-    const citySlug = parts.slice(0, i).join('-');
+    const citySlug = parts.slice(parts.length - i).join('-');
     if (KNOWN_CITY_SLUGS.has(citySlug)) {
-      const localitySlug = parts.slice(i).join('-');
+      const localitySlug = parts.slice(0, parts.length - i).join('-');
       return { city: citySlug, locality: localitySlug || undefined };
     }
   }
 
-  // Try city from the end — shortest match first (handles "locality-city" format,
-  // e.g. "aarey-road-mumbai" → city=mumbai, locality=aarey-road)
-  for (let i = parts.length - 1; i >= 1; i--) {
-    const citySlug = parts.slice(i).join('-');
+  // Fallback: try city from the BEGINNING (handles legacy city-first URLs)
+  // "gurgaon-sector-56" → tries "gurgaon" (found) → city="gurgaon", locality="sector-56"
+  for (let i = parts.length; i >= 1; i--) {
+    const citySlug = parts.slice(0, i).join('-');
     if (KNOWN_CITY_SLUGS.has(citySlug)) {
-      const localitySlug = parts.slice(0, i).join('-');
+      const localitySlug = parts.slice(i).join('-');
       return { city: citySlug, locality: localitySlug || undefined };
     }
   }

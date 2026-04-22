@@ -80,6 +80,7 @@ const URL_PREFIX_TO_CAT: { prefix: string; catKey: string }[] = [
   { prefix: 'pg-in-',                        catKey: 'pg'           },
   { prefix: 'property-for-sale-in-',         catKey: 'buy'          },
   { prefix: 'property-for-rent-in-',         catKey: 'rent'         },
+  { prefix: 'agents-in-',                    catKey: 'agents'       },
 ];
 
 // Parse pathname → { catKey, citySlug } or null
@@ -93,17 +94,33 @@ function parseUrlContext(pathname: string): { catKey: string; citySlug: string }
   return null;
 }
 
-// Convert a city slug (e.g. "navi-mumbai") to a city name that matches footer data
+// Convert a city slug (or locality-city slug) to a city name matching footer data.
+// Handles both "{city}" and "{locality}-{city}" URL orderings.
+// Tries longest suffix match first so compound cities like "navi-mumbai" beat "mumbai".
 function slugToCity(slug: string, categories: CategoryEntry[]): string | null {
   if (!slug) return null;
   const normalize = (s: string) => s.toLowerCase().replace(/[-\s]+/g, '');
   const normalizedSlug = normalize(slug);
+  const parts = slug.toLowerCase().split('-');
+
+  // Collect all known city names from footer data for suffix matching
+  const allCities: { normalized: string; name: string }[] = [];
   for (const cat of categories) {
     for (const cityEntry of cat.cities) {
-      if (normalize(cityEntry.city) === normalizedSlug) return cityEntry.city;
+      allCities.push({ normalized: normalize(cityEntry.city), name: cityEntry.city });
     }
   }
-  return null;
+
+  // Try longest suffix first (locality-city convention)
+  for (let i = parts.length; i >= 1; i--) {
+    const suffix = normalize(parts.slice(parts.length - i).join('-'));
+    const match  = allCities.find(c => c.normalized === suffix);
+    if (match) return match.name;
+  }
+
+  // Fallback: exact full-slug match (city-only URLs)
+  const exact = allCities.find(c => c.normalized === normalizedSlug);
+  return exact?.name ?? null;
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
