@@ -11,7 +11,8 @@ import { FOOTER_CATEGORIES } from '@/components/layout/FooterSeoLinks';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface City { id: string; name: string; slug: string }
+interface City { id: string; name: string; slug: string; stateId?: string; stateName?: string }
+interface StateOption { id: string; name: string; code: string; slug: string }
 interface LocalityOption { id: string; locality: string; city: string }
 interface PreviewItem {
   type: 'city' | 'locality';
@@ -273,10 +274,13 @@ const EMPTY_TEMPLATE = {
 
 export default function QuickSeoPage() {
   const [cities, setCities]             = useState<City[]>([]);
+  const [states, setStates]             = useState<StateOption[]>([]);
   const [categories, setCategories]     = useState<{ value: string; label: string; short: string }[]>([]);
 
   // Selection
   const [categorySlug, setCategorySlug] = useState('');
+  const [stateId, setStateId]           = useState('');
+  const [stateName, setStateName]       = useState('');
   const [citySlug, setCitySlug]         = useState('');
   const [cityName, setCityName]         = useState('');
   const [localitySlug, setLocalitySlug] = useState('');
@@ -315,9 +319,11 @@ export default function QuickSeoPage() {
   const [deletingTplId, setDeletingTplId]     = useState<string | null>(null);
 
   // Apply-template modal (city picker)
-  const [tplApplyModal, setTplApplyModal] = useState<{ tpl: QuickSeoTemplate } | null>(null);
-  const [tplApplyCity, setTplApplyCity]   = useState('');
-  const [tplApplyCityName, setTplApplyCityName] = useState('');
+  const [tplApplyModal, setTplApplyModal]         = useState<{ tpl: QuickSeoTemplate } | null>(null);
+  const [tplApplyStateId, setTplApplyStateId]     = useState('');
+  const [tplApplyStateName, setTplApplyStateName] = useState('');
+  const [tplApplyCity, setTplApplyCity]           = useState('');
+  const [tplApplyCityName, setTplApplyCityName]   = useState('');
   const [tplApplyOverwrite, setTplApplyOverwrite] = useState(false);
 
   const loadTemplates = useCallback(() => {
@@ -326,7 +332,7 @@ export default function QuickSeoPage() {
       .catch(() => {});
   }, []);
 
-  // Load cities & categories on mount
+  // Load cities, states & categories on mount
   useEffect(() => {
     const toSlug = (s: string) =>
       s.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-');
@@ -337,8 +343,22 @@ export default function QuickSeoPage() {
           id: c.id,
           name: c.name,
           slug: c.slug || toSlug(c.name),
+          stateId: c.stateId,
+          stateName: c.stateName,
         }));
         setCities(mapped);
+      })
+      .catch(() => {});
+
+    locationsApi.getStates()
+      .then(r => {
+        const mapped = (r.data || []).map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          code: s.code || '',
+          slug: s.slug || s.name.toLowerCase().replace(/\s+/g, '-'),
+        }));
+        setStates(mapped);
       })
       .catch(() => {});
     seoApi.adminGetFooterCategories()
@@ -373,18 +393,25 @@ export default function QuickSeoPage() {
 
   const tF = (key: keyof typeof EMPTY_TEMPLATE, val: any) => setTemplate(t => ({ ...t, [key]: val }));
 
+  const filteredCities = stateId ? cities.filter(c => c.stateId === stateId) : cities;
+
   const catShort = categories.find(c => c.value === categorySlug)?.short ?? categorySlug;
+  const stateLabel = stateName ? ` (${stateName})` : '';
   const scopeLabel = !categorySlug
     ? 'Select a category to start'
     : allCities
-    ? `All cities, all localities — ${catShort}`
+    ? stateName
+      ? `All cities in ${stateName}, all localities — ${catShort}`
+      : `All cities, all localities — ${catShort}`
     : !citySlug
-    ? `All cities — ${catShort}`
+    ? stateName
+      ? `All cities in ${stateName} — ${catShort}`
+      : `All cities — ${catShort}`
     : allLocalities
-    ? `All localities in ${cityName} — ${catShort}`
+    ? `All localities in ${cityName}${stateLabel} — ${catShort}`
     : !localitySlug
-    ? `All localities in ${cityName} — ${catShort}`
-    : `${localityName}, ${cityName} — ${catShort}`;
+    ? `All localities in ${cityName}${stateLabel} — ${catShort}`
+    : `${localityName}, ${cityName}${stateLabel} — ${catShort}`;
 
   const canPreview = !!categorySlug;
 
@@ -398,6 +425,7 @@ export default function QuickSeoPage() {
         categorySlug,
         citySlug: citySlug || undefined,
         localitySlug: localitySlug || undefined,
+        stateId: stateId || undefined,
         slugPattern,
         citySlugPattern,
         includeCityPage,
@@ -420,6 +448,7 @@ export default function QuickSeoPage() {
         categorySlug,
         citySlug: citySlug || undefined,
         localitySlug: localitySlug || undefined,
+        stateId: stateId || undefined,
         slugPattern,
         citySlugPattern,
         includeCityPage,
@@ -438,7 +467,8 @@ export default function QuickSeoPage() {
   };
 
   const resetAll = () => {
-    setCategorySlug(''); setCitySlug(''); setCityName(''); setLocalitySlug(''); setLocalityName('');
+    setCategorySlug(''); setStateId(''); setStateName('');
+    setCitySlug(''); setCityName(''); setLocalitySlug(''); setLocalityName('');
     setAllCities(false); setAllLocalities(false);
     setSlugPattern(DEFAULT_PATTERN);
     setCitySlugPattern('{category}-in-{city}');
@@ -510,6 +540,8 @@ export default function QuickSeoPage() {
 
   const openTplApplyModal = (t: QuickSeoTemplate) => {
     setTplApplyModal({ tpl: t });
+    setTplApplyStateId('');
+    setTplApplyStateName('');
     setTplApplyCity('');
     setTplApplyCityName('');
     setTplApplyOverwrite(false);
@@ -521,7 +553,8 @@ export default function QuickSeoPage() {
     setApplyingTplId(t.id);
     try {
       const r = await seoApi.adminApplyTemplate(t.id, {
-        citySlug:         tplApplyCity || undefined,
+        citySlug:          tplApplyCity || undefined,
+        stateId:           tplApplyStateId || undefined,
         overwriteExisting: tplApplyOverwrite,
       });
       setApplyResult(r.data);
@@ -714,6 +747,33 @@ export default function QuickSeoPage() {
               </select>
             </div>
 
+            {/* State filter */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">State <span className="text-gray-400 font-normal">(optional filter)</span></label>
+              <select
+                value={stateId}
+                onChange={e => {
+                  const sel = states.find(s => s.id === e.target.value);
+                  setStateId(e.target.value);
+                  setStateName(sel?.name || '');
+                  setCitySlug(''); setCityName('');
+                  setLocalitySlug(''); setLocalityName('');
+                  setPreviewData(null);
+                }}
+                className={inputCls}
+              >
+                <option value="">— All states —</option>
+                {states.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              {stateId && (
+                <p className="text-xs text-violet-600 mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Showing <strong>{filteredCities.length}</strong> cities in {stateName}
+                </p>
+              )}
+            </div>
+
             {/* City */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -729,19 +789,19 @@ export default function QuickSeoPage() {
                     }}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-xs font-medium text-blue-600">All cities</span>
+                  <span className="text-xs font-medium text-blue-600">All cities{stateName ? ` in ${stateName}` : ''}</span>
                 </label>
               </div>
               <CitySelector
-                cities={cities}
+                cities={filteredCities}
                 value={citySlug}
-                placeholder={allCities ? '— All cities selected —' : 'All cities'}
+                placeholder={allCities ? `— All cities${stateName ? ` in ${stateName}` : ''} selected —` : `All cities${stateName ? ` in ${stateName}` : ''}`}
                 onChange={(slug, name) => { setCitySlug(slug); setCityName(name); setLocalitySlug(''); setLocalityName(''); setAllLocalities(false); setPreviewData(null); }}
                 disabled={allCities}
               />
               {allCities && (
                 <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Pages will be created for <strong>all {cities.length} cities</strong>
+                  <CheckCircle2 className="w-3 h-3" /> Pages will be created for <strong>all {filteredCities.length} cities{stateName ? ` in ${stateName}` : ''}</strong>
                 </p>
               )}
             </div>
@@ -878,7 +938,7 @@ export default function QuickSeoPage() {
               {previewing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
               {previewing ? 'Generating preview…' : 'Preview'}
             </button>
-            <button onClick={() => setShowConfirm(true)} disabled={!canPreview || !previewData || applying}
+            <button onClick={() => setShowConfirm(true)} disabled={!canPreview || applying}
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors shadow-sm">
               <Zap className="w-4 h-4" />
               Apply SEO Template {previewData ? `(${previewData.total} pages)` : ''}
@@ -1192,14 +1252,37 @@ export default function QuickSeoPage() {
             </div>
 
             <div className="space-y-4">
+              {/* State filter in modal */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                  City <span className="text-gray-400 font-normal">(leave blank to apply to all cities)</span>
+                  State <span className="text-gray-400 font-normal">(optional — filter cities by state)</span>
+                </label>
+                <select
+                  value={tplApplyStateId}
+                  onChange={e => {
+                    const sel = states.find(s => s.id === e.target.value);
+                    setTplApplyStateId(e.target.value);
+                    setTplApplyStateName(sel?.name || '');
+                    setTplApplyCity('');
+                    setTplApplyCityName('');
+                  }}
+                  className={inputCls}
+                >
+                  <option value="">— All states —</option>
+                  {states.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  City <span className="text-gray-400 font-normal">(leave blank to apply to all{tplApplyStateName ? ` ${tplApplyStateName}` : ''} cities)</span>
                 </label>
                 <CitySelector
-                  cities={cities}
+                  cities={tplApplyStateId ? cities.filter(c => c.stateId === tplApplyStateId) : cities}
                   value={tplApplyCity}
-                  placeholder="All cities"
+                  placeholder={tplApplyStateName ? `All cities in ${tplApplyStateName}` : 'All cities'}
                   onChange={(slug, name) => { setTplApplyCity(slug); setTplApplyCityName(name); }}
                 />
                 {tplApplyCity && (
@@ -1211,7 +1294,7 @@ export default function QuickSeoPage() {
                 {!tplApplyCity && (
                   <p className="text-xs text-orange-500 mt-1.5 flex items-center gap-1">
                     <Info className="w-3 h-3" />
-                    No city selected — will run for all cities and all their localities
+                    No city selected — will run for {tplApplyStateName ? `all cities in ${tplApplyStateName}` : 'all cities'} and their localities
                   </p>
                 )}
               </div>
