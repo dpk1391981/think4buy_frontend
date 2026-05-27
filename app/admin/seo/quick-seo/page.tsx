@@ -305,6 +305,10 @@ export default function QuickSeoPage() {
   const [showConfirm, setShowConfirm]     = useState(false);
   const [applying, setApplying]           = useState(false);
   const [applyResult, setApplyResult]     = useState<{ created: number; updated: number; skipped: number; failed: number; total: number } | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{
+    current: number; total: number; currentCityName: string;
+    accumulated: { created: number; updated: number; skipped: number; failed: number; total: number };
+  } | null>(null);
 
   // Tab
   const [tab, setTab] = useState<'template' | 'preview'>('template');
@@ -443,18 +447,62 @@ export default function QuickSeoPage() {
   const doApply = async () => {
     setApplying(true);
     setApplyResult(null);
+    setBatchProgress(null);
+
+    const commonPayload = {
+      categorySlug,
+      localitySlug: localitySlug || undefined,
+      slugPattern,
+      citySlugPattern,
+      includeCityPage,
+      showInFooter,
+      overwriteExisting,
+      template,
+    };
+
+    // ── All-cities mode: batch one city at a time to avoid timeout ───────────
+    if (allCities) {
+      const citiesToProcess = filteredCities.length > 0 ? filteredCities : cities;
+      const acc = { created: 0, updated: 0, skipped: 0, failed: 0, total: 0 };
+
+      for (let i = 0; i < citiesToProcess.length; i++) {
+        const city = citiesToProcess[i];
+        setBatchProgress({
+          current: i + 1,
+          total: citiesToProcess.length,
+          currentCityName: city.name,
+          accumulated: { ...acc },
+        });
+        try {
+          const r = await seoApi.adminQuickSeoApply({
+            ...commonPayload,
+            citySlug: city.slug,
+            stateId: stateId || undefined,
+          });
+          acc.created  += r.data.created  ?? 0;
+          acc.updated  += r.data.updated  ?? 0;
+          acc.skipped  += r.data.skipped  ?? 0;
+          acc.failed   += r.data.failed   ?? 0;
+          acc.total    += r.data.total    ?? 0;
+        } catch {
+          acc.failed++;
+        }
+      }
+
+      setApplyResult(acc);
+      setShowConfirm(false);
+      setBatchProgress(null);
+      setPreviewData(null);
+      setApplying(false);
+      return;
+    }
+
+    // ── Single city / locality mode: original single request ─────────────────
     try {
       const r = await seoApi.adminQuickSeoApply({
-        categorySlug,
+        ...commonPayload,
         citySlug: citySlug || undefined,
-        localitySlug: localitySlug || undefined,
         stateId: stateId || undefined,
-        slugPattern,
-        citySlugPattern,
-        includeCityPage,
-        showInFooter,
-        overwriteExisting,
-        template,
       });
       setApplyResult(r.data);
       setShowConfirm(false);
@@ -551,6 +599,50 @@ export default function QuickSeoPage() {
     if (!tplApplyModal) return;
     const t = tplApplyModal.tpl;
     setApplyingTplId(t.id);
+
+    // ── All-cities mode for saved templates: batch one city at a time ─────────
+    if (!tplApplyCity) {
+      const citiesToProcess = tplApplyStateId
+        ? cities.filter(c => c.stateId === tplApplyStateId)
+        : cities;
+      const acc = { created: 0, updated: 0, skipped: 0, failed: 0, total: 0 };
+
+      setBatchProgress({
+        current: 0, total: citiesToProcess.length,
+        currentCityName: '', accumulated: { ...acc },
+      });
+
+      for (let i = 0; i < citiesToProcess.length; i++) {
+        const city = citiesToProcess[i];
+        setBatchProgress({
+          current: i + 1, total: citiesToProcess.length,
+          currentCityName: city.name, accumulated: { ...acc },
+        });
+        try {
+          const r = await seoApi.adminApplyTemplate(t.id, {
+            citySlug: city.slug,
+            stateId: tplApplyStateId || undefined,
+            overwriteExisting: tplApplyOverwrite,
+          });
+          acc.created  += r.data.created  ?? 0;
+          acc.updated  += r.data.updated  ?? 0;
+          acc.skipped  += r.data.skipped  ?? 0;
+          acc.failed   += r.data.failed   ?? 0;
+          acc.total    += r.data.total    ?? 0;
+        } catch {
+          acc.failed++;
+        }
+      }
+
+      setApplyResult(acc);
+      setTplApplyModal(null);
+      setBatchProgress(null);
+      setApplyingTplId(null);
+      loadTemplates();
+      return;
+    }
+
+    // ── Single city: original request ─────────────────────────────────────────
     try {
       const r = await seoApi.adminApplyTemplate(t.id, {
         citySlug:          tplApplyCity || undefined,
@@ -564,6 +656,7 @@ export default function QuickSeoPage() {
       alert(e?.response?.data?.message || 'Apply failed');
     } finally {
       setApplyingTplId(null);
+      setBatchProgress(null);
     }
   };
 
@@ -1220,10 +1313,39 @@ export default function QuickSeoPage() {
               </div>
             )}
 
+            {/* Batch progress bar */}
+            {batchProgress && (
+              <div className="mb-4 space-y-2">
+                <div className="flex items-center justify-between text-xs text-gray-600">
+                  <span className="flex items-center gap-1.5">
+                    <RefreshCw className="w-3 h-3 animate-spin text-violet-500" />
+                    <span>Processing <strong>{batchProgress.currentCityName}</strong></span>
+                  </span>
+                  <span className="font-semibold text-violet-700">{batchProgress.current}/{batchProgress.total} cities</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-violet-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                  />
+                </div>
+                <div className="flex gap-3 text-xs text-gray-500">
+                  <span className="text-green-600">Created: <strong>{batchProgress.accumulated.created}</strong></span>
+                  <span className="text-yellow-600">Updated: <strong>{batchProgress.accumulated.updated}</strong></span>
+                  <span>Skipped: <strong>{batchProgress.accumulated.skipped}</strong></span>
+                  {batchProgress.accumulated.failed > 0 && <span className="text-red-500">Failed: <strong>{batchProgress.accumulated.failed}</strong></span>}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button onClick={doApply} disabled={applying}
                 className="flex-1 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
-                {applying ? <><RefreshCw className="w-4 h-4 animate-spin" /> Applying…</> : <><Zap className="w-4 h-4" /> Apply Now</>}
+                {applying
+                  ? batchProgress
+                    ? <><RefreshCw className="w-4 h-4 animate-spin" /> {batchProgress.current}/{batchProgress.total} cities…</>
+                    : <><RefreshCw className="w-4 h-4 animate-spin" /> Applying…</>
+                  : <><Zap className="w-4 h-4" /> Apply Now</>}
               </button>
               <button onClick={() => setShowConfirm(false)} disabled={applying}
                 className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm hover:bg-gray-50 transition-colors">
@@ -1319,13 +1441,42 @@ export default function QuickSeoPage() {
               </label>
             </div>
 
+            {/* Batch progress bar for template apply */}
+            {batchProgress && !!applyingTplId && (
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between text-xs text-gray-600">
+                  <span className="flex items-center gap-1.5">
+                    <RefreshCw className="w-3 h-3 animate-spin text-violet-500" />
+                    <span>Processing <strong>{batchProgress.currentCityName}</strong></span>
+                  </span>
+                  <span className="font-semibold text-violet-700">{batchProgress.current}/{batchProgress.total} cities</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-violet-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.round((batchProgress.current / batchProgress.total) * 100)}%` }}
+                  />
+                </div>
+                <div className="flex gap-3 text-xs text-gray-500">
+                  <span className="text-green-600">Created: <strong>{batchProgress.accumulated.created}</strong></span>
+                  <span className="text-yellow-600">Updated: <strong>{batchProgress.accumulated.updated}</strong></span>
+                  <span>Skipped: <strong>{batchProgress.accumulated.skipped}</strong></span>
+                  {batchProgress.accumulated.failed > 0 && <span className="text-red-500">Failed: <strong>{batchProgress.accumulated.failed}</strong></span>}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3 mt-5">
               <button
                 onClick={confirmTplApply}
                 disabled={!!applyingTplId}
                 className="flex-1 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
               >
-                {applyingTplId ? <><RefreshCw className="w-4 h-4 animate-spin" /> Applying…</> : <><Zap className="w-4 h-4" /> Apply Now</>}
+                {applyingTplId
+                  ? batchProgress
+                    ? <><RefreshCw className="w-4 h-4 animate-spin" /> {batchProgress.current}/{batchProgress.total} cities…</>
+                    : <><RefreshCw className="w-4 h-4 animate-spin" /> Applying…</>
+                  : <><Zap className="w-4 h-4" /> Apply Now</>}
               </button>
               <button onClick={() => setTplApplyModal(null)} disabled={!!applyingTplId}
                 className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm hover:bg-gray-50 transition-colors">
