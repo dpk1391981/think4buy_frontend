@@ -307,6 +307,7 @@ export default function QuickSeoPage() {
   const [applyResult, setApplyResult]     = useState<{ created: number; updated: number; skipped: number; failed: number; total: number } | null>(null);
   const [batchProgress, setBatchProgress] = useState<{
     current: number; total: number; currentCityName: string;
+    cityDone: boolean;  // true while waiting for API, false while counting
     accumulated: { created: number; updated: number; skipped: number; failed: number; total: number };
   } | null>(null);
 
@@ -467,10 +468,12 @@ export default function QuickSeoPage() {
 
       for (let i = 0; i < citiesToProcess.length; i++) {
         const city = citiesToProcess[i];
+        // Show "Processing <city>…" with counts from previously completed cities
         setBatchProgress({
           current: i + 1,
           total: citiesToProcess.length,
           currentCityName: city.name,
+          cityDone: false,
           accumulated: { ...acc },
         });
         try {
@@ -487,6 +490,8 @@ export default function QuickSeoPage() {
         } catch {
           acc.failed++;
         }
+        // Mark city done — update counts immediately so user sees running total
+        setBatchProgress(prev => prev ? { ...prev, cityDone: true, accumulated: { ...acc } } : null);
       }
 
       setApplyResult(acc);
@@ -609,14 +614,14 @@ export default function QuickSeoPage() {
 
       setBatchProgress({
         current: 0, total: citiesToProcess.length,
-        currentCityName: '', accumulated: { ...acc },
+        currentCityName: '', cityDone: false, accumulated: { ...acc },
       });
 
       for (let i = 0; i < citiesToProcess.length; i++) {
         const city = citiesToProcess[i];
         setBatchProgress({
           current: i + 1, total: citiesToProcess.length,
-          currentCityName: city.name, accumulated: { ...acc },
+          currentCityName: city.name, cityDone: false, accumulated: { ...acc },
         });
         try {
           const r = await seoApi.adminApplyTemplate(t.id, {
@@ -632,6 +637,7 @@ export default function QuickSeoPage() {
         } catch {
           acc.failed++;
         }
+        setBatchProgress(prev => prev ? { ...prev, cityDone: true, accumulated: { ...acc } } : null);
       }
 
       setApplyResult(acc);
@@ -1318,22 +1324,30 @@ export default function QuickSeoPage() {
               <div className="mb-4 space-y-2">
                 <div className="flex items-center justify-between text-xs text-gray-600">
                   <span className="flex items-center gap-1.5">
-                    <RefreshCw className="w-3 h-3 animate-spin text-violet-500" />
-                    <span>Processing <strong>{batchProgress.currentCityName}</strong></span>
+                    {batchProgress.cityDone
+                      ? <CheckCircle2 className="w-3 h-3 text-green-500" />
+                      : <RefreshCw className="w-3 h-3 animate-spin text-violet-500" />}
+                    <span>
+                      {batchProgress.cityDone
+                        ? <><strong>{batchProgress.currentCityName}</strong> done</>
+                        : <>Processing <strong>{batchProgress.currentCityName}</strong>…</>}
+                    </span>
                   </span>
-                  <span className="font-semibold text-violet-700">{batchProgress.current}/{batchProgress.total} cities</span>
+                  <span className="font-semibold text-violet-700">
+                    {batchProgress.cityDone ? batchProgress.current : batchProgress.current - 1}/{batchProgress.total} done
+                  </span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                   <div
                     className="bg-violet-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                    style={{ width: `${((batchProgress.cityDone ? batchProgress.current : batchProgress.current - 1) / batchProgress.total) * 100}%` }}
                   />
                 </div>
-                <div className="flex gap-3 text-xs text-gray-500">
-                  <span className="text-green-600">Created: <strong>{batchProgress.accumulated.created}</strong></span>
-                  <span className="text-yellow-600">Updated: <strong>{batchProgress.accumulated.updated}</strong></span>
-                  <span>Skipped: <strong>{batchProgress.accumulated.skipped}</strong></span>
-                  {batchProgress.accumulated.failed > 0 && <span className="text-red-500">Failed: <strong>{batchProgress.accumulated.failed}</strong></span>}
+                <div className="flex gap-3 text-xs">
+                  <span className="text-green-600 font-medium">✓ Created: <strong>{batchProgress.accumulated.created}</strong></span>
+                  <span className="text-yellow-600 font-medium">↻ Updated: <strong>{batchProgress.accumulated.updated}</strong></span>
+                  <span className="text-gray-500">— Skipped: <strong>{batchProgress.accumulated.skipped}</strong></span>
+                  {batchProgress.accumulated.failed > 0 && <span className="text-red-500 font-medium">✗ Failed: <strong>{batchProgress.accumulated.failed}</strong></span>}
                 </div>
               </div>
             )}
@@ -1446,22 +1460,30 @@ export default function QuickSeoPage() {
               <div className="mt-4 space-y-2">
                 <div className="flex items-center justify-between text-xs text-gray-600">
                   <span className="flex items-center gap-1.5">
-                    <RefreshCw className="w-3 h-3 animate-spin text-violet-500" />
-                    <span>Processing <strong>{batchProgress.currentCityName}</strong></span>
+                    {batchProgress.cityDone
+                      ? <CheckCircle2 className="w-3 h-3 text-green-500" />
+                      : <RefreshCw className="w-3 h-3 animate-spin text-violet-500" />}
+                    <span>
+                      {batchProgress.cityDone
+                        ? <><strong>{batchProgress.currentCityName}</strong> done</>
+                        : <>Processing <strong>{batchProgress.currentCityName}</strong>…</>}
+                    </span>
                   </span>
-                  <span className="font-semibold text-violet-700">{batchProgress.current}/{batchProgress.total} cities</span>
+                  <span className="font-semibold text-violet-700">
+                    {batchProgress.cityDone ? batchProgress.current : batchProgress.current - 1}/{batchProgress.total} done
+                  </span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                   <div
                     className="bg-violet-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${Math.round((batchProgress.current / batchProgress.total) * 100)}%` }}
+                    style={{ width: `${((batchProgress.cityDone ? batchProgress.current : batchProgress.current - 1) / batchProgress.total) * 100}%` }}
                   />
                 </div>
-                <div className="flex gap-3 text-xs text-gray-500">
-                  <span className="text-green-600">Created: <strong>{batchProgress.accumulated.created}</strong></span>
-                  <span className="text-yellow-600">Updated: <strong>{batchProgress.accumulated.updated}</strong></span>
-                  <span>Skipped: <strong>{batchProgress.accumulated.skipped}</strong></span>
-                  {batchProgress.accumulated.failed > 0 && <span className="text-red-500">Failed: <strong>{batchProgress.accumulated.failed}</strong></span>}
+                <div className="flex gap-3 text-xs">
+                  <span className="text-green-600 font-medium">✓ Created: <strong>{batchProgress.accumulated.created}</strong></span>
+                  <span className="text-yellow-600 font-medium">↻ Updated: <strong>{batchProgress.accumulated.updated}</strong></span>
+                  <span className="text-gray-500">— Skipped: <strong>{batchProgress.accumulated.skipped}</strong></span>
+                  {batchProgress.accumulated.failed > 0 && <span className="text-red-500 font-medium">✗ Failed: <strong>{batchProgress.accumulated.failed}</strong></span>}
                 </div>
               </div>
             )}
