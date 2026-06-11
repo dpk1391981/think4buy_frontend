@@ -16,7 +16,7 @@ export default function CookieBanner() {
   return (
     <>
       {/* Backdrop dimmer (mobile only) */}
-      <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" aria-hidden="true" />
+      <div className="fixed inset-0 bg-black/30 z-40 lg:hidden pointer-events-none" aria-hidden="true" />
 
       {/* Banner */}
       <div

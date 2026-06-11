@@ -69,7 +69,7 @@ export default function AuthLoadingOverlay() {
       className={[
         'fixed inset-0 z-[200] flex flex-col items-center justify-center bg-white',
         'transition-opacity duration-300',
-        visible ? 'opacity-100' : 'opacity-0',
+        visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
       ].join(' ')}
     >
       {/* Spinner with logo */}
