@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Search, CheckCircle, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PRICE_RANGES_BUY, PRICE_RANGES_RENT } from '@/lib/utils';
@@ -116,6 +116,8 @@ function useFilterData(category: string) {
 export default function FilterPanel({ className, propCategory, propIsNewProject }: FilterPanelProps) {
   const router      = useRouter();
   const sp          = useSearchParams();
+  const pathname    = usePathname();
+  const filterBase  = pathname.startsWith('/properties') ? '/properties' : pathname;
   const isBuilderCat = propIsNewProject || sp.get('isNewProject') === 'true' || BUILDER_ONLY_CATEGORIES.has(propCategory || sp.get('category') || '');
   const category    = isBuilderCat && !(propCategory || sp.get('category')) ? 'new_projects' : (propCategory || sp.get('category') || 'buy');
 
@@ -135,19 +137,21 @@ export default function FilterPanel({ className, propCategory, propIsNewProject 
 
   const get = useCallback((k: string) => sp.get(k), [sp]);
 
+  const isSeoPage = filterBase !== '/properties';
+
   const push = useCallback((updates: Record<string, string | undefined>) => {
     const p = new URLSearchParams(sp.toString());
     Object.entries(updates).forEach(([k, v]) => v ? p.set(k, v) : p.delete(k));
     p.set('page', '1');
-    router.push(`/properties?${p.toString()}`, { scroll: false });
-  }, [sp, router]);
+    router.push(`${filterBase}?${p.toString()}`, { scroll: isSeoPage });
+  }, [sp, router, filterBase, isSeoPage]);
 
   const set1  = (k: string, v: string | undefined) => push({ [k]: v });
   const clearAll = () => {
     const p = new URLSearchParams();
     if (get('category')) p.set('category', get('category')!);
     if (get('city'))     p.set('city',     get('city')!);
-    router.push(`/properties?${p.toString()}`);
+    router.push(`${filterBase}?${p.toString()}`);
     setBuilder('');
   };
 
@@ -273,8 +277,11 @@ export function FilterModal({
 }: {
   open: boolean; onClose: () => void; totalCount?: number; propCategory?: string; propIsNewProject?: boolean;
 }) {
-  const router   = useRouter();
-  const sp       = useSearchParams();
+  const router      = useRouter();
+  const sp          = useSearchParams();
+  const pathname    = usePathname();
+  const filterBase  = pathname.startsWith('/properties') ? '/properties' : pathname;
+  const isSeoPage   = filterBase !== '/properties';
   const isBuilderCat = propIsNewProject || sp.get('isNewProject') === 'true' || BUILDER_ONLY_CATEGORIES.has(propCategory || sp.get('category') || '');
   const category = isBuilderCat && !(propCategory || sp.get('category')) ? 'new_projects' : (propCategory || sp.get('category') || 'buy');
 
@@ -313,7 +320,7 @@ export function FilterModal({
     ALL_FILTER_KEYS.forEach(k => p.delete(k));
     Object.entries(pending).forEach(([k, v]) => { if (v) p.set(k, v); });
     p.set('page', '1');
-    router.push(`/properties?${p.toString()}`, { scroll: false });
+    router.push(`${filterBase}?${p.toString()}`, { scroll: isSeoPage });
     onClose();
   };
 
@@ -508,8 +515,11 @@ export function MobileFilterSheet({
 }: {
   open: boolean; onClose: () => void; totalCount?: number; propCategory?: string; propIsNewProject?: boolean;
 }) {
-  const router   = useRouter();
-  const sp       = useSearchParams();
+  const router      = useRouter();
+  const sp          = useSearchParams();
+  const pathname    = usePathname();
+  const filterBase  = pathname.startsWith('/properties') ? '/properties' : pathname;
+  const isSeoPage   = filterBase !== '/properties';
   const isBuilderCat = propIsNewProject || sp.get('isNewProject') === 'true' || BUILDER_ONLY_CATEGORIES.has(propCategory || sp.get('category') || '');
   const category = isBuilderCat && !(propCategory || sp.get('category')) ? 'new_projects' : (propCategory || sp.get('category') || 'buy');
 
@@ -561,12 +571,10 @@ export function MobileFilterSheet({
 
   const applyAndClose = () => {
     const p = new URLSearchParams(sp.toString());
-    // Remove all filter keys first
     ALL_FILTER_KEYS.forEach(k => p.delete(k));
-    // Apply pending
     Object.entries(pending).forEach(([k, v]) => { if (v) p.set(k, v); });
     p.set('page', '1');
-    router.push(`/properties?${p.toString()}`, { scroll: false });
+    router.push(`${filterBase}?${p.toString()}`, { scroll: isSeoPage });
     onClose();
   };
 

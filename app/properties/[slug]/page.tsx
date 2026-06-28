@@ -17,7 +17,7 @@ interface Props {
  * ISR serves the cached HTML instantly from CDN while refreshing in background.
  * For a 20k concurrent platform this is critical — avoids hitting the DB on every view.
  */
-export const revalidate = 0; // disable ISR cache temporarily for debugging
+export const revalidate = 300; // ISR: revalidate every 5 minutes
 
 async function getProperty(slug: string) {
   try {
@@ -42,9 +42,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     property.metaDescription ||
     `${property.bedrooms ? property.bedrooms + ' BHK ' : ''}${getPropertyTypeLabel(property.type)} for ${getCategoryLabel(property.category)} in ${property.locality}, ${property.city}. ${property.area ? property.area + ' sqft. ' : ''}Contact now.`;
 
-  // Property detail pages are noindex by default to avoid thin-content SEO penalties.
-  // Admin can enable indexing per-property via the allowIndexing flag.
-  const shouldIndex = property.allowIndexing === true;
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com';
+  // Index all active/approved properties by default.
+  // Explicit allowIndexing === false lets admins noindex specific listings (e.g. duplicates, low-quality).
+  const shouldIndex = property.allowIndexing !== false;
+  const canonical = `${siteUrl}/properties/${property.slug}`;
+
+  const ogImage = property.images?.[0]
+    ? resolveImageUrl(property.images[0].url)
+    : `${siteUrl}/og-default.jpg`;
 
   return {
     title,
@@ -52,23 +58,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     robots: {
       index: shouldIndex,
       follow: true,
-      googleBot: { index: shouldIndex, follow: true },
+      googleBot: {
+        index: shouldIndex,
+        follow: true,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
     },
     openGraph: {
       title,
       description,
-      images: property.images?.[0]
-        ? [{ url: resolveImageUrl(property.images[0].url) }]
-        : [],
-      type: 'website',
+      url: canonical,
+      type: 'article',
+      siteName: 'Think4BuySale',
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
+      locale: 'en_IN',
+      ...(property.createdAt && { publishedTime: property.createdAt }),
+      ...(property.updatedAt && { modifiedTime: property.updatedAt }),
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
+      images: [ogImage],
+      site: '@think4buysale',
     },
     alternates: {
-      canonical: shouldIndex ? `/properties/${property.slug}` : undefined,
+      canonical: shouldIndex ? canonical : undefined,
     },
   };
 }
@@ -80,17 +96,17 @@ export default async function PropertyDetailPage({ params }: Props) {
     notFound();
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com';
+  const pageUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com';
 
   return (
     <>
       <JsonLd schema={[
-        buildRealEstateListingSchema(property, siteUrl),
+        buildRealEstateListingSchema(property, pageUrl),
         buildBreadcrumbSchema([
-          { name: 'Home',       url: siteUrl },
-          { name: 'Properties', url: `${siteUrl}/properties` },
-          ...(property.city ? [{ name: property.city, url: `${siteUrl}/properties?city=${property.city}` }] : []),
-          { name: property.title, url: `${siteUrl}/properties/${property.slug}` },
+          { name: 'Home',       url: pageUrl },
+          { name: 'Properties', url: `${pageUrl}/properties` },
+          ...(property.city ? [{ name: property.city, url: `${pageUrl}/property-for-sale-in-${property.city?.toLowerCase().replace(/\s+/g, '-')}` }] : []),
+          { name: property.title, url: `${pageUrl}/properties/${property.slug}` },
         ]),
       ]} />
       <PropertyDetailClient property={property} />

@@ -21,7 +21,11 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import PropertyListingPage from '@/app/properties/PropertyListingPage';
 import DbSeoContent from '@/components/seo/DbSeoContent';
-import JsonLd, { buildBreadcrumbSchema } from '@/components/seo/JsonLd';
+import JsonLd, {
+  buildBreadcrumbSchema,
+  buildListingPageSchema,
+  buildSpeakableWebPageSchema,
+} from '@/components/seo/JsonLd';
 import {
   resolveListingPageSeo,
   parseListingSlug,
@@ -68,24 +72,36 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const robots = config.robots ?? 'index,follow';
   const [idx, fol] = robots.split(',');
   const canonical = config.canonicalUrl ?? `${SITE}/${slug}`;
+  const ogImage = `${SITE}/og-default.jpg`;
+
+  const title = config.metaTitle ?? undefined;
+  const description = config.metaDescription ?? undefined;
 
   return {
-    ...(config.metaTitle && { title: config.metaTitle }),
-    ...(config.metaDescription && { description: config.metaDescription }),
+    ...(title && { title }),
+    ...(description && { description }),
     ...(config.metaKeywords && { keywords: config.metaKeywords }),
     robots: {
       index: idx?.trim().toLowerCase() !== 'noindex',
       follow: fol?.trim().toLowerCase() !== 'nofollow',
     },
     alternates: { canonical },
-    ...(config.metaTitle && config.metaDescription && {
-      openGraph: {
-        title: config.metaTitle,
-        description: config.metaDescription,
-        url: canonical,
-        type: 'website',
-      },
-    }),
+    openGraph: {
+      ...(title && { title }),
+      ...(description && { description }),
+      url: canonical,
+      type: 'website',
+      siteName: 'Think4BuySale',
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title ?? 'Think4BuySale' }],
+      locale: 'en_IN',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      ...(title && { title }),
+      ...(description && { description }),
+      images: [ogImage],
+      site: '@think4buysale',
+    },
   };
 }
 
@@ -121,7 +137,29 @@ export default async function ProgrammaticSeoListingPage({ params }: Props) {
   }
 
   // JSON-LD schemas
+  const canonical = config?.canonicalUrl ?? `${SITE}/${slug}`;
+  const pageTitle = config?.h1Title ?? config?.metaTitle ?? (cityName ? `Properties in ${cityName}` : 'Property Listings');
+
   const schemas: Record<string, unknown>[] = [buildBreadcrumbSchema(breadcrumbs)];
+
+  // SearchResultsPage — GEO: establishes this as a real estate search page for a location
+  schemas.push(buildListingPageSchema({
+    pageTitle,
+    description: config?.metaDescription,
+    canonical,
+    cityName,
+    localityName,
+    siteUrl: SITE,
+  }));
+
+  // WebPage + Speakable — AEO: marks h1 and intro summary for voice/AI assistants.
+  // Emitted unconditionally so pages without intro still get Speakable on the h1 + meta description.
+  schemas.push(buildSpeakableWebPageSchema({
+    pageTitle,
+    description: config?.metaDescription ?? config?.metaDescription ?? undefined,
+    canonical,
+  }));
+
   if (config?.faqJson?.length) schemas.push(buildFaqSchema(config.faqJson));
 
   // Build listing params: URL parsing is authoritative for category/city/locality;
