@@ -15,7 +15,12 @@ import {
 import HomeSearchPanel from '@/components/home/HomeSearchPanel';
 import HeroVisual from '@/components/home/HeroVisual';
 import CityRedirect from '@/components/home/CityRedirect';
-import JsonLd, { buildWebSiteSchema, buildOrganizationSchema } from '@/components/seo/JsonLd';
+import JsonLd, {
+  buildWebSiteSchema,
+  buildOrganizationSchema,
+  buildLocalBusinessSchema,
+  buildHomeFaqSchema,
+} from '@/components/seo/JsonLd';
 import CategoryGrid from '@/components/home/CategoryGrid';
 
 // ─── Above-the-fold: import directly ─────────────────────────────────────────
@@ -55,12 +60,12 @@ export const metadata: Metadata = {
 };
 
 const QUICK_LINKS = [
-  { label: 'Apartments for Sale', href: '/properties?category=buy&type=apartment' },
-  { label: 'Villas in Mumbai',    href: '/properties?category=buy&type=villa&city=Mumbai' },
-  { label: '2 BHK for Rent',     href: '/properties?category=rent&bedrooms=2' },
-  { label: 'PG in Bangalore',    href: '/properties?category=pg&city=Bangalore' },
-  { label: 'Office Space Delhi',  href: '/properties?category=commercial&city=Delhi' },
-  { label: 'Plots in Hyderabad', href: '/properties?category=buy&type=plot&city=Hyderabad' },
+  { label: 'Flats for Sale',      href: '/flats-for-sale-in-mumbai' },
+  { label: 'Villas in Mumbai',    href: '/villas-for-sale-in-mumbai' },
+  { label: 'Property for Rent',   href: '/property-for-rent-in-delhi' },
+  { label: 'PG in Bangalore',     href: '/pg-in-bangalore' },
+  { label: 'Office Space Delhi',  href: '/commercial-property-in-delhi' },
+  { label: 'Plots in Hyderabad',  href: '/plots-for-sale-in-hyderabad' },
 ];
 
 
@@ -429,10 +434,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Structured data for Google rich results */}
+      {/* Structured data — Website, Organization, LocalBusiness, FAQ for AI Overviews */}
       <JsonLd schema={[
         buildWebSiteSchema(process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com'),
         buildOrganizationSchema(process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com'),
+        buildLocalBusinessSchema(process.env.NEXT_PUBLIC_APP_URL || 'https://www.think4buysale.com'),
+        buildHomeFaqSchema(),
       ]} />
     </>
   );

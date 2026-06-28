@@ -100,7 +100,8 @@ export default function DbSeoContent({ config, section = 'all' }: Props) {
             {renderIntro && (
               <>
                 <div className="w-16 h-1 bg-primary-500 rounded mb-6" />
-                <HtmlOrText content={config.introContent!} className={proseBase} />
+                {/* seo-speakable — targeted by Speakable JSON-LD cssSelector for AEO */}
+                <HtmlOrText content={config.introContent!} className={`seo-speakable ${proseBase}`} />
               </>
             )}
           </div>
@@ -135,6 +136,7 @@ export default function DbSeoContent({ config, section = 'all' }: Props) {
               {config.faqJson!.map((faq, i) => (
                 <details
                   key={i}
+                  open={i === 0}
                   className="group bg-gray-50 border border-gray-100 rounded-xl overflow-hidden"
                 >
                   <summary className="px-5 py-4 cursor-pointer text-sm font-semibold text-gray-800 hover:text-primary-700 flex items-center justify-between list-none">

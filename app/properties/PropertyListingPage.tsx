@@ -96,6 +96,13 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
   // current path rather than jumping to /properties.
   const pathname = usePathname();
   const filterBase = pathname.startsWith('/properties') ? '/properties' : pathname;
+  const isSeoPage  = filterBase !== '/properties';
+
+  // Scroll to top on mount — handles browser scroll restoration on refresh for SEO slug pages
+  useEffect(() => {
+    if (isSeoPage) window.scrollTo({ top: 0, behavior: 'instant' });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Infinite scroll state ────────────────────────────────────────────────
   const [items, setItems]               = useState<Property[]>([]);
@@ -326,7 +333,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
     if (key === 'maxArea')  params.delete('minArea');
     params.delete(key);
     params.delete('page');
-    router.push(`${filterBase}?${params.toString()}`, { scroll: false });
+    router.push(`${filterBase}?${params.toString()}`, { scroll: isSeoPage });
   };
 
   const topAgentActive       = urlSearchParams.get('topAgent')      === 'true';
@@ -337,14 +344,14 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
     const params = new URLSearchParams(urlSearchParams.toString());
     if (active) { params.delete(key); } else { params.set(key, 'true'); }
     params.delete('page');
-    router.push(`${filterBase}?${params.toString()}`, { scroll: false });
+    router.push(`${filterBase}?${params.toString()}`, { scroll: isSeoPage });
   };
 
   const toggleOwnerFilter = () => {
     const params = new URLSearchParams(urlSearchParams.toString());
     if (ownerFilterActive) { params.delete('listedBy'); } else { params.set('listedBy', 'owner'); }
     params.delete('page');
-    router.push(`${filterBase}?${params.toString()}`, { scroll: false });
+    router.push(`${filterBase}?${params.toString()}`, { scroll: isSeoPage });
   };
 
   const POSSESSION_CHIPS = [
@@ -364,7 +371,7 @@ export default function PropertyListingPage({ searchParams: propSearchParams, pa
     if (!params.has('city')     && propDefaults.city)     params.set('city',     propDefaults.city);
     if (propDefaults.isNewProject === 'true') params.set('isNewProject', 'true');
     params.delete('page');
-    router.push(`${filterBase}?${params.toString()}`, { scroll: false });
+    router.push(`${filterBase}?${params.toString()}`, { scroll: isSeoPage });
   };
 
 
