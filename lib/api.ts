@@ -824,6 +824,8 @@ export const seoApi = {
 
   // Admin - Footer Links
   adminGetFooterGroups: () => api.get('/seo/admin/footer-groups'),
+  /** Full row incl. SEO content — the group listing omits it, see openEditLink. */
+  adminGetFooterLink: (id: string) => api.get(`/seo/admin/footer-links/${id}`),
   adminCreateFooterGroup: (data: any) => api.post('/seo/admin/footer-groups', data),
   adminUpdateFooterGroup: (id: string, data: any) => api.patch(`/seo/admin/footer-groups/${id}`, data),
   adminDeleteFooterGroup: (id: string) => api.delete(`/seo/admin/footer-groups/${id}`),

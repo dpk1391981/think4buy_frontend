@@ -6,14 +6,15 @@ import {
   Plus, RotateCcw, Copy, Link2, Pencil, Trash2,
   Save, ChevronRight, Clock, Play,
 } from 'lucide-react';
-import { seoApi, locationsApi } from '@/lib/api';
+import { seoApi, locationsApi, adminLocationsApi } from '@/lib/api';
 import { FOOTER_CATEGORIES } from '@/components/layout/FooterSeoLinks';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface City { id: string; name: string; slug: string; stateId?: string; stateName?: string }
-interface StateOption { id: string; name: string; code: string; slug: string }
+interface City { id: string; name: string; slug: string; stateName?: string; isActive?: boolean }
 interface LocalityOption { id: string; locality: string; city: string }
+/** A locality is only meaningful with its city — the same name repeats across cities. */
+interface LocalityChoice { slug: string; name: string; citySlug: string; cityName: string }
 interface PreviewItem {
   type: 'city' | 'locality';
   cityName: string;
@@ -97,53 +98,104 @@ function Badge({ children, color }: { children: React.ReactNode; color: 'green' 
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{children}</span>;
 }
 
-// ── City selector dropdown ────────────────────────────────────────────────────
+// ── Shared helpers ────────────────────────────────────────────────────────────
 
-function CitySelector({ cities, value, onChange, placeholder = 'All cities', disabled = false }: {
+/** Must match SeoService.toSlug() on the backend, or generated URLs won't line up. */
+const toSlug = (s: string) =>
+  s.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-');
+
+/** Closes a dropdown when the next click lands outside it. */
+function useClickOutside(ref: React.RefObject<HTMLElement>, onOutside: () => void) {
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onOutside(); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [ref, onOutside]);
+}
+
+function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-medium pl-2 pr-1 py-0.5 rounded-full">
+      {label}
+      <button type="button" onClick={onRemove} className="p-0.5 rounded-full hover:bg-blue-100">
+        <X className="w-3 h-3" />
+      </button>
+    </span>
+  );
+}
+
+// ── City multi-select ─────────────────────────────────────────────────────────
+
+function CityMultiSelect({ cities, selected, onChange, disabled = false, placeholder = 'All cities' }: {
   cities: City[];
-  value: string;
-  onChange: (slug: string, name: string) => void;
-  placeholder?: string;
+  selected: string[];               // city slugs
+  onChange: (slugs: string[]) => void;
   disabled?: boolean;
+  placeholder?: string;
 }) {
   const [search, setSearch] = useState('');
   const [open, setOpen]     = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const selected = cities.find(c => c.slug === value);
+  useClickOutside(ref, () => setOpen(false));
 
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, []);
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? cities.filter(c => c.name.toLowerCase().includes(q) || (c.stateName || '').toLowerCase().includes(q))
+    : cities;
+  const shown = filtered.slice(0, 200);
 
-  const filtered = cities.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).slice(0, 60);
+  const selectedSet = new Set(selected);
+  const toggle = (slug: string) =>
+    onChange(selectedSet.has(slug) ? selected.filter(s => s !== slug) : [...selected, slug]);
+
+  const label = disabled
+    ? placeholder
+    : selected.length === 0 ? placeholder
+    : selected.length === 1 ? (cities.find(c => c.slug === selected[0])?.name ?? '1 city')
+    : `${selected.length} cities selected`;
 
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => !disabled && setOpen(!open)} disabled={disabled}
+      <button type="button" onClick={() => !disabled && setOpen(o => !o)} disabled={disabled}
         className={`w-full flex items-center justify-between border rounded-xl px-3 py-2.5 text-sm transition-colors bg-white ${disabled ? 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60' : 'border-gray-200 hover:border-blue-300'}`}>
-        <div className="flex items-center gap-2">
-          <Building2 className="w-4 h-4 text-gray-400" />
-          <span className={selected && !disabled ? 'text-gray-900 font-medium' : 'text-gray-400'}>{selected && !disabled ? selected.name : placeholder}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          <span className={`truncate ${selected.length && !disabled ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{label}</span>
         </div>
-        <ChevronDown className="w-4 h-4 text-gray-400" />
+        <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
       </button>
+
       {open && (
         <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg">
           <div className="p-2 border-b border-gray-100">
-            <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Search city..."
+            <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Search city or state..."
               className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-400" />
           </div>
-          <div className="max-h-52 overflow-y-auto">
-            <button type="button" onClick={() => { onChange('', ''); setOpen(false); setSearch(''); }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-400 hover:bg-gray-50">— {placeholder}</button>
-            {filtered.map(c => (
-              <button key={c.id} type="button" onClick={() => { onChange(c.slug, c.name); setOpen(false); setSearch(''); }}
-                className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 transition-colors ${value === c.slug ? 'text-blue-700 bg-blue-50 font-medium' : 'text-gray-800'}`}>
-                {c.name}
-              </button>
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 text-xs">
+            <button type="button" onClick={() => onChange(Array.from(new Set([...selected, ...filtered.map(c => c.slug)])))}
+              className="text-blue-600 hover:text-blue-700 font-medium">
+              Select all {q ? `matching (${filtered.length})` : `(${cities.length})`}
+            </button>
+            <button type="button" onClick={() => onChange([])} className="text-gray-400 hover:text-gray-600">Clear</button>
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            {shown.length === 0 && <div className="p-3 text-xs text-gray-400 text-center">No cities found</div>}
+            {shown.map(c => (
+              <label key={c.id} className="flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer">
+                <input type="checkbox" checked={selectedSet.has(c.slug)} onChange={() => toggle(c.slug)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                <span className="flex-1 truncate text-gray-800">{c.name}</span>
+                {c.stateName && <span className="text-xs text-gray-400 truncate max-w-[90px]">{c.stateName}</span>}
+                {c.isActive === false && (
+                  <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">inactive</span>
+                )}
+              </label>
             ))}
+            {filtered.length > shown.length && (
+              <p className="px-3 py-2 text-xs text-gray-400">
+                Showing first {shown.length} of {filtered.length} — refine the search to see the rest.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -151,75 +203,130 @@ function CitySelector({ cities, value, onChange, placeholder = 'All cities', dis
   );
 }
 
-// ── Locality selector ─────────────────────────────────────────────────────────
+// ── Locality multi-select (across the selected cities) ────────────────────────
 
-function LocalitySelector({ cityName, value, onChange, disabled = false, placeholder }: {
-  cityName: string;
-  value: string;
-  onChange: (localitySlug: string, localityName: string) => void;
+/** Above this many cities the locality lists are fetched one city at a time, so the picker stays off. */
+const LOCALITY_PICKER_MAX_CITIES = 10;
+
+function LocalityMultiSelect({ cities, selected, onChange, disabled = false }: {
+  cities: { slug: string; name: string }[];   // the cities currently in scope
+  selected: LocalityChoice[];
+  onChange: (v: LocalityChoice[]) => void;
   disabled?: boolean;
-  placeholder?: string;
 }) {
-  const [options, setOptions] = useState<LocalityOption[]>([]);
+  const [options, setOptions] = useState<LocalityChoice[]>([]);
   const [search, setSearch]   = useState('');
   const [open, setOpen]       = useState(false);
   const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  useClickOutside(ref, () => setOpen(false));
 
+  const tooManyCities = cities.length > LOCALITY_PICKER_MAX_CITIES;
+  const inactive = disabled || cities.length === 0 || tooManyCities;
+  const cityKey = cities.map(c => c.slug).join(',');
+
+  // The API returns at most 200 localities per city, so the search term goes to
+  // the server rather than filtering what happened to arrive — otherwise the
+  // 300th locality of Delhi could never be picked.
   useEffect(() => {
-    if (!cityName || disabled) { setOptions([]); return; }
+    if (inactive) { setOptions([]); return; }
+    let cancelled = false;
     setLoading(true);
-    locationsApi.getLocalities(cityName, undefined, search || undefined)
-      .then(r => setOptions((r.data || []).slice(0, 100)))
-      .catch(() => setOptions([]))
-      .finally(() => setLoading(false));
-  }, [cityName, search, disabled]);
+    const timer = setTimeout(() => {
+      Promise.all(
+        cities.map(c =>
+          locationsApi.getLocalities(c.name, undefined, search.trim() || undefined)
+            .then(r => ((r.data || []) as LocalityOption[]).map(l => ({
+              slug: toSlug(l.locality), name: l.locality, citySlug: c.slug, cityName: c.name,
+            })))
+            .catch(() => [] as LocalityChoice[]),
+        ),
+      )
+        .then(lists => {
+          if (cancelled) return;
+          // The same locality name exists in more than one city — key on both.
+          const merged = new Map<string, LocalityChoice>();
+          for (const l of lists.flat()) if (l.slug) merged.set(`${l.citySlug}|${l.slug}`, l);
+          setOptions(Array.from(merged.values()));
+        })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    }, search ? 300 : 0);
+    return () => { cancelled = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cityKey, inactive, search]);
 
+  // Drop selections whose city has left the scope, so the payload can't carry
+  // a locality that belongs to a city we're no longer applying to.
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, []);
+    if (selected.length === 0) return;
+    const inScope = new Set(cities.map(c => c.slug));
+    const kept = selected.filter(l => inScope.has(l.citySlug));
+    if (kept.length !== selected.length) onChange(kept);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cityKey]);
 
-  const toSlug = (s: string) => s.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-');
+  const q = search.trim().toLowerCase();
+  const filtered = q ? options.filter(o => o.name.toLowerCase().includes(q)) : options;
+  const shown = filtered.slice(0, 300);
 
-  const select = (opt: LocalityOption) => {
-    setSearch(opt.locality);
-    onChange(toSlug(opt.locality), opt.locality);
-    setOpen(false);
-  };
+  const key = (l: LocalityChoice) => `${l.citySlug}|${l.slug}`;
+  const selectedSet = new Set(selected.map(key));
+  const toggle = (l: LocalityChoice) =>
+    onChange(selectedSet.has(key(l)) ? selected.filter(s => key(s) !== key(l)) : [...selected, l]);
 
-  const derivedPlaceholder = placeholder ?? (cityName ? `All localities in ${cityName}` : 'Select city first');
+  const placeholder =
+    disabled                 ? 'All localities'
+    : cities.length === 0    ? 'Select a city first'
+    : tooManyCities          ? `All localities (${cities.length} cities in scope)`
+    : selected.length === 0  ? `All localities in ${cities.length === 1 ? cities[0].name : `${cities.length} cities`}`
+    : `${selected.length} localit${selected.length === 1 ? 'y' : 'ies'} selected`;
 
   return (
     <div ref={ref} className="relative">
-      <div className="relative flex items-center">
-        <MapPin className="absolute left-3 w-4 h-4 text-gray-400 pointer-events-none" />
-        <input
-          value={disabled ? '' : search}
-          onChange={e => { if (disabled) return; setSearch(e.target.value); setOpen(true); if (!e.target.value) onChange('', ''); }}
-          onFocus={() => { if (!disabled) setOpen(true); }}
-          placeholder={derivedPlaceholder}
-          disabled={disabled || !cityName}
-          className={`w-full border rounded-xl pl-9 pr-8 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400 ${disabled ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60' : 'border-gray-200 disabled:bg-gray-50 disabled:text-gray-400'}`}
-        />
-        {search && (
-          <button type="button" onClick={() => { setSearch(''); onChange('', ''); }}
-            className="absolute right-2 p-1 text-gray-400 hover:text-gray-600"><X className="w-3.5 h-3.5" /></button>
-        )}
-      </div>
-      {open && cityName && (
-        <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
-          <button type="button" onClick={() => { setSearch(''); onChange('', ''); setOpen(false); }}
-            className="w-full text-left px-4 py-2 text-xs text-gray-400 hover:bg-gray-50 border-b border-gray-100">
-            — All localities (bulk apply)
-          </button>
-          {loading ? <div className="p-3 text-xs text-gray-400 text-center">Loading...</div>
-            : options.length === 0 ? <div className="p-3 text-xs text-gray-400 text-center">No localities found</div>
-            : options.map((opt, i) => (
-              <button key={i} type="button" onClick={() => select(opt)}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 transition-colors">{opt.locality}</button>
+      <button type="button" onClick={() => !inactive && setOpen(o => !o)} disabled={inactive}
+        className={`w-full flex items-center justify-between border rounded-xl px-3 py-2.5 text-sm transition-colors bg-white ${inactive ? 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60' : 'border-gray-200 hover:border-green-300'}`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          <span className={`truncate ${selected.length && !inactive ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{placeholder}</span>
+        </div>
+        <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+      </button>
+
+      {open && !inactive && (
+        <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg">
+          <div className="p-2 border-b border-gray-100">
+            <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Search locality..."
+              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-green-400" />
+          </div>
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 text-xs">
+            <button type="button"
+              onClick={() => {
+                const merged = new Map(selected.map(l => [key(l), l]));
+                for (const l of filtered) merged.set(key(l), l);
+                onChange(Array.from(merged.values()));
+              }}
+              className="text-green-600 hover:text-green-700 font-medium">
+              Select all {q ? `matching (${filtered.length})` : `(${options.length})`}
+            </button>
+            <button type="button" onClick={() => onChange([])} className="text-gray-400 hover:text-gray-600">Clear</button>
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            {loading && <div className="p-3 text-xs text-gray-400 text-center">Loading localities…</div>}
+            {!loading && shown.length === 0 && <div className="p-3 text-xs text-gray-400 text-center">No localities found</div>}
+            {!loading && shown.map(l => (
+              <label key={key(l)} className="flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-green-50 cursor-pointer">
+                <input type="checkbox" checked={selectedSet.has(key(l))} onChange={() => toggle(l)}
+                  className="rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                <span className="flex-1 truncate text-gray-800">{l.name}</span>
+                {cities.length > 1 && <span className="text-xs text-gray-400 truncate max-w-[90px]">{l.cityName}</span>}
+              </label>
             ))}
+            {filtered.length > shown.length && (
+              <p className="px-3 py-2 text-xs text-gray-400">
+                Showing first {shown.length} of {filtered.length} — refine the search to see the rest.
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -274,21 +381,15 @@ const EMPTY_TEMPLATE = {
 
 export default function QuickSeoPage() {
   const [cities, setCities]             = useState<City[]>([]);
-  const [states, setStates]             = useState<StateOption[]>([]);
   const [categories, setCategories]     = useState<{ value: string; label: string; short: string }[]>([]);
 
   // Selection
-  const [categorySlug, setCategorySlug] = useState('');
-  const [stateId, setStateId]           = useState('');
-  const [stateName, setStateName]       = useState('');
-  const [citySlug, setCitySlug]         = useState('');
-  const [cityName, setCityName]         = useState('');
-  const [localitySlug, setLocalitySlug] = useState('');
-  const [localityName, setLocalityName] = useState('');
+  const [categorySlug, setCategorySlug]         = useState('');
+  const [selectedCities, setSelectedCities]     = useState<string[]>([]);          // city slugs
+  const [selectedLocalities, setSelectedLocalities] = useState<LocalityChoice[]>([]);
   const [slugPattern, setSlugPattern]   = useState(DEFAULT_PATTERN);
   const [overwriteExisting, setOverwriteExisting] = useState(false);
   const [allCities, setAllCities]                   = useState(false);
-  const [allLocalities, setAllLocalities]           = useState(false);
   const [showInFooter, setShowInFooter]             = useState(true);
   const [includeCityPage, setIncludeCityPage]       = useState(false);
   const [citySlugPattern, setCitySlugPattern]       = useState('{category}-in-{city}');
@@ -325,10 +426,8 @@ export default function QuickSeoPage() {
 
   // Apply-template modal (city picker)
   const [tplApplyModal, setTplApplyModal]         = useState<{ tpl: QuickSeoTemplate } | null>(null);
-  const [tplApplyStateId, setTplApplyStateId]     = useState('');
-  const [tplApplyStateName, setTplApplyStateName] = useState('');
-  const [tplApplyCity, setTplApplyCity]           = useState('');
-  const [tplApplyCityName, setTplApplyCityName]   = useState('');
+  const [tplApplyCities, setTplApplyCities]       = useState<string[]>([]);        // city slugs
+  const [tplApplyLocalities, setTplApplyLocalities] = useState<LocalityChoice[]>([]);
   const [tplApplyOverwrite, setTplApplyOverwrite] = useState(false);
 
   const loadTemplates = useCallback(() => {
@@ -337,35 +436,32 @@ export default function QuickSeoPage() {
       .catch(() => {});
   }, []);
 
-  // Load cities, states & categories on mount
+  // Load cities & categories on mount
   useEffect(() => {
-    const toSlug = (s: string) =>
-      s.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-');
-
-    locationsApi.getCities(undefined, 300)
+    // The admin list, not /locations/cities: it includes cities that are still
+    // inactive (everything the India import brings in), which are exactly the
+    // ones an SEO campaign for a new market needs to target.
+    adminLocationsApi.getCities({ limit: 2000 })
       .then(r => {
-        const mapped = (r.data || []).map((c: any) => ({
+        const rows = r.data?.cities ?? r.data ?? [];
+        setCities(rows.map((c: any) => ({
           id: c.id,
           name: c.name,
           slug: c.slug || toSlug(c.name),
-          stateId: c.stateId,
-          stateName: c.stateName,
-        }));
-        setCities(mapped);
+          stateName: c.state?.name ?? c.stateName,
+          isActive: c.isActive,
+        })));
       })
-      .catch(() => {});
+      .catch(() => {
+        // Fall back to the public list so the screen still works if the admin
+        // endpoint is unavailable.
+        locationsApi.getCities(undefined, 300)
+          .then(r => setCities((r.data || []).map((c: any) => ({
+            id: c.id, name: c.name, slug: c.slug || toSlug(c.name), stateName: c.stateName, isActive: true,
+          }))))
+          .catch(() => {});
+      });
 
-    locationsApi.getStates()
-      .then(r => {
-        const mapped = (r.data || []).map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          code: s.code || '',
-          slug: s.slug || s.name.toLowerCase().replace(/\s+/g, '-'),
-        }));
-        setStates(mapped);
-      })
-      .catch(() => {});
     seoApi.adminGetFooterCategories()
       .then(r => {
         const dbCats = r.data || [];
@@ -398,27 +494,37 @@ export default function QuickSeoPage() {
 
   const tF = (key: keyof typeof EMPTY_TEMPLATE, val: any) => setTemplate(t => ({ ...t, [key]: val }));
 
-  const filteredCities = stateId ? cities.filter(c => c.stateId === stateId) : cities;
+  // The cities this run will actually touch. "All cities" means every city in
+  // the list; otherwise it is exactly what was ticked.
+  const scopeCities = allCities ? cities : cities.filter(c => selectedCities.includes(c.slug));
+  const allLocalities = selectedLocalities.length === 0;
 
   const catShort = categories.find(c => c.value === categorySlug)?.short ?? categorySlug;
-  const stateLabel = stateName ? ` (${stateName})` : '';
+  const citiesLabel = allCities
+    ? `all ${cities.length} cities`
+    : scopeCities.length === 0 ? 'all cities'
+    : scopeCities.length === 1 ? scopeCities[0].name
+    : `${scopeCities.length} cities`;
   const scopeLabel = !categorySlug
     ? 'Select a category to start'
-    : allCities
-    ? stateName
-      ? `All cities in ${stateName}, all localities — ${catShort}`
-      : `All cities, all localities — ${catShort}`
-    : !citySlug
-    ? stateName
-      ? `All cities in ${stateName} — ${catShort}`
-      : `All cities — ${catShort}`
     : allLocalities
-    ? `All localities in ${cityName}${stateLabel} — ${catShort}`
-    : !localitySlug
-    ? `All localities in ${cityName}${stateLabel} — ${catShort}`
-    : `${localityName}, ${cityName}${stateLabel} — ${catShort}`;
+    ? `${citiesLabel}, all localities — ${catShort}`
+    : `${selectedLocalities.length} localit${selectedLocalities.length === 1 ? 'y' : 'ies'} in ${citiesLabel} — ${catShort}`;
 
   const canPreview = !!categorySlug;
+  // Writing needs an explicit scope. Without one, a stray click would generate
+  // pages for every city in the database.
+  const canApply = canPreview && (allCities || scopeCities.length > 0);
+
+  // The slug previews below read better with a real city than with {city}.
+  const sampleCitySlug     = scopeCities[0]?.slug ?? '{city}';
+  const sampleLocalitySlug = selectedLocalities[0]?.slug ?? '{locality}';
+
+  // Only the first few cities are previewed: a preview of hundreds of cities is
+  // thousands of rows nobody reads, and the apply below runs city by city anyway.
+  const PREVIEW_CITY_LIMIT = 10;
+  const previewCities = scopeCities.slice(0, PREVIEW_CITY_LIMIT);
+  const previewTruncated = scopeCities.length > PREVIEW_CITY_LIMIT;
 
   const doPreview = useCallback(async () => {
     if (!canPreview) return;
@@ -428,9 +534,8 @@ export default function QuickSeoPage() {
     try {
       const r = await seoApi.adminQuickSeoPreview({
         categorySlug,
-        citySlug: citySlug || undefined,
-        localitySlug: localitySlug || undefined,
-        stateId: stateId || undefined,
+        citySlugs: previewCities.map(c => c.slug),
+        localitySlugs: selectedLocalities.map(l => l.slug),
         slugPattern,
         citySlugPattern,
         includeCityPage,
@@ -443,7 +548,8 @@ export default function QuickSeoPage() {
     } finally {
       setPreviewing(false);
     }
-  }, [canPreview, categorySlug, citySlug, localitySlug, slugPattern, citySlugPattern, includeCityPage, template]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canPreview, categorySlug, scopeCities.map(c => c.slug).join(','), selectedLocalities, slugPattern, citySlugPattern, includeCityPage, template]);
 
   const doApply = async () => {
     setApplying(true);
@@ -452,7 +558,6 @@ export default function QuickSeoPage() {
 
     const commonPayload = {
       categorySlug,
-      localitySlug: localitySlug || undefined,
       slugPattern,
       citySlugPattern,
       includeCityPage,
@@ -461,68 +566,56 @@ export default function QuickSeoPage() {
       template,
     };
 
-    // ── All-cities mode: batch one city at a time to avoid timeout ───────────
-    if (allCities) {
-      const citiesToProcess = filteredCities.length > 0 ? filteredCities : cities;
-      const acc = { created: 0, updated: 0, skipped: 0, failed: 0, total: 0 };
+    // One request per city, always: a single request covering hundreds of
+    // cities would outrun the gateway timeout, and this way the progress bar
+    // reflects work that is already committed.
+    const citiesToProcess = scopeCities;
+    const acc = { created: 0, updated: 0, skipped: 0, failed: 0, total: 0 };
 
-      for (let i = 0; i < citiesToProcess.length; i++) {
-        const city = citiesToProcess[i];
-        // Show "Processing <city>…" with counts from previously completed cities
-        setBatchProgress({
-          current: i + 1,
-          total: citiesToProcess.length,
-          currentCityName: city.name,
-          cityDone: false,
-          accumulated: { ...acc },
-        });
-        try {
-          const r = await seoApi.adminQuickSeoApply({
-            ...commonPayload,
-            citySlug: city.slug,
-            stateId: stateId || undefined,
-          });
-          acc.created  += r.data.created  ?? 0;
-          acc.updated  += r.data.updated  ?? 0;
-          acc.skipped  += r.data.skipped  ?? 0;
-          acc.failed   += r.data.failed   ?? 0;
-          acc.total    += r.data.total    ?? 0;
-        } catch {
-          acc.failed++;
-        }
-        // Mark city done — update counts immediately so user sees running total
-        setBatchProgress(prev => prev ? { ...prev, cityDone: true, accumulated: { ...acc } } : null);
-      }
+    for (let i = 0; i < citiesToProcess.length; i++) {
+      const city = citiesToProcess[i];
+      const cityLocalities = selectedLocalities.filter(l => l.citySlug === city.slug).map(l => l.slug);
+      // Localities were picked, none of them here, and no city page to write —
+      // nothing this city needs.
+      if (!allLocalities && cityLocalities.length === 0 && !includeCityPage) continue;
 
-      setApplyResult(acc);
-      setShowConfirm(false);
-      setBatchProgress(null);
-      setPreviewData(null);
-      setApplying(false);
-      return;
-    }
-
-    // ── Single city / locality mode: original single request ─────────────────
-    try {
-      const r = await seoApi.adminQuickSeoApply({
-        ...commonPayload,
-        citySlug: citySlug || undefined,
-        stateId: stateId || undefined,
+      // Show "Processing <city>…" with counts from previously completed cities
+      setBatchProgress({
+        current: i + 1,
+        total: citiesToProcess.length,
+        currentCityName: city.name,
+        cityDone: false,
+        accumulated: { ...acc },
       });
-      setApplyResult(r.data);
-      setShowConfirm(false);
-      setPreviewData(null);
-    } catch (e: any) {
-      alert(e?.response?.data?.message || 'Apply failed');
-    } finally {
-      setApplying(false);
+      try {
+        const r = await seoApi.adminQuickSeoApply({
+          ...commonPayload,
+          citySlug: city.slug,
+          localitySlugs: allLocalities ? undefined : cityLocalities,
+        });
+        acc.created  += r.data.created  ?? 0;
+        acc.updated  += r.data.updated  ?? 0;
+        acc.skipped  += r.data.skipped  ?? 0;
+        acc.failed   += r.data.failed   ?? 0;
+        acc.total    += r.data.total    ?? 0;
+      } catch {
+        acc.failed++;
+      }
+      // Mark city done — update counts immediately so user sees running total
+      setBatchProgress(prev => prev ? { ...prev, cityDone: true, accumulated: { ...acc } } : null);
     }
+
+    setApplyResult(acc);
+    setShowConfirm(false);
+    setBatchProgress(null);
+    setPreviewData(null);
+    setApplying(false);
   };
 
   const resetAll = () => {
-    setCategorySlug(''); setStateId(''); setStateName('');
-    setCitySlug(''); setCityName(''); setLocalitySlug(''); setLocalityName('');
-    setAllCities(false); setAllLocalities(false);
+    setCategorySlug('');
+    setSelectedCities([]); setSelectedLocalities([]);
+    setAllCities(false);
     setSlugPattern(DEFAULT_PATTERN);
     setCitySlugPattern('{category}-in-{city}');
     setIncludeCityPage(false);
@@ -593,77 +686,61 @@ export default function QuickSeoPage() {
 
   const openTplApplyModal = (t: QuickSeoTemplate) => {
     setTplApplyModal({ tpl: t });
-    setTplApplyStateId('');
-    setTplApplyStateName('');
-    setTplApplyCity('');
-    setTplApplyCityName('');
+    setTplApplyCities([]);
+    setTplApplyLocalities([]);
     setTplApplyOverwrite(false);
   };
+
+  const tplScopeCities = tplApplyCities.length > 0
+    ? cities.filter(c => tplApplyCities.includes(c.slug))
+    : cities;
 
   const confirmTplApply = async () => {
     if (!tplApplyModal) return;
     const t = tplApplyModal.tpl;
     setApplyingTplId(t.id);
 
-    // ── All-cities mode for saved templates: batch one city at a time ─────────
-    if (!tplApplyCity) {
-      const citiesToProcess = tplApplyStateId
-        ? cities.filter(c => c.stateId === tplApplyStateId)
-        : cities;
-      const acc = { created: 0, updated: 0, skipped: 0, failed: 0, total: 0 };
+    // One request per city, same as the main Apply — see doApply().
+    const citiesToProcess = tplScopeCities;
+    const allTplLocalities = tplApplyLocalities.length === 0;
+    const acc = { created: 0, updated: 0, skipped: 0, failed: 0, total: 0 };
+
+    setBatchProgress({
+      current: 0, total: citiesToProcess.length,
+      currentCityName: '', cityDone: false, accumulated: { ...acc },
+    });
+
+    for (let i = 0; i < citiesToProcess.length; i++) {
+      const city = citiesToProcess[i];
+      const cityLocalities = tplApplyLocalities.filter(l => l.citySlug === city.slug).map(l => l.slug);
+      if (!allTplLocalities && cityLocalities.length === 0 && !t.includeCityPage) continue;
 
       setBatchProgress({
-        current: 0, total: citiesToProcess.length,
-        currentCityName: '', cityDone: false, accumulated: { ...acc },
+        current: i + 1, total: citiesToProcess.length,
+        currentCityName: city.name, cityDone: false, accumulated: { ...acc },
       });
-
-      for (let i = 0; i < citiesToProcess.length; i++) {
-        const city = citiesToProcess[i];
-        setBatchProgress({
-          current: i + 1, total: citiesToProcess.length,
-          currentCityName: city.name, cityDone: false, accumulated: { ...acc },
+      try {
+        const r = await seoApi.adminApplyTemplate(t.id, {
+          citySlug: city.slug,
+          localitySlugs: allTplLocalities ? undefined : cityLocalities,
+          overwriteExisting: tplApplyOverwrite,
         });
-        try {
-          const r = await seoApi.adminApplyTemplate(t.id, {
-            citySlug: city.slug,
-            stateId: tplApplyStateId || undefined,
-            overwriteExisting: tplApplyOverwrite,
-          });
-          acc.created  += r.data.created  ?? 0;
-          acc.updated  += r.data.updated  ?? 0;
-          acc.skipped  += r.data.skipped  ?? 0;
-          acc.failed   += r.data.failed   ?? 0;
-          acc.total    += r.data.total    ?? 0;
-        } catch {
-          acc.failed++;
-        }
-        setBatchProgress(prev => prev ? { ...prev, cityDone: true, accumulated: { ...acc } } : null);
+        acc.created  += r.data.created  ?? 0;
+        acc.updated  += r.data.updated  ?? 0;
+        acc.skipped  += r.data.skipped  ?? 0;
+        acc.failed   += r.data.failed   ?? 0;
+        acc.total    += r.data.total    ?? 0;
+      } catch {
+        acc.failed++;
       }
-
-      setApplyResult(acc);
-      setTplApplyModal(null);
-      setBatchProgress(null);
-      setApplyingTplId(null);
-      loadTemplates();
-      return;
+      setBatchProgress(prev => prev ? { ...prev, cityDone: true, accumulated: { ...acc } } : null);
     }
 
-    // ── Single city: original request ─────────────────────────────────────────
-    try {
-      const r = await seoApi.adminApplyTemplate(t.id, {
-        citySlug:          tplApplyCity || undefined,
-        stateId:           tplApplyStateId || undefined,
-        overwriteExisting: tplApplyOverwrite,
-      });
-      setApplyResult(r.data);
-      setTplApplyModal(null);
-      loadTemplates();
-    } catch (e: any) {
-      alert(e?.response?.data?.message || 'Apply failed');
-    } finally {
-      setApplyingTplId(null);
-      setBatchProgress(null);
-    }
+    setApplyResult(acc);
+    setTplApplyModal(null);
+    setBatchProgress(null);
+    setApplyingTplId(null);
+    loadTemplates();
   };
 
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400';
@@ -846,97 +923,98 @@ export default function QuickSeoPage() {
               </select>
             </div>
 
-            {/* State filter */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">State <span className="text-gray-400 font-normal">(optional filter)</span></label>
-              <select
-                value={stateId}
-                onChange={e => {
-                  const sel = states.find(s => s.id === e.target.value);
-                  setStateId(e.target.value);
-                  setStateName(sel?.name || '');
-                  setCitySlug(''); setCityName('');
-                  setLocalitySlug(''); setLocalityName('');
-                  setPreviewData(null);
-                }}
-                className={inputCls}
-              >
-                <option value="">— All states —</option>
-                {states.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-              {stateId && (
-                <p className="text-xs text-violet-600 mt-1 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Showing <strong>{filteredCities.length}</strong> cities in {stateName}
-                </p>
-              )}
-            </div>
-
-            {/* City */}
+            {/* Cities — multi-select */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-gray-600">City</label>
+                <label className="text-xs font-semibold text-gray-600">
+                  Cities {selectedCities.length > 0 && !allCities && (
+                    <span className="text-blue-600 font-bold">({selectedCities.length})</span>
+                  )}
+                </label>
                 <label className="flex items-center gap-1.5 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={allCities}
                     onChange={e => {
                       setAllCities(e.target.checked);
-                      if (e.target.checked) { setCitySlug(''); setCityName(''); setLocalitySlug(''); setLocalityName(''); setAllLocalities(true); }
+                      if (e.target.checked) { setSelectedCities([]); setSelectedLocalities([]); }
                       setPreviewData(null);
                     }}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-xs font-medium text-blue-600">All cities{stateName ? ` in ${stateName}` : ''}</span>
+                  <span className="text-xs font-medium text-blue-600">All cities</span>
                 </label>
               </div>
-              <CitySelector
-                cities={filteredCities}
-                value={citySlug}
-                placeholder={allCities ? `— All cities${stateName ? ` in ${stateName}` : ''} selected —` : `All cities${stateName ? ` in ${stateName}` : ''}`}
-                onChange={(slug, name) => { setCitySlug(slug); setCityName(name); setLocalitySlug(''); setLocalityName(''); setAllLocalities(false); setPreviewData(null); }}
+              <CityMultiSelect
+                cities={cities}
+                selected={selectedCities}
+                onChange={slugs => { setSelectedCities(slugs); setPreviewData(null); }}
                 disabled={allCities}
+                placeholder={allCities ? `— All ${cities.length} cities selected —` : 'Pick one or more cities'}
               />
+              {!allCities && selectedCities.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {scopeCities.slice(0, 12).map(c => (
+                    <Chip key={c.slug} label={c.name}
+                      onRemove={() => { setSelectedCities(selectedCities.filter(s => s !== c.slug)); setPreviewData(null); }} />
+                  ))}
+                  {scopeCities.length > 12 && (
+                    <span className="text-xs text-gray-400 self-center">+{scopeCities.length - 12} more</span>
+                  )}
+                </div>
+              )}
               {allCities && (
                 <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Pages will be created for <strong>all {filteredCities.length} cities{stateName ? ` in ${stateName}` : ''}</strong>
+                  <CheckCircle2 className="w-3 h-3" /> Pages will be created for <strong>all {cities.length} cities</strong>
                 </p>
               )}
             </div>
 
-            {/* Locality */}
+            {/* Localities — multi-select across the cities in scope */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-gray-600">Locality</label>
-                <label className={`flex items-center gap-1.5 cursor-pointer select-none ${!categorySlug ? 'opacity-40 pointer-events-none' : ''}`}>
+                <label className="text-xs font-semibold text-gray-600">
+                  Localities {selectedLocalities.length > 0 && (
+                    <span className="text-green-600 font-bold">({selectedLocalities.length})</span>
+                  )}
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={allLocalities}
-                    onChange={e => {
-                      setAllLocalities(e.target.checked);
-                      if (e.target.checked) { setLocalitySlug(''); setLocalityName(''); }
-                      setPreviewData(null);
-                    }}
+                    onChange={e => { if (e.target.checked) { setSelectedLocalities([]); setPreviewData(null); } }}
                     className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                    disabled={!categorySlug}
                   />
                   <span className="text-xs font-medium text-green-600">All localities</span>
                 </label>
               </div>
-              <LocalitySelector
-                cityName={allLocalities ? '' : cityName}
-                value={localitySlug}
-                onChange={(slug, name) => { setLocalitySlug(slug); setLocalityName(name); setPreviewData(null); }}
-                disabled={allLocalities}
-                placeholder={allLocalities ? (cityName ? `All localities in ${cityName}` : 'All localities') : undefined}
+              <LocalityMultiSelect
+                cities={scopeCities.map(c => ({ slug: c.slug, name: c.name }))}
+                selected={selectedLocalities}
+                onChange={v => { setSelectedLocalities(v); setPreviewData(null); }}
+                disabled={allCities}
               />
+              {selectedLocalities.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {selectedLocalities.slice(0, 12).map(l => (
+                    <Chip key={`${l.citySlug}|${l.slug}`}
+                      label={scopeCities.length > 1 ? `${l.name} · ${l.cityName}` : l.name}
+                      onRemove={() => { setSelectedLocalities(selectedLocalities.filter(s => !(s.slug === l.slug && s.citySlug === l.citySlug))); setPreviewData(null); }} />
+                  ))}
+                  {selectedLocalities.length > 12 && (
+                    <span className="text-xs text-gray-400 self-center">+{selectedLocalities.length - 12} more</span>
+                  )}
+                </div>
+              )}
               {allLocalities && (
                 <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" />
-                  {cityName
-                    ? <>Pages will be created for <strong>all localities in {cityName}</strong></>
-                    : <>Pages will be created for <strong>all localities across all cities</strong></>}
+                  Pages will be created for <strong>every locality in {citiesLabel}</strong>
+                </p>
+              )}
+              {!allCities && scopeCities.length > LOCALITY_PICKER_MAX_CITIES && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Locality picking is off above {LOCALITY_PICKER_MAX_CITIES} cities — all localities will be used.
                 </p>
               )}
             </div>
@@ -963,8 +1041,8 @@ export default function QuickSeoPage() {
               <div className="p-2.5 bg-blue-50 rounded-lg text-xs text-blue-700 font-mono break-all">
                 {slugPattern
                   .replace('{category}', categorySlug || '{category}')
-                  .replace('{city}', citySlug || '{city}')
-                  .replace('{locality}', localitySlug || '{locality}')}
+                  .replace('{city}', sampleCitySlug)
+                  .replace('{locality}', sampleLocalitySlug)}
               </div>
             )}
           </div>
@@ -1011,7 +1089,7 @@ export default function QuickSeoPage() {
                   <div className="p-2 bg-blue-50 rounded-lg text-xs text-blue-700 font-mono break-all">
                     {citySlugPattern
                       .replace('{category}', categorySlug || '{category}')
-                      .replace('{city}', citySlug || '{city}')}
+                      .replace('{city}', sampleCitySlug)}
                   </div>
                 )}
               </div>
@@ -1037,11 +1115,14 @@ export default function QuickSeoPage() {
               {previewing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
               {previewing ? 'Generating preview…' : 'Preview'}
             </button>
-            <button onClick={() => setShowConfirm(true)} disabled={!canPreview || applying}
+            <button onClick={() => setShowConfirm(true)} disabled={!canApply || applying}
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors shadow-sm">
               <Zap className="w-4 h-4" />
               Apply SEO Template {previewData ? `(${previewData.total} pages)` : ''}
             </button>
+            {canPreview && !canApply && (
+              <p className="text-xs text-gray-400 text-center">Pick at least one city, or tick <strong>All cities</strong>, to apply.</p>
+            )}
           </div>
         </div>
 
@@ -1208,6 +1289,15 @@ export default function QuickSeoPage() {
                 )}
                 {previewData && (
                   <div className="space-y-4">
+                    {previewTruncated && (
+                      <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-start gap-2 text-xs text-blue-700">
+                        <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                        <span>
+                          Preview covers the first <strong>{PREVIEW_CITY_LIMIT}</strong> of <strong>{scopeCities.length}</strong> cities in scope.
+                          Apply still runs for all {scopeCities.length}.
+                        </span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className="text-sm font-semibold text-gray-700">{previewData.total} pages</span>
                       <Badge color="green">{previewData.items.filter(i => !i.exists).length} new</Badge>
@@ -1388,50 +1478,58 @@ export default function QuickSeoPage() {
             </div>
 
             <div className="space-y-4">
-              {/* State filter in modal */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                  State <span className="text-gray-400 font-normal">(optional — filter cities by state)</span>
+                  Cities {tplApplyCities.length > 0
+                    ? <span className="text-violet-600 font-bold">({tplApplyCities.length})</span>
+                    : <span className="text-gray-400 font-normal">(leave blank for all cities)</span>}
                 </label>
-                <select
-                  value={tplApplyStateId}
-                  onChange={e => {
-                    const sel = states.find(s => s.id === e.target.value);
-                    setTplApplyStateId(e.target.value);
-                    setTplApplyStateName(sel?.name || '');
-                    setTplApplyCity('');
-                    setTplApplyCityName('');
-                  }}
-                  className={inputCls}
-                >
-                  <option value="">— All states —</option>
-                  {states.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
+                <CityMultiSelect
+                  cities={cities}
+                  selected={tplApplyCities}
+                  onChange={slugs => { setTplApplyCities(slugs); setTplApplyLocalities([]); }}
+                  placeholder="All cities"
+                />
+                {tplApplyCities.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {tplScopeCities.slice(0, 10).map(c => (
+                      <Chip key={c.slug} label={c.name}
+                        onRemove={() => setTplApplyCities(tplApplyCities.filter(s => s !== c.slug))} />
+                    ))}
+                    {tplScopeCities.length > 10 && (
+                      <span className="text-xs text-gray-400 self-center">+{tplScopeCities.length - 10} more</span>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-orange-500 mt-1.5 flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    No city selected — will run for all {cities.length} cities and their localities
+                  </p>
+                )}
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                  City <span className="text-gray-400 font-normal">(leave blank to apply to all{tplApplyStateName ? ` ${tplApplyStateName}` : ''} cities)</span>
+                  Localities {tplApplyLocalities.length > 0
+                    ? <span className="text-green-600 font-bold">({tplApplyLocalities.length})</span>
+                    : <span className="text-gray-400 font-normal">(leave blank for all)</span>}
                 </label>
-                <CitySelector
-                  cities={tplApplyStateId ? cities.filter(c => c.stateId === tplApplyStateId) : cities}
-                  value={tplApplyCity}
-                  placeholder={tplApplyStateName ? `All cities in ${tplApplyStateName}` : 'All cities'}
-                  onChange={(slug, name) => { setTplApplyCity(slug); setTplApplyCityName(name); }}
+                <LocalityMultiSelect
+                  cities={tplScopeCities.map(c => ({ slug: c.slug, name: c.name }))}
+                  selected={tplApplyLocalities}
+                  onChange={setTplApplyLocalities}
                 />
-                {tplApplyCity && (
-                  <p className="text-xs text-violet-600 mt-1.5 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Will create pages for <strong>all localities in {tplApplyCityName}</strong>
-                  </p>
-                )}
-                {!tplApplyCity && (
-                  <p className="text-xs text-orange-500 mt-1.5 flex items-center gap-1">
-                    <Info className="w-3 h-3" />
-                    No city selected — will run for {tplApplyStateName ? `all cities in ${tplApplyStateName}` : 'all cities'} and their localities
-                  </p>
+                {tplApplyLocalities.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {tplApplyLocalities.slice(0, 10).map(l => (
+                      <Chip key={`${l.citySlug}|${l.slug}`}
+                        label={tplScopeCities.length > 1 ? `${l.name} · ${l.cityName}` : l.name}
+                        onRemove={() => setTplApplyLocalities(tplApplyLocalities.filter(s => !(s.slug === l.slug && s.citySlug === l.citySlug)))} />
+                    ))}
+                    {tplApplyLocalities.length > 10 && (
+                      <span className="text-xs text-gray-400 self-center">+{tplApplyLocalities.length - 10} more</span>
+                    )}
+                  </div>
                 )}
               </div>
 

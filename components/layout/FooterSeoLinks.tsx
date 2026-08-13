@@ -6,248 +6,18 @@ import { usePathname } from 'next/navigation';
 import { ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/lib/store';
 import { fetchFooterLinks, fetchFooterCategories } from '@/lib/store/slices/seoSlice';
+import {
+  FOOTER_CATEGORIES,
+  buildCategories,
+  parseUrlContext,
+  slugToCity,
+  type FLink,
+  type FGroup,
+  type CategoryEntry,
+} from '@/lib/footer-seo';
 
-// ── types ─────────────────────────────────────────────────────────────────────
-
-interface FLink {
-  id: string; label: string; url: string;
-  isActive?: boolean; localityName?: string | null;
-}
-interface FGroup {
-  id: string; title: string;
-  cityName?: string | null;
-  category?: string | null;
-  isActive?: boolean;
-  links: FLink[];
-}
-
-interface CityEntry {
-  city:          string;
-  cityLink?:     FLink;      // primary "Category in City" link → shown in main grid
-  localityLinks: FLink[];    // sub-locality links → shown when city is expanded
-}
-
-interface CategoryEntry {
-  key:    string;
-  label:  string;
-  short:  string;
-  cities: CityEntry[];       // sorted: cities-with-localities first
-}
-
-// ── category registry ─────────────────────────────────────────────────────────
-
-export const FOOTER_CATEGORIES: { value: string; label: string; short: string }[] = [
-  { value: 'buy',          label: 'Property for Sale',     short: 'Buy'          },
-  { value: 'rent',         label: 'Property for Rent',     short: 'Rent'         },
-  { value: 'flats',        label: 'Flats for Sale',        short: 'Flats'        },
-  { value: 'flats-rent',   label: 'Flats for Rent',        short: 'Flats Rent'   },
-  { value: 'villas',       label: 'Villas for Sale',       short: 'Villas'       },
-  { value: 'plots',        label: 'Plots for Sale',        short: 'Plots'        },
-  { value: 'commercial',   label: 'Commercial for Rent',   short: 'Commercial'   },
-  { value: 'office',       label: 'Office Space for Rent', short: 'Office'       },
-  { value: 'new-projects', label: 'New Projects',          short: 'New Projects' },
-  { value: 'pg',           label: 'PG / Co-Living',        short: 'PG'           },
-  { value: 'agents',       label: 'Property Agents',       short: 'Agents'       },
-];
-
-const CAT_MAP = new Map(FOOTER_CATEGORIES.map(c => [c.value, c]));
-
-const TITLE_TO_SLUG: Record<string, string> = {
-  'property for sale':              'buy',
-  'property for rent':              'rent',
-  'flats for sale':                 'flats',
-  'flats for rent':                 'flats-rent',
-  'villas for sale':                'villas',
-  'plots for sale':                 'plots',
-  'commercial properties for rent': 'commercial',
-  'office space for rent':          'office',
-  'new projects':                   'new-projects',
-  'pg / co-living':                 'pg',
-  'pg/co-living':                   'pg',
-  'property agents':                'agents',
-};
-
-// ── URL prefix → footer category mapping ─────────────────────────────────────
-// Order: most specific first (longer prefixes before shorter ones)
-
-const URL_PREFIX_TO_CAT: { prefix: string; catKey: string }[] = [
-  { prefix: 'flats-for-sale-in-',            catKey: 'flats'        },
-  { prefix: 'flats-for-rent-in-',            catKey: 'flats-rent'   },
-  { prefix: 'villas-for-sale-in-',           catKey: 'villas'       },
-  { prefix: 'plots-for-sale-in-',            catKey: 'plots'        },
-  { prefix: 'commercial-property-for-rent-in-', catKey: 'commercial' },
-  { prefix: 'commercial-property-in-',       catKey: 'commercial'   },
-  { prefix: 'office-space-for-rent-in-',     catKey: 'office'       },
-  { prefix: 'new-projects-in-',              catKey: 'new-projects' },
-  { prefix: 'pg-in-',                        catKey: 'pg'           },
-  { prefix: 'property-for-sale-in-',         catKey: 'buy'          },
-  { prefix: 'property-for-rent-in-',         catKey: 'rent'         },
-  { prefix: 'agents-in-',                    catKey: 'agents'       },
-];
-
-// Parse pathname → { catKey, citySlug } or null
-function parseUrlContext(pathname: string): { catKey: string; citySlug: string } | null {
-  const seg = pathname.replace(/^\//, '').split('/')[0].toLowerCase();
-  for (const { prefix, catKey } of URL_PREFIX_TO_CAT) {
-    if (seg.startsWith(prefix)) {
-      return { catKey, citySlug: seg.slice(prefix.length) };
-    }
-  }
-  return null;
-}
-
-// Convert a city slug (or locality-city slug) to a city name matching footer data.
-// Handles both "{city}" and "{locality}-{city}" URL orderings.
-// Tries longest suffix match first so compound cities like "navi-mumbai" beat "mumbai".
-function slugToCity(slug: string, categories: CategoryEntry[]): string | null {
-  if (!slug) return null;
-  const normalize = (s: string) => s.toLowerCase().replace(/[-\s]+/g, '');
-  const normalizedSlug = normalize(slug);
-  const parts = slug.toLowerCase().split('-');
-
-  // Collect all known city names from footer data for suffix matching
-  const allCities: { normalized: string; name: string }[] = [];
-  for (const cat of categories) {
-    for (const cityEntry of cat.cities) {
-      allCities.push({ normalized: normalize(cityEntry.city), name: cityEntry.city });
-    }
-  }
-
-  // Try longest suffix first (locality-city convention)
-  for (let i = parts.length; i >= 1; i--) {
-    const suffix = normalize(parts.slice(parts.length - i).join('-'));
-    const match  = allCities.find(c => c.normalized === suffix);
-    if (match) return match.name;
-  }
-
-  // Fallback: exact full-slug match (city-only URLs)
-  const exact = allCities.find(c => c.normalized === normalizedSlug);
-  return exact?.name ?? null;
-}
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-function escRe(s: string) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-
-function isValidUrl(u?: string | null): u is string {
-  return !!(u?.trim()) && !u.includes('undefined') && !u.includes('null');
-}
-
-function activeLinks(links: FLink[]) {
-  return links.filter(l => l.isActive !== false && isValidUrl(l.url));
-}
-
-function resolveCategory(
-  g: FGroup,
-  catMap: Map<string, { short: string; label: string }>,
-): { key: string; short: string; label: string } {
-  if (g.category?.trim()) {
-    const k = g.category.trim();
-    const m = catMap.get(k);
-    return { key: k, short: m?.short ?? k, label: m?.label ?? g.title };
-  }
-  const bare = g.cityName
-    ? g.title.replace(new RegExp(`\\s+in\\s+${escRe(g.cityName)}\\s*$`, 'i'), '').trim()
-    : g.title;
-  const slug = TITLE_TO_SLUG[bare.toLowerCase().trim()];
-  if (slug) {
-    const m = catMap.get(slug);
-    if (m) return { key: slug, short: m.short, label: m.label };
-  }
-  return { key: bare.toLowerCase().trim(), short: bare, label: bare };
-}
-
-// ── buildCategories ───────────────────────────────────────────────────────────
-//
-// Result per category:
-//   cities[n].cityLink      = the primary "Category in City" link shown in main grid
-//   cities[n].localityLinks = extra sub-locality links shown when user expands that city
-//
-// Pass 1 (generic groups, no cityName):
-//   - First link per localityName → cityLink
-//   - Further links for same city  → localityLinks
-//
-// Pass 2 (city-specific groups, cityName set):
-//   - Overrides localityLinks with the group's full locality list
-//   - Keeps cityLink from Pass 1 if it exists (so the main-grid link is preserved)
-
-function buildCategories(
-  groups: FGroup[],
-  resolveMap: Map<string, { short: string; label: string }>,
-  categoryRegistry: { value: string; sortOrder: number }[],
-): CategoryEntry[] {
-  type Cat = { short: string; label: string; cities: Map<string, CityEntry> };
-  const catMap = new Map<string, Cat>();
-
-  const getOrCreate = (key: string, short: string, label: string): Cat => {
-    if (!catMap.has(key)) catMap.set(key, { short, label, cities: new Map() });
-    return catMap.get(key)!;
-  };
-
-  // ── Pass 1 ────────────────────────────────────────────────────────────────
-  for (const g of groups.filter(g => !g.cityName)) {
-    const al = activeLinks(g.links);
-    if (!al.length) continue;
-    const { key, short, label } = resolveCategory(g, resolveMap);
-    const cat = getOrCreate(key, short, label);
-
-    for (const link of al) {
-      const city = link.localityName;
-      if (!city) continue;
-
-      if (!cat.cities.has(city)) {
-        cat.cities.set(city, { city, cityLink: link, localityLinks: [] });
-      } else {
-        cat.cities.get(city)!.localityLinks.push(link);
-      }
-    }
-  }
-
-  // ── Pass 2 ────────────────────────────────────────────────────────────────
-  for (const g of groups.filter(g => !!g.cityName)) {
-    const al = activeLinks(g.links);
-    if (!al.length) continue;
-    const { key, short, label } = resolveCategory(g, resolveMap);
-    const cat = getOrCreate(key, short, label);
-    const existing = cat.cities.get(g.cityName!);
-
-    cat.cities.set(g.cityName!, {
-      city:          g.cityName!,
-      cityLink:      existing?.cityLink,  // keep generic city link if present
-      localityLinks: al,                  // full locality list from city-specific group
-    });
-  }
-
-  // ── assemble ──────────────────────────────────────────────────────────────
-  const sortedRegistry = [...categoryRegistry].sort((a, b) => a.sortOrder - b.sortOrder);
-  const ORDER = sortedRegistry.map(c => c.value);
-  const result: CategoryEntry[] = [];
-
-  for (const [key, { short, label, cities }] of catMap) {
-    const cityArr = Array.from(cities.values())
-      // only cities that have either a city link or locality links
-      .filter(c => c.cityLink || c.localityLinks.length)
-      .sort((a, b) => {
-        // cities with localities first; within each group, alphabetical
-        const aHas = a.localityLinks.length > 0 ? 1 : 0;
-        const bHas = b.localityLinks.length > 0 ? 1 : 0;
-        if (aHas !== bHas) return bHas - aHas;
-        return a.city.localeCompare(b.city);
-      });
-
-    if (cityArr.length) result.push({ key, label, short, cities: cityArr });
-  }
-
-  result.sort((a, b) => {
-    const ai = ORDER.indexOf(a.key), bi = ORDER.indexOf(b.key);
-    if (ai !== -1 && bi !== -1) return ai - bi;
-    if (ai !== -1) return -1;
-    if (bi !== -1) return  1;
-    return a.label.localeCompare(b.label);
-  });
-
-  return result;
-}
+// Re-exported for the admin SEO screens, which have always imported it here.
+export { FOOTER_CATEGORIES };
 
 // ── Category tab bar ──────────────────────────────────────────────────────────
 
@@ -430,8 +200,25 @@ function FooterPanel({ cat, initialCity }: { cat: CategoryEntry; initialCity?: s
             <div className="mt-3 pt-3 border-t border-gray-800/40">
               <div className="flex items-center gap-2 mb-2.5">
                 <MapPin className="w-3.5 h-3.5 text-red-400" />
-                <span className="text-xs font-semibold text-gray-300">{expandedEntry.city}</span>
+                {/* The expanded city is a destination of its own — link to its
+                    page when one exists, rather than being dead text above
+                    links that all lead somewhere. */}
+                {expandedEntry.cityLink ? (
+                  <Link href={expandedEntry.cityLink.url} title={expandedEntry.cityLink.label}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-gray-200 hover:text-white hover:underline underline-offset-2 transition-colors">
+                    {expandedEntry.city}
+                    <ChevronRight className="w-3 h-3 text-red-400" />
+                  </Link>
+                ) : (
+                  <span className="text-xs font-semibold text-gray-300">{expandedEntry.city}</span>
+                )}
                 <span className="text-xs text-gray-600">· {expandedEntry.localityLinks.length} localities</span>
+                {expandedEntry.cityLink && (
+                  <Link href={expandedEntry.cityLink.url}
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors">
+                    View all in {expandedEntry.city} →
+                  </Link>
+                )}
                 <button onClick={() => setExpandedCity('')}
                   className="ml-auto text-xs text-gray-600 hover:text-gray-300 transition-colors">
                   ✕ close
@@ -555,7 +342,29 @@ export default function FooterSeoLinks() {
     return {};
   }, [pathname, categories, selectedCity]);
 
-  if (!categories.length) return null;
+  // Until the fetch lands there is nothing to draw, and returning null makes
+  // the whole band appear late and shove the page down. Hold the space with a
+  // skeleton of the same shape instead.
+  if (!categories.length) {
+    if (footerLoaded && catsLoaded) return null;
+    return (
+      <section className="border-b border-gray-800 bg-gray-900/80" aria-hidden>
+        <div className="container-max">
+          <div className="flex items-center gap-6 border-b border-gray-800 py-3.5 px-4 overflow-hidden">
+            {[64, 48, 56, 72, 44, 60].map((w, i) => (
+              <span key={i} className="h-3 rounded bg-gray-800 animate-pulse flex-shrink-0" style={{ width: w }} />
+            ))}
+          </div>
+          <div className="py-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-6 gap-y-3">
+            {Array.from({ length: 18 }).map((_, i) => (
+              <span key={i} className="h-2.5 rounded bg-gray-800/70 animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <TwoLevelFooter
       categories={categories}

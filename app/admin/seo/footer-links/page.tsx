@@ -39,6 +39,8 @@ interface FooterLink {
   bottomContent?: string;
   faqJson?: { question: string; answer: string }[];
   robots?: string;
+  /** Server-computed: the listing omits the content columns, see hasSeo(). */
+  hasSeoContent?: boolean;
 }
 interface FooterGroup {
   id: string;
@@ -61,7 +63,13 @@ const EMPTY_LINK_FORM = {
 };
 type LinkForm = typeof EMPTY_LINK_FORM;
 
+/**
+ * Whether a link carries SEO content. The listing no longer ships the content
+ * columns (they crashed the API), so the server computes the flag; the field
+ * check is the fallback for a link object that came from somewhere else.
+ */
 function hasSeo(link: FooterLink) {
+  if (typeof link.hasSeoContent === 'boolean') return link.hasSeoContent;
   return !!(link.metaTitle || link.h1Title || link.introContent || link.bottomContent);
 }
 
@@ -586,11 +594,11 @@ function RemapSlideOver({
 
 // ── Link SEO Slide-Over ────────────────────────────────────────────────────────
 function LinkSlideOver({
-  open, onClose, editId, form, setForm, onSave, saving, groupCityName,
+  open, onClose, editId, form, setForm, onSave, saving, loading, groupCityName,
 }: {
   open: boolean; onClose: () => void; editId: string | null;
   form: LinkForm; setForm: (fn: (f: LinkForm) => LinkForm) => void;
-  onSave: () => void; saving: boolean; groupCityName?: string;
+  onSave: () => void; saving: boolean; loading?: boolean; groupCityName?: string;
 }) {
   const [tab, setTab] = useState<'basic' | 'seo'>('basic');
   if (!open) return null;
@@ -731,9 +739,10 @@ function LinkSlideOver({
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
-          <button onClick={onSave} disabled={saving || !form.label || !form.url}
+          {/* Saving while the SEO content is still in flight would write back blanks. */}
+          <button onClick={onSave} disabled={saving || loading || !form.label || !form.url}
             className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {saving ? 'Saving…' : editId ? 'Update Link' : 'Create Link'}
+            {loading ? 'Loading SEO content…' : saving ? 'Saving…' : editId ? 'Update Link' : 'Create Link'}
           </button>
           <button onClick={onClose} className="px-5 py-2.5 border border-gray-200 rounded-xl text-sm hover:bg-gray-50 transition-colors">Cancel</button>
         </div>
@@ -1045,6 +1054,7 @@ export default function AdminFooterLinksPage() {
   const [linkEditId, setLinkEditId] = useState<string | null>(null);
   const [linkForm, setLinkForm]     = useState<LinkForm>({ ...EMPTY_LINK_FORM });
   const [linkSaving, setLinkSaving] = useState(false);
+  const [linkLoading, setLinkLoading] = useState(false);
 
   // Remap slide-over
   const [remapOpen, setRemapOpen]     = useState(false);
@@ -1135,17 +1145,38 @@ export default function AdminFooterLinksPage() {
     setLinkForm({ ...EMPTY_LINK_FORM, sortOrder: (selectedGroup?.links || []).length, groupId: selectedGroupId });
     setLinkOpen(true);
   };
-  const openEditLink = (link: FooterLink) => {
+  // The group listing omits introContent / bottomContent / faqJson — shipping
+  // them for every link is what was crashing the API. Fetch the one row being
+  // edited, or saving would write back the blanks we never loaded.
+  const openEditLink = async (link: FooterLink) => {
     setLinkEditId(link.id);
     setLinkForm({
       label: link.label, url: link.url, sortOrder: link.sortOrder, isActive: link.isActive,
       groupId: selectedGroupId!, localityId: link.localityId || '', localityName: link.localityName || '',
-      h1Title: link.h1Title || '', metaTitle: link.metaTitle || '', metaDescription: link.metaDescription || '',
-      metaKeywords: link.metaKeywords || '', canonicalUrl: link.canonicalUrl || '',
-      introContent: link.introContent || '', bottomContent: link.bottomContent || '',
-      faqJson: link.faqJson || [], robots: link.robots || 'index,follow',
+      h1Title: link.h1Title || '', metaTitle: link.metaTitle || '', metaDescription: '',
+      metaKeywords: '', canonicalUrl: '',
+      introContent: '', bottomContent: '',
+      faqJson: [], robots: link.robots || 'index,follow',
     });
     setLinkOpen(true);
+    setLinkLoading(true);
+    try {
+      const full = (await seoApi.adminGetFooterLink(link.id)).data as FooterLink;
+      setLinkForm(f => ({
+        ...f,
+        label: full.label, url: full.url, sortOrder: full.sortOrder, isActive: full.isActive,
+        localityId: full.localityId || '', localityName: full.localityName || '',
+        h1Title: full.h1Title || '', metaTitle: full.metaTitle || '', metaDescription: full.metaDescription || '',
+        metaKeywords: full.metaKeywords || '', canonicalUrl: full.canonicalUrl || '',
+        introContent: full.introContent || '', bottomContent: full.bottomContent || '',
+        faqJson: full.faqJson || [], robots: full.robots || 'index,follow',
+      }));
+    } catch {
+      alert('Could not load this link’s SEO content — close and retry rather than saving over it.');
+      setLinkOpen(false);
+    } finally {
+      setLinkLoading(false);
+    }
   };
   const openRemapLink = (link: FooterLink) => {
     setRemapMode('link');
@@ -1480,7 +1511,7 @@ export default function AdminFooterLinksPage() {
 
       {/* ── Link Slide-Over ──────────────────────────────────────────────────── */}
       <LinkSlideOver open={linkOpen} onClose={() => setLinkOpen(false)} editId={linkEditId}
-        form={linkForm} setForm={setLinkForm} onSave={saveLink} saving={linkSaving}
+        form={linkForm} setForm={setLinkForm} onSave={saveLink} saving={linkSaving} loading={linkLoading}
         groupCityName={selectedGroup?.cityName} />
 
       {/* ── Remap Slide-Over ─────────────────────────────────────────────────── */}
