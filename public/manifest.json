@@ -1,0 +1,16 @@
+{
+  "name": "Think4BuySale — Real Estate India",
+  "short_name": "Think4BuySale",
+  "description": "India's trusted real estate portal — buy, rent & sell properties across 50+ cities.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/favicon.ico",          "sizes": "48x48",   "type": "image/x-icon" }
+  ],
+  "categories": ["real estate", "property", "housing"]
+}
