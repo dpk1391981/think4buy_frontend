@@ -50,7 +50,9 @@ interface FooterGroup {
   category?: string;
   sortOrder: number;
   isActive: boolean;
-  links: FooterLink[];
+  /** Server-computed. The group listing carries counts only — the links of the
+   *  selected group are fetched separately, see loadGroupLinks(). */
+  linkCount: number;
 }
 
 const EMPTY_LINK_FORM = {
@@ -267,8 +269,8 @@ function RemapSlideOver({
       setNewGroupId(l.groupId || '');
       setNewLocalityName(l.localityName || '');
       setNewLocalityId(l.localityId || '');
-      // find parent group for city ctx
-      const pg = allGroups.find(g => g.links.some(lnk => lnk.id === l.id));
+      // find parent group for city ctx — openRemapLink stamps groupId on the target
+      const pg = allGroups.find(g => g.id === l.groupId);
       setLocalityCityCtx(pg?.cityName || '');
       setSection('group');
     }
@@ -370,7 +372,7 @@ function RemapSlideOver({
             {mode === 'link' && (
               <>
                 {(() => {
-                  const pg = allGroups.find(g => g.links.some(l => l.id === target.id));
+                  const pg = allGroups.find(g => g.id === targetLink?.groupId);
                   return pg
                     ? <span className="inline-flex items-center gap-1 text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">
                         <FolderInput className="w-3 h-3" /> Group: {pg.title}
@@ -474,7 +476,7 @@ function RemapSlideOver({
                 <label className="block text-xs font-medium text-gray-700 mb-2">Select Target Group</label>
                 <div className="space-y-1.5 max-h-80 overflow-y-auto border border-gray-200 rounded-xl p-2">
                   {allGroups.map(g => {
-                    const isCurrent = g.links.some(l => l.id === target.id);
+                    const isCurrent = g.id === targetLink?.groupId;
                     const isSelected = g.id === newGroupId;
                     return (
                       <button key={g.id} type="button"
@@ -495,7 +497,7 @@ function RemapSlideOver({
                                 <MapPin className="w-2.5 h-2.5" />{g.cityName}
                               </span>
                             )}
-                            <span className="text-xs text-gray-400">{g.links?.length || 0} links</span>
+                            <span className="text-xs text-gray-400">{g.linkCount ?? 0} links</span>
                             {isCurrent && <span className="text-xs text-blue-500 font-medium">• current</span>}
                           </div>
                         </div>
@@ -505,7 +507,7 @@ function RemapSlideOver({
                   })}
                 </div>
               </div>
-              {selectedNewGroup && !selectedNewGroup.links.some(l => l.id === target.id) && (
+              {selectedNewGroup && selectedNewGroup.id !== targetLink?.groupId && (
                 <div className="p-3 bg-violet-50 border border-violet-200 rounded-xl text-xs text-violet-700">
                   Link will be moved to group: <strong>{selectedNewGroup.title}</strong>
                   {selectedNewGroup.cityName && <> (City: {selectedNewGroup.cityName})</>}
@@ -998,7 +1000,7 @@ function GroupRow({ g, selected, onSelect, onEdit, onRemap, onDelete }: {
               <MapPin className="w-2.5 h-2.5" />{g.cityName}
             </span>
           )}
-          <span className="text-xs text-gray-400">{g.links?.length || 0} links</span>
+          <span className="text-xs text-gray-400">{g.linkCount ?? 0} links</span>
           {!g.isActive && <span className="text-xs text-gray-300 italic">inactive</span>}
         </div>
       </div>
@@ -1027,6 +1029,10 @@ export default function AdminFooterLinksPage() {
   const [cities, setCities]   = useState<City[]>([]);
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>('__all__');
   const [selectedGroupId, setSelectedGroupId]       = useState<string | null>(null);
+  // Links of the selected group only — tagged with the group they belong to so
+  // a slow response for a previous group can never render under a new one.
+  const [groupLinks, setGroupLinks]   = useState<{ groupId: string; links: FooterLink[] } | null>(null);
+  const [linksLoading, setLinksLoading] = useState(false);
 
   // Categories
   const [adminCategories, setAdminCategories]   = useState<FooterCategory[]>([]);
@@ -1074,7 +1080,31 @@ export default function AdminFooterLinksPage() {
     finally { setLoading(false); }
   }, []);
 
+  // Links are fetched one group at a time. Fetching all of them up front is
+  // ~60k rows, which never finished inside the client's 15s timeout — the page
+  // just sat there showing "No groups".
+  const loadGroupLinks = useCallback(async (groupId: string) => {
+    setLinksLoading(true);
+    try {
+      const r = await seoApi.adminGetFooterGroupLinks(groupId);
+      setGroupLinks({ groupId, links: r.data || [] });
+    } catch (e) {
+      console.error(e);
+      setGroupLinks({ groupId, links: [] });
+    } finally { setLinksLoading(false); }
+  }, []);
+
+  /** After a link write: counts live on the groups, the rows on the group. */
+  const refresh = useCallback(async () => {
+    await load();
+    if (selectedGroupId) await loadGroupLinks(selectedGroupId);
+  }, [load, loadGroupLinks, selectedGroupId]);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!selectedGroupId) { setGroupLinks(null); return; }
+    loadGroupLinks(selectedGroupId);
+  }, [selectedGroupId, loadGroupLinks]);
   useEffect(() => { loadCategories(); }, [loadCategories]);
   useEffect(() => {
     locationsApi.getCities(undefined, 200)
@@ -1109,6 +1139,7 @@ export default function AdminFooterLinksPage() {
   const citySpecificGroups = filteredGroups.filter(g => !!g.cityName);
 
   const selectedGroup = groups.find(g => g.id === selectedGroupId);
+  const selectedLinks = groupLinks?.groupId === selectedGroupId ? groupLinks.links : [];
 
   // ── group CRUD ───────────────────────────────────────────────────────────────
   const openCreateGroup = () => {
@@ -1142,7 +1173,7 @@ export default function AdminFooterLinksPage() {
   const openCreateLink = () => {
     if (!selectedGroupId) return;
     setLinkEditId(null);
-    setLinkForm({ ...EMPTY_LINK_FORM, sortOrder: (selectedGroup?.links || []).length, groupId: selectedGroupId });
+    setLinkForm({ ...EMPTY_LINK_FORM, sortOrder: selectedLinks.length, groupId: selectedGroupId });
     setLinkOpen(true);
   };
   // The group listing omits introContent / bottomContent / faqJson — shipping
@@ -1197,7 +1228,7 @@ export default function AdminFooterLinksPage() {
       };
       if (linkEditId) await seoApi.adminUpdateFooterLink(linkEditId, p);
       else await seoApi.adminCreateFooterLink(p);
-      setLinkOpen(false); load();
+      setLinkOpen(false); refresh();
     } catch (e: any) { alert(e?.response?.data?.message || 'Failed'); }
     finally { setLinkSaving(false); }
   };
@@ -1211,7 +1242,7 @@ export default function AdminFooterLinksPage() {
       } else {
         await seoApi.adminDeleteFooterLink(deleteTarget.id);
       }
-      setDeleteTarget(null); load();
+      setDeleteTarget(null); refresh();
     } catch (e: any) { alert(e?.response?.data?.message || 'Failed to delete'); }
   };
 
@@ -1355,7 +1386,7 @@ export default function AdminFooterLinksPage() {
                       <MapPin className="w-3 h-3" />{selectedGroup.cityName}
                     </span>
                   )}
-                  <span className="ml-2 text-xs text-gray-400">{selectedGroup.links?.length || 0} links</span>
+                  <span className="ml-2 text-xs text-gray-400">{selectedGroup.linkCount ?? 0} links</span>
                 </div>
                 <button onClick={openCreateLink}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors">
@@ -1364,7 +1395,9 @@ export default function AdminFooterLinksPage() {
               </div>
 
               <div className="flex-1 overflow-y-auto">
-                {!selectedGroup.links?.length ? (
+                {linksLoading ? (
+                  <div className="p-4 space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="h-9 bg-gray-100 rounded-lg animate-pulse" />)}</div>
+                ) : !selectedLinks.length ? (
                   <div className="p-8 text-center text-sm text-gray-400">No links yet. Click &ldquo;Add Link&rdquo;.</div>
                 ) : (
                   <table className="w-full text-sm">
@@ -1376,7 +1409,7 @@ export default function AdminFooterLinksPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {selectedGroup.links.slice().sort((a, b) => a.sortOrder - b.sortOrder).map(link => (
+                      {selectedLinks.slice().sort((a, b) => a.sortOrder - b.sortOrder).map(link => (
                         <tr key={link.id} className="hover:bg-gray-50/60">
                           <td className="px-5 py-2.5 font-medium text-gray-800 max-w-[160px]">
                             <span className="block truncate">{link.label}</span>
@@ -1523,7 +1556,7 @@ export default function AdminFooterLinksPage() {
         allGroups={groups}
         cities={cities}
         categories={categoryOptions}
-        onSaved={load}
+        onSaved={refresh}
       />
 
       {/* ── Category Manager Slide-Over ──────────────────────────────────────── */}

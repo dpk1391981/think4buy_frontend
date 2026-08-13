@@ -823,7 +823,9 @@ export const seoApi = {
   adminDeleteFooterCategory: (id: string) => api.delete(`/seo/admin/footer-categories/${id}`),
 
   // Admin - Footer Links
+  /** Groups + link counts only. The links are fetched per group — 60k rows in one response times out. */
   adminGetFooterGroups: () => api.get('/seo/admin/footer-groups'),
+  adminGetFooterGroupLinks: (groupId: string) => api.get(`/seo/admin/footer-groups/${groupId}/links`),
   /** Full row incl. SEO content — the group listing omits it, see openEditLink. */
   adminGetFooterLink: (id: string) => api.get(`/seo/admin/footer-links/${id}`),
   adminCreateFooterGroup: (data: any) => api.post('/seo/admin/footer-groups', data),

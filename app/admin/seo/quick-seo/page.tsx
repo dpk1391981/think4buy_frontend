@@ -205,8 +205,15 @@ function CityMultiSelect({ cities, selected, onChange, disabled = false, placeho
 
 // ── Locality multi-select (across the selected cities) ────────────────────────
 
-/** Above this many cities the locality lists are fetched one city at a time, so the picker stays off. */
+/**
+ * Up to this many cities the picker fetches each city's localities separately,
+ * which keeps every locality of every city listed. Above it — including "All
+ * cities" — that would be hundreds of parallel requests, so the picker searches
+ * the locality table directly instead and maps each hit back to its city.
+ */
 const LOCALITY_PICKER_MAX_CITIES = 10;
+/** Rows the whole-table search returns before the admin has to narrow it down. */
+const LOCALITY_SEARCH_LIMIT = 200;
 
 function LocalityMultiSelect({ cities, selected, onChange, disabled = false }: {
   cities: { slug: string; name: string }[];   // the cities currently in scope
@@ -221,8 +228,8 @@ function LocalityMultiSelect({ cities, selected, onChange, disabled = false }: {
   const ref = useRef<HTMLDivElement>(null);
   useClickOutside(ref, () => setOpen(false));
 
-  const tooManyCities = cities.length > LOCALITY_PICKER_MAX_CITIES;
-  const inactive = disabled || cities.length === 0 || tooManyCities;
+  const wideScope = cities.length > LOCALITY_PICKER_MAX_CITIES;
+  const inactive = disabled || cities.length === 0;
   const cityKey = cities.map(c => c.slug).join(',');
 
   // The API returns at most 200 localities per city, so the search term goes to
@@ -233,27 +240,48 @@ function LocalityMultiSelect({ cities, selected, onChange, disabled = false }: {
     let cancelled = false;
     setLoading(true);
     const timer = setTimeout(() => {
-      Promise.all(
-        cities.map(c =>
-          locationsApi.getLocalities(c.name, undefined, search.trim() || undefined)
-            .then(r => ((r.data || []) as LocalityOption[]).map(l => ({
-              slug: toSlug(l.locality), name: l.locality, citySlug: c.slug, cityName: c.name,
-            })))
-            .catch(() => [] as LocalityChoice[]),
-        ),
-      )
-        .then(lists => {
+      const q = search.trim();
+
+      // Wide scope: one search over the whole locality table, then keep the
+      // rows whose city is in scope. Ordered by property count, so with no
+      // search term the list opens on the localities that matter most.
+      const fetchWide = () =>
+        adminLocationsApi.getLocalities({ search: q || undefined, limit: LOCALITY_SEARCH_LIMIT })
+          .then(r => {
+            const byName = new Map(cities.map(c => [c.name.toLowerCase(), c]));
+            return ((r.data?.items || []) as { locality?: string; city?: string }[])
+              .flatMap(l => {
+                const city = l.city ? byName.get(l.city.toLowerCase()) : undefined;
+                if (!city || !l.locality) return [];
+                return [{ slug: toSlug(l.locality), name: l.locality, citySlug: city.slug, cityName: city.name }];
+              });
+          })
+          .catch(() => [] as LocalityChoice[]);
+
+      const fetchPerCity = () =>
+        Promise.all(
+          cities.map(c =>
+            locationsApi.getLocalities(c.name, undefined, q || undefined)
+              .then(r => ((r.data || []) as LocalityOption[]).map(l => ({
+                slug: toSlug(l.locality), name: l.locality, citySlug: c.slug, cityName: c.name,
+              })))
+              .catch(() => [] as LocalityChoice[]),
+          ),
+        ).then(lists => lists.flat());
+
+      (wideScope ? fetchWide() : fetchPerCity())
+        .then(list => {
           if (cancelled) return;
           // The same locality name exists in more than one city — key on both.
           const merged = new Map<string, LocalityChoice>();
-          for (const l of lists.flat()) if (l.slug) merged.set(`${l.citySlug}|${l.slug}`, l);
+          for (const l of list) if (l.slug) merged.set(`${l.citySlug}|${l.slug}`, l);
           setOptions(Array.from(merged.values()));
         })
         .finally(() => { if (!cancelled) setLoading(false); });
     }, search ? 300 : 0);
     return () => { cancelled = true; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cityKey, inactive, search]);
+  }, [cityKey, inactive, search, wideScope]);
 
   // Drop selections whose city has left the scope, so the payload can't carry
   // a locality that belongs to a city we're no longer applying to.
@@ -277,7 +305,6 @@ function LocalityMultiSelect({ cities, selected, onChange, disabled = false }: {
   const placeholder =
     disabled                 ? 'All localities'
     : cities.length === 0    ? 'Select a city first'
-    : tooManyCities          ? `All localities (${cities.length} cities in scope)`
     : selected.length === 0  ? `All localities in ${cities.length === 1 ? cities[0].name : `${cities.length} cities`}`
     : `${selected.length} localit${selected.length === 1 ? 'y' : 'ies'} selected`;
 
@@ -295,7 +322,8 @@ function LocalityMultiSelect({ cities, selected, onChange, disabled = false }: {
       {open && !inactive && (
         <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg">
           <div className="p-2 border-b border-gray-100">
-            <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Search locality..."
+            <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
+              placeholder={wideScope ? `Search localities across ${cities.length} cities...` : 'Search locality...'}
               className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-green-400" />
           </div>
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 text-xs">
@@ -324,6 +352,11 @@ function LocalityMultiSelect({ cities, selected, onChange, disabled = false }: {
             {filtered.length > shown.length && (
               <p className="px-3 py-2 text-xs text-gray-400">
                 Showing first {shown.length} of {filtered.length} — refine the search to see the rest.
+              </p>
+            )}
+            {wideScope && !loading && options.length >= LOCALITY_SEARCH_LIMIT && (
+              <p className="px-3 py-2 text-xs text-gray-400 border-t border-gray-100">
+                Top {LOCALITY_SEARCH_LIMIT} by property count — search to reach the rest.
               </p>
             )}
           </div>
@@ -505,11 +538,16 @@ export default function QuickSeoPage() {
     : scopeCities.length === 0 ? 'all cities'
     : scopeCities.length === 1 ? scopeCities[0].name
     : `${scopeCities.length} cities`;
+  // Picking localities narrows the run to the cities those localities sit in —
+  // doApply skips every other city unless a city page was also asked for.
+  const localityCities = scopeCities.filter(c => selectedLocalities.some(l => l.citySlug === c.slug));
+  const localityCitiesLabel = localityCities.length === 1 ? localityCities[0].name : `${localityCities.length} cities`;
   const scopeLabel = !categorySlug
     ? 'Select a category to start'
     : allLocalities
     ? `${citiesLabel}, all localities — ${catShort}`
-    : `${selectedLocalities.length} localit${selectedLocalities.length === 1 ? 'y' : 'ies'} in ${citiesLabel} — ${catShort}`;
+    : `${selectedLocalities.length} localit${selectedLocalities.length === 1 ? 'y' : 'ies'} in ${localityCitiesLabel}`
+      + `${includeCityPage ? `, plus a city page for ${citiesLabel}` : ''} — ${catShort}`;
 
   const canPreview = !!categorySlug;
   // Writing needs an explicit scope. Without one, a stray click would generate
@@ -517,14 +555,17 @@ export default function QuickSeoPage() {
   const canApply = canPreview && (allCities || scopeCities.length > 0);
 
   // The slug previews below read better with a real city than with {city}.
-  const sampleCitySlug     = scopeCities[0]?.slug ?? '{city}';
+  const sampleCitySlug     = (localityCities[0] ?? scopeCities[0])?.slug ?? '{city}';
   const sampleLocalitySlug = selectedLocalities[0]?.slug ?? '{locality}';
 
   // Only the first few cities are previewed: a preview of hundreds of cities is
   // thousands of rows nobody reads, and the apply below runs city by city anyway.
+  // When localities were picked, preview the cities they belong to — the first
+  // ten of "all cities" would otherwise be ten cities with nothing to show.
   const PREVIEW_CITY_LIMIT = 10;
-  const previewCities = scopeCities.slice(0, PREVIEW_CITY_LIMIT);
-  const previewTruncated = scopeCities.length > PREVIEW_CITY_LIMIT;
+  const previewScope = allLocalities ? scopeCities : localityCities;
+  const previewCities = previewScope.slice(0, PREVIEW_CITY_LIMIT);
+  const previewTruncated = previewScope.length > PREVIEW_CITY_LIMIT;
 
   const doPreview = useCallback(async () => {
     if (!canPreview) return;
@@ -992,7 +1033,6 @@ export default function QuickSeoPage() {
                 cities={scopeCities.map(c => ({ slug: c.slug, name: c.name }))}
                 selected={selectedLocalities}
                 onChange={v => { setSelectedLocalities(v); setPreviewData(null); }}
-                disabled={allCities}
               />
               {selectedLocalities.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
@@ -1012,9 +1052,10 @@ export default function QuickSeoPage() {
                   Pages will be created for <strong>every locality in {citiesLabel}</strong>
                 </p>
               )}
-              {!allCities && scopeCities.length > LOCALITY_PICKER_MAX_CITIES && (
+              {scopeCities.length > LOCALITY_PICKER_MAX_CITIES && (
                 <p className="text-xs text-gray-400 mt-1">
-                  Locality picking is off above {LOCALITY_PICKER_MAX_CITIES} cities — all localities will be used.
+                  Above {LOCALITY_PICKER_MAX_CITIES} cities the picker searches localities across the whole scope —
+                  leave it empty for every locality, or search to pick specific ones.
                 </p>
               )}
             </div>
