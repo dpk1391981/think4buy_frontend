@@ -10,7 +10,7 @@ interface AuthGuardProps {
   allowedRoles?: string[];
   /** Where to redirect after login. Defaults to current path. */
   redirectTo?: string;
-  /** Override the redirect target when user is not authenticated (instead of /auth/login). */
+  /** Override the redirect target when user is not authenticated (instead of /auth). */
   loginRedirect?: string;
 }
 
@@ -54,7 +54,7 @@ export default function AuthGuard({ children, allowedRoles, redirectTo, loginRed
         router.replace(loginRedirect);
       } else {
         const dest = redirectTo ?? (typeof window !== 'undefined' ? window.location.pathname : '/');
-        router.replace(`/auth/login?redirect=${encodeURIComponent(dest)}`);
+        router.replace(`/auth?redirect=${encodeURIComponent(dest)}`);
       }
       return;
     }

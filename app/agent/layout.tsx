@@ -144,7 +144,7 @@ export default function AgentLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!loading && mounted) {
-      if (!user) { router.replace('/auth/login?redirect=/agent'); return; }
+      if (!user) { router.replace('/auth?redirect=/agent'); return; }
       if (!ALLOWED_ROLES.includes(user.role)) {
         if (user.role === 'buyer') router.replace('/buyer');
         else if (user.role === 'owner' || user.role === 'seller') router.replace('/owner');

@@ -32,9 +32,9 @@ export default function ServicesBanner() {
   ];
 
   return (
-    <section className="py-5 sm:py-12 bg-white">
-      <div className="container-max">
-        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 text-center mb-1">More Services for You</h2>
+    <section className="py-7 sm:py-12 lg:py-13 bg-white">
+      <div className="container-rv">
+        <h2 className="rv-h2 text-center mb-1">More Services for You</h2>
         <p className="text-gray-500 text-center text-sm mb-3 sm:mb-8">
           Everything you need for your property journey
         </p>

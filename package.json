@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prod:dev": "NEXT_PUBLIC_API_BASE_URL=https://reales-api.vtechxhub.com BACKEND_INTERNAL_URL=https://reales-api.vtechxhub.com/api/v1 next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

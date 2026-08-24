@@ -19,7 +19,10 @@ import { authEvents } from '@/lib/authEvents';
 //
 const _appUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/api\/v1\/?$/, '');
 const API_BASE = typeof window !== 'undefined'
-  ? `${_appUrl}/api/q`          // Browser: always go through BFF proxy
+  // Browser: same-origin relative path. Using the origin that actually served
+  // the page (instead of NEXT_PUBLIC_API_URL) keeps the BFF reachable when the
+  // dev server lands on a different port than the env var assumes.
+  ? '/api/q'
   : `${_appUrl}/api/q`;         // SSR also uses proxy (though server components use bff-client.ts directly)
 
 export const api = axios.create({
@@ -239,6 +242,13 @@ export const authApi = {
   sendOtp: (phone: string) => api.post('/auth/otp/send', { phone }),
   verifyOtp: (phone: string, otp: string, name?: string) =>
     api.post('/auth/otp/verify', { phone, otp, name }),
+
+  // ── Email OTP — the live OTP channel while mobile OTP awaits DLT approval ──
+  getAuthConfig: () => api.get('/auth/config'),
+  emailStatus: (email: string) => api.post('/auth/email-status', { email }),
+  sendEmailOtp: (email: string) => api.post('/auth/otp/email/send', { email }),
+  verifyEmailOtp: (email: string, otp: string, name?: string) =>
+    api.post('/auth/otp/email/verify', { email, otp, name }),
   completeOnboarding: (data: { role: string; name?: string; agentLicense?: string; agentExperience?: number }) =>
     api.patch('/auth/onboarding', data),
   upgradeRole: (role: 'owner' | 'agent') => api.patch('/auth/upgrade-role', { role }),

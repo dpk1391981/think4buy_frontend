@@ -23,27 +23,27 @@ interface ApiInsight {
   confidence: number;
 }
 
-const TYPE_META: Record<InsightType, { icon: React.ElementType; iconColor: string; bgColor: string; barColor: string }> = {
-  timing:     { icon: Clock,      iconColor: 'text-orange-500', bgColor: 'bg-orange-50',  barColor: 'bg-orange-400' },
-  price:      { icon: DollarSign, iconColor: 'text-green-600',  bgColor: 'bg-green-50',   barColor: 'bg-green-500'  },
-  location:   { icon: MapPin,     iconColor: 'text-blue-600',   bgColor: 'bg-blue-50',    barColor: 'bg-blue-500'   },
-  investment: { icon: TrendingUp, iconColor: 'text-purple-600', bgColor: 'bg-purple-50',  barColor: 'bg-purple-500' },
-  type:       { icon: Building2,  iconColor: 'text-teal-600',   bgColor: 'bg-teal-50',    barColor: 'bg-teal-500'   },
+const TYPE_META: Record<InsightType, { icon: React.ElementType; darkIconColor: string }> = {
+  timing:     { icon: Clock,      darkIconColor: 'text-orange-300' },
+  price:      { icon: DollarSign, darkIconColor: 'text-green-300'  },
+  location:   { icon: MapPin,     darkIconColor: 'text-blue-300'   },
+  investment: { icon: TrendingUp, darkIconColor: 'text-purple-300' },
+  type:       { icon: Building2,  darkIconColor: 'text-teal-300'   },
 };
 
 function ConfidenceMeter({ value }: { value: number }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.12]">
         <div
           className={cn(
             'h-full rounded-full transition-all duration-700',
-            value >= 90 ? 'bg-green-500' : value >= 75 ? 'bg-blue-500' : 'bg-orange-400',
+            value >= 90 ? 'bg-green-400' : value >= 75 ? 'bg-blue-400' : 'bg-orange-400',
           )}
           style={{ width: `${value}%` }}
         />
       </div>
-      <span className="text-[10px] text-gray-400 font-medium flex-shrink-0">{value}% confidence</span>
+      <span className="flex-shrink-0 text-[10px] font-semibold text-slate-300/55">{value}% confidence</span>
     </div>
   );
 }
@@ -53,36 +53,24 @@ function InsightCard({ insight }: { insight: ApiInsight }) {
   const Icon = meta.icon;
 
   return (
-    <div className={cn(
-      'group flex flex-col rounded-2xl border border-gray-100 overflow-hidden transition-all duration-300',
-      'hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 bg-white',
-    )}>
-      <div className={cn('h-1', meta.barColor)} />
+    <div className="group flex flex-col overflow-hidden rounded-2xl border border-white/[0.12] bg-white/[0.06] p-4 transition-all duration-300 hover:border-white/25 hover:bg-white/[0.09] sm:p-[18px]">
+      <div className="mb-3 flex items-center justify-between">
+        <span className={cn('flex h-8 w-8 items-center justify-center rounded-[10px] bg-white/10')}>
+          <Icon className={cn('w-4 h-4', meta.darkIconColor)} />
+        </span>
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-slate-300/55">
+          {insight.tag}
+        </span>
+      </div>
 
-      <div className="p-4 sm:p-5 flex flex-col flex-1">
-        <div className="flex items-center justify-between mb-3">
-          <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', meta.bgColor)}>
-            <Icon className={cn('w-4 h-4', meta.iconColor)} />
-          </div>
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 px-2 py-1 rounded-lg">
-            {insight.tag}
-          </span>
-        </div>
+      <h3 className="mb-1.5 text-[14.5px] font-bold leading-snug text-white">{insight.title}</h3>
+      <p className="flex-1 text-[12.5px] leading-relaxed text-slate-300/60">{insight.body}</p>
 
-        <h3 className="font-bold text-gray-900 text-sm sm:text-base leading-snug mb-2">{insight.title}</h3>
-        <p className="text-xs sm:text-sm text-gray-500 leading-relaxed flex-1">{insight.body}</p>
-
-        <div className="my-3">
-          <ConfidenceMeter value={insight.confidence} />
-        </div>
-
+      <div className="mt-auto pt-3.5">
+        <ConfidenceMeter value={insight.confidence} />
         <Link
           href={insight.href}
-          className={cn(
-            'flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80',
-            meta.bgColor,
-            meta.iconColor,
-          )}
+          className="mt-2.5 flex items-center justify-between text-xs font-bold text-blue-300 transition-colors hover:text-blue-200"
         >
           {insight.cta}
           <ChevronRight className="w-3.5 h-3.5" />
@@ -94,19 +82,16 @@ function InsightCard({ insight }: { insight: ApiInsight }) {
 
 function InsightCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-gray-100 overflow-hidden animate-pulse bg-white">
-      <div className="h-1 bg-gray-200" />
-      <div className="p-4 sm:p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="w-9 h-9 rounded-xl bg-gray-200" />
-          <div className="w-20 h-5 rounded-lg bg-gray-200" />
-        </div>
-        <div className="h-4 bg-gray-200 rounded w-3/4" />
-        <div className="h-3 bg-gray-200 rounded w-full" />
-        <div className="h-3 bg-gray-200 rounded w-5/6" />
-        <div className="h-1.5 bg-gray-200 rounded-full mt-2" />
-        <div className="h-9 bg-gray-200 rounded-xl mt-2" />
+    <div className="animate-pulse overflow-hidden rounded-2xl border border-white/[0.12] bg-white/[0.06] p-4 sm:p-[18px]">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="h-8 w-8 rounded-[10px] bg-white/15" />
+        <div className="h-4 w-16 rounded bg-white/10" />
       </div>
+      <div className="h-4 w-3/4 rounded bg-white/15" />
+      <div className="mt-2.5 h-3 w-full rounded bg-white/10" />
+      <div className="mt-1.5 h-3 w-5/6 rounded bg-white/10" />
+      <div className="mt-4 h-1 rounded-full bg-white/10" />
+      <div className="mt-3 h-3 w-24 rounded bg-white/10" />
     </div>
   );
 }
@@ -140,28 +125,27 @@ export default function AIInsightsSection() {
   const featured = insights[activeInsight] ?? null;
 
   return (
-    <section className="py-5 sm:py-14 bg-white">
-      <div className="container-max">
+    <section className="relative overflow-hidden rv-dark py-7 sm:py-12 lg:py-13">
+      <div className="absolute inset-0 rv-insights-glow pointer-events-none" />
+      <div className="container-rv relative z-10">
         {/* Header */}
-        <div className="flex items-start justify-between mb-4 sm:mb-10">
+        <div className="flex items-start justify-between mb-4 sm:mb-6 lg:mb-[22px]">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                <Sparkles className="w-3 h-3 text-white" />
-              </div>
-              <span className="text-xs font-semibold text-purple-600 uppercase tracking-wide">Data-Driven Insights</span>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-violet-300" />
+              <span className="rv-eyebrow text-violet-300">Decision intelligence</span>
             </div>
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">
+            <h2 className="rv-h2-light">
               Smart Insights for {locationLabel}
             </h2>
-            <p className="text-gray-500 text-xs sm:text-sm mt-1">
+            <p className="mt-1.5 text-[12.5px] sm:text-sm text-slate-300/65">
               Intelligence derived from real listing activity, prices &amp; inquiries on the platform
             </p>
           </div>
 
           <Link
             href="/articles"
-            className="hidden sm:flex items-center gap-1 text-primary-600 font-medium text-sm hover:underline"
+            className="hidden sm:flex items-center gap-1 text-[13.5px] font-bold text-blue-300 hover:text-blue-200 transition-colors"
           >
             Real Estate Guides <ArrowRight className="w-4 h-4" />
           </Link>
@@ -169,7 +153,7 @@ export default function AIInsightsSection() {
 
         {/* Featured insight banner */}
         {isLoading ? (
-          <div className="mb-4 sm:mb-6 animate-pulse h-40 rounded-2xl bg-gradient-to-br from-violet-200 to-indigo-200" />
+          <div className="mb-4 sm:mb-6 h-40 animate-pulse rounded-2xl bg-white/[0.08]" />
         ) : featured ? (
           <div className="mb-4 sm:mb-6 relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-700 to-indigo-800 p-5 sm:p-7 text-white">
             <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
@@ -210,8 +194,8 @@ export default function AIInsightsSection() {
             {Array.from({ length: 5 }).map((_, i) => <InsightCardSkeleton key={i} />)}
           </div>
         ) : insights.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
-            <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <div className="py-12 text-center text-slate-300/50">
+            <Sparkles className="mx-auto mb-3 h-10 w-10 opacity-30" />
             <p className="text-sm">Insights will appear as listings and activity data accumulates.</p>
           </div>
         ) : (
@@ -222,7 +206,7 @@ export default function AIInsightsSection() {
           </div>
         )}
 
-        <p className="text-center text-[10px] text-gray-400 mt-5">
+        <p className="mt-5 text-center text-[10px] text-slate-300/45">
           * Insights are derived from real listing data on Think4BuySale. Not financial advice.
         </p>
       </div>

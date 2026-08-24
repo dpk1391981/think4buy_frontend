@@ -342,7 +342,7 @@ function OnboardingForm() {
   const effectiveUpgrade = isUpgrade || (hasGuestRoleKey && user?.needsOnboarding === false && !!user?.name?.trim());
 
   if (!authLoading && !user) {
-    router.replace(`/auth/login?redirect=${encodeURIComponent('/auth/onboarding' + (redirect !== '/' ? `?redirect=${encodeURIComponent(redirect)}` : ''))}`);
+    router.replace(`/auth?redirect=${encodeURIComponent('/auth/onboarding' + (redirect !== '/' ? `?redirect=${encodeURIComponent(redirect)}` : ''))}`);
     return null;
   }
   if (!authLoading && user && user.needsOnboarding === false && user.name?.trim() && !isUpgrade && !hasGuestRoleKey) {

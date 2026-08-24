@@ -316,8 +316,8 @@ export default function CityPriceSnapshot({ city: cityProp }: { city?: string })
   const rentCount      = snap?.rentListingCount ?? 0;
 
   return (
-    <section className="py-5 sm:py-14 bg-gray-50">
-      <div className="container-max">
+    <section className="py-7 sm:py-12 lg:py-13 bg-gray-50">
+      <div className="container-rv">
         {/* Header */}
         <div className="flex items-start justify-between mb-4 sm:mb-6">
           <div>
@@ -327,7 +327,7 @@ export default function CityPriceSnapshot({ city: cityProp }: { city?: string })
                 Market Intelligence
               </span>
             </div>
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">
+            <h2 className="rv-h2">
               {activeCity} Price Snapshot
             </h2>
             <p className="text-gray-500 text-xs sm:text-sm mt-1">

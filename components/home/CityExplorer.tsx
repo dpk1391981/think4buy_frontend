@@ -60,9 +60,9 @@ export default function CityExplorer() {
 
   return (
     <section className="py-10 sm:py-12 bg-gray-50">
-      <div className="container-max">
+      <div className="container-rv">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">{sectionTitle}</h2>
+          <h2 className="rv-h2">{sectionTitle}</h2>
           {selectedState && (
             <Link
               href={`/properties?state=${encodeURIComponent(selectedState)}`}

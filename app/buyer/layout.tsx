@@ -50,7 +50,7 @@ export default function BuyerLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!loading && mounted) {
-      if (!user) { router.replace('/auth/login?redirect=/buyer'); return; }
+      if (!user) { router.replace('/auth?redirect=/buyer'); return; }
       if (!ALLOWED_ROLES.includes(user.role)) {
         // Redirect to the correct panel for their role
         if (user.role === 'admin')  router.replace('/admin');

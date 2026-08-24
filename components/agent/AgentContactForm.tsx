@@ -254,7 +254,7 @@ export default function AgentContactForm({
             </div>
             <div className="flex flex-col gap-2">
               <Link
-                href={`/auth/login?redirect=${encodeURIComponent(pathname)}`}
+                href={`/auth?redirect=${encodeURIComponent(pathname)}`}
                 className="flex items-center justify-center gap-2 py-2.5 bg-primary-600 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 transition-colors"
               >
                 <LogIn className="w-3.5 h-3.5" />

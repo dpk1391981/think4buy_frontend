@@ -46,7 +46,7 @@ export default function StatsBar() {
 
   return (
     <div className="bg-white border-b border-gray-100">
-      <div className="container-max">
+      <div className="container-rv">
         <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-100">
           {items.map(({ icon: Icon, value, label, color }) => (
             <div key={label} className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-3 p-3 sm:p-5 justify-center">

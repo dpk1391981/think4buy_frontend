@@ -180,7 +180,7 @@ export default function AgentFeedbackSection({ agentId }: { agentId: string }) {
             </button>
           ) : (
             <Link
-              href="/auth/login"
+              href="/auth"
               className="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-primary-600 transition-colors"
             >
               <Lock className="w-3.5 h-3.5" />

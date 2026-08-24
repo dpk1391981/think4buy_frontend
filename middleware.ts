@@ -29,9 +29,13 @@ const PRIVATE_PREFIXES = [
   '/admin',
 ];
 
-const GUEST_ONLY_PREFIXES = [
-  '/auth/login',
-  '/auth/register',
+// Matched EXACTLY, not as prefixes. '/auth/onboarding' lives under the same
+// segment but requires a session — a startsWith('/auth') guard would bounce
+// brand-new users off the one page they are sent to right after signing up.
+const GUEST_ONLY_PATHS = [
+  '/auth',
+  '/auth/login',    // legacy — redirects to /auth
+  '/auth/register', // legacy — redirects to /auth
 ];
 
 // ── File-extension cleanup ─────────────────────────────────────────────────────
@@ -288,14 +292,14 @@ export function middleware(request: NextRequest) {
   // Protect private routes — pass intended path as ?redirect= for post-login return
   if (PRIVATE_PREFIXES.some(p => pathname.startsWith(p)) && !isAuthed) {
     const url = request.nextUrl.clone();
-    url.pathname = '/auth/login';
+    url.pathname = '/auth';
     // Only store the path (never full URL) to prevent open-redirect attacks
     url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }
 
   // Redirect logged-in users away from auth pages
-  if (GUEST_ONLY_PREFIXES.some(p => pathname.startsWith(p)) && isAuthed) {
+  if (GUEST_ONLY_PATHS.includes(pathname.replace(/\/$/, '')) && isAuthed) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
     url.search = '';

@@ -14,7 +14,7 @@ const STATIC_CARDS = [
     href:  '/post-property',
     tag:   'FREE LISTING',
     color: '#1a56db',
-    icon:  <Home className="w-5 h-5 text-white" />,
+    icon:  <Home className="w-4 h-4 sm:w-[17px] sm:h-[17px]" />,
     title: 'Post Property Free',
     stat:  'List in minutes, reach buyers',
     cta:   'Post Now',
@@ -67,7 +67,7 @@ export default function PlatformStatsCards() {
       href:  agentsHref,
       tag:   agentsTag,
       color: '#6d28d9',
-      icon:  <Users className="w-5 h-5 text-white" />,
+      icon:  <Users className="w-4 h-4 sm:w-[17px] sm:h-[17px]" />,
       title: 'Find Top Agents',
       stat:  agentsStat,
       cta:   'Explore',
@@ -77,7 +77,7 @@ export default function PlatformStatsCards() {
       href:  citiesHref,
       tag:   citiesTag,
       color: '#065f46',
-      icon:  <MapPin className="w-5 h-5 text-white" />,
+      icon:  <MapPin className="w-4 h-4 sm:w-[17px] sm:h-[17px]" />,
       title: selectedCity ? `Properties in ${selectedCity}` : selectedState ? `Properties in ${selectedState}` : 'Top Cities',
       stat:  citiesStat,
       cta:   'Browse',
@@ -87,7 +87,7 @@ export default function PlatformStatsCards() {
       href:  '/find-property',
       tag:   'FREE HELP',
       color: '#b45309',
-      icon:  <Search className="w-5 h-5 text-white" />,
+      icon:  <Search className="w-4 h-4 sm:w-[17px] sm:h-[17px]" />,
       title: 'Find Your Property',
       stat:  'No Brokerage',
       cta:   'Get Help',
@@ -95,54 +95,46 @@ export default function PlatformStatsCards() {
   ];
 
   return (
-    <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3.5">
       {CARDS.map(card => (
         <Link
           key={card.id}
           href={card.href}
-          className="group relative bg-white rounded-xl overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col px-4 py-3.5 gap-2"
-          style={{ border: `1.5px solid ${card.color}40` }}
+          className="rv-card rv-card-hover group flex flex-col gap-1.5 p-3.5 shadow-[0_6px_18px_rgba(15,23,42,0.06)] sm:gap-2.5 sm:p-[18px]"
         >
-          {/* Tag + Icon row */}
-          <div className="flex items-center justify-between">
+          {/* Glyph + tag row */}
+          <div className="flex items-center justify-between gap-2">
             <span
-              className="text-[9px] font-extrabold tracking-widest uppercase"
-              style={{ color: card.color }}
+              className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-[9px] sm:h-[34px] sm:w-[34px] sm:rounded-[10px]"
+              style={{ backgroundColor: `${card.color}14`, color: card.color }}
+            >
+              {card.icon}
+            </span>
+            <span
+              className="truncate rounded-md px-1.5 py-[3px] text-[8.5px] font-extrabold uppercase tracking-[0.09em] sm:px-2 sm:py-1 sm:text-[10px] sm:tracking-[0.1em]"
+              style={{ backgroundColor: `${card.color}14`, color: card.color }}
             >
               {card.tag}
             </span>
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: card.color }}
-            >
-              {card.icon}
-            </div>
           </div>
 
-          {/* Title */}
-          <p className="text-sm font-bold text-gray-900 leading-tight line-clamp-1">
-            {card.title}
-          </p>
+          <div>
+            <p className="text-[13px] font-bold leading-tight text-gray-900 line-clamp-1 sm:text-[15px]">
+              {card.title}
+            </p>
+            <p className="mt-0.5 text-[11.5px] leading-snug text-gray-500 line-clamp-2 sm:mt-[3px] sm:text-[12.5px]">
+              {card.stat}
+            </p>
+          </div>
 
-          {/* Stat */}
-          <p className="text-[11px] text-gray-500 font-medium line-clamp-1">{card.stat}</p>
-
-          {/* CTA */}
-          <div
-            className="flex items-center gap-1 mt-0.5 self-start px-2.5 py-1 rounded-md"
-            style={{ backgroundColor: `${card.color}15` }}
+          {/* CTA — desktop only; the whole card is tappable on mobile */}
+          <span
+            className="mt-auto hidden items-center gap-1.5 pt-1 text-[12.5px] font-bold sm:flex"
+            style={{ color: card.color }}
           >
-            <span
-              className="text-[11px] font-extrabold transition-colors"
-              style={{ color: card.color }}
-            >
-              {card.cta}
-            </span>
-            <ArrowRight
-              className="w-3 h-3 group-hover:translate-x-0.5 transition-all"
-              style={{ color: card.color }}
-            />
-          </div>
+            {card.cta}
+            <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+          </span>
         </Link>
       ))}
     </div>

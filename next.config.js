@@ -12,6 +12,12 @@ let _apiOrigin = 'http://localhost:3001';
 try { _apiOrigin = new URL(_backendBaseUrl).origin; } catch {}
 
 const nextConfig = {
+  // Lets a production build run without clobbering the `.next` a concurrent
+  // `next dev` is using — `NEXT_DIST_DIR=.next-verify npm run build`. Both
+  // processes sharing one directory corrupts the dev server's route manifest
+  // and makes the build fail with "Cannot find module .next/server/.../page.js".
+  distDir: process.env.NEXT_DIST_DIR || '.next',
+
   // ─── Image Optimization ──────────────────────────────────────────────────
   images: {
     // Modern formats: browser picks best supported (AVIF > WebP > original)

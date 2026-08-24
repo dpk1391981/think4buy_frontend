@@ -13,6 +13,11 @@ export async function generateMetadata({
   searchParams: Record<string, string>;
 }): Promise<Metadata> {
   const city = searchParams?.city || '';
+
+  // Mirrors the slug the middleware builds when it 301s `/agents?city=X`.
+  const citySlug = city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const canonicalUrl = citySlug ? `${APP_URL}/agents-in-${citySlug}` : `${APP_URL}/agents`;
+
   const title = city
     ? `Real Estate Agents in ${city} | Verified Brokers | Think4BuySale`
     : 'Find Verified Real Estate Agents in India | RERA Certified Brokers | Think4BuySale';
@@ -26,12 +31,15 @@ export async function generateMetadata({
     keywords: city
       ? `real estate agents ${city}, property brokers ${city}, RERA agents ${city}, buy sell property ${city}, top agents ${city}`
       : 'real estate agents India, property brokers, RERA certified agents, find property agent, real estate broker India, top property agents',
-    alternates: { canonical: city ? `${APP_URL}/agents?city=${encodeURIComponent(city)}` : `${APP_URL}/agents` },
+    // The city variant canonicalises to the hyphen URL, not back to
+    // `/agents?city=`: middleware 301s that query form to `/agents-in-{slug}`,
+    // and a canonical pointing at a redirect is a canonical Google discards.
+    alternates: { canonical: canonicalUrl },
     openGraph: {
       title,
       description,
       type: 'website',
-      url: city ? `${APP_URL}/agents?city=${encodeURIComponent(city)}` : `${APP_URL}/agents`,
+      url: canonicalUrl,
       siteName: 'Think4BuySale',
       images: [{ url: `${APP_URL}/og-image.jpg`, width: 1200, height: 630 }],
     },

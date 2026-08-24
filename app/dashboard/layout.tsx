@@ -25,7 +25,7 @@ export default function UserDashboardLayout({ children }: { children: React.Reac
   useEffect(() => {
     if (!loading && mounted) {
       if (!user) {
-        router.replace('/auth/login?redirect=/dashboard');
+        router.replace('/auth?redirect=/dashboard');
       } else if (user.role === 'buyer') {
         router.replace('/buyer');
       } else if (user.role === 'owner' || user.role === 'seller') {

@@ -224,7 +224,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (!user) {
       // Not logged in
       document.cookie = 't4bs_auth=; path=/; max-age=0; samesite=strict';
-      router.replace('/auth/login?redirect=/admin');
+      router.replace('/auth?redirect=/admin');
       return;
     }
 
@@ -376,7 +376,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <button
             onClick={() => {
               logout();
-              router.push('/auth/login');
+              router.push('/auth');
             }}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-red-400 hover:bg-red-950/30 transition-all"
           >

@@ -189,15 +189,15 @@ export default function TestimonialsSection() {
     : null;
 
   return (
-    <section className="py-5 sm:py-14 bg-gradient-to-b from-gray-50 to-white">
-      <div className="container-max">
+    <section className="py-7 sm:py-12 lg:py-13 bg-gradient-to-b from-gray-50 to-white">
+      <div className="container-rv">
         {/* Header */}
         <div className="text-center mb-6 sm:mb-10">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
             <span className="text-xs font-semibold text-yellow-600 uppercase tracking-wide">Real Stories</span>
           </div>
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">
+          <h2 className="rv-h2">
             Trusted by 10,000+ Families
           </h2>
           <p className="text-gray-500 text-xs sm:text-sm mt-1">

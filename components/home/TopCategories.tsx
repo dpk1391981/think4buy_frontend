@@ -54,8 +54,8 @@ export default function TopCategories() {
   if (!loading && categories.length === 0) return null;
 
   return (
-    <section className="py-5 sm:py-14 bg-gray-50">
-      <div className="container-max">
+    <section className="py-7 sm:py-12 lg:py-13 bg-gray-50">
+      <div className="container-rv">
 
         {/* ── Header ── */}
         <div className="flex items-end justify-between mb-3 sm:mb-7">
@@ -66,7 +66,7 @@ export default function TopCategories() {
                 Browse by Category
               </span>
             </div>
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 leading-tight">
+            <h2 className="rv-h2 leading-tight">
               Top Categories across India
             </h2>
             <p className="text-gray-500 mt-1 text-sm">

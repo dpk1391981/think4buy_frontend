@@ -289,8 +289,8 @@ export default function NewProjectsDevelopersSection({ cityOverride }: { cityOve
   if (!isLoading && builders.length === 0) return null;
 
   return (
-    <section className="py-10 sm:py-16 bg-white border-t border-gray-100">
-      <div className="container-max">
+    <section className="py-7 sm:py-12 lg:py-13 bg-white border-t border-gray-100">
+      <div className="container-rv">
 
         {/* ── Section header ─────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 sm:mb-8">
@@ -305,7 +305,7 @@ export default function NewProjectsDevelopersSection({ cityOverride }: { cityOve
                 </span>
               )}
             </div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 leading-tight">
+            <h2 className="rv-h2 leading-tight">
               Top Builders &amp; Developers{' '}
               <span className="text-primary-600">{locationLabel}</span>
             </h2>

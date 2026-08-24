@@ -226,8 +226,8 @@ export default function PropertyComparison() {
   const isSelected = (p: any) => selected.some(x => x.id === p.id);
 
   return (
-    <section className="py-5 sm:py-14 bg-white">
-      <div className="container-max">
+    <section className="py-7 sm:py-12 lg:py-13 bg-white">
+      <div className="container-rv">
         {/* Header */}
         <div className="flex items-start justify-between mb-4 sm:mb-8">
           <div>
@@ -235,7 +235,7 @@ export default function PropertyComparison() {
               <GitCompare className="w-4 h-4 text-primary-600" />
               <span className="text-xs font-semibold text-primary-600 uppercase tracking-wide">Smart Tool</span>
             </div>
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Compare Properties</h2>
+            <h2 className="rv-h2">Compare Properties</h2>
             <p className="text-gray-500 text-xs sm:text-sm mt-1">
               Select up to {MAX_COMPARE} properties — we&apos;ll compare price, area, amenities &amp; more
             </p>

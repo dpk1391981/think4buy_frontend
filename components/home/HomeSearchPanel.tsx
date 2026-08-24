@@ -5,9 +5,9 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   Search, MapPin, Loader2, X, Users, Building2,
-  ArrowLeft, ChevronRight, SlidersHorizontal, TrendingUp,
+  ArrowLeft, ArrowRight, ChevronRight, SlidersHorizontal, TrendingUp,
   ChevronDown, BedDouble, IndianRupee, CheckCircle2, Sliders, LocateFixed,
-  Clock, Flame,
+  Clock, Flame, Sparkles,
 } from 'lucide-react';
 import { locationsApi, propertyConfigApi, smartSearchApi } from '@/lib/api';
 import { getGeoCoords, reverseGeocode } from '@/lib/geolocation';
@@ -772,12 +772,13 @@ function DesktopPropertySearch({
   const activeFilterCount = [type, bhk.length > 0, budget, more.possession, more.furnishing, more.postedBy].filter(Boolean).length;
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-3.5">
       {/* ── Big Search Input ── */}
       <div ref={suggRef} className="relative">
-        <div className="flex items-center h-14 md:h-[68px] bg-white rounded-2xl border-2 border-gray-200 focus-within:border-primary-400 focus-within:ring-4 focus-within:ring-primary-100 transition-all overflow-hidden shadow-lg shadow-black/10">
-          <div className="flex items-center flex-1 px-4 md:px-6 h-full gap-2">
-            <MapPin className="w-5 h-5 text-primary-500 flex-shrink-0" />
+        <div className="flex items-center gap-3">
+          {/* The field */}
+          <div className="flex h-[52px] md:h-[60px] flex-1 items-center gap-3 rounded-[14px] border-[1.5px] border-gray-200 bg-slate-50 px-4 transition-all focus-within:border-primary-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-100">
+            <Search className="w-5 h-5 flex-shrink-0 text-primary-600" />
             <input
               ref={inputRef}
               type="text"
@@ -791,62 +792,60 @@ function DesktopPropertySearch({
               }}
               onFocus={() => setShowSugg(true)}
               onKeyDown={e => { if (e.key === 'Enter') search(); }}
-              className="flex-1 text-base md:text-lg text-gray-800 placeholder-gray-400 outline-none bg-transparent font-medium min-w-0"
+              className="min-w-0 flex-1 bg-transparent text-[15px] md:text-[17px] font-medium text-gray-900 outline-none placeholder-gray-400"
             />
+            {/* Suggestion loader / clear */}
+            {!detecting && busy ? (
+              <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin text-gray-400" />
+            ) : !detecting && q ? (
+              <button
+                onClick={() => { setQ(''); setSuggs([]); inputRef.current?.focus(); }}
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-200/70 transition-colors hover:bg-gray-300"
+                aria-label="Clear"
+              >
+                <X className="w-3 h-3 text-gray-500" />
+              </button>
+            ) : null}
             {/* GPS detect button */}
             {detecting ? (
-              <div className="flex items-center gap-1.5 px-3 h-8 rounded-xl bg-primary-50 border border-primary-200 flex-shrink-0">
-                <Loader2 className="w-3.5 h-3.5 text-primary-500 animate-spin" />
-                <span className="hidden sm:inline text-xs font-semibold text-primary-600">Detecting…</span>
+              <div className="flex h-[34px] flex-shrink-0 items-center gap-1.5 rounded-[10px] border border-primary-200 bg-primary-50 px-3">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary-600" />
+                <span className="hidden text-xs font-bold text-primary-700 sm:inline">Detecting…</span>
               </div>
             ) : (
               <button
                 onClick={handleDetect}
                 title={detectErr || 'Detect my location'}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 h-8 rounded-xl border font-semibold text-xs flex-shrink-0 transition-all duration-150 whitespace-nowrap',
+                  'flex h-[34px] flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] border px-3 text-xs font-bold transition-all duration-150',
                   detectErr
-                    ? 'bg-red-50 border-red-200 text-red-500'
-                    : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-600',
+                    ? 'border-red-200 bg-red-50 text-red-500'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:text-primary-700',
                 )}
                 aria-label="Detect my location"
               >
-                <LocateFixed className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="hidden sm:inline">{detectErr || 'Near Me'}</span>
+                <LocateFixed className="w-3.5 h-3.5 flex-shrink-0 text-primary-600" />
+                <span className="hidden sm:inline">{detectErr || 'Near me'}</span>
               </button>
             )}
-            {/* Suggestion loader / clear */}
-            {!detecting && busy ? (
-              <Loader2 className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />
-            ) : !detecting && q ? (
-              <button
-                onClick={() => { setQ(''); setSuggs([]); inputRef.current?.focus(); }}
-                className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 transition-colors"
-                aria-label="Clear"
-              >
-                <X className="w-3 h-3 text-gray-500" />
-              </button>
-            ) : null}
           </div>
-
-          {/* Divider */}
-          <div className="h-8 w-px bg-gray-200 flex-shrink-0" />
 
           {/* Search button */}
           <button
             onClick={() => search()}
             disabled={searching}
-            className="h-full px-6 md:px-10 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 disabled:bg-primary-500 text-white font-bold text-base flex items-center gap-2 md:gap-2.5 transition-colors flex-shrink-0"
+            className="flex h-[52px] md:h-[60px] flex-shrink-0 items-center gap-2 rounded-[14px] bg-primary-600 px-6 md:px-8 text-[15px] md:text-base font-bold text-white shadow-[0_6px_16px_rgba(37,99,235,0.35)] transition-colors hover:bg-primary-700 active:bg-primary-800 disabled:bg-primary-500"
           >
             {searching
               ? <Loader2 className="w-5 h-5 animate-spin" />
-              : <Search className="w-5 h-5" />
+              : <span className="hidden sm:inline">Search</span>
             }
-            <span className="hidden sm:inline text-[15px] md:text-base">
-              {searching ? 'Searching…' : 'Search'}
-            </span>
+            {searching
+              ? <span className="hidden sm:inline">Searching…</span>
+              : <ArrowRight className="w-[18px] h-[18px]" />
+            }
             {!searching && activeFilterCount > 0 && (
-              <span className="bg-white/25 text-white text-xs font-bold px-1.5 py-0.5 rounded-full ml-1">
+              <span className="rounded-full bg-white/25 px-1.5 py-0.5 text-xs font-bold text-white">
                 +{activeFilterCount}
               </span>
             )}
@@ -1739,44 +1738,60 @@ export default function HomeSearchPanel() {
           ══════════════════════════════════ */}
       <div className="sm:hidden w-full">
 
-        {/* Category tabs row */}
-        <div className="flex items-center gap-1.5 mb-3 overflow-x-auto no-scrollbar">
-          {tabs.map(tab => (
-            <button
-              key={tab.value}
-              onClick={() => setCat(tab.value)}
-              className={cn(
-                'flex-shrink-0 h-8 px-4 rounded-full text-xs font-bold transition-all active:scale-95',
-                cat === tab.value ? 'bg-white text-gray-900 shadow-md' : 'bg-white/15 text-white/80',
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* One white card — tabs, field and the search CTA together */}
+        <div className="rounded-2xl bg-white p-3 shadow-[0_16px_34px_rgba(2,6,23,0.4)]">
 
-        {/* Native-style search bar */}
-        <button
-          onClick={() => setOpen(true)}
-          className="w-full flex items-center gap-3 bg-white rounded-2xl shadow-xl shadow-black/20 px-4 active:scale-[0.98] transition-transform"
-          style={{ height: 52 }}
-        >
-          <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br shadow-sm', catInfo.color)}>
-            {isAgent ? <Users className="w-4 h-4 text-white" /> : <Search className="w-4 h-4 text-white" />}
+          {/* Category tabs row */}
+          <div className="-mx-1 mb-2.5 flex items-center gap-0.5 overflow-x-auto no-scrollbar px-1">
+            {tabs.map(tab => (
+              <button
+                key={tab.value}
+                onClick={() => setCat(tab.value)}
+                className={cn(
+                  'flex-shrink-0 rounded-lg px-3 py-[7px] text-[12.5px] transition-all active:scale-95',
+                  cat === tab.value ? 'bg-gray-900 font-bold text-white' : 'font-semibold text-gray-500',
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-          <span className="flex-1 text-left text-[14px] text-gray-400 font-medium truncate">
+
+          {/* Search field — opens the full-screen sheet */}
+          <button
+            onClick={() => setOpen(true)}
+            className="mb-2 flex h-12 w-full items-center gap-2.5 rounded-xl border-[1.5px] border-gray-200 bg-slate-50 px-3 active:scale-[0.99] transition-transform"
+          >
             {isAgent
-              ? 'Find agents by city or state…'
-              : isNewProject
-              ? 'City, locality or builder…'
-              : `${catInfo.label} — city, locality, project…`
-            }
-          </span>
-          <div className="flex-shrink-0 flex items-center gap-1.5">
-            <div className="w-px h-5 bg-gray-200" />
-            <LocateFixed className="w-4 h-4 text-primary-400" />
+              ? <Users className="w-[17px] h-[17px] flex-shrink-0 text-primary-600" />
+              : <Search className="w-[17px] h-[17px] flex-shrink-0 text-primary-600" />}
+            <span className="flex-1 truncate text-left text-[13.5px] font-medium text-gray-400">
+              {isAgent
+                ? 'Find agents by city or state…'
+                : isNewProject
+                ? 'City, locality or builder…'
+                : `${catInfo.label} — city, locality, project…`
+              }
+            </span>
+          </button>
+
+          {/* Primary CTA + near-me */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setOpen(true)}
+              className="h-[46px] flex-1 rounded-xl bg-primary-600 text-[14.5px] font-bold text-white active:scale-[0.98] transition-transform"
+            >
+              {isAgent ? 'Find agents' : isNewProject ? 'Find new projects' : 'Search properties'}
+            </button>
+            <button
+              onClick={() => setOpen(true)}
+              aria-label="Search near me"
+              className="flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white active:scale-[0.98] transition-transform"
+            >
+              <LocateFixed className="w-[17px] h-[17px] text-primary-600" />
+            </button>
           </div>
-        </button>
+        </div>
 
         {open && (
           <MobileSearch initialCat={cat} onClose={() => setOpen(false)} allTabs={tabs} allTypes={types} />
@@ -1787,30 +1802,40 @@ export default function HomeSearchPanel() {
           DESKTOP — full inline panel
           ══════════════════════════════════ */}
       <div className="hidden sm:block">
-        {/* Category tabs */}
-        <div className="flex gap-0.5 overflow-x-auto no-scrollbar">
-          {tabs.map(tab => (
-            <button
-              key={tab.value}
-              onClick={() => setCat(tab.value)}
-              className={cn(
-                'flex-shrink-0 flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-t-xl transition-all',
-                cat === tab.value
-                  ? 'bg-white text-primary-700 shadow-sm'
-                  : 'bg-white/20 text-white hover:bg-white/30',
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* One white card: intent tabs sit inside it, above the search row */}
+        <div className="bg-white rounded-[20px] shadow-[0_24px_60px_rgba(2,6,23,0.45)] px-2 pt-2 pb-4 md:pb-[18px]">
 
-        {/* Panel body */}
-        <div className="bg-white rounded-b-2xl rounded-tr-2xl shadow-2xl p-4 md:p-6">
-          {isAgent
-            ? <DesktopAgentSearch />
-            : <DesktopPropertySearch category={cat} types={types} onSearch={handleSearch} />
-          }
+          {/* Category tabs — underline style */}
+          <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar border-b border-gray-100 px-1.5 md:px-2.5">
+            {tabs.map(tab => (
+              <button
+                key={tab.value}
+                onClick={() => setCat(tab.value)}
+                className={cn(
+                  'flex-shrink-0 -mb-px border-b-[2.5px] px-3 md:px-4 pb-3 pt-2.5 text-sm transition-colors',
+                  cat === tab.value
+                    ? 'border-primary-600 font-bold text-gray-900'
+                    : 'border-transparent font-semibold text-gray-500 hover:text-gray-800',
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+
+            {/* Smart-search indicator — the field really does run NLP parsing */}
+            <span className="ml-auto mb-2.5 hidden flex-shrink-0 items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1 text-[11px] font-bold text-violet-700 lg:inline-flex">
+              <Sparkles className="w-[11px] h-[11px]" />
+              Smart search on
+            </span>
+          </div>
+
+          {/* Panel body */}
+          <div className="px-1.5 pt-3.5 md:px-2.5 md:pt-4">
+            {isAgent
+              ? <DesktopAgentSearch />
+              : <DesktopPropertySearch category={cat} types={types} onSearch={handleSearch} />
+            }
+          </div>
         </div>
       </div>
     </div>

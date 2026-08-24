@@ -27,6 +27,36 @@ if (!process.env.BACKEND_INTERNAL_URL && !process.env.NEXT_PUBLIC_API_BASE_URL) 
   console.warn('[BFF] Neither BACKEND_INTERNAL_URL nor NEXT_PUBLIC_API_BASE_URL is set — falling back to localhost');
 }
 
+/**
+ * HTTP header values must be Latin-1 (ByteString). A single character above
+ * U+00FF anywhere in a value makes `fetch` throw before the request is sent —
+ * which surfaced as a blanket 503 on every proxied call. Cookies are the usual
+ * source: on localhost the browser hands us cookies belonging to *any* app that
+ * ever ran on the same host and port, and one of those can carry an em dash.
+ */
+function isHeaderSafe(value: string) {
+  for (let i = 0; i < value.length; i++) {
+    if (value.charCodeAt(i) > 0xff) return false;
+  }
+  return true;
+}
+
+/** Drops the individual cookie pairs that would poison the whole header. */
+function buildCookieHeader(pairs: { name: string; value: string }[]) {
+  const safe: string[] = [];
+  const dropped: string[] = [];
+
+  for (const { name, value } of pairs) {
+    if (isHeaderSafe(name) && isHeaderSafe(value)) safe.push(`${name}=${value}`);
+    else dropped.push(name);
+  }
+
+  if (dropped.length && process.env.NODE_ENV !== 'production') {
+    console.warn(`[BFF] Dropped non-Latin-1 cookie(s) from upstream request: ${dropped.join(', ')}`);
+  }
+  return safe.join('; ');
+}
+
 function buildSignatureHeaders(method: string, path: string) {
   if (!SIGNING_KEY || !SIGNING_SECRET) return {};
   const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -44,18 +74,21 @@ async function handler(req: NextRequest, { params }: { params: { slug: string[] 
   const search = req.nextUrl.search ?? '';
   const target = `${BACKEND_URL}${path}${search}`;
 
-  const authHeader  = req.headers.get('authorization') ?? '';
-  const cookieStore = cookies();
-  const cookieHeader = cookieStore.getAll().map((c) => `${c.name}=${c.value}`).join('; ');
+  const authHeader   = req.headers.get('authorization') ?? '';
+  const cookieStore  = cookies();
+  const cookieHeader = buildCookieHeader(cookieStore.getAll());
+
+  const contentTypeIn    = req.headers.get('content-type')    ?? 'application/json';
+  const acceptLanguageIn = req.headers.get('accept-language') ?? 'en-US,en;q=0.9';
 
   const forwardHeaders: HeadersInit = {
-    'Content-Type':    req.headers.get('content-type') ?? 'application/json',
+    'Content-Type':    isHeaderSafe(contentTypeIn)    ? contentTypeIn    : 'application/json',
     'Accept':          'application/json',
-    'Accept-Language': req.headers.get('accept-language') ?? 'en-US,en;q=0.9',
+    'Accept-Language': isHeaderSafe(acceptLanguageIn) ? acceptLanguageIn : 'en-US,en;q=0.9',
     'X-Forwarded-For': req.headers.get('x-forwarded-for') ?? req.ip ?? '',
     'X-Request-ID':    req.headers.get('x-request-id') ?? crypto.randomUUID(),
     ...(BFF_SECRET && { 'X-BFF-Secret': BFF_SECRET }),
-    ...(authHeader && { Authorization: authHeader }),
+    ...(authHeader && isHeaderSafe(authHeader) && { Authorization: authHeader }),
     ...(cookieHeader && { Cookie: cookieHeader }),
     ...buildSignatureHeaders(req.method, path),
   };

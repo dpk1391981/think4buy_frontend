@@ -379,8 +379,8 @@ export default function FeaturedProperties({ city: cityProp }: { city?: string }
   const showLocation  = cityProp ? location : (mounted ? location : null);
 
   return (
-    <section className="py-5 sm:py-14 bg-white">
-      <div className="container-max">
+    <section className="py-7 sm:py-12 lg:py-13 bg-white">
+      <div className="container-rv">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="flex items-start justify-between mb-4 sm:mb-6">
@@ -391,7 +391,7 @@ export default function FeaturedProperties({ city: cityProp }: { city?: string }
                 Curated for You
               </span>
             </div>
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <h2 className="rv-h2 flex items-center gap-2">
               Featured Properties
               {showLocation && (
                 <span className="text-sm font-normal text-gray-500">in {showLocation}</span>

@@ -110,7 +110,7 @@ export default function PropertyLeadsPage() {
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <Link
-                    href="/auth/register"
+                    href="/auth"
                     className="px-6 py-3 bg-white text-primary-700 rounded-xl font-bold text-sm hover:bg-primary-50 transition-colors"
                   >
                     Start Getting Leads
@@ -209,7 +209,7 @@ export default function PropertyLeadsPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-3">Ready to Grow Your Business?</h2>
             <p className="text-gray-500 mb-6">Register as an agent, complete your profile, and start receiving verified leads in your city.</p>
             <div className="flex flex-wrap gap-3 justify-center">
-              <Link href="/auth/register" className="px-6 py-3 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-700 transition-colors">
+              <Link href="/auth" className="px-6 py-3 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-700 transition-colors">
                 Register as Agent
               </Link>
               <Link href="/contact" className="px-6 py-3 border border-gray-200 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-50 transition-colors">

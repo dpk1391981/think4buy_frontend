@@ -207,8 +207,8 @@ export default function TrendingProperties({ city: cityProp }: { city?: string }
     : (mounted ? (effectiveCity || selectedState || null) : null);
 
   return (
-    <section className="py-5 sm:py-14 bg-gradient-to-b from-gray-50 to-white">
-      <div className="container-max">
+    <section className="py-7 sm:py-12 lg:py-13 bg-gradient-to-b from-gray-50 to-white">
+      <div className="container-rv">
         {/* Header */}
         <div className="flex items-start justify-between mb-4 sm:mb-8">
           <div>
@@ -216,7 +216,7 @@ export default function TrendingProperties({ city: cityProp }: { city?: string }
               <Flame className="w-3.5 h-3.5 fill-red-500 text-red-500" />
               <span className="text-xs font-semibold text-red-500 uppercase tracking-wide">Real-Time Activity</span>
             </div>
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <h2 className="rv-h2 flex items-center gap-2">
               Trending Now
               {locationLabel && (
                 <span className="text-sm font-normal text-gray-500">in {locationLabel}</span>

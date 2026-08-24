@@ -341,12 +341,12 @@ export default function TopAgents({ city: cityProp }: { city?: string }) {
     : '/agents';
 
   return (
-    <section className="py-5 sm:py-14 bg-gray-50">
-      <div className="container-max">
+    <section className="py-7 sm:py-12 lg:py-13 bg-gray-50">
+      <div className="container-rv">
         {/* Header */}
         <div className="flex items-center justify-between mb-3 sm:mb-6 px-0">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Top Real Estate Agencies</h2>
+            <h2 className="rv-h2">Top Real Estate Agencies</h2>
             <p className="text-gray-500 mt-0.5 text-sm">
               Verified RERA-certified agencies {locationLabel}
             </p>

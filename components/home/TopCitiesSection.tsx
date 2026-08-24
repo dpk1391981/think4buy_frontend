@@ -403,8 +403,8 @@ export default function TopCitiesSection() {
   const viewAllText = cityMode ? `All in ${selectedCity}` : 'View All';
 
   return (
-    <section className="py-5 sm:py-12 bg-gray-50 border-b border-gray-100">
-      <div className="container-max">
+    <section className="py-7 sm:py-12 lg:py-13 bg-gray-50 border-b border-gray-100">
+      <div className="container-rv">
 
         {/* ── Header ── */}
         <div className="flex items-end justify-between mb-4 sm:mb-6">
@@ -412,7 +412,7 @@ export default function TopCitiesSection() {
               <p className="text-xs font-semibold text-primary-600 uppercase tracking-widest mb-1">
               {label}
             </p>
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 leading-tight">
+            <h2 className="rv-h2 leading-tight">
               {heading}
             </h2>
             <p className="mt-0.5 text-sm text-gray-500">{subtext}</p>

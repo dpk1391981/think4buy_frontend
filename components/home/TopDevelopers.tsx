@@ -299,8 +299,8 @@ export default function TopDevelopers({ city: cityProp }: { city?: string }) {
     : `/new-projects-in-${citySlug}`;
 
   return (
-    <section className="py-10 sm:py-14 bg-gray-50 border-t border-gray-100">
-      <div className="container-max">
+    <section className="py-7 sm:py-12 lg:py-13 bg-gray-50 border-t border-gray-100">
+      <div className="container-rv">
 
         {/* ── Header ─────────────────────────────────────────────────── */}
         <div className="flex items-end justify-between mb-5 sm:mb-7">
@@ -315,7 +315,7 @@ export default function TopDevelopers({ city: cityProp }: { city?: string }) {
                 </span>
               )}
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+            <h2 className="rv-h2 leading-tight">
               Top Builders &amp; Developers{' '}
               <span className="text-primary-600">{locationLabel}</span>
             </h2>

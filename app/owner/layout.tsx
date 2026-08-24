@@ -106,7 +106,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!loading && mounted) {
-      if (!user) { router.replace('/auth/login?redirect=/owner'); return; }
+      if (!user) { router.replace('/auth?redirect=/owner'); return; }
       if (!ALLOWED_ROLES.includes(user.role)) {
         if (user.role === 'admin')  router.replace('/admin');
         else if (user.role === 'agent') router.replace('/agent');
