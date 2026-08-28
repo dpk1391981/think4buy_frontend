@@ -12,8 +12,13 @@
  */
 
 import { createHmac } from 'crypto';
+import { BACKEND_BASE_URL } from '@/lib/backendUrl';
 
-const BACKEND  = process.env.BACKEND_INTERNAL_URL ?? 'http://127.0.0.1:3001/api/v1';
+// Shares the BFF proxy's resolution, so the two server-side paths can never
+// disagree about which backend they are talking to. The old hardcoded loopback
+// default meant a missing env var failed silently in exactly the environment
+// where loopback is guaranteed to be wrong.
+const BACKEND  = BACKEND_BASE_URL;
 const BFF_SECRET   = process.env.BFF_INTERNAL_SECRET  ?? '';
 const SIGNING_KEY  = process.env.INTERNAL_API_KEY      ?? '';
 const SIGNING_SECRET = process.env.INTERNAL_API_SECRET ?? '';

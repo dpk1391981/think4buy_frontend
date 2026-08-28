@@ -584,16 +584,35 @@ export default function EmailAuthFlow({
               Log in <ArrowRight className="w-4 h-4" />
             </PrimaryBtn>
 
-            {/* Doubles as the forgotten-password route: a code proves the
-                address just as well as a remembered password does. */}
+            {/* Password and email code are two equal ways in, so they are
+                presented as two buttons rather than a login plus a recovery
+                link. A returning user who signed up by code and never set a
+                password should not have to read "forgot password?" to find the
+                door that actually works for them — and it still covers
+                recovery, since a code proves the address just as well as a
+                remembered password does. */}
+            <div className="relative py-1" aria-hidden="true">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-white px-3 text-xs font-medium text-gray-400">or</span>
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={useCodeInstead}
               disabled={loading}
-              className="w-full text-sm font-semibold text-primary-600 hover:text-primary-700 hover:underline disabled:opacity-50"
+              className="w-full min-h-[54px] flex items-center justify-center gap-2 py-3.5 bg-white border border-gray-200 text-gray-700 rounded-2xl font-semibold text-sm transition-colors hover:border-primary-300 hover:bg-primary-50/60 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
             >
-              Forgot password? Email me a 6-digit code instead
+              <ShieldCheck className="w-4 h-4 text-primary-600" />
+              Email me a 6-digit code
             </button>
+
+            <p className="text-center text-xs text-gray-400">
+              Forgotten your password? The code signs you in too.
+            </p>
           </form>
         )}
 

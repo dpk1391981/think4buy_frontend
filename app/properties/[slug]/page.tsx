@@ -22,10 +22,15 @@ export const revalidate = 300; // ISR: revalidate every 5 minutes
 async function getProperty(slug: string) {
   try {
     const res = await propertiesApi.getBySlug(slug);
-    console.log('[PropertyDetail] API response images:', JSON.stringify(res.data?.images ?? [], null, 2));
     return res.data;
-  } catch (err) {
-    console.error('[PropertyDetail] API error:', err);
+  } catch (err: any) {
+    // A 404 is an ordinary outcome here — a stale slug, or a listing that is
+    // not approved yet — and this route is crawled hard, so logging those
+    // would bury the failures that actually mean something.
+    const status = err?.response?.status;
+    if (status !== 404) {
+      console.error(`[PropertyDetail] ${slug} failed:`, status ?? err?.message ?? err);
+    }
     return null;
   }
 }

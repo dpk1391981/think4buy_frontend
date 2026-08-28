@@ -12,6 +12,7 @@ import { locationsApi, seoApi } from '@/lib/api';
 import { resolveImageSrc } from '@/components/common/OptimizedImage';
 import { detectLocation } from '@/lib/geolocation';
 import { usePropertyCategories, usePropertyTypes, getCategoryHref } from '@/hooks/usePropertyCategories';
+import { loginHref } from '@/lib/authLink';
 
 
 // ─── City Selector ────────────────────────────────────────────────────────────
@@ -833,7 +834,11 @@ export default function Header() {
     pathname.startsWith('/agent/') || pathname === '/agent' ||
     pathname.startsWith('/owner') ||
     pathname.startsWith('/buyer') ||
-    pathname === '/auth/onboarding';
+    // The whole /auth tree — sign-in, onboarding — renders its own full-screen
+    // layout with its own logo and its own way back home. Letting the global
+    // chrome through stacks a second header on top of it, and on a phone the
+    // bottom nav sits over the form.
+    pathname === '/auth' || pathname.startsWith('/auth/');
   if (isPanel) return null;
 
   return (
@@ -971,12 +976,18 @@ export default function Header() {
                 user ? (
                   <UserMenu />
                 ) : (
-                  <button
-                    onClick={() => dispatch(openAuthModal('login'))}
+                  // A link, not a modal trigger: the navbar entry is a
+                  // deliberate sign-in, so it gets its own page and URL.
+                  // prefetch is off because this sits on every page — there is
+                  // no reason to pull the auth bundle down for the visitors who
+                  // never click it.
+                  <Link
+                    href={loginHref(pathname)}
+                    prefetch={false}
                     className="text-sm font-medium text-gray-700 hover:text-primary-600 px-3 py-2 transition-colors"
                   >
                     Login
-                  </button>
+                  </Link>
                 )
               )}
 

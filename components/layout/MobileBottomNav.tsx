@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppDispatch } from '@/lib/store';
 import { openAuthModal } from '@/lib/store/slices/uiSlice';
+import { loginHref } from '@/lib/authLink';
 
 const navItems = [
   { icon: Home, label: 'Home', href: '/' },
@@ -26,7 +27,11 @@ export default function MobileBottomNav() {
     pathname.startsWith('/admin') ||
     pathname === '/agent' || pathname.startsWith('/agent/') ||
     pathname === '/owner' || pathname.startsWith('/owner/') ||
-    pathname === '/auth/onboarding'
+    // The whole /auth tree — sign-in, onboarding — renders its own full-screen
+    // layout with its own logo and its own way back home. Letting the global
+    // chrome through stacks a second header on top of it, and on a phone the
+    // bottom nav sits over the form.
+    pathname === '/auth' || pathname.startsWith('/auth/')
   ) return null;
 
   return (
@@ -81,17 +86,20 @@ export default function MobileBottomNav() {
               : null;
 
             if (!user) {
+              // Matches the desktop navbar: the Account tab is a deliberate
+              // sign-in, so it opens the /auth page rather than a sheet.
               return (
-                <button
+                <Link
                   key={label}
-                  onClick={() => dispatch(openAuthModal('login'))}
+                  href={loginHref(pathname)}
+                  prefetch={false}
                   className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] transition-colors text-gray-400"
                 >
                   <div className="w-6 h-6 flex items-center justify-center">
                     <Icon className="w-5 h-5" />
                   </div>
                   <span className="text-[10px] font-medium">{label}</span>
-                </button>
+                </Link>
               );
             }
 

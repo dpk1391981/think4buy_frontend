@@ -2919,7 +2919,13 @@ function PostPropertyPageInner() {
       dispatch(resetForm());
       setSubmitSuccess(true);
       setTimeout(() => {
-        router.push(isEditMode ? `/properties/${propertySlug}?updated=1` : `/properties/${propertySlug}?posted=1`);
+        // Both paths land on My Listings rather than the public property URL.
+        // A submitted listing is PENDING until an admin approves it, and the
+        // public page now 404s for anyone who is not the owner — so the old
+        // redirect showed a live-looking page for something nobody else could
+        // see, and would have broken outright once the visibility gate landed.
+        // My Listings shows it with a Pending pill, which is what happened.
+        router.push(isEditMode ? '/my-listings?updated=1' : '/my-listings?posted=1');
       }, 2200);
     } catch (err: any) {
       setError(err.response?.data?.message || (isEditMode ? 'Failed to update property.' : 'Failed to post property. Please try again.'));

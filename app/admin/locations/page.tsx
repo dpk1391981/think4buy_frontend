@@ -1,9 +1,164 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { adminLocationsApi, adminApi, api, locationsApi } from '@/lib/api';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { adminLocationsApi, adminApi, api } from '@/lib/api';
 import OptimizedImage, { resolveImageSrc } from '@/components/common/OptimizedImage';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Search, Check, ChevronDown, X } from 'lucide-react';
+
+interface CityOption { id: string; name: string; stateName?: string }
+
+/**
+ * Async city picker for the locality screens.
+ *
+ * Searches server-side against /admin/cities, which lists the cities table as it
+ * is. The public /locations/states/:id/cities endpoint — what this screen used
+ * before — additionally requires each city to already have a live listing, so on
+ * an empty catalogue it returned nothing for every state. The dropdown looked
+ * broken, the empty state said "Add cities first", and following that advice is
+ * what put zone names into the cities table alongside the real cities.
+ *
+ * There is no state selector any more: a locality belongs to a city, and the
+ * state is whatever that city's state is. It is still shown next to each option,
+ * because "Hyderabad" exists in more than one state and the admin needs to see
+ * which one they are picking.
+ */
+function CityCombobox({
+  value, onChange, placeholder = 'Search a city…', autoFocus = false, allowClear = false,
+}: {
+  value: CityOption | null;
+  onChange: (city: CityOption | null) => void;
+  placeholder?: string;
+  autoFocus?: boolean;
+  allowClear?: boolean;
+}) {
+  const [open,    setOpen]    = useState(false);
+  const [query,   setQuery]   = useState('');
+  const [options, setOptions] = useState<CityOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [active,  setActive]  = useState(0);
+  const boxRef   = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+
+  // Debounced so a fast typist fires one request, not one per keystroke.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const r = await adminLocationsApi.getCities({ search: query.trim() || undefined, limit: 50 });
+        const rows = (r.data?.cities ?? r.data ?? []) as any[];
+        if (!cancelled) {
+          setOptions(rows.map(c => ({ id: c.id, name: c.name, stateName: c.state?.name ?? c.stateName })));
+          setActive(0);
+        }
+      } catch {
+        if (!cancelled) setOptions([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query, open]);
+
+  const pick = (c: CityOption) => { onChange(c); setOpen(false); setQuery(''); };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(i => Math.min(i + 1, options.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(i => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter' && options[active]) { e.preventDefault(); pick(options[active]); }
+    else if (e.key === 'Escape') { setOpen(false); }
+  };
+
+  return (
+    <div ref={boxRef} className="relative">
+      {value && !open ? (
+        <button
+          type="button"
+          onClick={() => { setOpen(true); setQuery(''); setTimeout(() => inputRef.current?.focus(), 0); }}
+          className="w-full flex items-center justify-between gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-left bg-white hover:border-gray-300 transition-colors"
+        >
+          <span className="truncate">
+            <span className="text-gray-900 font-medium">{value.name}</span>
+            {value.stateName && <span className="text-gray-400"> — {value.stateName}</span>}
+          </span>
+          <span className="flex items-center gap-1 shrink-0">
+            {allowClear && (
+              <span
+                role="button"
+                tabIndex={-1}
+                aria-label="Clear city"
+                onClick={(e) => { e.stopPropagation(); onChange(null); }}
+                className="text-gray-300 hover:text-gray-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </span>
+            )}
+            <ChevronDown className="w-4 h-4 text-gray-400" />
+          </span>
+        </button>
+      ) : (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            autoFocus={autoFocus}
+            placeholder={placeholder}
+            onFocus={() => setOpen(true)}
+            onChange={e => { setQuery(e.target.value); setOpen(true); }}
+            onKeyDown={onKeyDown}
+            role="combobox"
+            aria-expanded={open}
+            aria-autocomplete="list"
+            className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      )}
+
+      {open && (
+        <ul
+          role="listbox"
+          className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1"
+        >
+          {loading && <li className="px-3 py-2 text-sm text-gray-400">Searching…</li>}
+          {!loading && options.length === 0 && (
+            <li className="px-3 py-2 text-sm text-gray-400">
+              {query.trim() ? `No city matches "${query.trim()}".` : 'No cities yet.'}
+            </li>
+          )}
+          {!loading && options.map((c, i) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={value?.id === c.id}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => pick(c)}
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left ${i === active ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+              >
+                <span className="truncate">
+                  <span className="text-gray-900">{c.name}</span>
+                  {c.stateName && <span className="text-gray-400"> — {c.stateName}</span>}
+                </span>
+                {value?.id === c.id && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 interface Country {
   id: string;
@@ -77,8 +232,17 @@ const uploadImage = async (file: File): Promise<string> => {
   return r.data.url;
 };
 
+/**
+ * Must match SeoService.toSlug() on the backend, or the slug this screen shows
+ * and stores is not the slug the SEO layer generates.
+ *
+ * The trailing collapse is the part that used to be missing here. Without it a
+ * name that already contains a hyphen next to a space — "Vasai - Virar",
+ * "Mira - Bhayandar" — slugged to "vasai---virar" on this screen while the
+ * backend produced "vasai-virar", and the two never matched again.
+ */
 function toSlug(name: string) {
-  return name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  return name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-');
 }
 
 // ── SEO Tab for City modal ──────────────────────────────────────────────────
@@ -316,14 +480,13 @@ export default function AdminLocationsPage() {
   const [localitiesTotal, setLocalitiesTotal] = useState(0);
   const [localitiesPage, setLocalitiesPage] = useState(1);
   const [localitiesSearch, setLocalitiesSearch] = useState('');
-  const [localitiesCityFilter, setLocalitiesCityFilter] = useState('');
   const [localitiesLoading, setLocalitiesLoading] = useState(false);
   const [localityModal, setLocalityModal] = useState<{ open: boolean; editing: Locality | null }>({ open: false, editing: null });
-  const [localityForm, setLocalityForm] = useState({ stateId: '', state: '', cityId: '', city: '', locality: '', pincode: '', latitude: '', longitude: '', isActive: true });
-  const [localityModalCities, setLocalityModalCities] = useState<{ id: string; name: string }[]>([]);
-  const [localityModalCitiesLoading, setLocalityModalCitiesLoading] = useState(false);
-  const [localitiesStateFilter, setLocalitiesStateFilter] = useState('');
-  const [localitiesFilterCities, setLocalitiesFilterCities] = useState<{ id: string; name: string }[]>([]);
+  // The city is the whole location key now — `state` rides along from whichever
+  // city was picked, so it stays correct in the row without being a form field.
+  const [localityCity, setLocalityCity] = useState<CityOption | null>(null);
+  const [localityForm, setLocalityForm] = useState({ locality: '', pincode: '', latitude: '', longitude: '', isActive: true });
+  const [localitiesCityFilterOption, setLocalitiesCityFilterOption] = useState<CityOption | null>(null);
   const [bulkCsvText, setBulkCsvText] = useState('');
   const [bulkImporting, setBulkImporting] = useState(false);
 
@@ -372,8 +535,10 @@ export default function AdminLocationsPage() {
     try {
       const r = await adminLocationsApi.getLocalities({
         page: localitiesPage, limit: 20,
-        state: localitiesStateFilter || undefined,
-        city: localitiesCityFilter || undefined,
+        // State still goes to the API — two states can hold a city of the same
+        // name — but it comes from the chosen city, never from its own control.
+        state: localitiesCityFilterOption?.stateName || undefined,
+        city:  localitiesCityFilterOption?.name || undefined,
         search: localitiesSearch || undefined,
       });
       const data = r.data;
@@ -381,7 +546,7 @@ export default function AdminLocationsPage() {
       setLocalitiesTotal(data?.total ?? 0);
     } catch (e) { console.error(e); }
     finally { setLocalitiesLoading(false); }
-  }, [localitiesPage, localitiesSearch, localitiesCityFilter, localitiesStateFilter]);
+  }, [localitiesPage, localitiesSearch, localitiesCityFilterOption]);
 
   useEffect(() => { loadStates(); loadCountries(); }, [loadStates, loadCountries]);
   useEffect(() => { if (tab === 'cities') loadCities(); }, [tab, loadCities]);
@@ -561,7 +726,14 @@ export default function AdminLocationsPage() {
           <button onClick={openAddCountry} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">+ Add Country</button>
         )}
         {tab === 'localities' && (
-          <button onClick={() => { setLocalityForm({ stateId: '', state: '', cityId: '', city: '', locality: '', pincode: '', latitude: '', longitude: '', isActive: true }); setLocalityModalCities([]); setLocalityModal({ open: true, editing: null }); }}
+          <button onClick={() => {
+            // Pre-fill from the filter when one is set — adding several
+            // localities to the same city is the normal case.
+            setLocalityCity(localitiesCityFilterOption);
+            setLocalityForm({ locality: '', pincode: '', latitude: '', longitude: '', isActive: true });
+            setError('');
+            setLocalityModal({ open: true, editing: null });
+          }}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">+ Add Locality</button>
         )}
       </div>
@@ -745,7 +917,9 @@ export default function AdminLocationsPage() {
       {/* ── LOCALITIES TAB ── */}
       {tab === 'localities' && (
         <div className="space-y-4">
-          {/* Filters — State → City cascade + text search */}
+          {/* Filters — one searchable city, plus free text. The old State → City
+              cascade is gone: it sourced cities from the listings-gated public
+              endpoint, so the second dropdown was permanently empty. */}
           <div className="flex flex-col sm:flex-row gap-3">
             <input
               value={localitiesSearch}
@@ -753,38 +927,14 @@ export default function AdminLocationsPage() {
               placeholder="Search locality, pincode..."
               className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <select
-              value={localitiesStateFilter}
-              onChange={async e => {
-                const stateName = e.target.value;
-                setLocalitiesStateFilter(stateName);
-                setLocalitiesCityFilter('');
-                setLocalitiesFilterCities([]);
-                setLocalitiesPage(1);
-                if (stateName) {
-                  const matched = states.find(s => s.name === stateName);
-                  if (matched) {
-                    try {
-                      const r = await locationsApi.getCitiesByState(matched.id);
-                      setLocalitiesFilterCities(Array.isArray(r.data) ? r.data : r.data?.cities || []);
-                    } catch {}
-                  }
-                }
-              }}
-              className="w-44 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">All States</option>
-              {states.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-            </select>
-            <select
-              value={localitiesCityFilter}
-              onChange={e => { setLocalitiesCityFilter(e.target.value); setLocalitiesPage(1); }}
-              disabled={!localitiesStateFilter || localitiesFilterCities.length === 0}
-              className="w-44 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">All Cities</option>
-              {localitiesFilterCities.map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
+            <div className="w-full sm:w-64">
+              <CityCombobox
+                value={localitiesCityFilterOption}
+                onChange={(c) => { setLocalitiesCityFilterOption(c); setLocalitiesPage(1); }}
+                placeholder="All cities — type to filter"
+                allowClear
+              />
+            </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -822,18 +972,23 @@ export default function AdminLocationsPage() {
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={async () => {
-                              // pre-load cities for the locality's state
-                              const matchedState = states.find(s => s.name === loc.state);
-                              let preloadedCities: { id: string; name: string }[] = [];
-                              if (matchedState) {
-                                try {
-                                  const r = await locationsApi.getCitiesByState(matchedState.id);
-                                  preloadedCities = Array.isArray(r.data) ? r.data : r.data?.cities || [];
-                                } catch {}
-                              }
-                              setLocalityModalCities(preloadedCities);
-                              const matchedCity = preloadedCities.find((c: any) => c.name === loc.city);
-                              setLocalityForm({ stateId: matchedState?.id || '', state: loc.state, cityId: matchedCity?.id || '', city: loc.city, locality: loc.locality || '', pincode: loc.pincode || '', latitude: String(loc.latitude || ''), longitude: String(loc.longitude || ''), isActive: loc.isActive });
+                              // Resolve the stored city name back to a real city
+                              // row so the picker opens on the right one. A row
+                              // whose city no longer exists opens with an empty
+                              // picker, which is the honest thing to show.
+                              let matched: CityOption | null = null;
+                              try {
+                                const r = await adminLocationsApi.getCities({ search: loc.city, limit: 50 });
+                                const rows = (r.data?.cities ?? r.data ?? []) as any[];
+                                const hit = rows.find((c: any) =>
+                                  c.name?.toLowerCase() === loc.city?.toLowerCase() &&
+                                  (!loc.state || (c.state?.name ?? c.stateName ?? '').toLowerCase() === loc.state.toLowerCase()),
+                                ) ?? rows.find((c: any) => c.name?.toLowerCase() === loc.city?.toLowerCase());
+                                if (hit) matched = { id: hit.id, name: hit.name, stateName: hit.state?.name ?? hit.stateName };
+                              } catch {}
+                              setLocalityCity(matched);
+                              setLocalityForm({ locality: loc.locality || '', pincode: loc.pincode || '', latitude: String(loc.latitude || ''), longitude: String(loc.longitude || ''), isActive: loc.isActive });
+                              setError('');
                               setLocalityModal({ open: true, editing: loc });
                             }}
                             className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-medium hover:bg-gray-200">Edit</button>
@@ -904,59 +1059,45 @@ export default function AdminLocationsPage() {
             </div>
             {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
             <div className="space-y-3">
-              {/* State dropdown */}
+              {/* City — the only location control. A locality belongs to a city,
+                  and the state follows from that city, so asking for it twice
+                  only creates a way for the two to disagree. */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">State <span className="text-red-500">*</span></label>
-                <select
-                  value={localityForm.stateId}
-                  onChange={async e => {
-                    const stateId = e.target.value;
-                    const matched = states.find(s => s.id === stateId);
-                    setLocalityForm(f => ({ ...f, stateId, state: matched?.name || '', cityId: '', city: '' }));
-                    setLocalityModalCities([]);
-                    if (stateId) {
-                      setLocalityModalCitiesLoading(true);
-                      try {
-                        const r = await locationsApi.getCitiesByState(stateId);
-                        setLocalityModalCities(Array.isArray(r.data) ? r.data : r.data?.cities || []);
-                      } catch {} finally { setLocalityModalCitiesLoading(false); }
-                    }
-                  }}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  <option value="">— Select State —</option>
-                  {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                <label className="block text-xs font-medium text-gray-700 mb-1">City <span className="text-red-500">*</span></label>
+                <CityCombobox
+                  value={localityCity}
+                  onChange={setLocalityCity}
+                  placeholder="Type to search cities…"
+                  autoFocus={!localityModal.editing}
+                  allowClear
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  {localityCity?.stateName
+                    ? <>State <span className="font-medium text-gray-600">{localityCity.stateName}</span> is taken from this city.</>
+                    : 'Pick an existing city. To add a city itself, use the Cities tab.'}
+                </p>
               </div>
 
-              {/* City dropdown — enabled only after state is chosen */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  City <span className="text-red-500">*</span>
-                  {localityModalCitiesLoading && <span className="ml-2 text-gray-400 text-xs">Loading…</span>}
-                </label>
-                <select
-                  value={localityForm.cityId}
-                  disabled={!localityForm.stateId || localityModalCitiesLoading}
-                  onChange={e => {
-                    const cityId = e.target.value;
-                    const matched = localityModalCities.find((c: any) => c.id === cityId);
-                    setLocalityForm(f => ({ ...f, cityId, city: matched?.name || '' }));
-                  }}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">— Select City —</option>
-                  {localityModalCities.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                {localityForm.stateId && !localityModalCitiesLoading && localityModalCities.length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">No cities found for this state. Add cities first.</p>
-                )}
-              </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Locality Name</label>
                 <input value={localityForm.locality} onChange={e => setLocalityForm(f => ({ ...f, locality: e.target.value }))}
                   placeholder="Bandra West" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                <p className="text-xs text-gray-400 mt-1">Leave blank to add the city itself as a location entry.</p>
               </div>
+
+              {/* What the SEO layer will build from these two values. Shown here
+                  because the slug is what actually has to resolve — if the city
+                  is not a real city row, the generated page 404s. */}
+              {localityCity && (
+                <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">SEO page URL</p>
+                  <p className="text-xs font-mono text-gray-700 break-all">
+                    /{localityForm.locality.trim()
+                        ? `${toSlug(localityForm.locality)}-${toSlug(localityCity.name)}`
+                        : toSlug(localityCity.name)}
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Pincode</label>
@@ -982,15 +1123,20 @@ export default function AdminLocationsPage() {
             </div>
             <div className="flex gap-3 mt-5">
               <button
-                disabled={saving || !localityForm.stateId || !localityForm.cityId}
+                disabled={saving || !localityCity}
                 onClick={async () => {
+                  if (!localityCity) return;
                   setSaving(true); setError('');
                   try {
+                    // cityId is the authoritative field — the backend resolves
+                    // the canonical city and state names from it. The names are
+                    // sent too so an older backend still gets what it needs.
                     const payload: any = {
-                      city: localityForm.city,
-                      state: localityForm.state,
-                      locality: localityForm.locality || undefined,
-                      pincode: localityForm.pincode || undefined,
+                      cityId: localityCity.id,
+                      city: localityCity.name,
+                      state: localityCity.stateName || '',
+                      locality: localityForm.locality.trim() || undefined,
+                      pincode: localityForm.pincode.trim() || undefined,
                       isActive: localityForm.isActive,
                     };
                     if (localityForm.latitude) payload.latitude = parseFloat(localityForm.latitude);
@@ -1002,7 +1148,10 @@ export default function AdminLocationsPage() {
                     }
                     setLocalityModal({ open: false, editing: null });
                     loadLocalities();
-                  } catch (e: any) { setError(e?.response?.data?.message || 'Failed to save'); }
+                  } catch (e: any) {
+                    const m = e?.response?.data?.message;
+                    setError(Array.isArray(m) ? m[0] : m || 'Failed to save');
+                  }
                   finally { setSaving(false); }
                 }}
                 className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"

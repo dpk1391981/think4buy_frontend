@@ -8,7 +8,11 @@ export default function ConditionalFooter() {
   if (
     pathname.startsWith('/admin') ||
     pathname === '/agent' || pathname.startsWith('/agent/') ||
-    pathname === '/auth/onboarding'
+    // The whole /auth tree — sign-in, onboarding — renders its own full-screen
+    // layout with its own logo and its own way back home. Letting the global
+    // chrome through stacks a second header on top of it, and on a phone the
+    // bottom nav sits over the form.
+    pathname === '/auth' || pathname.startsWith('/auth/')
   ) return null;
   return <Footer />;
 }

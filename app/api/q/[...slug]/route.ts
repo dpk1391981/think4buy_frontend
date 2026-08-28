@@ -7,28 +7,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { cookies } from 'next/headers';
+import { BACKEND_BASE_URL } from '@/lib/backendUrl';
 
-// Resolution order for the backend URL:
-//   1. BACKEND_INTERNAL_URL          — server-only var. Loopback (http://127.0.0.1:3001/api/v1)
-//        only works when the frontend runs on the same host as the backend. On Vercel it must be
-//        the public https origin — https://reales-api.vtechxhub.com/api/v1 — because the lambda
-//        has no loopback backend and the backend's app ports are firewalled off the internet.
-//   2. NEXT_PUBLIC_API_BASE_URL+/api/v1 — public backend origin already needed for images
-//   3. localhost fallback             — local dev only
-// NEXT_PUBLIC_API_URL is the *frontend* URL — never use it here (would cause the proxy to call itself).
-const _backendOrigin = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, '');
-const BACKEND_URL =
-  process.env.BACKEND_INTERNAL_URL ??
-  (_backendOrigin ? `${_backendOrigin}/api/v1` : null) ??
-  'http://localhost:3001/api/v1';
+// See lib/backendUrl.ts for how this is resolved, and why a loopback value is
+// refused when the code is running as a serverless function.
+const BACKEND_URL = BACKEND_BASE_URL;
 
 const BFF_SECRET     = process.env.BFF_INTERNAL_SECRET  ?? '';
 const SIGNING_KEY    = process.env.INTERNAL_API_KEY     ?? '';
 const SIGNING_SECRET = process.env.INTERNAL_API_SECRET  ?? '';
-
-if (!process.env.BACKEND_INTERNAL_URL && !process.env.NEXT_PUBLIC_API_BASE_URL) {
-  console.warn('[BFF] Neither BACKEND_INTERNAL_URL nor NEXT_PUBLIC_API_BASE_URL is set — falling back to localhost');
-}
 
 /**
  * HTTP header values must be Latin-1 (ByteString). A single character above
