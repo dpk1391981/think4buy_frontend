@@ -9,7 +9,10 @@ import { createHmac } from 'crypto';
 import { cookies } from 'next/headers';
 
 // Resolution order for the backend URL:
-//   1. BACKEND_INTERNAL_URL          — server-only secret var, ideal for prod (e.g. http://127.0.0.1:3001/api/v1)
+//   1. BACKEND_INTERNAL_URL          — server-only var. Loopback (http://127.0.0.1:3001/api/v1)
+//        only works when the frontend runs on the same host as the backend. On Vercel it must be
+//        the public https origin — https://reales-api.vtechxhub.com/api/v1 — because the lambda
+//        has no loopback backend and the backend's app ports are firewalled off the internet.
 //   2. NEXT_PUBLIC_API_BASE_URL+/api/v1 — public backend origin already needed for images
 //   3. localhost fallback             — local dev only
 // NEXT_PUBLIC_API_URL is the *frontend* URL — never use it here (would cause the proxy to call itself).
@@ -150,8 +153,21 @@ async function handler(req: NextRequest, { params }: { params: { slug: string[] 
       console.error(`[BFF] Timeout: ${req.method} ${target}`);
       return NextResponse.json({ success: false, message: 'Gateway timeout' }, { status: 504 });
     }
-    console.error(`[BFF] Upstream error: ${req.method} ${target} — ${err?.message ?? err}`);
-    return NextResponse.json({ success: false, message: 'Service unavailable' }, { status: 503 });
+    // Name the failure. A misconfigured BACKEND_INTERNAL_URL takes down *every*
+    // endpoint at once, and an unlabelled 503 gives nobody a thread to pull:
+    //   ConnectTimeoutError / ETIMEDOUT — host reachable but the port is firewalled
+    //     (the backend is only exposed on 443 via nginx; 3000/3001/3005 are closed,
+    //      so BACKEND_INTERNAL_URL must be the https origin, never an app port)
+    //   ECONNREFUSED — nothing listening; usually a localhost URL left in prod
+    //   ENOTFOUND / EAI_AGAIN — DNS does not resolve the configured host
+    const reason = err?.cause?.code ?? err?.code ?? err?.name ?? 'UnknownError';
+    console.error(
+      `[BFF] Upstream unreachable (${reason}): ${req.method} ${target} — ${err?.message ?? err}`,
+    );
+    return NextResponse.json(
+      { success: false, message: 'Service unavailable', reason },
+      { status: 503 },
+    );
   }
 }
 
